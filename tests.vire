@@ -1,5 +1,13 @@
 use "checks/core.vire"
 
+define expect with got, want
+  if got != want
+    say got
+    return 1
+  end
+  return 0
+end
+
 define main
   let n be 0
   let n be numbers with n
@@ -8,6 +16,14 @@ define main
   let n be guard with n
   let n be picture with n
   let n be tools with n
+  let n be n + expect with (run with "systems/chain.vire"), "chain pass"
+  let n be n + expect with (run with "systems/tiny.vire"), "tiny pass"
+  let n be n + expect with (run with "systems/page.vire"), "page pass"
+  let n be n + expect with (run with "systems/search.vire"), "search pass"
+  let n be n + expect with (run with "systems/disk.vire"), "disk pass"
+  let n be n + expect with (run with "systems/net.vire"), "net pass"
+  let n be n + expect with (run with "systems/cpu.vire"), "cpu pass"
+  let n be n + expect with (run with "systems/live.vire"), "live pass"
   if n == 0
     say "pass"
   else

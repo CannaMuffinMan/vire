@@ -10,6 +10,7 @@ RUN useradd --create-home --uid 1000 vire \
  && chown -R vire:vire /usr/local/bin/vire
 WORKDIR /work
 COPY checks ./checks/
+COPY systems ./systems/
 COPY tests.vire term.vire vault.vire count.vire ./
 RUN chown -R vire:vire /work
 USER vire

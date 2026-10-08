@@ -1,0 +1,11 @@
+name: check
+on:
+  push:
+  pull_request:
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t vire .
+      - run: docker run --rm vire tests.vire

@@ -48,7 +48,7 @@ define main
   let earlier be loaded at 1
   let later be loaded at 2
   let link be later at "previous"
-  if link == earlier at "proof" or link == earlier at "previous"
+  if link == earlier at "proof"
     say "chain pass"
   else
     say "chain fail"

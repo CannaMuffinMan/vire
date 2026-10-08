@@ -140,7 +140,7 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash"
+        "round", "pick", "clear", "hash", "run"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -366,6 +366,30 @@ sealed class Machine
                 foreach (byte piece in bytes) hex.Append(piece.ToString("x2"));
                 return hex.ToString();
             }
+        }
+        if (name == "run")
+        {
+            string rel = args[0] as string;
+            if (rel == null || rel.Contains("..") || Path.IsPathRooted(rel) || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
+                throw new VireError("run needs a vire file in this folder", line);
+            string full = Path.GetFullPath(Path.Combine(root, rel));
+            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+                throw new VireError("run stays inside the program folder", line);
+            StringWriter sink = new StringWriter();
+            TextWriter previous = Console.Out;
+            try
+            {
+                Console.SetOut(sink);
+                Program.RunFile(full, root);
+            }
+            finally { Console.SetOut(previous); }
+            string text = sink.ToString().Replace("\r", "");
+            Console.Write(text);
+            string last = "";
+            foreach (string row in text.Split('\n'))
+                if (row.Trim().Length > 0) last = row.Trim();
+            return last;
         }
         if (name == "abs")
         {
@@ -2051,6 +2075,13 @@ sealed class Json
 
 sealed class Program
 {
+    public static void RunFile(string program, string folder)
+    {
+        Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
+        if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
+        new Machine(funcs, folder).Run();
+    }
+
     static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
     {
         string full = Path.GetFullPath(program);
