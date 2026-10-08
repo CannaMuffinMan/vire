@@ -27,6 +27,7 @@ define records with fails
   let fails be check with fails, (join with (split with "a,b", ","), "-"), "a-b"
   let fails be check with fails, (kind with [1]), "list"
   let fails be check with fails, (has with {"ok": true}, "ok"), true
+  let fails be check with fails, term, "term"
   return fails
 end
 
@@ -61,5 +62,26 @@ define guard with fails
   if (length with text with now) < 16
     return fails + 1
   end
+  return fails
+end
+
+define picture with fails
+  term
+  open with "sheet"
+  sheet with 40, 20
+  ink with 1, 2, 3
+  fill with 4, 5, 6, 7
+  stroke with 8, 9, 10, 11
+  dot with 12, 13, 2
+  let row be marks at 0
+  let fails be check with fails, (row at "kind"), "fill"
+  let fails be check with fails, (row at "a"), 4
+  let fails be check with fails, (row at "r"), 1
+  let fails be check with fails, (row at "blue"), 3
+  let fails be check with fails, (length with marks), 3
+  let drawn be marks at 1
+  let fails be check with fails, (drawn at "kind"), "stroke"
+  let spot be marks at 2
+  let fails be check with fails, (spot at "kind"), "dot"
   return fails
 end

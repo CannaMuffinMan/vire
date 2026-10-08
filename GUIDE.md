@@ -240,7 +240,7 @@ end
 2. `line` adds a line of text.
 3. `field` adds an editable box. The name is how you read it later.
 4. `button` adds a button. The second argument is the definition to call when it is clicked.
-5. `value with "note"` reads that box.
+Start a window program with `term` when it should run in the terminal instead of a desktop window. The same `open`, `line`, `field`, `button`, `sheet`, `ink`, `fill`, `stroke`, `dot`, and `show` words apply. Without `term`, Windows opens a desktop window. `term.vire` is the terminal sample. `screen` returns the lines added so far.
 6. `show` displays the window and waits until it is closed.
 7. `place with 16, 80` sets where the next line, field, or button goes.
 8. `sheet with 420, 260` adds a white drawing surface.
@@ -248,7 +248,7 @@ end
 10. `fill` paints a rectangle. `stroke` paints a line. `dot with x, y, 6` paints a circle.
 11. `watch with "tapped"` calls that definition with the click's x and y. The definition draws by calling `ink` and `dot` again. `board.vire` is that program.
 
-`tests.vire` loads `checks/core.vire`. That file defines `check`, then groups for numbers, records, failures, and the folder boundary. The program prints `pass`, or the number of checks that failed. Run `vire.exe tests.vire`.
+`marks` returns the sheet's drawings as a list of maps, without `show`. `picture` in `checks/core.vire` checks that list. A build of the runner without a desktop window still runs that check.
 
 Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.txt`.
 

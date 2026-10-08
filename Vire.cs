@@ -5,7 +5,9 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+#if WINDOWS
 using System.Windows.Forms;
+#endif
 
 sealed class VireError : Exception
 {
@@ -64,14 +66,14 @@ sealed class Env
 sealed class Stroke
 {
     public string Kind;
-    public int A, B, C, D;
-    public System.Drawing.Color Color;
-    public Stroke(string kind, int a, int b, int c, int d, System.Drawing.Color color)
+    public int A, B, C, D, R, G, Blue;
+    public Stroke(string kind, int a, int b, int c, int d, int r, int g, int blue)
     {
-        Kind = kind; A = a; B = b; C = c; D = d; Color = color;
+        Kind = kind; A = a; B = b; C = c; D = d; R = r; G = g; Blue = blue;
     }
 }
 
+#if WINDOWS
 sealed class SheetBox : Panel
 {
     public List<Stroke> Ops = new List<Stroke>();
@@ -85,8 +87,9 @@ sealed class SheetBox : Panel
         base.OnPaint(e);
         foreach (Stroke mark in Ops)
         {
-            using (System.Drawing.Pen pen = new System.Drawing.Pen(mark.Color, 2))
-            using (System.Drawing.SolidBrush brush = new System.Drawing.SolidBrush(mark.Color))
+            System.Drawing.Color color = System.Drawing.Color.FromArgb(mark.R, mark.G, mark.Blue);
+            using (System.Drawing.Pen pen = new System.Drawing.Pen(color, 2))
+            using (System.Drawing.SolidBrush brush = new System.Drawing.SolidBrush(color))
             {
                 if (mark.Kind == "fill") e.Graphics.FillRectangle(brush, mark.A, mark.B, mark.C, mark.D);
                 else if (mark.Kind == "stroke") e.Graphics.DrawLine(pen, mark.A, mark.B, mark.C, mark.D);
@@ -95,6 +98,7 @@ sealed class SheetBox : Panel
         }
     }
 }
+#endif
 
 sealed class Machine
 {
@@ -107,12 +111,31 @@ sealed class Machine
     string root;
     int depth;
     int calls;
-    Form form;
     int nextTop = 16;
     int nextLeft = 16;
-    Dictionary<string, TextBox> fields = new Dictionary<string, TextBox>();
+#if WINDOWS
+    Form form;
+    Dictionary<string, TextBox> boxes = new Dictionary<string, TextBox>();
     SheetBox sheet;
-    System.Drawing.Color inkColor = System.Drawing.Color.Black;
+#else
+    object form;
+    Dictionary<string, string> boxes = new Dictionary<string, string>();
+    List<Stroke> sheet;
+#endif
+#if WINDOWS
+    bool desk;
+#else
+    bool desk = true;
+#endif
+    string title;
+    List<string> termLines = new List<string>();
+    List<string> termFields = new List<string>();
+    Dictionary<string, string> termValues = new Dictionary<string, string>();
+    List<string> termButtons = new List<string>();
+    List<string> termActions = new List<string>();
+    List<Stroke> termOps = new List<Stroke>();
+    bool termSheet;
+    int inkR, inkG, inkB;
     string watchName;
     int watchLine;
 
@@ -120,7 +143,7 @@ sealed class Machine
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
         "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show", "place", "mark",
-        "sheet", "ink", "stroke", "fill", "dot", "watch"
+        "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -177,7 +200,7 @@ sealed class Machine
     {
         Step(line);
         int need = 1;
-        if (name == "now" || name == "show") need = 0;
+        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks") need = 0;
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet") need = 2;
         if (name == "ink" || name == "dot") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -447,7 +470,9 @@ sealed class Machine
         }
         if (name == "ink")
         {
-            inkColor = ColorOf(args[0], args[1], args[2], line);
+            int rr, gg, bb;
+            ColorOf(args[0], args[1], args[2], line, out rr, out gg, out bb);
+            inkR = rr; inkG = gg; inkB = bb;
             return 0;
         }
         if (name == "stroke")
@@ -464,8 +489,12 @@ sealed class Machine
         {
             if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int)) throw new VireError("dot needs three whole numbers", line);
             RequireSheet(line);
-            sheet.Ops.Add(new Stroke("dot", (int)args[0], (int)args[1], (int)args[2], 0, inkColor));
+            Stroke mark = new Stroke("dot", (int)args[0], (int)args[1], (int)args[2], 0, inkR, inkG, inkB);
+            if (desk) { termOps.Add(mark); return 0; }
+#if WINDOWS
+            sheet.Ops.Add(mark);
             sheet.Invalidate();
+#endif
             return 0;
         }
         if (name == "watch")
@@ -480,17 +509,38 @@ sealed class Machine
         if (name == "value")
         {
             string fieldName = args[0] as string;
+            if (fieldName == null) throw new VireError("there is no field by that name", line);
+            if (desk)
+            {
+                if (!termValues.ContainsKey(fieldName)) throw new VireError("there is no field by that name", line);
+                return termValues[fieldName];
+            }
+#if WINDOWS
             TextBox box;
-            if (fieldName == null || !fields.TryGetValue(fieldName, out box))
-                throw new VireError("there is no field by that name", line);
+            if (!boxes.TryGetValue(fieldName, out box)) throw new VireError("there is no field by that name", line);
             return box.Text;
+#else
+            throw new VireError("there is no field by that name", line);
+#endif
         }
         if (name == "show")
         {
-            if (form == null) throw new VireError("open a window before show", line);
-            Application.Run(form);
+            if (title == null) throw new VireError("open a window before show", line);
+            if (desk) TermShow();
+#if WINDOWS
+            else Application.Run(form);
+#else
+            else TermShow();
+#endif
             return 0;
         }
+        if (name == "term")
+        {
+            desk = true;
+            return "term";
+        }
+        if (name == "screen") return string.Join("\n", termLines.ToArray());
+        if (name == "marks") return MarkList();
         List<object> parts = args[0] as List<object>;
         string joiner = args[1] as string;
         if (parts == null || joiner == null) throw new VireError("join needs a list of text", line);
@@ -503,21 +553,37 @@ sealed class Machine
         return string.Join(joiner, joined);
     }
 
-    void OpenWindow(string title)
+    void OpenWindow(string titleText)
     {
+        title = titleText;
+        nextTop = 16;
+        nextLeft = 16;
+        termLines = new List<string>();
+        termFields = new List<string>();
+        termValues = new Dictionary<string, string>();
+        termButtons = new List<string>();
+        termActions = new List<string>();
+        termOps = new List<Stroke>();
+        termSheet = false;
+        if (desk) return;
+#if WINDOWS
         form = new Form();
-        form.Text = title;
+        form.Text = titleText;
         form.Width = 520;
         form.Height = 420;
         form.StartPosition = FormStartPosition.CenterScreen;
-        nextTop = 16;
-        nextLeft = 16;
-        fields = new Dictionary<string, TextBox>();
+        boxes = new Dictionary<string, TextBox>();
+        sheet = null;
+#else
+        desk = true;
+#endif
     }
 
     void AddLine(string text, int line)
     {
-        if (form == null) throw new VireError("open a window first", line);
+        if (title == null) throw new VireError("open a window first", line);
+        if (desk) { termLines.Add(text); return; }
+#if WINDOWS
         Label label = new Label();
         label.Text = text;
         label.Left = nextLeft;
@@ -526,24 +592,30 @@ sealed class Machine
         label.Height = 24;
         form.Controls.Add(label);
         nextTop += 28;
+#endif
     }
 
     void AddField(string name, int line)
     {
-        if (form == null) throw new VireError("open a window first", line);
+        if (title == null) throw new VireError("open a window first", line);
+        if (desk) { termFields.Add(name); termValues[name] = ""; return; }
+#if WINDOWS
         TextBox box = new TextBox();
         box.Left = nextLeft;
         box.Top = nextTop;
         box.Width = 470;
         form.Controls.Add(box);
-        fields[name] = box;
+        boxes[name] = box;
         nextTop += 32;
+#endif
     }
 
     void AddButton(string label, string func, int line)
     {
-        if (form == null) throw new VireError("open a window first", line);
+        if (title == null) throw new VireError("open a window first", line);
         if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line);
+        if (desk) { termButtons.Add(label); termActions.Add(func); return; }
+#if WINDOWS
         Button button = new Button();
         button.Text = label;
         button.Left = nextLeft;
@@ -556,30 +628,37 @@ sealed class Machine
         };
         form.Controls.Add(button);
         nextTop += 40;
+#endif
     }
 
     void AddMark(int x, int y, int w, int h, string func, int line)
     {
-        if (form == null) throw new VireError("open a window first", line);
+        if (title == null) throw new VireError("open a window first", line);
         if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line);
+        if (desk) { termButtons.Add("mark"); termActions.Add(func); return; }
+#if WINDOWS
         Panel panel = new Panel();
         panel.Left = x;
         panel.Top = y;
         panel.Width = w;
         panel.Height = h;
-        panel.BackColor = System.Drawing.Color.FromArgb(176, 98, 58);
+        panel.BackColor = System.Drawing.Color.FromArgb(inkR, inkG, inkB);
         panel.Click += delegate
         {
             try { Call(func, new List<object>(), line); }
             catch (VireError exc) { MessageBox.Show(exc.Message, "Vire"); }
         };
         form.Controls.Add(panel);
+#endif
     }
 
     void AddSheet(int width, int height, int line)
     {
-        if (form == null) throw new VireError("open a window first", line);
+        if (title == null) throw new VireError("open a window first", line);
         if (width < 1 || height < 1 || width > 2000 || height > 2000) throw new VireError("sheet size is out of range", line);
+        if (desk) { termSheet = true; return; }
+#if WINDOWS
+        if (sheet != null) form.Controls.Remove(sheet);
         sheet = new SheetBox();
         sheet.Left = nextLeft;
         sheet.Top = nextTop;
@@ -588,31 +667,44 @@ sealed class Machine
         sheet.MouseClick += delegate(object sender, MouseEventArgs ev) { HitSheet(ev.X, ev.Y); };
         form.Controls.Add(sheet);
         nextTop += height + 12;
+#endif
     }
 
     void HitSheet(int x, int y)
     {
-        if (watchName == null || sheet == null) return;
+        if (watchName == null) return;
         Func func = funcs[watchName];
         List<object> args = new List<object>();
         if (func.Params.Count >= 1) args.Add(x);
         if (func.Params.Count >= 2) args.Add(y);
         try { Call(watchName, args, watchLine); }
-        catch (VireError exc) { MessageBox.Show(exc.Message, "Vire"); }
-        sheet.Invalidate();
+        catch (VireError exc)
+        {
+#if WINDOWS
+            if (!desk) MessageBox.Show(exc.Message, "Vire");
+            else Console.WriteLine(exc.Message);
+#else
+            Console.WriteLine(exc.Message);
+#endif
+        }
+#if WINDOWS
+        if (sheet != null) sheet.Invalidate();
+#endif
     }
 
     void RequireSheet(int line)
     {
-        if (sheet == null) throw new VireError("open a sheet first", line);
+#if WINDOWS
+        if (!desk && sheet == null) throw new VireError("open a sheet first", line);
+#endif
+        if (desk && !termSheet) throw new VireError("open a sheet first", line);
     }
 
-    static System.Drawing.Color ColorOf(object r, object g, object b, int line)
+    static void ColorOf(object r, object g, object b, int line, out int rr, out int gg, out int bb)
     {
         if (!(r is int) || !(g is int) || !(b is int)) throw new VireError("ink needs three whole numbers", line);
-        int rr = (int)r, gg = (int)g, bb = (int)b;
+        rr = (int)r; gg = (int)g; bb = (int)b;
         if (rr < 0 || rr > 255 || gg < 0 || gg > 255 || bb < 0 || bb > 255) throw new VireError("ink numbers run from 0 to 255", line);
-        return System.Drawing.Color.FromArgb(rr, gg, bb);
     }
 
     void Draw(string kind, List<object> args, int line)
@@ -620,9 +712,76 @@ sealed class Machine
         if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int) || !(args[3] is int))
             throw new VireError(kind + " needs four whole numbers", line);
         RequireSheet(line);
+        Stroke mark = new Stroke(kind, (int)args[0], (int)args[1], (int)args[2], (int)args[3], inkR, inkG, inkB);
+        if (desk)
+        {
+            if (termOps.Count > 10000) throw new VireError("the sheet has too many marks", line);
+            termOps.Add(mark);
+            return;
+        }
+#if WINDOWS
         if (sheet.Ops.Count > 10000) throw new VireError("the sheet has too many marks", line);
-        sheet.Ops.Add(new Stroke(kind, (int)args[0], (int)args[1], (int)args[2], (int)args[3], inkColor));
+        sheet.Ops.Add(mark);
         sheet.Invalidate();
+#endif
+    }
+
+    List<Stroke> ActiveOps()
+    {
+#if WINDOWS
+        if (!desk && sheet != null) return sheet.Ops;
+#endif
+        return termOps;
+    }
+
+    object MarkList()
+    {
+        List<object> list = new List<object>();
+        foreach (Stroke mark in ActiveOps())
+        {
+            Dictionary<string, object> row = new Dictionary<string, object>();
+            row["kind"] = mark.Kind;
+            row["a"] = mark.A;
+            row["b"] = mark.B;
+            row["c"] = mark.C;
+            row["d"] = mark.D;
+            row["r"] = mark.R;
+            row["g"] = mark.G;
+            row["blue"] = mark.Blue;
+            list.Add(row);
+        }
+        return list;
+    }
+
+    void TermShow()
+    {
+        while (true)
+        {
+            Console.WriteLine(title);
+            foreach (string row in termLines) Console.WriteLine(row);
+            foreach (string name in termFields)
+            {
+                Console.Write(name + ": ");
+                string typed = Console.ReadLine();
+                termValues[name] = typed == null ? "" : typed;
+            }
+            if (termSheet) Console.WriteLine("sheet " + termOps.Count);
+            for (int i = 0; i < termButtons.Count; i++) Console.WriteLine((i + 1) + " " + termButtons[i]);
+            Console.WriteLine("0 close");
+            string choice = Console.ReadLine();
+            if (choice == null || choice == "0" || choice == "") return;
+            int pick;
+            if (int.TryParse(choice, out pick) && pick >= 1 && pick <= termActions.Count)
+            {
+                try { Call(termActions[pick - 1], new List<object>(), watchLine); }
+                catch (VireError exc) { Console.WriteLine(exc.Message); }
+                continue;
+            }
+            string[] bits = choice.Split(' ');
+            int x, y;
+            if (termSheet && bits.Length == 2 && int.TryParse(bits[0], out x) && int.TryParse(bits[1], out y))
+                HitSheet(x, y);
+        }
     }
 
     void Serve(int port, int line)
@@ -837,6 +996,8 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks"))
+                return Builtin(name, new List<object>(), (int)tree[2]);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), (int)tree[2]);
             return env.Get(name, (int)tree[2]);

@@ -1,0 +1,9 @@
+define main
+  term
+  open with "Vire tasks"
+  line with "hello from any machine"
+  sheet with 40, 20
+  ink with 20, 70, 60
+  fill with 1, 1, 8, 4
+  say screen
+end
