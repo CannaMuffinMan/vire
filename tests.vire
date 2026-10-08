@@ -1,11 +1,14 @@
 use "checks/core.vire"
 
-define expect with got, want
-  if got != want
-    say got
-    return 1
+define kept with line
+  if line == "pass"
+    return 0
   end
-  return 0
+  if ends with line, " pass"
+    return 0
+  end
+  say line
+  return 1
 end
 
 define main
@@ -16,14 +19,9 @@ define main
   let n be guard with n
   let n be picture with n
   let n be tools with n
-  let n be n + expect with (run with "systems/chain.vire"), "chain pass"
-  let n be n + expect with (run with "systems/tiny.vire"), "tiny pass"
-  let n be n + expect with (run with "systems/page.vire"), "page pass"
-  let n be n + expect with (run with "systems/search.vire"), "search pass"
-  let n be n + expect with (run with "systems/disk.vire"), "disk pass"
-  let n be n + expect with (run with "systems/net.vire"), "net pass"
-  let n be n + expect with (run with "systems/cpu.vire"), "cpu pass"
-  let n be n + expect with (run with "systems/live.vire"), "live pass"
+  for name in sources with "systems"
+    let n be n + kept with (run with ("systems/" + name))
+  end
   if n == 0
     say "pass"
   else

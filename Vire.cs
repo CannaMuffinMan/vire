@@ -140,7 +140,7 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "run"
+        "round", "pick", "clear", "hash", "run", "sources"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -476,6 +476,21 @@ sealed class Machine
             List<object> names = new List<object>();
             foreach (string file in Directory.GetFiles(path)) names.Add(Path.GetFileName(file));
             return names;
+        }
+        if (name == "sources")
+        {
+            string rel = args[0] as string;
+            if (rel == null || rel.Length == 0 || rel.Contains("..") || rel.Contains(":") || rel.Contains("/") || rel.Contains("\\") || Path.IsPathRooted(rel))
+                throw new VireError("sources needs one folder name inside this program", line);
+            string dir = Path.GetFullPath(Path.Combine(root, rel));
+            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!dir.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(dir))
+                throw new VireError("sources needs one folder name inside this program", line);
+            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
+                throw new VireError("sources stays inside the program folder", line);
+            List<object> found = new List<object>();
+            foreach (string file in Directory.GetFiles(dir, "*.vire")) found.Add(Path.GetFileName(file));
+            return found;
         }
         if (name == "json") return Json.Write(args[0]);
         if (name == "parse")

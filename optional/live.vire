@@ -1,4 +1,5 @@
 ~ Legal public data: one real block hash, and the text of a public page.
+~ Not part of the push suite. Those two sites can be down.
 
 define main
   let tip be fetch with "https://blockstream.info/api/blocks/tip/hash"
