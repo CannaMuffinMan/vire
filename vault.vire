@@ -1,0 +1,41 @@
+~ One run writes a private media vault, a branching story, and a data page into site/.
+
+define clip with name
+  if (find with name, ".mp4") >= 0
+    return true
+  end
+  if (find with name, ".webm") >= 0
+    return true
+  end
+  if (find with name, ".ogv") >= 0
+    return true
+  end
+  return false
+end
+
+define main
+  try
+    let found be files with "site/videos"
+  miss problem
+    write with "site/videos/put-videos-here.txt", "Put .mp4 .webm or .ogv files here, then run vault.vire again."
+    let found be files with "site/videos"
+  end
+  let clips be []
+  for name in found
+    if clip with name
+      push with clips, name
+    end
+  end
+  write with "site/catalog.json", json with clips
+  write with "site/vault.css", "body{font-family:Georgia,serif;margin:2rem;background:#16130f;color:#f4efe6}video{width:100%;max-width:40rem;background:#000}input,button{font:inherit;margin:0.3rem 0.3rem 0.3rem 0}a{color:#e7c07b}"
+  write with "site/vault.js", "var clips=[];function show(items){var list=document.getElementById('list');list.innerHTML='';for(var i=0;i<items.length;i++){(function(name){var b=document.createElement('button');b.textContent=name;b.onclick=function(){var p=document.getElementById('player');p.src='videos/'+name;p.play()};list.appendChild(b)})(items[i])}}fetch('catalog.json').then(function(r){return r.json()}).then(function(data){clips=data;show(clips)});document.getElementById('q').oninput=function(){var q=this.value.toLowerCase();var hit=[];for(var i=0;i<clips.length;i++){if(clips[i].toLowerCase().indexOf(q)>=0)hit.push(clips[i])}show(hit)}"
+  write with "site/index.html", "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Vire vault</title><link rel=\"stylesheet\" href=\"vault.css\"></head><body><h1>Private vault</h1><p><a href=\"story.html\">Story</a> <a href=\"dash.html\">Dashboard</a></p><video id=\"player\" controls></video><p><input id=\"q\" placeholder=\"Search\"></p><div id=\"list\"></div><script src=\"vault.js\"></script></body></html>"
+  write with "site/story.json", json with {"start": "door", "door": {"text": "A door. Left or right?", "left": "hall", "right": "yard"}, "hall": {"text": "The hall is quiet.", "left": "door", "right": "door"}, "yard": {"text": "The yard is bright.", "left": "door", "right": "door"}}
+  write with "site/story.js", "var book={};var here='start';function draw(){var node=book[here];document.getElementById('tale').textContent=node.text;localStorage.setItem('vire-story',here)}function go(way){here=book[here][way];draw()}fetch('story.json').then(function(r){return r.json()}).then(function(data){book=data;var saved=localStorage.getItem('vire-story');if(saved&&book[saved])here=saved;else here=book.start;draw()})"
+  write with "site/story.html", "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Vire story</title><link rel=\"stylesheet\" href=\"vault.css\"></head><body><h1>Story</h1><p id=\"tale\"></p><button onclick=\"go('left')\">Left</button><button onclick=\"go('right')\">Right</button><p><a href=\"index.html\">Vault</a></p><script src=\"story.js\"></script></body></html>"
+  write with "site/data.json", json with {"title": "desk", "points": [2, 5, 9], "at": now}
+  write with "site/dash.js", "fetch('data.json').then(function(r){return r.json()}).then(function(data){document.getElementById('title').textContent=data.title;document.getElementById('when').textContent=data.at;var s='';for(var i=0;i<data.points.length;i++){s=s+'<div style=\"width:'+(data.points[i]*12)+'px;height:12px;background:#e7c07b;margin:4px 0\"></div>'}document.getElementById('bars').innerHTML=s})"
+  write with "site/dash.html", "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Vire desk</title><link rel=\"stylesheet\" href=\"vault.css\"></head><body><h1 id=\"title\"></h1><p id=\"when\"></p><div id=\"bars\"></div><p><a href=\"index.html\">Vault</a></p><script src=\"dash.js\"></script></body></html>"
+  say "vault written"
+  say length with clips
+end

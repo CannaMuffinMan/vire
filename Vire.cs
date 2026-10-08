@@ -173,7 +173,72 @@ sealed class Machine
         if (!path.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(path, root, StringComparison.OrdinalIgnoreCase))
             throw new VireError("files stay inside the program folder", line);
+        string dataRoot = Path.GetFullPath(Path.Combine(root, "data"));
+        string siteRoot = Path.GetFullPath(Path.Combine(root, "site"));
+        if (!InFolder(dataRoot, path) && !InFolder(siteRoot, path))
+            throw new VireError("files stay in data or site", line);
+        RefuseReparse(path, line);
         return path;
+    }
+
+    static bool InFolder(string folder, string path)
+    {
+        string full = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return string.Equals(path, folder, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith(full, StringComparison.OrdinalIgnoreCase);
+    }
+
+    void RefuseReparse(string path, int line)
+    {
+        string cursor = path;
+        string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        while (!string.IsNullOrEmpty(cursor) &&
+            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(cursor, root, StringComparison.OrdinalIgnoreCase)))
+        {
+            if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
+                (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
+                throw new VireError("files stay inside the program folder", line);
+            string parent = Path.GetDirectoryName(cursor);
+            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
+            cursor = parent;
+        }
+    }
+
+    static void DemandPublic(string url, int line)
+    {
+        Uri parsed;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
+            throw new VireError("that address is not allowed", line);
+        if (parsed.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            throw new VireError("fetch stays off this machine and private networks", line);
+        IPAddress[] addresses;
+        try { addresses = Dns.GetHostAddresses(parsed.Host); }
+        catch (Exception) { throw new VireError("could not check that address", line); }
+        if (addresses.Length == 0) throw new VireError("could not check that address", line);
+        foreach (IPAddress address in addresses)
+            if (!IsPublicAddress(address))
+                throw new VireError("fetch stays off this machine and private networks", line);
+    }
+
+    static bool IsPublicAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address)) return false;
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            byte[] part = address.GetAddressBytes();
+            if (part[0] == 0 || part[0] == 10 || part[0] == 127) return false;
+            if (part[0] == 169 && part[1] == 254) return false;
+            if (part[0] == 172 && part[1] >= 16 && part[1] <= 31) return false;
+            if (part[0] == 192 && part[1] == 168) return false;
+            if (part[0] >= 224) return false;
+            return true;
+        }
+        byte[] bits = address.GetAddressBytes();
+        if (bits.Length < 2) return false;
+        if (bits[0] == 0xfe && (bits[1] & 0xc0) == 0x80) return false;
+        if ((bits[0] & 0xfe) == 0xfc) return false;
+        return true;
     }
 
     public object Call(string name, List<object> args, int line)
@@ -395,6 +460,7 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line);
+            DemandPublic(url, line);
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -413,6 +479,7 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("post needs an http or https address", line);
+            DemandPublic(url, line);
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -896,7 +963,9 @@ sealed class Machine
         if (!Directory.Exists(site)) throw new VireError("there is no site folder to serve", line);
         System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
         listener.Start();
-        Console.WriteLine("open http://127.0.0.1:" + port + "/  (this machine only)");
+        string key = Guid.NewGuid().ToString("N");
+        Console.WriteLine("key " + key);
+        Console.WriteLine("open http://127.0.0.1:" + port + "/?key=" + key);
         try
         {
             while (true)
@@ -904,7 +973,7 @@ sealed class Machine
                 System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
                 client.ReceiveTimeout = 2000;
                 client.SendTimeout = 2000;
-                try { Answer(client, site); }
+                try { Answer(client, site, key); }
                 catch (IOException) { }
                 finally { client.Close(); }
             }
@@ -912,7 +981,17 @@ sealed class Machine
         finally { listener.Stop(); }
     }
 
-    static void Answer(System.Net.Sockets.TcpClient client, string site)
+    static string gate = "";
+
+    static bool QueryHas(string query, string key)
+    {
+        string[] parts = query.Split('&');
+        foreach (string part in parts)
+            if (part == "key=" + key) return true;
+        return false;
+    }
+
+    static void Answer(System.Net.Sockets.TcpClient client, string site, string key)
     {
         NetworkStream stream = client.GetStream();
         byte[] buffer = new byte[4096];
@@ -923,8 +1002,16 @@ sealed class Machine
         string[] bits = request.Substring(0, lineEnd).Split(' ');
         if (bits.Length < 2) { Send(stream, 400, "text/plain", "bad request"); return; }
         string url = bits[1];
-        int query = url.IndexOf('?');
-        if (query >= 0) url = url.Substring(0, query);
+        string query = "";
+        int queryAt = url.IndexOf('?');
+        if (queryAt >= 0)
+        {
+            query = url.Substring(queryAt + 1);
+            url = url.Substring(0, queryAt);
+        }
+        bool keyed = QueryHas(query, key) || request.IndexOf("X-Vire-Key: " + key) >= 0 || request.IndexOf("vire=" + key) >= 0;
+        if (!keyed) { Send(stream, 401, "text/plain", "key required"); return; }
+        gate = QueryHas(query, key) ? "Set-Cookie: vire=" + key + "; HttpOnly; Path=/\r\n" : "";
         if (bits[0] == "POST" && url == "/inbox")
         {
             int split = request.IndexOf("\r\n\r\n");
@@ -997,7 +1084,7 @@ sealed class Machine
         string reason = code == 206 ? "Partial Content" : "OK";
         string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
         if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += "Connection: close\r\n\r\n";
+        head += gate + "Connection: close\r\n\r\n";
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
         if (count > 0) stream.Write(data, start, count);
@@ -1008,7 +1095,7 @@ sealed class Machine
         string reason = code == 206 ? "Partial Content" : "OK";
         string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
         if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += "Connection: close\r\n\r\n";
+        head += gate + "Connection: close\r\n\r\n";
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
         if (count <= 0) return;

@@ -274,7 +274,7 @@ Vire writes the browser files, then serves that one folder on this computer only
 5. Run `vire.exe serve.vire` and open `http://127.0.0.1:8080/`.
 6. Press Ctrl+C to stop the server.
 
-Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. The server allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 80 MB, and a player may request a byte range so seeking works. Other files stay at 1 MB. `..` is refused. The port must be from 1024 through 65535. Nothing is uploaded and nothing is public: the listener is `127.0.0.1` only.
+Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. The server allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 512 MB and are read from disk in pieces, including a byte range for seeking. Other files stay at 1 MB. The listener is `127.0.0.1` only. A run prints a key. Open `http://127.0.0.1:8080/?key=` plus that key. The browser then sends the key as a cookie. A request without the key is refused, including a post to `/inbox`. `fetch` and `post` refuse localhost and private network addresses. `read`, `write`, `append`, `copy`, `erase`, `files`, and `folders` work only in `data` and `site`. A link or junction in the folder is refused. `..` is refused. The port must be from 1024 through 65535.
 
 The window in section 11 stays inside Vire. The site path is for a browser.
 

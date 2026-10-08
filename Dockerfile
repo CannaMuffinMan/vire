@@ -6,7 +6,11 @@ RUN dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingl
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libicu72 && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/vire /usr/local/bin/vire
+RUN useradd --create-home --uid 1000 vire \
+ && chown -R vire:vire /usr/local/bin/vire
 WORKDIR /work
 COPY checks ./checks/
 COPY tests.vire term.vire vault.vire count.vire ./
+RUN chown -R vire:vire /work
+USER vire
 ENTRYPOINT ["vire"]

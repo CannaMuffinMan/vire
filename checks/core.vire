@@ -47,10 +47,18 @@ end
 
 define guard with fails
   try
-    read with "../secret.txt"
+    read with "count.vire"
     return fails + 1
   miss problem
-    if (find with problem, "folder") < 0
+    if (find with problem, "data or site") < 0
+      return fails + 1
+    end
+  end
+  try
+    fetch with "http://127.0.0.1:9/"
+    return fails + 1
+  miss problem
+    if (find with problem, "private") < 0
       return fails + 1
     end
   end
