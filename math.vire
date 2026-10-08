@@ -1,0 +1,9 @@
+define clamp with n, low, high
+  if n < low
+    return low
+  end
+  if n > high
+    return high
+  end
+  return n
+end

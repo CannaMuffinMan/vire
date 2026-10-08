@@ -1,0 +1,15 @@
+define main
+  try
+    write with "bad.exe", "nope"
+  miss problem
+    say problem
+  end
+  let n be 0
+  try
+    while true
+      let n be n + 1
+    end
+  miss problem
+    say problem
+  end
+end

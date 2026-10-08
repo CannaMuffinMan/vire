@@ -1,0 +1,5 @@
+use "note.txt"
+
+define main
+  say "should not run"
+end

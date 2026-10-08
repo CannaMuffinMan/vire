@@ -1,0 +1,13 @@
+define save_note
+  write with "data/note.txt", value with "note"
+  line with "Saved"
+end
+
+define main
+  open with "Vire tasks"
+  line with "Write Vire — done"
+  line with "Open the site — open"
+  field with "note"
+  button with "Save", "save_note"
+  show
+end

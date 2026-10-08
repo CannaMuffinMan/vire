@@ -1,0 +1,20 @@
+~ Definitions are the only units of code. main is where a run starts.
+
+define greet with name
+  say "hello " + name
+  return name
+end
+
+define double with n
+  return n * 2
+end
+
+define main
+  let who be greet with "vire"
+  say double with 21
+  if who == "vire"
+    say "it ran"
+  else
+    say "it missed"
+  end
+end

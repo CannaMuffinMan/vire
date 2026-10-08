@@ -1,0 +1,45 @@
+~ General-purpose Vire: data, control flow, functions, files, and errors.
+
+define area with w, h
+  return w * h
+end
+
+define main
+  let nums be [1, 2, 3]
+  push with nums, 4
+  put 9 into nums at 0
+  say nums at 0
+  say length with nums
+
+  let person be {"name": "ada", "year": 1815}
+  say person at "name"
+  say has with person, "year"
+
+  let total be 0
+  for n in nums
+    if n == 2
+      skip
+    end
+    let total be total + n
+  end
+  say total
+
+  say area with 3, 4
+  say kind with person
+  say join with ["a", "b", "c"], "-"
+
+  write with "note.txt", "stored by vire"
+  say read with "note.txt"
+
+  try
+    say number with "nope"
+  miss problem
+    say problem
+  end
+
+  if none == none
+    say "empty is a value"
+  else
+    say "missed"
+  end
+end

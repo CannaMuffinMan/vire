@@ -1,0 +1,7 @@
+data/
+site/
+err.txt
+out.txt
+*.user
+bin/
+obj/

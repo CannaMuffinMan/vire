@@ -1,0 +1,10 @@
+use "math.vire"
+
+define main
+  say clamp with 12, 0, 10
+  say span with 1, 3
+  say split with "a,b,c", ","
+  say lower with "VIRE"
+  say sort with [4, 1, 3]
+  say abs with -8
+end

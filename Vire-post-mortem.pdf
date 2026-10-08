@@ -1,0 +1,496 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 4150 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (Vire, a post-mortem) Tj
+1 0 0 1 54 728 Tm () Tj
+1 0 0 1 54 714 Tm (This is the record of making Vire, a new programming language, in one working) Tj
+1 0 0 1 54 700 Tm (session, and the field guide that should travel with it. It is written so the text) Tj
+1 0 0 1 54 686 Tm (can be selected and copied. The language is published under the MIT license. The aim) Tj
+1 0 0 1 54 672 Tm (of this piece is to leave a developer, or a coding agent, with enough context to read) Tj
+1 0 0 1 54 658 Tm (a Vire program, write a new one, explain why the runner behaves the way it does, and) Tj
+1 0 0 1 54 644 Tm (refuse the jobs Vire is not built to do.) Tj
+1 0 0 1 54 630 Tm () Tj
+1 0 0 1 54 616 Tm (The original request) Tj
+1 0 0 1 54 602 Tm () Tj
+1 0 0 1 54 588 Tm (The request was not for a tutorial in an existing language. It was for a new type of) Tj
+1 0 0 1 54 574 Tm (code. The first constraint was novelty: the result should not be a skin on Java,) Tj
+1 0 0 1 54 560 Tm (Python, JavaScript, or C. The second constraint was usefulness: after the novelty was) Tj
+1 0 0 1 54 546 Tm (established, the language had to carry the everyday jobs people already spread across) Tj
+1 0 0 1 54 532 Tm (those languages. The third constraint was independence: a Vire program should not) Tj
+1 0 0 1 54 518 Tm (need Python underneath it, and an application written in Vire should not have to drop) Tj
+1 0 0 1 54 504 Tm (into HTML, CSS, and JavaScript just to appear on screen. The fourth constraint was) Tj
+1 0 0 1 54 490 Tm (restraint: the runner must not be a virus, must not wander the disk, and must not be) Tj
+1 0 0 1 54 476 Tm (described as unhackable, because that claim is false for every program that runs on a) Tj
+1 0 0 1 54 462 Tm (general-purpose computer.) Tj
+1 0 0 1 54 448 Tm () Tj
+1 0 0 1 54 434 Tm (Those four constraints pulled against each other all day. A language that is truly) Tj
+1 0 0 1 54 420 Tm (new is often hard to use. A language that does everything other languages do tends to) Tj
+1 0 0 1 54 406 Tm (become a pile of other languages. A language that draws a window still needs some) Tj
+1 0 0 1 54 392 Tm (native runner, because a text file cannot execute itself on a bare processor. The) Tj
+1 0 0 1 54 378 Tm (work below is the compromise that survived those tensions.) Tj
+1 0 0 1 54 364 Tm () Tj
+1 0 0 1 54 350 Tm (What Vire is) Tj
+1 0 0 1 54 336 Tm () Tj
+1 0 0 1 54 322 Tm (A Vire program is a text file whose name ends in .vire. Execution starts at the) Tj
+1 0 0 1 54 308 Tm (definition named main and stops when that definition finishes, or when the window it) Tj
+1 0 0 1 54 294 Tm (opened is closed. There is no loose script body. If main is missing, the runner stops) Tj
+1 0 0 1 54 280 Tm (before doing work. Comments begin with a tilde and run to the end of the line. Blocks) Tj
+1 0 0 1 54 266 Tm (close with the word end. Assignment is written let name be expression. Printing a) Tj
+1 0 0 1 54 252 Tm (line is say. A definition is introduced with define, takes arguments after with, and) Tj
+1 0 0 1 54 238 Tm (returns a value with return. A call looks like area with 3, 4. Lists are written in) Tj
+1 0 0 1 54 224 Tm (brackets. Maps are written in braces, with a colon between a key and a value. The) Tj
+1 0 0 1 54 210 Tm (words while, for, if, else, try, and miss are the control forms. The words true,) Tj
+1 0 0 1 54 196 Tm (false, and none are values.) Tj
+1 0 0 1 54 182 Tm () Tj
+1 0 0 1 54 168 Tm (The runner is vire.exe on Windows. You pass it one program path. The folder that) Tj
+1 0 0 1 54 154 Tm (contains that file becomes the sandbox root. read, write, files, use, and need are) Tj
+1 0 0 1 54 140 Tm (all judged against that folder. A second folder of source, deps, holds packages. Each) Tj
+1 0 0 1 54 126 Tm (package is a directory whose code file is lib.vire. A program names a package with) Tj
+1 0 0 1 54 112 Tm (need and a quoted word. A program names a sibling file with use and a quoted relative) Tj
+1 0 0 1 54 98 Tm (path that must end in .vire.) Tj
+1 0 0 1 54 84 Tm () Tj
+1 0 0 1 54 70 Tm (This shape is deliberate. Agents often invent a main function, a package manager, and) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Length 4199 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (a filesystem in the same hour, and then they reach outside the project. Vire makes) Tj
+1 0 0 1 54 728 Tm (the legal moves look like the syntax, and it makes the illegal moves fail with a) Tj
+1 0 0 1 54 714 Tm (short message.) Tj
+1 0 0 1 54 700 Tm () Tj
+1 0 0 1 54 686 Tm (How the session actually went) Tj
+1 0 0 1 54 672 Tm () Tj
+1 0 0 1 54 658 Tm (The first design was not the language described above. It was a model called Silt, in) Tj
+1 0 0 1 54 644 Tm (which a program was a bed of grains and execution was a rising flood. A grain had a) Tj
+1 0 0 1 54 630 Tm (hardness. When the water reached that hardness, the grain washed away and its action) Tj
+1 0 0 1 54 616 Tm (ran. Actions could lay new grains at future flood levels. The idea was genuinely) Tj
+1 0 0 1 54 602 Tm (different from statement order, and a small interpreter ran. It was set aside because) Tj
+1 0 0 1 54 588 Tm (the person who asked for the language recognized, correctly, that it was not yet a) Tj
+1 0 0 1 54 574 Tm (programming language in the sense of Java or the other languages they already use.) Tj
+1 0 0 1 54 560 Tm (Novelty that cannot express an ordinary loop in an ordinary way does not meet the) Tj
+1 0 0 1 54 546 Tm (request.) Tj
+1 0 0 1 54 532 Tm () Tj
+1 0 0 1 54 518 Tm (The second design was Vire as an imperative language, still hosted by Python. It grew) Tj
+1 0 0 1 54 504 Tm (definitions, arithmetic, strings, booleans, while, if, and calls. Then it grew lists,) Tj
+1 0 0 1 54 490 Tm (maps, for, try, files, and a set of operations: length, push, slice, keys, join, and) Tj
+1 0 0 1 54 476 Tm (the rest. The objection at that point was also correct. If the way you run a program) Tj
+1 0 0 1 54 462 Tm (is python vire.py, then Python is the language and Vire is a script. The Python file) Tj
+1 0 0 1 54 448 Tm (was deleted. The implementation moved into a Windows executable named vire.exe. From) Tj
+1 0 0 1 54 434 Tm (then on, the command is vire.exe and a program file.) Tj
+1 0 0 1 54 420 Tm () Tj
+1 0 0 1 54 406 Tm (Widening the executable is where the language became something a person could keep.) Tj
+1 0 0 1 54 392 Tm (Local files gained a hard boundary. Packages arrived as need. A page builder and a) Tj
+1 0 0 1 54 378 Tm (local server arrived so a program could write a site and open it at 127.0.0.1 on a) Tj
+1 0 0 1 54 364 Tm (high port. A sample notes page proved the server. That success created the next) Tj
+1 0 0 1 54 350 Tm (objection: the page was HTML, the look was CSS, and the save button was JavaScript.) Tj
+1 0 0 1 54 336 Tm (The application was still borrowing three other languages. The response was a window) Tj
+1 0 0 1 54 322 Tm (vocabulary that belongs to Vire: open, line, field, button, value, and show.) Tj
+1 0 0 1 54 308 Tm (work.vire uses only those words, plus write, to put a note on disk. vire.exe draws) Tj
+1 0 0 1 54 294 Tm (the window. The browser path still exists, because browsers read HTML, but it is no) Tj
+1 0 0 1 54 280 Tm (longer the definition of a Vire application.) Tj
+1 0 0 1 54 266 Tm () Tj
+1 0 0 1 54 252 Tm (The last stretch of the session was documentation. GUIDE.md is the manual an agent) Tj
+1 0 0 1 54 238 Tm (should read before editing a program. This article is the narrative and the caution) Tj
+1 0 0 1 54 224 Tm (list. Both belong in the public repository so the language is not trapped in a chat) Tj
+1 0 0 1 54 210 Tm (transcript.) Tj
+1 0 0 1 54 196 Tm () Tj
+1 0 0 1 54 182 Tm (The syntax, in the order a newcomer needs it) Tj
+1 0 0 1 54 168 Tm () Tj
+1 0 0 1 54 154 Tm (A smallest program is three lines. define main, then say and a quoted sentence, then) Tj
+1 0 0 1 54 140 Tm (end. Run it with vire.exe hello.vire from the folder that contains the executable, or) Tj
+1 0 0 1 54 126 Tm (pass a full path to the program. The runner prints the sentence and exits. That is) Tj
+1 0 0 1 54 112 Tm (the hello-world test. If it fails, fix the runner before inventing features.) Tj
+1 0 0 1 54 98 Tm () Tj
+1 0 0 1 54 84 Tm (Names are created with let. let n be 1 stores a whole number. let who be "ada" stores) Tj
+1 0 0 1 54 70 Tm (text. let ready be true stores a boolean. let empty be none stores the empty value. A) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Length 4540 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (later let of the same name in the same definition replaces the value. Text uses) Tj
+1 0 0 1 54 728 Tm (double quotes. The escapes are quote, backslash, newline, and tab. Numbers may) Tj
+1 0 0 1 54 714 Tm (include a decimal point. When both sides of a division are whole numbers, the result) Tj
+1 0 0 1 54 700 Tm (is whole-number division, not a fraction. That surprise is recorded here so nobody) Tj
+1 0 0 1 54 686 Tm (treats slash as a calculator key without testing it.) Tj
+1 0 0 1 54 672 Tm () Tj
+1 0 0 1 54 658 Tm (Arithmetic uses plus, minus, star, slash, and percent. Comparisons use the usual) Tj
+1 0 0 1 54 644 Tm (two-character forms, plus the single character forms for less and greater. and, or,) Tj
+1 0 0 1 54 630 Tm (and not combine tests. and and or evaluate the right side only when the left side) Tj
+1 0 0 1 54 616 Tm (does not already decide the result. Parentheses group expressions. Plus also joins) Tj
+1 0 0 1 54 602 Tm (text to text, and it joins two lists. Plus does not silently mix a number and a list.) Tj
+1 0 0 1 54 588 Tm () Tj
+1 0 0 1 54 574 Tm (The sharp edge that cost real debugging time is argument extent. A call consumes the) Tj
+1 0 0 1 54 560 Tm (following expression. escape with title plus a closing tag does not mean escape the) Tj
+1 0 0 1 54 546 Tm (title and then add the tag. It means escape the title joined with the tag, so the tag) Tj
+1 0 0 1 54 532 Tm (is escaped too and the markup breaks. The repair is parentheses around the call. Say) Tj
+1 0 0 1 54 518 Tm (hi, then a space, then text with n, is written with the call in parentheses. Any) Tj
+1 0 0 1 54 504 Tm (agent that generates Vire should parenthesize every call that sits beside plus.) Tj
+1 0 0 1 54 490 Tm () Tj
+1 0 0 1 54 476 Tm (if tests a value, runs a block, and may continue with else if or else before end.) Tj
+1 0 0 1 54 462 Tm (Empty text, none, false, zero, an empty list, and an empty map are all untrue. Other) Tj
+1 0 0 1 54 448 Tm (values are true. while repeats until the test is untrue, and it refuses to spin past) Tj
+1 0 0 1 54 434 Tm (one hundred thousand passes. for walks a list, the characters of a text, or the keys) Tj
+1 0 0 1 54 420 Tm (of a map. skip starts the next pass. stop leaves the loop. Both words are errors) Tj
+1 0 0 1 54 406 Tm (outside a loop. A whole program also stops if it performs more than one million) Tj
+1 0 0 1 54 392 Tm (steps, so a nested explosion still ends.) Tj
+1 0 0 1 54 378 Tm () Tj
+1 0 0 1 54 364 Tm (define names a body. Parameters follow with, separated by commas. return sends a) Tj
+1 0 0 1 54 350 Tm (value back and leaves the definition. If the body ends without return, the call) Tj
+1 0 0 1 54 336 Tm (yields zero. Calls may not nest more than sixty-four deep, which blocks a recursive) Tj
+1 0 0 1 54 322 Tm (accident from consuming the machine. Each definition has its own names. There is no) Tj
+1 0 0 1 54 308 Tm (shared mutable global table. If two files define the same name, loading fails. That) Tj
+1 0 0 1 54 294 Tm (is strict on purpose. Silent overwrite is how agents corrupt a program they only half) Tj
+1 0 0 1 54 280 Tm (read.) Tj
+1 0 0 1 54 266 Tm () Tj
+1 0 0 1 54 252 Tm (Lists are ordered and mutable. push adds at the end and returns the same list. drop) Tj
+1 0 0 1 54 238 Tm (removes the last item and returns it, and it fails on an empty list. put value into) Tj
+1 0 0 1 54 224 Tm (name at index writes a slot. at reads a slot. Negative indexes count from the end. An) Tj
+1 0 0 1 54 210 Tm (index outside the list is an error, not a wrapped surprise, except for the negative) Tj
+1 0 0 1 54 196 Tm (form that is defined as from the end. slice copies a half-open range and tolerates) Tj
+1 0 0 1 54 182 Tm (bounds by clipping. span with 1, 3 builds the list of whole numbers from one through) Tj
+1 0 0 1 54 168 Tm (three, and it refuses a span that would blow the size cap. sort copies a list of) Tj
+1 0 0 1 54 154 Tm (numbers into ascending order. Maps store text keys. A number used as a key is shown) Tj
+1 0 0 1 54 140 Tm (as text. has asks whether a key exists. keys lists the keys. put writes a map entry) Tj
+1 0 0 1 54 126 Tm (the same way it writes a list slot. kind reports number, text, list, map, bool, or) Tj
+1 0 0 1 54 112 Tm (none. text and number convert. number fails with a catchable error when the text is) Tj
+1 0 0 1 54 98 Tm (not numeric. lower and upper change letter case. split and join move between text and) Tj
+1 0 0 1 54 84 Tm (lists. find returns an index or negative one.) Tj
+1 0 0 1 54 70 Tm () Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 4255 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (try runs a block. miss runs when that block raises a Vire error. The name after miss) Tj
+1 0 0 1 54 728 Tm (receives the message. The handler does not catch a malformed program, because a) Tj
+1 0 0 1 54 714 Tm (malformed program never starts. Use try around number, read, fetch, and any index you) Tj
+1 0 0 1 54 700 Tm (do not fully trust.) Tj
+1 0 0 1 54 686 Tm () Tj
+1 0 0 1 54 672 Tm (Files, packages, data, and the clock) Tj
+1 0 0 1 54 658 Tm () Tj
+1 0 0 1 54 644 Tm (write with a relative path and a value stores text. It creates missing directories) Tj
+1 0 0 1 54 630 Tm (under the sandbox root. read loads that text back. files lists names in a directory,) Tj
+1 0 0 1 54 616 Tm (not full machine paths, and not a recursive walk of the disk. Absolute paths are) Tj
+1 0 0 1 54 602 Tm (refused. A path that contains dot-dot is refused. The runner will not write an) Tj
+1 0 0 1 54 588 Tm (extension used to launch a program: exe, dll, bat, cmd, ps1, com, scr, vbs, or msi. A) Tj
+1 0 0 1 54 574 Tm (file larger than one million characters is refused in either direction. These rules) Tj
+1 0 0 1 54 560 Tm (are the difference between a sample that saves a note and a sample that replaces the) Tj
+1 0 0 1 54 546 Tm (runner or reads another user's folder.) Tj
+1 0 0 1 54 532 Tm () Tj
+1 0 0 1 54 518 Tm (json turns a Vire value into one text document. parse turns that text back into a) Tj
+1 0 0 1 54 504 Tm (value. The subset is objects, arrays, strings, numbers, true, false, and null. null) Tj
+1 0 0 1 54 490 Tm (becomes none. This is a data notation, not a second programming language, and it is) Tj
+1 0 0 1 54 476 Tm (how work that must reload tomorrow should be stored. now is the local time as a) Tj
+1 0 0 1 54 462 Tm (year-month-day hour-minute-second string. In an expression, write it in parentheses,) Tj
+1 0 0 1 54 448 Tm (because a bare name is otherwise looked up as a stored value. The runner treats the) Tj
+1 0 0 1 54 434 Tm (bare name now as the clock when it is used as a value.) Tj
+1 0 0 1 54 420 Tm () Tj
+1 0 0 1 54 406 Tm (fetch performs one HTTP GET. The address must begin with http:// or https://. The) Tj
+1 0 0 1 54 392 Tm (wait is at most five seconds. The body is at most one million bytes. Redirects are) Tj
+1 0 0 1 54 378 Tm (limited. Failure becomes a Vire error that try can catch. fetch is the seam where) Tj
+1 0 0 1 54 364 Tm (Vire touches the outside world, so it is narrow on purpose. There is no general) Tj
+1 0 0 1 54 350 Tm (socket API, no upload of the sandbox, and no shell.) Tj
+1 0 0 1 54 336 Tm () Tj
+1 0 0 1 54 322 Tm (need loads deps, then a package word, then lib.vire. The word may contain letters,) Tj
+1 0 0 1 54 308 Tm (digits, and underscores, and nothing else. use loads a sibling or nested .vire file) Tj
+1 0 0 1 54 294 Tm (by relative path. At most thirty-two files may be pulled in. A cycle is an error. A) Tj
+1 0 0 1 54 280 Tm (duplicate definition name is an error. A package does not need its own main. Only the) Tj
+1 0 0 1 54 266 Tm (file you pass to vire.exe needs main. The ui package in the repository shows the) Tj
+1 0 0 1 54 252 Tm (pattern: small definitions, no main, consumed by a program that does have main.) Tj
+1 0 0 1 54 238 Tm () Tj
+1 0 0 1 54 224 Tm (The window) Tj
+1 0 0 1 54 210 Tm () Tj
+1 0 0 1 54 196 Tm (open with a title creates the window. line adds a label. field adds a text box and) Tj
+1 0 0 1 54 182 Tm (remembers it under the name you give. button takes a label and the name of a) Tj
+1 0 0 1 54 168 Tm (definition to call. value reads a field. show displays the window and waits until the) Tj
+1 0 0 1 54 154 Tm (person closes it. The click handler runs on the same runner, so the definition it) Tj
+1 0 0 1 54 140 Tm (names can write files, compute, and even add another line. If that definition fails,) Tj
+1 0 0 1 54 126 Tm (the window shows the message instead of killing the process silently.) Tj
+1 0 0 1 54 112 Tm () Tj
+1 0 0 1 54 98 Tm (work.vire is the canonical application. It opens a window titled Vire tasks, shows) Tj
+1 0 0 1 54 84 Tm (two lines of status, offers a note field, and saves the field to data/note.txt when) Tj
+1 0 0 1 54 70 Tm (Save is pressed. The entire source is Vire. There is no stylesheet and no script file) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 4246 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (beside it. If you are an agent asked to build an app, start from that file and change) Tj
+1 0 0 1 54 728 Tm (the lines, the field name, and the save definition. Do not invent a parallel HTML app) Tj
+1 0 0 1 54 714 Tm (unless the person asked for a browser page.) Tj
+1 0 0 1 54 700 Tm () Tj
+1 0 0 1 54 686 Tm (The local site, and why it is secondary) Tj
+1 0 0 1 54 672 Tm () Tj
+1 0 0 1 54 658 Tm (serve with a port from 1024 through 65535 listens on 127.0.0.1 only. It serves the) Tj
+1 0 0 1 54 644 Tm (site directory next to the program. It accepts GET and HEAD. It allows html, css, js,) Tj
+1 0 0 1 54 630 Tm (svg, json, and txt. It refuses dot-dot and it refuses to treat a program file as) Tj
+1 0 0 1 54 616 Tm (content. Ctrl+C stops it. This exists because a browser is a separate program with) Tj
+1 0 0 1 54 602 Tm (its own languages. Vire can prepare files for that browser and can hand them out on) Tj
+1 0 0 1 54 588 Tm (the loopback interface. That is useful. It is not the same claim as Vire being the) Tj
+1 0 0 1 54 574 Tm (language of the page. When the requirement is that no other language appear in the) Tj
+1 0 0 1 54 560 Tm (application source, use the window, not serve.) Tj
+1 0 0 1 54 546 Tm () Tj
+1 0 0 1 54 532 Tm (An agent building a site should still escape text that came from a person. The escape) Tj
+1 0 0 1 54 518 Tm (operation replaces the characters that would break markup. Remember the parentheses) Tj
+1 0 0 1 54 504 Tm (rule, or the closing tags will be escaped along with the title. That bug happened) Tj
+1 0 0 1 54 490 Tm (during the session, was visible in the served page, and was fixed by parenthesizing) Tj
+1 0 0 1 54 476 Tm (the call. It is the example to remember.) Tj
+1 0 0 1 54 462 Tm () Tj
+1 0 0 1 54 448 Tm (Use cases that match the runner we actually shipped) Tj
+1 0 0 1 54 434 Tm () Tj
+1 0 0 1 54 420 Tm (One, print a count or a total, the way count.vire walks from one to five. Two,) Tj
+1 0 0 1 54 406 Tm (convert a unit inside a definition that takes a number and returns a number. Three,) Tj
+1 0 0 1 54 392 Tm (ask a question on the terminal and branch with if. Four, store a person or a record) Tj
+1 0 0 1 54 378 Tm (in a map and read one field with at. Five, walk scores, skip blanks, and add the) Tj
+1 0 0 1 54 364 Tm (rest. Six, clean a line of words with split, lower, join, and sort. Seven, save a) Tj
+1 0 0 1 54 350 Tm (note and read it back, which is the file test. Eight, share a helper through need so) Tj
+1 0 0 1 54 336 Tm (two programs do not copy it. Nine, wrap a risky conversion in try and print the) Tj
+1 0 0 1 54 322 Tm (problem from miss. Ten, open a small desktop tool with open, field, button, and show.) Tj
+1 0 0 1 54 308 Tm (Eleven, store a list of tasks as json and reload it. Twelve, build a loopback page) Tj
+1 0 0 1 54 294 Tm (only when a browser is truly required.) Tj
+1 0 0 1 54 280 Tm () Tj
+1 0 0 1 54 266 Tm (If a proposed use case needs a microphone, a game engine, a phone store, a kernel) Tj
+1 0 0 1 54 252 Tm (driver, or an account on someone else's computer, it is outside the language as) Tj
+1 0 0 1 54 238 Tm (shipped. Say so, and offer the nearest thing inside the list above.) Tj
+1 0 0 1 54 224 Tm () Tj
+1 0 0 1 54 210 Tm (What an agent should do, step by step) Tj
+1 0 0 1 54 196 Tm () Tj
+1 0 0 1 54 182 Tm (Read GUIDE.md once. Then read the program you were asked to change, plus any file) Tj
+1 0 0 1 54 168 Tm (named by use or need. Do not scan the whole disk. Create or edit only .vire files and) Tj
+1 0 0 1 54 154 Tm (the data files those programs are supposed to own. Keep paths relative. Include) Tj
+1 0 0 1 54 140 Tm (define main in the file that will be executed. Do not put main in a library unless) Tj
+1 0 0 1 54 126 Tm (that library is itself a program. Parenthesize calls that are combined with plus.) Tj
+1 0 0 1 54 112 Tm (After editing, run vire.exe on the program and read the output. A window program) Tj
+1 0 0 1 54 98 Tm (stays running until the window closes, so do not start it and then assume the) Tj
+1 0 0 1 54 84 Tm (terminal has hung for a mysterious reason. If you change Vire.cs, rebuild vire.exe) Tj
+1 0 0 1 54 70 Tm (with the C# compiler command in the guide before you trust a run. The command) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Length 4168 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (references the Windows forms and drawing libraries because the window is part of the) Tj
+1 0 0 1 54 728 Tm (runner. Do not add a feature that starts a shell, binds every network interface, or) Tj
+1 0 0 1 54 714 Tm (writes an executable into the sandbox. Those were rejected on purpose.) Tj
+1 0 0 1 54 700 Tm () Tj
+1 0 0 1 54 686 Tm (When a run fails, the message starts with vire: and usually includes a line number.) Tj
+1 0 0 1 54 672 Tm (Missing main, a bad path, a missing definition, a type mismatch, and a refused write) Tj
+1 0 0 1 54 658 Tm (are the common ones. Fix the program. Do not weaken the runner to make a sample pass.) Tj
+1 0 0 1 54 644 Tm () Tj
+1 0 0 1 54 630 Tm (What we refused, and why the refusal is part of the design) Tj
+1 0 0 1 54 616 Tm () Tj
+1 0 0 1 54 602 Tm (We refused to call the runner unhackable. The accurate sentence is that a program is) Tj
+1 0 0 1 54 588 Tm (boxed into its folder, capped in time and size, and unable to launch other programs.) Tj
+1 0 0 1 54 574 Tm (We refused to keep the Python interpreter beside the executable, because two runners) Tj
+1 0 0 1 54 560 Tm (means nobody knows which language is real. We refused to let write replace vire.exe) Tj
+1 0 0 1 54 546 Tm (or drop a batch file. We refused to let serve listen on the open network. We refused) Tj
+1 0 0 1 54 532 Tm (to treat HTML as the only application story after the requirement was restated. We) Tj
+1 0 0 1 54 518 Tm (also refused the fantasy that one session can absorb every feature of every other) Tj
+1 0 0 1 54 504 Tm (language. Device drivers, application stores, and a public package index are) Tj
+1 0 0 1 54 490 Tm (products, not syntax. The repository can grow toward more of the everyday jobs. It) Tj
+1 0 0 1 54 476 Tm (should grow by adding Vire definitions and careful runner features, not by embedding) Tj
+1 0 0 1 54 462 Tm (another language and calling the combination Vire.) Tj
+1 0 0 1 54 448 Tm () Tj
+1 0 0 1 54 434 Tm (Known limits a careful reader should memorize) Tj
+1 0 0 1 54 420 Tm () Tj
+1 0 0 1 54 406 Tm (Whole-number division. Call expressions that swallow the following plus. No global) Tj
+1 0 0 1 54 392 Tm (variables. No user-defined types beyond maps and lists. No concurrent definitions.) Tj
+1 0 0 1 54 378 Tm (The window blocks until it is closed, so a program does not continue after show until) Tj
+1 0 0 1 54 364 Tm (the person is done. serve blocks until Ctrl+C. fetch does not post a body. JSON) Tj
+1 0 0 1 54 350 Tm (strings in the writer escape quotes and backslashes, and the reader accepts a) Tj
+1 0 0 1 54 336 Tm (practical subset, not every corner of the JSON specification. The step counter counts) Tj
+1 0 0 1 54 322 Tm (work, so a server that is actively handling a flood of requests can eventually trip a) Tj
+1 0 0 1 54 308 Tm (limit that an idle design might not. The sandbox judges paths lexically and by full) Tj
+1 0 0 1 54 294 Tm (path prefix. It is a seatbelt, not a formal proof. None of these are secrets. They) Tj
+1 0 0 1 54 280 Tm (are the contract.) Tj
+1 0 0 1 54 266 Tm () Tj
+1 0 0 1 54 252 Tm (How to judge whether a change belongs) Tj
+1 0 0 1 54 238 Tm () Tj
+1 0 0 1 54 224 Tm (A change belongs if a Vire program can do a new everyday job without a second) Tj
+1 0 0 1 54 210 Tm (programming language in the program text, and if the change still respects the folder) Tj
+1 0 0 1 54 196 Tm (boundary and the refusal to launch other programs. A change does not belong if it) Tj
+1 0 0 1 54 182 Tm (exists only to make Vire look like it contains C, Python, and JavaScript at once. The) Tj
+1 0 0 1 54 168 Tm (language is already one language. Adding a foreign source language in the middle of a) Tj
+1 0 0 1 54 154 Tm (program would undo the point of the session.) Tj
+1 0 0 1 54 140 Tm () Tj
+1 0 0 1 54 126 Tm (The repository) Tj
+1 0 0 1 54 112 Tm () Tj
+1 0 0 1 54 98 Tm (The public repository contains Vire.cs, the guide, the samples, the ui package, the) Tj
+1 0 0 1 54 84 Tm (MIT license, and this article as a PDF. Samples include the counter, the greeting and) Tj
+1 0 0 1 54 70 Tm (function demo, the guard that tries to escape the folder, the limit demo, and the) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Length 4165 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm (window application. Build instructions live in the guide. The license allows use,) Tj
+1 0 0 1 54 728 Tm (modification, and redistribution. It does not include a warranty. If you ship Vire to) Tj
+1 0 0 1 54 714 Tm (other people, keep the license notice with the source.) Tj
+1 0 0 1 54 700 Tm () Tj
+1 0 0 1 54 686 Tm (A closing account) Tj
+1 0 0 1 54 672 Tm () Tj
+1 0 0 1 54 658 Tm (At the start of the session there was no Vire. There was a request for a language) Tj
+1 0 0 1 54 644 Tm (that did not exist, then a correction that it had to be a real programming language,) Tj
+1 0 0 1 54 630 Tm (then a correction that it had to be broad, then a correction that it must not be a) Tj
+1 0 0 1 54 616 Tm (virus, then a correction that it must not be hosted by Python, then a correction that) Tj
+1 0 0 1 54 602 Tm (an application must not lean on HTML, CSS, and JavaScript to count. Each correction) Tj
+1 0 0 1 54 588 Tm (narrowed the honest claim and improved the artifact. The artifact that remains is a) Tj
+1 0 0 1 54 574 Tm (runner, a syntax, a sandbox, a package convention, a window, a local file and data) Tj
+1 0 0 1 54 560 Tm (story, an optional loopback site, and a manual.) Tj
+1 0 0 1 54 546 Tm () Tj
+1 0 0 1 54 532 Tm (That is enough to play with and enough to grow. It is not enough to retire every) Tj
+1 0 0 1 54 518 Tm (other language, and this post-mortem will not pretend otherwise. Growth looks like) Tj
+1 0 0 1 54 504 Tm (new .vire files, new packages under deps, and runner changes that keep the same) Tj
+1 0 0 1 54 490 Tm (boundaries. The test of a growth step is simple. A newcomer should still be able to) Tj
+1 0 0 1 54 476 Tm (read define main, run vire.exe, and predict where a file will be written. If a change) Tj
+1 0 0 1 54 462 Tm (breaks that prediction, it is not a feature. It is a different language, and this one) Tj
+1 0 0 1 54 448 Tm (already cost a full session to make coherent.) Tj
+1 0 0 1 54 434 Tm () Tj
+1 0 0 1 54 420 Tm (A worked transcript for the first hour with the repository) Tj
+1 0 0 1 54 406 Tm () Tj
+1 0 0 1 54 392 Tm (Clone the repository, or copy the folder, onto a Windows machine. Open a terminal in) Tj
+1 0 0 1 54 378 Tm (that folder. Run vire.exe count.vire. You should see the lines 1, 2, 3, 4, and 5. Run) Tj
+1 0 0 1 54 364 Tm (vire.exe greet.vire. You should see a greeting, the number 42, and the line it ran.) Tj
+1 0 0 1 54 350 Tm (Those two runs prove definitions, arithmetic, loops, calls, and branching before you) Tj
+1 0 0 1 54 336 Tm (touch the window. Run vire.exe guard.vire. You should see two refusals, both saying) Tj
+1 0 0 1 54 322 Tm (that files stay inside the program folder. That is the security test, and it should) Tj
+1 0 0 1 54 308 Tm (keep failing in exactly that way. If a future patch makes guard.vire print a secret) Tj
+1 0 0 1 54 294 Tm (from another directory, revert the patch.) Tj
+1 0 0 1 54 280 Tm () Tj
+1 0 0 1 54 266 Tm (Then run vire.exe work.vire. A window opens. The title is Vire tasks. Two lines of) Tj
+1 0 0 1 54 252 Tm (text are already there. The box is empty. Type a sentence and press Save. A new line,) Tj
+1 0 0 1 54 238 Tm (Saved, appears in the window. Close the window. Open data/note.txt. The sentence is) Tj
+1 0 0 1 54 224 Tm (there. If the file is missing, the sandbox root is not the folder you think it is, or) Tj
+1 0 0 1 54 210 Tm (write was pointed at a forbidden extension. Do not fix that by disabling the check.) Tj
+1 0 0 1 54 196 Tm (Fix the path.) Tj
+1 0 0 1 54 182 Tm () Tj
+1 0 0 1 54 168 Tm (If you are extending the language rather than a program, change Vire.cs and rebuild) Tj
+1 0 0 1 54 154 Tm (with the compiler command in GUIDE.md before you rerun the four programs above. A) Tj
+1 0 0 1 54 140 Tm (rebuild that is skipped is the usual reason a new word is reported as an unknown) Tj
+1 0 0 1 54 126 Tm (definition. The executable and the source had diverged once during this session for) Tj
+1 0 0 1 54 112 Tm (that exact reason, when a rebuild could not overwrite a running vire.exe. Stop the) Tj
+1 0 0 1 54 98 Tm (old process, then compile.) Tj
+1 0 0 1 54 84 Tm () Tj
+1 0 0 1 54 70 Tm (What the samples are for) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Length 3167 >>
+stream
+BT /F1 11 Tf
+1 0 0 1 54 742 Tm () Tj
+1 0 0 1 54 728 Tm (count.vire is the control-flow baseline. greet.vire is the definition baseline,) Tj
+1 0 0 1 54 714 Tm (including a returned value used in a comparison. everything.vire, if you still have) Tj
+1 0 0 1 54 700 Tm (it from the working tree, is the crowded feature pass: lists, maps, skip, kind, join,) Tj
+1 0 0 1 54 686 Tm (read, write, and miss. limits.vire shows a refused program-file write and a loop that) Tj
+1 0 0 1 54 672 Tm (is cut off. baduse.vire shows that use will not open a text file as code. app.vire) Tj
+1 0 0 1 54 658 Tm (and math.vire show use across files. web.vire and serve.vire show the browser path) Tj
+1 0 0 1 54 644 Tm (and should be treated as optional. work.vire is the application you should copy.) Tj
+1 0 0 1 54 630 Tm (deps/ui/lib.vire is the package you should copy when a helper is shared. If a sample) Tj
+1 0 0 1 54 616 Tm (and this article disagree, trust the sample that you just ran, then fix the article.) Tj
+1 0 0 1 54 602 Tm (A manual that drifts from the runner is worse than a short manual.) Tj
+1 0 0 1 54 588 Tm () Tj
+1 0 0 1 54 574 Tm (Advice for the post that points at the repository) Tj
+1 0 0 1 54 560 Tm () Tj
+1 0 0 1 54 546 Tm (Say that Vire is a new language with its own syntax and a Windows runner. Say that) Tj
+1 0 0 1 54 532 Tm (programs are .vire files. Say that the interesting application is a window written) Tj
+1 0 0 1 54 518 Tm (only in Vire, and that files stay in the program folder. Say that the license is MIT.) Tj
+1 0 0 1 54 504 Tm (Do not say that it replaces every other language. Do not say that it cannot be abused) Tj
+1 0 0 1 54 490 Tm (if a person rewrites the runner. Do not paste a drive letter from a private machine) Tj
+1 0 0 1 54 476 Tm (into the post. Link the repository, and let GUIDE.md do the teaching. The image that) Tj
+1 0 0 1 54 462 Tm (accompanies the post should show a single window and a page of Vire source, not a) Tj
+1 0 0 1 54 448 Tm (collage of other languages' logos. The language spent the whole session climbing out) Tj
+1 0 0 1 54 434 Tm (of other languages. The picture should not put it back.) Tj
+1 0 0 1 54 420 Tm () Tj
+1 0 0 1 54 406 Tm (A note on length and honesty) Tj
+1 0 0 1 54 392 Tm () Tj
+1 0 0 1 54 378 Tm (This account is long because the decisions were easy to flatten into a slogan and the) Tj
+1 0 0 1 54 364 Tm (slogan would be false. The short version, if you need it in conversation, is this:) Tj
+1 0 0 1 54 350 Tm (Vire is a small language you run with vire.exe, it can compute, store files, load) Tj
+1 0 0 1 54 336 Tm (local packages, and open a window, and it refuses to leave its folder or launch other) Tj
+1 0 0 1 54 322 Tm (programs. The long version is everything above, including the flood-language detour,) Tj
+1 0 0 1 54 308 Tm (the Python runner we deleted, the HTML detour we demoted, and the parentheses bug) Tj
+1 0 0 1 54 294 Tm (that escaped a closing tag. Keep the long version with the code. Future changes will) Tj
+1 0 0 1 54 280 Tm (be easier to judge against a record that admits what failed.) Tj
+1 0 0 1 54 266 Tm () Tj
+1 0 0 1 54 252 Tm (End of record.) Tj
+1 0 0 1 54 238 Tm () Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+12 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+13 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+15 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+16 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+17 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+18 0 obj
+<< /Type /Pages /Count 8 /Kids [10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R] >>
+endobj
+19 0 obj
+<< /Type /Catalog /Pages 18 0 R >>
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000004281 00000 n 
+0000008532 00000 n 
+0000013124 00000 n 
+0000017431 00000 n 
+0000021729 00000 n 
+0000025949 00000 n 
+0000030166 00000 n 
+0000033385 00000 n 
+0000033513 00000 n 
+0000033641 00000 n 
+0000033769 00000 n 
+0000033897 00000 n 
+0000034025 00000 n 
+0000034153 00000 n 
+0000034281 00000 n 
+0000034409 00000 n 
+0000034517 00000 n 
+trailer << /Size 20 /Root 19 0 R >>
+startxref
+34568
+%%EOF

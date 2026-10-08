@@ -1,0 +1,12 @@
+define main
+  try
+    read with "../secret.txt"
+  miss problem
+    say problem
+  end
+  try
+    read with "C:/Windows/win.ini"
+  miss problem
+    say problem
+  end
+end

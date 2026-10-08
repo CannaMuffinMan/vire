@@ -1,0 +1,9 @@
+~ Vire program. Run with: python vire.py count.vire
+
+define main
+  let n be 1
+  while n <= 5
+    say n
+    let n be n + 1
+  end
+end

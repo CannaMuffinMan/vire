@@ -1,0 +1,9 @@
+need "ui"
+
+define main
+  let markup be page with "Vire notes", "<h1>Notes</h1><p>A small app built by Vire.</p><textarea id=\"note\"></textarea><button id=\"save\">Save</button><script src=\"app.js\"></script>"
+  write with "site/index.html", markup
+  write with "site/app.css", style with "app"
+  write with "site/app.js", "document.getElementById(\"save\").onclick=function(){localStorage.setItem(\"note\",document.getElementById(\"note\").value)};document.getElementById(\"note\").value=localStorage.getItem(\"note\")||\"\";"
+  say "built site/index.html"
+end
