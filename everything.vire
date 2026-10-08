@@ -28,8 +28,8 @@ define main
   say kind with person
   say join with ["a", "b", "c"], "-"
 
-  write with "note.txt", "stored by vire"
-  say read with "note.txt"
+  write with "data/note.txt", "stored by vire"
+  say read with "data/note.txt"
 
   try
     say number with "nope"
