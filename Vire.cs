@@ -47,6 +47,12 @@ sealed class Env
     public Env Parent;
     public Dictionary<string, object> Values = new Dictionary<string, object>();
     public void Declare(string name, object value) { Values[name] = value; }
+    public bool Has(string name)
+    {
+        if (Values.ContainsKey(name)) return true;
+        return Parent != null && Parent.Has(name);
+    }
+
     public object Get(string name, int line)
     {
         if (Values.ContainsKey(name)) return Values[name];
@@ -68,12 +74,13 @@ sealed class Machine
     int calls;
     Form form;
     int nextTop = 16;
+    int nextLeft = 16;
     Dictionary<string, TextBox> fields = new Dictionary<string, TextBox>();
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
-        "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show"
+        "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show", "place", "mark"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -121,7 +128,7 @@ sealed class Machine
             for (int i = 0; i < func.Params.Count; i++) env.Declare(func.Params[i], args[i]);
             try { ExecBlock(func.Body, env); }
             catch (ReturnSignal signal) { return signal.Value; }
-            return 0;
+            return null;
         }
         finally { calls--; }
     }
@@ -131,7 +138,8 @@ sealed class Machine
         Step(line);
         int need = 1;
         if (name == "now" || name == "show") need = 0;
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place") need = 2;
+        if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
         if (name == "slice") need = 3;
         if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line);
@@ -372,6 +380,23 @@ sealed class Machine
             AddButton(label, func, line);
             return 0;
         }
+        if (name == "place")
+        {
+            if (!(args[0] is int) || !(args[1] is int)) throw new VireError("place needs two whole numbers", line);
+            if (form == null) throw new VireError("open a window first", line);
+            nextLeft = (int)args[0];
+            nextTop = (int)args[1];
+            return 0;
+        }
+        if (name == "mark")
+        {
+            if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int) || !(args[3] is int))
+                throw new VireError("mark needs four whole numbers and a definition name", line);
+            string func = args[4] as string;
+            if (func == null) throw new VireError("mark needs four whole numbers and a definition name", line);
+            AddMark((int)args[0], (int)args[1], (int)args[2], (int)args[3], func, line);
+            return 0;
+        }
         if (name == "value")
         {
             string fieldName = args[0] as string;
@@ -406,6 +431,7 @@ sealed class Machine
         form.Height = 420;
         form.StartPosition = FormStartPosition.CenterScreen;
         nextTop = 16;
+        nextLeft = 16;
         fields = new Dictionary<string, TextBox>();
     }
 
@@ -414,7 +440,7 @@ sealed class Machine
         if (form == null) throw new VireError("open a window first", line);
         Label label = new Label();
         label.Text = text;
-        label.Left = 16;
+        label.Left = nextLeft;
         label.Top = nextTop;
         label.Width = 470;
         label.Height = 24;
@@ -426,7 +452,7 @@ sealed class Machine
     {
         if (form == null) throw new VireError("open a window first", line);
         TextBox box = new TextBox();
-        box.Left = 16;
+        box.Left = nextLeft;
         box.Top = nextTop;
         box.Width = 470;
         form.Controls.Add(box);
@@ -440,7 +466,7 @@ sealed class Machine
         if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line);
         Button button = new Button();
         button.Text = label;
-        button.Left = 16;
+        button.Left = nextLeft;
         button.Top = nextTop;
         button.Width = 120;
         button.Click += delegate
@@ -450,6 +476,24 @@ sealed class Machine
         };
         form.Controls.Add(button);
         nextTop += 40;
+    }
+
+    void AddMark(int x, int y, int w, int h, string func, int line)
+    {
+        if (form == null) throw new VireError("open a window first", line);
+        if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line);
+        Panel panel = new Panel();
+        panel.Left = x;
+        panel.Top = y;
+        panel.Width = w;
+        panel.Height = h;
+        panel.BackColor = System.Drawing.Color.FromArgb(176, 98, 58);
+        panel.Click += delegate
+        {
+            try { Call(func, new List<object>(), line); }
+            catch (VireError exc) { MessageBox.Show(exc.Message, "Vire"); }
+        };
+        form.Controls.Add(panel);
     }
 
     void Serve(int port, int line)
@@ -660,10 +704,13 @@ sealed class Machine
         string kind = (string)tree[0];
         if (kind == "num" || kind == "str" || kind == "bool") return tree[1];
         if (kind == "none") return null;
+        if (kind == "now") return Builtin("now", new List<object>(), (int)tree[1]);
         if (kind == "var")
         {
-            if ((string)tree[1] == "now") return Builtin("now", new List<object>(), (int)tree[2]);
-            return env.Get((string)tree[1], (int)tree[2]);
+            string name = (string)tree[1];
+            if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
+                return Call(name, new List<object>(), (int)tree[2]);
+            return env.Get(name, (int)tree[2]);
         }
         if (kind == "call")
         {
@@ -754,7 +801,6 @@ sealed class Machine
         if (op == "/")
         {
             if (ToDouble(right) == 0) throw new VireError("division by zero", line);
-            if (left is int && right is int) return ((int)left) / ((int)right);
             return ToDouble(left) / ToDouble(right);
         }
         if (op == "%")
@@ -1053,11 +1099,11 @@ sealed class Parser
         List<object> args = new List<object>();
         if (!At("with")) return args;
         Eat("with");
-        args.Add(Expression());
+        args.Add(ParseProduct());
         while (At(","))
         {
             Eat(",");
-            args.Add(Expression());
+            args.Add(ParseProduct());
         }
         return args;
     }
@@ -1145,6 +1191,7 @@ sealed class Parser
         if (tok.Kind == "true") { Eat("true"); return new object[] { "bool", true, tok.Line }; }
         if (tok.Kind == "false") { Eat("false"); return new object[] { "bool", false, tok.Line }; }
         if (tok.Kind == "none") { Eat("none"); return new object[] { "none", null, tok.Line }; }
+        if (tok.Kind == "now") { Eat("now"); return new object[] { "now", tok.Line }; }
         if (tok.Kind == "name")
         {
             Eat("name");
@@ -1207,7 +1254,7 @@ static class Lexer
     static readonly HashSet<string> Keywords = new HashSet<string>(new string[] {
         "define", "with", "end", "let", "be", "say", "while", "if", "else", "return",
         "and", "or", "not", "true", "false", "for", "in", "at", "put", "into",
-        "try", "miss", "stop", "skip", "none", "use", "need"
+        "try", "miss", "stop", "skip", "none", "now", "use", "need"
     });
 
     public static List<Token> Tokenize(string source)

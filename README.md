@@ -10,7 +10,7 @@ The full guide for people and for coding agents is [GUIDE.md](GUIDE.md).
 vire.exe work.vire
 ```
 
-That opens a window titled "Vire tasks". Save writes `data/note.txt`.
+That opens a window titled "Vire tasks". Save writes `data/note.txt`. `board.vire` adds a clickable mark. `tests.vire` prints `pass` when the language checks hold.
 
 Build the runner on Windows from the source in this repo:
 

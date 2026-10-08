@@ -64,13 +64,15 @@ Values are numbers (whole or decimal), text in double quotes, `true`, `false`, a
 
 Text escapes: `\"` `\\` `\n` `\t`.
 
-Arithmetic: `+ - * / %`. When both numbers are whole, `/` is whole-number division. Comparisons: `== != < > <= >=`. Logic: `and`, `or`, `not`. Parentheses group expressions: `(1 + 2) * 3`.
+Arithmetic: `+ - * / %`. `/` is ordinary division, so `5 / 2` is `2.5`. Comparisons: `== != < > <= >=`. Logic: `and`, `or`, `not`. Parentheses group expressions: `(1 + 2) * 3`.
 
-`+` joins text, and also joins two lists. A call's argument is a whole expression, so wrap a call in parentheses when you add more text after it:
+`+` joins text, and also joins two lists. A call argument stops before `+`, so this prints `Vire</p>`:
 
 ```vire
-say "hi " + (text with n)
+say escape with "Vire" + "</p>"
 ```
+
+Use parentheses when a single argument itself contains `+`: `area with (1 + 2), 4`.
 
 `say` prints a line. `ask with "Name? "` reads one line from the terminal.
 
@@ -186,7 +188,7 @@ let loaded be parse with read with "data/tasks.json"
 say now
 ```
 
-`json` turns a Vire value into text. `parse` turns that text back into a value. `now` is the local time as `yyyy-MM-dd HH:mm:ss`. In an expression, write `(now)` so it is not read as a stored name.
+`json` turns a Vire value into text. `parse` turns that text back into a value. `now` is the local time as `yyyy-MM-dd HH:mm:ss`, and it is a word of the language, so you can write `say now`. A definition that ends without `return` yields `none`. A definition with no parameters can be used by its bare name.
 
 `fetch with "https://example.com"` performs one HTTP GET. The address must start with `http://` or `https://`. The wait is at most 5 seconds, and the body is at most 1,000,000 bytes.
 
@@ -238,8 +240,12 @@ end
 2. `line` adds a line of text.
 3. `field` adds an editable box. The name is how you read it later.
 4. `button` adds a button. The second argument is the definition to call when it is clicked.
-5. `value with "note"` reads the box.
+5. `value with "note"` reads that box.
 6. `show` displays the window and waits until it is closed.
+7. `place with 16, 80` sets where the next line, field, or button goes.
+8. `mark with 16, 120, 140, 48, "tapped"` paints a rectangle that calls `tapped` when it is clicked. `board.vire` is that program.
+
+`tests.vire` checks division, call-and-plus, a missing return, the clock, and a path that tries to leave the folder. Run `vire.exe tests.vire`. It prints `pass`.
 
 Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.txt`.
 
@@ -275,8 +281,8 @@ The window in section 11 is the path that stays inside Vire. The site path write
 
 - Put every program in the folder with `vire.exe`, or pass a path to a `.vire` file. The file's folder is the sandbox root.
 - Start every runnable file with definitions, and include `define main` in the file you pass to `vire.exe`. Packages must not require their own `main`.
-- Call definitions as `name with arg`. Zero-argument builtins such as `now` and `show` are written as a bare name.
-- Wrap a call in parentheses before using `+` on its result.
+- Call definitions as `name with arg`. A bare name with no parameters, and the words `now` and `show`, run with no `with`.
+- A call argument stops before `+`. Parenthesize an argument that itself uses `+`.
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
 - Prefer the window operations for an application. Use `serve` only when the result must be a browser page.

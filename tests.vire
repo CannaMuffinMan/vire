@@ -1,0 +1,37 @@
+define blank
+end
+
+define main
+  let ok be true
+  if (escape with "Vire" + "</p>") != "Vire</p>"
+    say "call"
+    let ok be false
+  end
+  if (5 / 2) != 2.5
+    say "divide"
+    let ok be false
+  end
+  if blank != none
+    say "return"
+    let ok be false
+  end
+  if (length with text with now) < 16
+    say "clock"
+    let ok be false
+  end
+  try
+    read with "../secret.txt"
+    say "sandbox"
+    let ok be false
+  miss problem
+    if (find with problem, "folder") < 0
+      say "sandbox"
+      let ok be false
+    end
+  end
+  if ok
+    say "pass"
+  else
+    say "fail"
+  end
+end

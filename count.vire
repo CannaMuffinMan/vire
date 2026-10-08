@@ -1,4 +1,4 @@
-~ Vire program. Run with: python vire.py count.vire
+~ Vire program. Run with: vire.exe count.vire
 
 define main
   let n be 1
