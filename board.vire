@@ -1,11 +1,15 @@
-define tapped
-  line with "the mark was hit"
+define tapped with x, y
+  ink with 20, 70, 60
+  dot with x, y, 6
+  line with "marked"
 end
 
 define main
   open with "Vire board"
-  line with "A window drawn by Vire"
-  place with 16, 80
-  mark with 16, 120, 140, 48, "tapped"
+  sheet with 420, 260
+  ink with 176, 98, 58
+  fill with 24, 24, 120, 48
+  stroke with 24, 100, 280, 160
+  watch with "tapped"
   show
 end

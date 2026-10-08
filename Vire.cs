@@ -61,6 +61,41 @@ sealed class Env
     }
 }
 
+sealed class Stroke
+{
+    public string Kind;
+    public int A, B, C, D;
+    public System.Drawing.Color Color;
+    public Stroke(string kind, int a, int b, int c, int d, System.Drawing.Color color)
+    {
+        Kind = kind; A = a; B = b; C = c; D = d; Color = color;
+    }
+}
+
+sealed class SheetBox : Panel
+{
+    public List<Stroke> Ops = new List<Stroke>();
+    public SheetBox()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        BackColor = System.Drawing.Color.White;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        foreach (Stroke mark in Ops)
+        {
+            using (System.Drawing.Pen pen = new System.Drawing.Pen(mark.Color, 2))
+            using (System.Drawing.SolidBrush brush = new System.Drawing.SolidBrush(mark.Color))
+            {
+                if (mark.Kind == "fill") e.Graphics.FillRectangle(brush, mark.A, mark.B, mark.C, mark.D);
+                else if (mark.Kind == "stroke") e.Graphics.DrawLine(pen, mark.A, mark.B, mark.C, mark.D);
+                else e.Graphics.FillEllipse(brush, mark.A - mark.C, mark.B - mark.C, mark.C * 2, mark.C * 2);
+            }
+        }
+    }
+}
+
 sealed class Machine
 {
     const int MaxCalls = 64;
@@ -76,11 +111,16 @@ sealed class Machine
     int nextTop = 16;
     int nextLeft = 16;
     Dictionary<string, TextBox> fields = new Dictionary<string, TextBox>();
+    SheetBox sheet;
+    System.Drawing.Color inkColor = System.Drawing.Color.Black;
+    string watchName;
+    int watchLine;
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
-        "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show", "place", "mark"
+        "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show", "place", "mark",
+        "sheet", "ink", "stroke", "fill", "dot", "watch"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -138,7 +178,9 @@ sealed class Machine
         Step(line);
         int need = 1;
         if (name == "now" || name == "show") need = 0;
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet") need = 2;
+        if (name == "ink" || name == "dot") need = 3;
+        if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
         if (name == "slice") need = 3;
@@ -397,6 +439,44 @@ sealed class Machine
             AddMark((int)args[0], (int)args[1], (int)args[2], (int)args[3], func, line);
             return 0;
         }
+        if (name == "sheet")
+        {
+            if (!(args[0] is int) || !(args[1] is int)) throw new VireError("sheet needs a width and a height", line);
+            AddSheet((int)args[0], (int)args[1], line);
+            return 0;
+        }
+        if (name == "ink")
+        {
+            inkColor = ColorOf(args[0], args[1], args[2], line);
+            return 0;
+        }
+        if (name == "stroke")
+        {
+            Draw("stroke", args, line);
+            return 0;
+        }
+        if (name == "fill")
+        {
+            Draw("fill", args, line);
+            return 0;
+        }
+        if (name == "dot")
+        {
+            if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int)) throw new VireError("dot needs three whole numbers", line);
+            RequireSheet(line);
+            sheet.Ops.Add(new Stroke("dot", (int)args[0], (int)args[1], (int)args[2], 0, inkColor));
+            sheet.Invalidate();
+            return 0;
+        }
+        if (name == "watch")
+        {
+            string func = args[0] as string;
+            if (func == null || !funcs.ContainsKey(func)) throw new VireError("watch needs a definition name", line);
+            RequireSheet(line);
+            watchName = func;
+            watchLine = line;
+            return 0;
+        }
         if (name == "value")
         {
             string fieldName = args[0] as string;
@@ -494,6 +574,55 @@ sealed class Machine
             catch (VireError exc) { MessageBox.Show(exc.Message, "Vire"); }
         };
         form.Controls.Add(panel);
+    }
+
+    void AddSheet(int width, int height, int line)
+    {
+        if (form == null) throw new VireError("open a window first", line);
+        if (width < 1 || height < 1 || width > 2000 || height > 2000) throw new VireError("sheet size is out of range", line);
+        sheet = new SheetBox();
+        sheet.Left = nextLeft;
+        sheet.Top = nextTop;
+        sheet.Width = width;
+        sheet.Height = height;
+        sheet.MouseClick += delegate(object sender, MouseEventArgs ev) { HitSheet(ev.X, ev.Y); };
+        form.Controls.Add(sheet);
+        nextTop += height + 12;
+    }
+
+    void HitSheet(int x, int y)
+    {
+        if (watchName == null || sheet == null) return;
+        Func func = funcs[watchName];
+        List<object> args = new List<object>();
+        if (func.Params.Count >= 1) args.Add(x);
+        if (func.Params.Count >= 2) args.Add(y);
+        try { Call(watchName, args, watchLine); }
+        catch (VireError exc) { MessageBox.Show(exc.Message, "Vire"); }
+        sheet.Invalidate();
+    }
+
+    void RequireSheet(int line)
+    {
+        if (sheet == null) throw new VireError("open a sheet first", line);
+    }
+
+    static System.Drawing.Color ColorOf(object r, object g, object b, int line)
+    {
+        if (!(r is int) || !(g is int) || !(b is int)) throw new VireError("ink needs three whole numbers", line);
+        int rr = (int)r, gg = (int)g, bb = (int)b;
+        if (rr < 0 || rr > 255 || gg < 0 || gg > 255 || bb < 0 || bb > 255) throw new VireError("ink numbers run from 0 to 255", line);
+        return System.Drawing.Color.FromArgb(rr, gg, bb);
+    }
+
+    void Draw(string kind, List<object> args, int line)
+    {
+        if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int) || !(args[3] is int))
+            throw new VireError(kind + " needs four whole numbers", line);
+        RequireSheet(line);
+        if (sheet.Ops.Count > 10000) throw new VireError("the sheet has too many marks", line);
+        sheet.Ops.Add(new Stroke(kind, (int)args[0], (int)args[1], (int)args[2], (int)args[3], inkColor));
+        sheet.Invalidate();
     }
 
     void Serve(int port, int line)

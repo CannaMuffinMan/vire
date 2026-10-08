@@ -1,0 +1,65 @@
+define check with fails, got, want
+  if got != want
+    return fails + 1
+  end
+  return fails
+end
+
+define blank
+end
+
+define area with w, h
+  return w * h
+end
+
+define numbers with fails
+  let fails be check with fails, (5 / 2), 2.5
+  let fails be check with fails, (4 / 2), 2
+  let fails be check with fails, (escape with "Vire" + "</p>"), "Vire</p>"
+  let fails be check with fails, (area with (1 + 2), 4), 12
+  let fails be check with fails, blank, none
+  return fails
+end
+
+define records with fails
+  let row be parse with json with {"n": 2.5}
+  let fails be check with fails, (row at "n"), 2.5
+  let fails be check with fails, (join with (split with "a,b", ","), "-"), "a-b"
+  let fails be check with fails, (kind with [1]), "list"
+  let fails be check with fails, (has with {"ok": true}, "ok"), true
+  return fails
+end
+
+define trouble with fails
+  try
+    number with "nope"
+    return fails + 1
+  miss problem
+  end
+  try
+    let unused be 1 / 0
+    return fails + 1
+  miss problem
+  end
+  return fails
+end
+
+define guard with fails
+  try
+    read with "../secret.txt"
+    return fails + 1
+  miss problem
+    if (find with problem, "folder") < 0
+      return fails + 1
+    end
+  end
+  try
+    write with "nope.exe", "x"
+    return fails + 1
+  miss problem
+  end
+  if (length with text with now) < 16
+    return fails + 1
+  end
+  return fails
+end

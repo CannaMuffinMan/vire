@@ -243,9 +243,12 @@ end
 5. `value with "note"` reads that box.
 6. `show` displays the window and waits until it is closed.
 7. `place with 16, 80` sets where the next line, field, or button goes.
-8. `mark with 16, 120, 140, 48, "tapped"` paints a rectangle that calls `tapped` when it is clicked. `board.vire` is that program.
+8. `sheet with 420, 260` adds a white drawing surface.
+9. `ink with 176, 98, 58` chooses the color for later drawing. The numbers run from 0 to 255.
+10. `fill` paints a rectangle. `stroke` paints a line. `dot with x, y, 6` paints a circle.
+11. `watch with "tapped"` calls that definition with the click's x and y. The definition draws by calling `ink` and `dot` again. `board.vire` is that program.
 
-`tests.vire` checks division, call-and-plus, a missing return, the clock, and a path that tries to leave the folder. Run `vire.exe tests.vire`. It prints `pass`.
+`tests.vire` loads `checks/core.vire`. That file defines `check`, then groups for numbers, records, failures, and the folder boundary. The program prints `pass`, or the number of checks that failed. Run `vire.exe tests.vire`.
 
 Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.txt`.
 
