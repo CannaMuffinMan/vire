@@ -1,45 +1,52 @@
 # Vire
 
-Vire is a small programming language with its own syntax. Programs are `.vire` files. `vire.exe` runs them. A program can compute, store data, read and write files in its own folder, load local packages, and open a window.
+Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 8 SDK, can run them. A Windows desktop build can also open a window.
 
-The full guide for people and for coding agents is [GUIDE.md](GUIDE.md).
+The manual is [GUIDE.md](GUIDE.md).
 
-## Run on Windows, Linux, or macOS
+## Run with Docker
 
-The desktop window runner is `vire.exe` on Windows. Everywhere else, Vire runs in the terminal. Start a program with `term` if you are using `vire.exe` and do not want a window. The other runners are already in terminal mode.
-
-Self-contained runners are in `dist` after a publish:
-
-| Machine | File |
-| --- | --- |
-| Linux, 64-bit Intel | `dist/linux-x64/vire` |
-| Linux, 64-bit ARM | `dist/linux-arm64/vire` |
-| macOS, Intel | `dist/osx-x64/vire` |
-| macOS, Apple silicon | `dist/osx-arm64/vire` |
-| Windows, 64-bit | `dist/win-x64/vire.exe` |
+This does not depend on a Windows PC.
 
 ```text
-./dist/linux-x64/vire tests.vire
+docker build -t vire .
+docker run --rm vire tests.vire
 ```
 
-Build them again with the .NET 8 SDK:
+`tests.vire` is inside the image. It should print `pass`.
+
+To run your own program, mount the folder that contains it:
+
+```text
+docker run --rm -v "$PWD":/work vire my.vire
+```
+
+On Windows PowerShell, if Docker cannot mount the drive, copy the program into a folder on `C:` or keep using the files already in the image: `tests.vire`, `count.vire`, `term.vire`, and `vault.vire`.
+
+## Run with .NET 8
+
+```text
+dotnet run -c Release -- tests.vire
+```
+
+That runner uses the terminal. `open` and `show` do not draw a desktop window.
+
+Publish a single file for another machine:
 
 ```text
 dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o dist/linux-x64
+dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o dist/linux-arm64
+dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -o dist/osx-x64
+dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -o dist/osx-arm64
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64
 ```
 
-Use `linux-arm64`, `osx-x64`, `osx-arm64`, or `win-x64` the same way. These runners do not open a desktop window. `tests.vire` prints `pass` on them, including the sheet check.
+## Windows desktop window
+
+`vire.exe` in a Windows build opens a real window for `work.vire` and `board.vire`. Build it with:
 
 ```text
-vire.exe work.vire
-```
-
-That opens a window titled "Vire tasks". Save writes `data/note.txt`. `board.vire` draws on a sheet. `tests.vire` loads `checks/core.vire` and prints `pass` when the checks hold.
-
-Build the runner on Windows from the source in this repo:
-
-```text
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:vire.exe Vire.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:vire.exe Vire.cs
 ```
 
 ## License

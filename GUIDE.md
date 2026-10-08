@@ -151,7 +151,16 @@ Useful operations:
 | `abs with n` / `min with a, b` / `max with a, b` | numbers |
 | `text with value` / `number with text` | convert |
 | `kind with value` | `number`, `text`, `list`, `map`, `bool`, or `none` |
-| `escape with text` | text safe to place in HTML |
+| `replace with text, "a", "b"` | text with each `a` changed to `b` |
+| `begins with text, "vi"` / `ends with text, "re"` | `true` or `false` |
+| `round with 2.5` | nearest whole number |
+| `pick with 4` | a whole number from 0 through 3 |
+| `exists with "data/log.txt"` | `true` when that file or folder is in the program folder |
+| `folders with "."` | folder names in a directory |
+| `append with "data/log.txt", "two"` | adds text to the end of a file |
+| `copy with "a.txt", "b.txt"` | copies inside the program folder |
+| `erase with "data/log.txt"` | deletes a file in the program folder |
+| `clear` | removes every mark on the current sheet |
 
 `for name in map` walks the keys. `for name in text` walks characters.
 
@@ -254,16 +263,20 @@ Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.tx
 
 ## 12. Step by step: a local site
 
-Vire can also write a folder of web files and serve them on this computer only.
+Vire writes the browser files, then serves that one folder on this computer only. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire.
 
-1. Build the files with a program that `write`s `site/index.html` and `site/app.css`. The `ui` package has `page` and `style` for that.
-2. Run a program whose `main` is `serve with 8080`.
-3. Open `http://127.0.0.1:8080/`.
-4. Press Ctrl+C in the terminal to stop it.
+`vault.vire` is the one-shot local experiment:
 
-The server listens on this machine only. It serves files from `site`, allows `.html`, `.css`, `.js`, `.svg`, `.json`, and `.txt`, and refuses `..`. The port must be from 1024 through 65535.
+1. Run `vire.exe vault.vire`.
+2. It lists `site/videos` with `files`, keeps names that end in `.mp4`, `.webm`, or `.ogv`, and writes `site/catalog.json`.
+3. It writes `site/index.html`, `site/vault.css`, and `site/vault.js`. The page has a player, a playlist, and a search box. The script loads the catalog and points the player at `videos/` plus the file name.
+4. It also writes a branching story (`site/story.html`, `site/story.json`) that remembers the last room in the browser, and a dashboard (`site/dash.html`, `site/data.json`) that loads its numbers with `fetch`.
+5. Run `vire.exe serve.vire` and open `http://127.0.0.1:8080/`.
+6. Press Ctrl+C to stop the server.
 
-The window in section 11 is the path that stays inside Vire. The site path writes HTML because browsers read HTML.
+Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. The server allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 80 MB, and a player may request a byte range so seeking works. Other files stay at 1 MB. `..` is refused. The port must be from 1024 through 65535. Nothing is uploaded and nothing is public: the listener is `127.0.0.1` only.
+
+The window in section 11 stays inside Vire. The site path is for a browser.
 
 ## 13. Use cases
 
@@ -279,6 +292,7 @@ The window in section 11 is the path that stays inside Vire. The site path write
 10. Open a small desktop tool with `open`, `field`, `button`, and `show`, as `work.vire` does.
 11. Save a list of records as JSON, then build a page from those records.
 12. Serve that page on this computer with `serve`.
+13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open them through `serve`.
 
 ## 14. Rules an agent should follow
 

@@ -6,5 +6,6 @@
     <Nullable>disable</Nullable>
     <AssemblyName>vire</AssemblyName>
     <RootNamespace>Vire</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 </Project>

@@ -142,8 +142,9 @@ sealed class Machine
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
-        "files", "json", "parse", "now", "fetch", "open", "line", "field", "button", "value", "show", "place", "mark",
-        "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks"
+        "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
+        "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
+        "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append", "round", "pick", "clear"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -200,9 +201,9 @@ sealed class Machine
     {
         Step(line);
         int need = 1;
-        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks") need = 0;
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet") need = 2;
-        if (name == "ink" || name == "dot") need = 3;
+        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear") need = 0;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
+        if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
@@ -402,19 +403,32 @@ sealed class Machine
                 request.ReadWriteTimeout = 5000;
                 request.UserAgent = "Vire";
                 request.MaximumAutomaticRedirections = 2;
-                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
-                using (Stream stream = response.GetResponseStream())
-                {
-                    byte[] data = new byte[1000001];
-                    int used = 0;
-                    int n;
-                    while (used < data.Length && (n = stream.Read(data, used, data.Length - used)) > 0) used += n;
-                    if (used > 1000000) throw new VireError("the response is too large", line);
-                    return Encoding.UTF8.GetString(data, 0, used);
-                }
+                return ReadHttp(request, line);
             }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not fetch that address", line); }
+        }
+        if (name == "post")
+        {
+            string url = args[0] as string;
+            if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
+                throw new VireError("post needs an http or https address", line);
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                request.Method = "POST";
+                request.Timeout = 5000;
+                request.ReadWriteTimeout = 5000;
+                request.UserAgent = "Vire";
+                byte[] payload = Encoding.UTF8.GetBytes(Show(args[1]));
+                if (payload.Length > 1000000) throw new VireError("text is too large to send", line);
+                request.ContentType = "text/plain";
+                request.ContentLength = payload.Length;
+                using (Stream body = request.GetRequestStream()) body.Write(payload, 0, payload.Length);
+                return ReadHttp(request, line);
+            }
+            catch (VireError) { throw; }
+            catch (Exception) { throw new VireError("could not post to that address", line); }
         }
         if (name == "open")
         {
@@ -541,6 +555,76 @@ sealed class Machine
         }
         if (name == "screen") return string.Join("\n", termLines.ToArray());
         if (name == "marks") return MarkList();
+        if (name == "replace")
+        {
+            string raw = args[0] as string;
+            string oldText = args[1] as string;
+            string newer = args[2] as string;
+            if (raw == null || oldText == null || newer == null) throw new VireError("replace needs three texts", line);
+            return raw.Replace(oldText, newer);
+        }
+        if (name == "begins" || name == "ends")
+        {
+            string raw = args[0] as string;
+            string edge = args[1] as string;
+            if (raw == null || edge == null) throw new VireError(name + " needs two texts", line);
+            return name == "begins" ? raw.StartsWith(edge) : raw.EndsWith(edge);
+        }
+        if (name == "exists") return File.Exists(SafePath(args[0], line)) || Directory.Exists(SafePath(args[0], line));
+        if (name == "folders")
+        {
+            string path = SafePath(args[0], line);
+            if (!Directory.Exists(path)) throw new VireError("there is no folder by that name", line);
+            List<object> names = new List<object>();
+            foreach (string dir in Directory.GetDirectories(path)) names.Add(Path.GetFileName(dir));
+            return names;
+        }
+        if (name == "erase")
+        {
+            string path = SafePath(args[0], line);
+            RefuseProgram(path, line);
+            if (File.Exists(path)) File.Delete(path);
+            return true;
+        }
+        if (name == "copy")
+        {
+            string from = SafePath(args[0], line);
+            string to = SafePath(args[1], line);
+            RefuseProgram(to, line);
+            string parent = Path.GetDirectoryName(to);
+            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
+            File.Copy(from, to, true);
+            return args[1];
+        }
+        if (name == "append")
+        {
+            string path = SafePath(args[0], line);
+            RefuseProgram(path, line);
+            string text = Show(args[1]);
+            if (text.Length > MaxText) throw new VireError("text is too large to write", line);
+            string parent = Path.GetDirectoryName(path);
+            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
+            File.AppendAllText(path, text, Encoding.UTF8);
+            return text;
+        }
+        if (name == "round")
+        {
+            if (!IsNum(args[0])) throw new VireError("round needs a number", line);
+            return (int)Math.Round(ToDouble(args[0]), MidpointRounding.AwayFromZero);
+        }
+        if (name == "pick")
+        {
+            if (!(args[0] is int) || (int)args[0] < 1) throw new VireError("pick needs a whole number above zero", line);
+            return new Random().Next((int)args[0]);
+        }
+        if (name == "clear")
+        {
+            termOps.Clear();
+#if WINDOWS
+            if (sheet != null) { sheet.Ops.Clear(); sheet.Invalidate(); }
+#endif
+            return 0;
+        }
         List<object> parts = args[0] as List<object>;
         string joiner = args[1] as string;
         if (parts == null || joiner == null) throw new VireError("join needs a list of text", line);
@@ -726,6 +810,13 @@ sealed class Machine
 #endif
     }
 
+    static void RefuseProgram(string path, int line)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi")
+            throw new VireError("vire will not write a program file", line);
+    }
+
     List<Stroke> ActiveOps()
     {
 #if WINDOWS
@@ -784,6 +875,20 @@ sealed class Machine
         }
     }
 
+    static string ReadHttp(HttpWebRequest request, int line)
+    {
+        using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+        using (Stream stream = response.GetResponseStream())
+        {
+            byte[] data = new byte[1000001];
+            int used = 0;
+            int n;
+            while (used < data.Length && (n = stream.Read(data, used, data.Length - used)) > 0) used += n;
+            if (used > 1000000) throw new VireError("the response is too large", line);
+            return Encoding.UTF8.GetString(data, 0, used);
+        }
+    }
+
     void Serve(int port, int line)
     {
         if (port < 1024 || port > 65535) throw new VireError("port must be from 1024 to 65535", line);
@@ -816,31 +921,107 @@ sealed class Machine
         int lineEnd = request.IndexOf("\r\n");
         if (lineEnd < 0) { Send(stream, 400, "text/plain", "bad request"); return; }
         string[] bits = request.Substring(0, lineEnd).Split(' ');
-        if (bits.Length < 2 || (bits[0] != "GET" && bits[0] != "HEAD")) { Send(stream, 405, "text/plain", "method not allowed"); return; }
+        if (bits.Length < 2) { Send(stream, 400, "text/plain", "bad request"); return; }
         string url = bits[1];
         int query = url.IndexOf('?');
         if (query >= 0) url = url.Substring(0, query);
+        if (bits[0] == "POST" && url == "/inbox")
+        {
+            int split = request.IndexOf("\r\n\r\n");
+            string posted = split >= 0 ? request.Substring(split + 4) : "";
+            if (posted.Length > 1000000) posted = posted.Substring(0, 1000000);
+            File.WriteAllText(Path.Combine(site, "inbox.txt"), posted, Encoding.UTF8);
+            Send(stream, 200, "text/plain", "saved");
+            return;
+        }
+        if (bits[0] != "GET" && bits[0] != "HEAD") { Send(stream, 405, "text/plain", "method not allowed"); return; }
         if (url == "/") url = "/index.html";
         url = url.Replace('/', Path.DirectorySeparatorChar);
         if (url.Contains("..") || url.IndexOf(':') >= 0) { Send(stream, 403, "text/plain", "forbidden"); return; }
         string ext = Path.GetExtension(url).ToLowerInvariant();
-        string type = ext == ".html" ? "text/html" : ext == ".css" ? "text/css" : ext == ".js" ? "text/javascript" : ext == ".svg" ? "image/svg+xml" : ext == ".json" ? "application/json" : ext == ".txt" ? "text/plain" : null;
-        if (type == null) { Send(stream, 403, "text/plain", "forbidden"); return; }
+        string type = null;
+        int limit = 1000000;
+        if (ext == ".html") type = "text/html";
+        else if (ext == ".css") type = "text/css";
+        else if (ext == ".js") type = "text/javascript";
+        else if (ext == ".svg") type = "image/svg+xml";
+        else if (ext == ".json") type = "application/json";
+        else if (ext == ".txt") type = "text/plain";
+        else if (ext == ".mp4") { type = "video/mp4"; limit = 512000000; }
+        else if (ext == ".webm") { type = "video/webm"; limit = 512000000; }
+        else if (ext == ".ogv") { type = "video/ogg"; limit = 512000000; }
+        if (type == null) { SendBytes(stream, 403, "text/plain", Encoding.UTF8.GetBytes("forbidden"), 0, 9, false, 9); return; }
         string path = Path.GetFullPath(Path.Combine(site, url.TrimStart(Path.DirectorySeparatorChar)));
         string siteFull = Path.GetFullPath(site).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!path.StartsWith(siteFull, StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) { Send(stream, 404, "text/plain", "not found"); return; }
-        byte[] body = File.ReadAllBytes(path);
-        if (body.Length > 1000000) { Send(stream, 413, "text/plain", "too large"); return; }
-        Send(stream, 200, type, bits[0] == "HEAD" ? "" : Encoding.UTF8.GetString(body));
+        long length = new FileInfo(path).Length;
+        if (length > limit) { Send(stream, 413, "text/plain", "too large"); return; }
+        long start = 0;
+        long count = length;
+        bool partial = false;
+        int rangeAt = request.IndexOf("Range: bytes=");
+        if (rangeAt >= 0 && length > 0)
+        {
+            int rangeEnd = request.IndexOf("\r\n", rangeAt);
+            string spec = request.Substring(rangeAt + 13, (rangeEnd < 0 ? request.Length : rangeEnd) - (rangeAt + 13));
+            int dash = spec.IndexOf('-');
+            if (dash >= 0)
+            {
+                long from = 0;
+                long to = length - 1;
+                if (dash > 0) long.TryParse(spec.Substring(0, dash), out from);
+                if (dash + 1 < spec.Length) long.TryParse(spec.Substring(dash + 1), out to);
+                if (from < 0) from = 0;
+                if (to >= length) to = length - 1;
+                if (from <= to)
+                {
+                    start = from;
+                    count = to - from + 1;
+                    partial = true;
+                }
+            }
+        }
+        if (bits[0] == "HEAD") count = 0;
+        using (FileStream file = File.OpenRead(path))
+            SendFile(stream, partial ? 206 : 200, type, file, start, count, partial, length);
     }
 
     static void Send(NetworkStream stream, int code, string type, string body)
     {
         byte[] data = Encoding.UTF8.GetBytes(body);
-        string head = "HTTP/1.0 " + code + " OK\r\nContent-Type: " + type + "\r\nContent-Length: " + data.Length + "\r\nConnection: close\r\n\r\n";
+        SendBytes(stream, code, type, data, 0, data.Length, false, data.Length);
+    }
+
+    static void SendBytes(NetworkStream stream, int code, string type, byte[] data, int start, int count, bool partial, int total)
+    {
+        string reason = code == 206 ? "Partial Content" : "OK";
+        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
+        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
+        head += "Connection: close\r\n\r\n";
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
-        if (data.Length > 0) stream.Write(data, 0, data.Length);
+        if (count > 0) stream.Write(data, start, count);
+    }
+
+    static void SendFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total)
+    {
+        string reason = code == 206 ? "Partial Content" : "OK";
+        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
+        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
+        head += "Connection: close\r\n\r\n";
+        byte[] prefix = Encoding.ASCII.GetBytes(head);
+        stream.Write(prefix, 0, prefix.Length);
+        if (count <= 0) return;
+        file.Seek(start, SeekOrigin.Begin);
+        byte[] buf = new byte[65536];
+        long left = count;
+        while (left > 0)
+        {
+            int n = file.Read(buf, 0, (int)Math.Min(buf.Length, left));
+            if (n <= 0) break;
+            stream.Write(buf, 0, n);
+            left -= n;
+        }
     }
 
     static string SliceText(string value, int start, int end)
@@ -996,7 +1177,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear"))
                 return Builtin(name, new List<object>(), (int)tree[2]);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), (int)tree[2]);

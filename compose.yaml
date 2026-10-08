@@ -1,0 +1,5 @@
+services:
+  vire:
+    build: .
+    working_dir: /work
+    entrypoint: ["vire", "tests.vire"]

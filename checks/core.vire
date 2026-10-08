@@ -65,6 +65,32 @@ define guard with fails
   return fails
 end
 
+define tools with fails
+  let fails be check with fails, (replace with "a-b-a", "a", "c"), "c-b-c"
+  let fails be check with fails, (begins with "vire", "vi"), true
+  let fails be check with fails, (ends with "vire", "re"), true
+  let fails be check with fails, (round with 2.5), 3
+  write with "data/log.txt", "one"
+  append with "data/log.txt", "two"
+  let fails be check with fails, (read with "data/log.txt"), "onetwo"
+  let fails be check with fails, (exists with "data/log.txt"), true
+  erase with "data/log.txt"
+  let fails be check with fails, (exists with "data/log.txt"), false
+  try
+    copy with "data/log.txt", "bad.exe"
+    return fails + 1
+  miss problem
+  end
+  let n be pick with 4
+  if n < 0
+    return fails + 1
+  end
+  if n > 3
+    return fails + 1
+  end
+  return fails
+end
+
 define picture with fails
   term
   open with "sheet"
