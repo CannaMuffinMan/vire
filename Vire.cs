@@ -5,6 +5,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 #if WINDOWS
 using System.Windows.Forms;
@@ -138,7 +139,8 @@ sealed class Machine
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
-        "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append", "round", "pick", "clear"
+        "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
+        "round", "pick", "clear", "hash"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -151,7 +153,7 @@ sealed class Machine
 
     void Step(int line)
     {
-        steps++;
+        steps = System.Threading.Interlocked.Increment(ref steps);
         if (steps > MaxSteps) throw new VireError("program ran too long and was stopped", line);
     }
 
@@ -316,9 +318,7 @@ sealed class Machine
             string path = SafePath(args[0], line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi")
-                throw new VireError("vire will not write a program file", line);
+            RefuseProgram(path, line);
             try
             {
                 string parent = Path.GetDirectoryName(path);
@@ -355,6 +355,18 @@ sealed class Machine
             return map.ContainsKey(KeyOf(args[1], line));
         }
         if (name == "kind") return KindOf(args[0]);
+        if (name == "hash")
+        {
+            string raw = args[0] as string;
+            if (raw == null) raw = Show(args[0]);
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
+                StringBuilder hex = new StringBuilder();
+                foreach (byte piece in bytes) hex.Append(piece.ToString("x2"));
+                return hex.ToString();
+            }
+        }
         if (name == "abs")
         {
             if (!IsNum(args[0])) throw new VireError("abs needs a number", line);
@@ -457,7 +469,7 @@ sealed class Machine
             DemandPublic(url, line);
             try { return SendWeb(HttpMethod.Get, url, null, line); }
             catch (VireError) { throw; }
-            catch (Exception) { throw new VireError("could not fetch that address", line); }
+            catch (Exception exc) { throw new VireError(exc.GetBaseException().Message, line); }
         }
         if (name == "post")
         {
@@ -919,17 +931,26 @@ sealed class Machine
         }
     }
 
-    static readonly HttpClient web = new HttpClient();
+    static readonly HttpClient web = CreateWeb();
+
+    static HttpClient CreateWeb()
+    {
+        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+        HttpClient client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(8);
+        return client;
+    }
 
     static string SendWeb(HttpMethod method, string url, string body, int line)
     {
-        web.Timeout = TimeSpan.FromSeconds(5);
         using (HttpRequestMessage message = new HttpRequestMessage(method, url))
         {
             if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
             using (HttpResponseMessage response = web.SendAsync(message).Result)
             {
                 string text = response.Content.ReadAsStringAsync().Result;
+                int code = (int)response.StatusCode;
+                if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
                 if (text.Length > 1000000) throw new VireError("the response is too large", line);
                 return text;
             }

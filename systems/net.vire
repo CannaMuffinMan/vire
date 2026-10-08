@@ -1,0 +1,16 @@
+~ One frame, checked and delivered in memory. No sockets.
+
+define main
+  let frame be {"source": "host-a", "dest": "port-7", "payload": "ping"}
+  let ports be {"port-7": ""}
+  if (frame at "dest") == "port-7"
+    put frame at "payload" into ports at "port-7"
+  else
+    say "net fail"
+  end
+  if (ports at "port-7") == "ping"
+    say "net pass"
+  else
+    say "net fail"
+  end
+end

@@ -1,0 +1,26 @@
+~ Tiny page reader. Visible text and links only.
+
+define between with page, open, close
+  let start be find with page, open
+  if start < 0
+    return ""
+  end
+  let from be start + length with open
+  let rest be slice with page, from, length with page
+  let rel be find with rest, close
+  if rel < 0
+    return ""
+  end
+  return slice with rest, 0, rel
+end
+
+define main
+  let page be "<p>Hello</p><a href=\"/x\">Go</a>"
+  let text be between with page, "<p>", "</p>"
+  let link be between with page, "href=\"", "\""
+  if text == "Hello"
+    if link == "/x"
+      say "page pass"
+    end
+  end
+end

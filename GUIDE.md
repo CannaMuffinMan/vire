@@ -295,6 +295,7 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 11. Save a list of records as JSON, then build a page from those records.
 12. Serve that page on this computer with `serve`.
 13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open them through `serve`.
+14. Run the small systems under `systems/`: a block chain, a tiny expression language, a page reader, a search index, a file-system image, an in-memory frame, and a virtual CPU that schedules two guests.
 
 ## 14. Rules an agent should follow
 

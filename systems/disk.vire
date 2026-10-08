@@ -1,0 +1,17 @@
+~ A two-file image stored as one JSON document.
+
+define main
+  let image be {"readme": "boot", "note": ""}
+  put "hello disk" into image at "note"
+  write with "data/disk.json", json with image
+  let back be parse with read with "data/disk.json"
+  if (back at "note") == "hello disk"
+    if (back at "readme") == "boot"
+      say "disk pass"
+    else
+      say "disk fail"
+    end
+  else
+    say "disk fail"
+  end
+end

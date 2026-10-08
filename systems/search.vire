@@ -1,0 +1,20 @@
+~ Tiny search index over three local documents.
+
+define main
+  let docs be [["birds", "fly"], ["vire", "runs"], ["pages", "links"]]
+  let index be {}
+  let n be 0
+  while n < length with docs
+    let words be docs at n
+    let i be 0
+    while i < length with words
+      put n into index at words at i
+      let i be i + 1
+    end
+    let n be n + 1
+  end
+  let hit be index at "vire"
+  if hit == 1
+    say "search pass"
+  end
+end

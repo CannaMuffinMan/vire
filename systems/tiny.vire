@@ -1,0 +1,89 @@
+~ Tiny expression language: numbers, + and -, parentheses, left to right.
+
+define pack with v, i
+  return {"v": v, "i": i}
+end
+
+define read_num with src, i
+  let start be i
+  let n be length with src
+  while i < n
+    let c be src at i
+    if c == "+"
+      stop
+    else if c == "-"
+      stop
+    else if c == "("
+      stop
+    else if c == ")"
+      stop
+    else if c == " "
+      stop
+    else
+      let i be i + 1
+    end
+  end
+  let piece be slice with src, start, i
+  return pack with (number with piece), i
+end
+
+define factor with src, i
+  while i < (length with src)
+    if (src at i) == " "
+      let i be i + 1
+    else
+      stop
+    end
+  end
+  if (src at i) == "("
+    let r be expr with src, (i + 1)
+    let j be r at "i"
+    while j < (length with src)
+      if (src at j) == " "
+        let j be j + 1
+      else
+        stop
+      end
+    end
+    return pack with (r at "v"), (j + 1)
+  end
+  return read_num with src, i
+end
+
+define expr with src, i
+  let r be factor with src, i
+  let v be r at "v"
+  let i be r at "i"
+  let n be length with src
+  while i < n
+    let c be src at i
+    if c == " "
+      let i be i + 1
+    else if c == "+"
+      let r be factor with src, (i + 1)
+      let v be v + (r at "v")
+      let i be r at "i"
+    else if c == "-"
+      let r be factor with src, (i + 1)
+      let v be v - (r at "v")
+      let i be r at "i"
+    else
+      stop
+    end
+  end
+  return pack with v, i
+end
+
+define tiny with src
+  let r be expr with src, 0
+  return r at "v"
+end
+
+define main
+  let got be tiny with "(1+2)-3"
+  if got == 0
+    say "tiny pass"
+  else
+    say "tiny fail"
+  end
+end

@@ -1,0 +1,56 @@
+~ Tiny chain: genesis plus two blocks, stored as json.
+
+define code with ch
+  if ch == "e"
+    return 101
+  end
+  if ch == "g"
+    return 103
+  end
+  if ch == "n"
+    return 110
+  end
+  if ch == "o"
+    return 111
+  end
+  if ch == "t"
+    return 116
+  end
+  if ch == "w"
+    return 119
+  end
+  return 0
+end
+
+define checksum with body
+  let total be 0
+  for ch in body
+    let total be total + code with ch
+  end
+  return total
+end
+
+define block with index, text, previous
+  let proof be hash with (text + text with previous)
+  return {"index": index, "text": text, "previous": previous, "proof": proof}
+end
+
+define main
+  let genesis be block with 0, "gen", 0
+  let first be block with 1, "one", genesis at "proof"
+  let second be block with 2, "two", first at "proof"
+  let chain be []
+  push with chain, genesis
+  push with chain, first
+  push with chain, second
+  write with "data/chain.json", json with chain
+  let loaded be parse with read with "data/chain.json"
+  let earlier be loaded at 1
+  let later be loaded at 2
+  let link be later at "previous"
+  if link == earlier at "proof" or link == earlier at "previous"
+    say "chain pass"
+  else
+    say "chain fail"
+  end
+end

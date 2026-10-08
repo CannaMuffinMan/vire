@@ -1,0 +1,24 @@
+~ Legal public data: one real block hash, and the text of a public page.
+
+define main
+  try
+    let tip be fetch with "https://blockstream.info/api/blocks/tip/hash"
+    if (length with tip) == 64
+      say "block pass"
+    else
+      say tip
+    end
+  miss problem
+    say problem
+  end
+  try
+    let page be fetch with "https://example.com/"
+    if (find with page, "Example Domain") >= 0
+      say "web pass"
+    else
+      say "web fail"
+    end
+  miss problem
+    say problem
+  end
+end
