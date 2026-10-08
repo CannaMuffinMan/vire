@@ -46,7 +46,7 @@ end
 To rebuild the runner from source:
 
 ```text
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:vire.exe Vire.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /out:vire.exe Vire.cs
 ```
 
 ## 3. Names and values

@@ -46,7 +46,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 `vire.exe` in a Windows build opens a real window for `work.vire` and `board.vire`. Build it with:
 
 ```text
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:vire.exe Vire.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /out:vire.exe Vire.cs
 ```
 
 ## License

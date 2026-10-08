@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 #if WINDOWS
@@ -46,19 +47,16 @@ sealed class Func
 
 sealed class Env
 {
-    public Env Parent;
     public Dictionary<string, object> Values = new Dictionary<string, object>();
     public void Declare(string name, object value) { Values[name] = value; }
     public bool Has(string name)
     {
-        if (Values.ContainsKey(name)) return true;
-        return Parent != null && Parent.Has(name);
+        return Values.ContainsKey(name);
     }
 
     public object Get(string name, int line)
     {
         if (Values.ContainsKey(name)) return Values[name];
-        if (Parent != null) return Parent.Get(name, line);
         throw new VireError(name + " has no value", line);
     }
 }
@@ -117,10 +115,6 @@ sealed class Machine
     Form form;
     Dictionary<string, TextBox> boxes = new Dictionary<string, TextBox>();
     SheetBox sheet;
-#else
-    object form;
-    Dictionary<string, string> boxes = new Dictionary<string, string>();
-    List<Stroke> sheet;
 #endif
 #if WINDOWS
     bool desk;
@@ -461,16 +455,7 @@ sealed class Machine
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line);
             DemandPublic(url, line);
-            try
-            {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "GET";
-                request.Timeout = 5000;
-                request.ReadWriteTimeout = 5000;
-                request.UserAgent = "Vire";
-                request.MaximumAutomaticRedirections = 2;
-                return ReadHttp(request, line);
-            }
+            try { return SendWeb(HttpMethod.Get, url, null, line); }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not fetch that address", line); }
         }
@@ -482,17 +467,9 @@ sealed class Machine
             DemandPublic(url, line);
             try
             {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "POST";
-                request.Timeout = 5000;
-                request.ReadWriteTimeout = 5000;
-                request.UserAgent = "Vire";
-                byte[] payload = Encoding.UTF8.GetBytes(Show(args[1]));
+                string payload = Show(args[1]);
                 if (payload.Length > 1000000) throw new VireError("text is too large to send", line);
-                request.ContentType = "text/plain";
-                request.ContentLength = payload.Length;
-                using (Stream body = request.GetRequestStream()) body.Write(payload, 0, payload.Length);
-                return ReadHttp(request, line);
+                return SendWeb(HttpMethod.Post, url, payload, line);
             }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not post to that address", line); }
@@ -529,7 +506,7 @@ sealed class Machine
         if (name == "place")
         {
             if (!(args[0] is int) || !(args[1] is int)) throw new VireError("place needs two whole numbers", line);
-            if (form == null) throw new VireError("open a window first", line);
+            if (title == null) throw new VireError("open a window first", line);
             nextLeft = (int)args[0];
             nextTop = (int)args[1];
             return 0;
@@ -942,17 +919,20 @@ sealed class Machine
         }
     }
 
-    static string ReadHttp(HttpWebRequest request, int line)
+    static readonly HttpClient web = new HttpClient();
+
+    static string SendWeb(HttpMethod method, string url, string body, int line)
     {
-        using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
-        using (Stream stream = response.GetResponseStream())
+        web.Timeout = TimeSpan.FromSeconds(5);
+        using (HttpRequestMessage message = new HttpRequestMessage(method, url))
         {
-            byte[] data = new byte[1000001];
-            int used = 0;
-            int n;
-            while (used < data.Length && (n = stream.Read(data, used, data.Length - used)) > 0) used += n;
-            if (used > 1000000) throw new VireError("the response is too large", line);
-            return Encoding.UTF8.GetString(data, 0, used);
+            if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
+            using (HttpResponseMessage response = web.SendAsync(message).Result)
+            {
+                string text = response.Content.ReadAsStringAsync().Result;
+                if (text.Length > 1000000) throw new VireError("the response is too large", line);
+                return text;
+            }
         }
     }
 
@@ -1339,8 +1319,8 @@ sealed class Machine
         if (op == "or") return Truth(Eval(node[2], env)) || Truth(Eval(node[3], env));
         object left = Eval(node[2], env);
         object right = Eval(node[3], env);
-        if (op == "==") return Equals(left, right);
-        if (op == "!=") return !Equals(left, right);
+        if (op == "==") return ValuesMatch(left, right);
+        if (op == "!=") return !ValuesMatch(left, right);
         if (op == "+")
         {
             if (left is string || right is string) return Show(left) + Show(right);
@@ -1376,7 +1356,7 @@ sealed class Machine
         throw new VireError("unknown operator " + op, line);
     }
 
-    static bool Equals(object left, object right)
+    static bool ValuesMatch(object left, object right)
     {
         if (left == null || right == null) return left == null && right == null;
         if (IsNum(left) && IsNum(right)) return ToDouble(left) == ToDouble(right);
