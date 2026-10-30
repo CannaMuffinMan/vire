@@ -209,7 +209,23 @@ let loaded be parse with read with "data/tasks.json"
 say now
 ```
 
-`json` turns a Vire value into text. `parse` turns that text back into a value. `now` is the local time as `yyyy-MM-dd HH:mm:ss`, and it is a word of the language, so you can write `say now`. A definition that ends without `return` yields `none`. A definition with no parameters can be used by its bare name.
+`json` turns a Vire value into text. `parse` turns that text back into a value. `parse with text, schema` then checks the value against a schema map. The schema uses `kind` (`text`, `number`, `bool`, `none`, `list`, `map`). A map schema may list `need` (required keys), `keys` (per-key schemas), and `closed` (when `true`, extra keys are refused). Parse rejects text longer than 1,000,000 characters, nesting deeper than 256, and lists or maps with more than 100,000 items. Wrong types, missing required keys, and extra keys on a closed map are errors.
+
+Safe crypto is backed only by the .NET BCL (no extra packages, no hand-rolled primitives):
+
+```vire
+let key be "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+say hmac with "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b", "Hi There"
+say samebytes with "ab", "ab"
+let packed be encrypt with key, "hello"
+say decrypt with key, packed
+say length with (random with 16)
+say token with 16
+```
+
+`random with n` returns `n` CSPRNG bytes as lowercase hex (`n` from 1 to 4096). `token with n` returns an unpadded base64url token from `n` CSPRNG bytes (`n` from 16 to 64). `hmac with key, text` is HMAC-SHA256; the key is hex. `samebytes` compares two texts in constant time (UTF-8 bytes; different lengths are false). `encrypt with key, text` is AES-256-GCM with a required 32-byte hex key and a fresh 12-byte CSPRNG nonce every call (the nonce is prepended; you cannot supply one, so a nonce cannot be reused through this builtin). `decrypt with key, packed` takes that hex packing (`nonce || ciphertext || tag`) and fails closed on any tamper. Ed25519 sign/verify is not exposed: the .NET 10 BCL has no standalone Ed25519 type (only composite ML-DSA hybrids), and Vire will not hand-roll signatures.
+
+`now` is the local time as `yyyy-MM-dd HH:mm:ss`, and it is a word of the language, so you can write `say now`. A definition that ends without `return` yields `none`. A definition with no parameters can be used by its bare name.
 
 `fetch with "https://example.com"` performs one HTTP GET. The address must start with `http://` or `https://`. The wait is at most 5 seconds, and the body is at most 1,000,000 bytes.
 

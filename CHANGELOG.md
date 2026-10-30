@@ -1,5 +1,14 @@
 # Changelog
 
+## Phase 1 (safe stdlib groundwork)
+
+Crypto and JSON pieces that do not wait on types or capabilities:
+
+- Builtins `random`, `token`, `hmac`, `samebytes`, `encrypt`, `decrypt` on both `Machine` and `CompiledMachine`, implemented once in `VireCrypto` with the .NET BCL (`RandomNumberGenerator`, `HMACSHA256`, `AesGcm`, `FixedTimeEquals`).
+- AES-256-GCM encrypt always generates a 12-byte nonce; decrypt fails closed on tampers. HMAC known-answer tests follow RFC 4231. GCM known-answer tests follow the all-zero NIST vectors.
+- `parse` accepts an optional schema map (`kind`, `need`, `keys`, `closed`) with explicit depth and size limits. Seeded fuzz covers the parser and GCM decrypt.
+- Ed25519 is documented as left: no standalone type in the .NET 10 BCL, no hand-rolled substitute.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.
