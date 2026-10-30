@@ -14,9 +14,16 @@ $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 $VireExe = Join-Path $Root "bin/Release/net10.0/vire.exe"
 function Invoke-Vire {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    if (Test-Path $VireExe) { & $VireExe @Args }
-    else { & dotnet exec $VireDll @Args }
-    return $LASTEXITCODE
+    # Capture stdout so this function returns only the exit code. A
+    # PowerShell function otherwise returns stdout mixed with LASTEXITCODE,
+    # so `$code -ne 0` is true after a successful compile that printed
+    # "compiled". Read LASTEXITCODE before Write-Host.
+    if (Test-Path $VireExe) { $out = & $VireExe @Args }
+    else { $out = & dotnet exec $VireDll @Args }
+    $code = $LASTEXITCODE
+    if ($null -ne $out) { $out | Write-Host }
+    if ($null -eq $code) { return 0 }
+    return [int]$code
 }
 
 $programs = @(
@@ -32,7 +39,7 @@ foreach ($program in $programs) {
     $hexRel = "data/native-smoke/" + $program.Name + ".hex"
     $code = Invoke-Vire compile-native.vire $srcRel $hexRel
     if ($code -ne 0) {
-        Write-Output "FAIL compile $($program.Name)"
+        Write-Output "FAIL compile $($program.Name) exit=$code"
         $failed = $true
         continue
     }
