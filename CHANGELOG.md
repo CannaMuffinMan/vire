@@ -18,3 +18,9 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - Close-out. `PHASE0-DONE.md` maps each Phase 0 done-criterion to a test or CI job. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
 
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
+
+## Phase 3A (compiler grammar, first cut)
+
+- Dual-mode conformance harness: each suite program runs in the interpreter and as compiled `.vc`; stdout must match, and stderr matches after normalizing columns.
+- `compiler.vire` parses `for`/`skip`, `else if`, `try`/`miss`, `use`/`need`, map literals, decimals, and emits line/column on the tree.
+- `CompiledMachine` executes those steps, fills in more builtins used by the suite, and reports the real line and column on errors.

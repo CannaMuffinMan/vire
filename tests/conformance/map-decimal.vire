@@ -1,0 +1,6 @@
+define main
+  let row be {"n": 2.5, "ok": true}
+  say row at "n"
+  say has with row, "ok"
+  say 1.5 + 2.25
+end
