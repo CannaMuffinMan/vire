@@ -18,40 +18,45 @@ static class VirePaths
 
     public static void CheckName(string raw, int line)
     {
+        CheckName(raw, line, 1);
+    }
+
+    public static void CheckName(string raw, int line, int column)
+    {
         if (raw == null || raw.Trim().Length == 0)
-            throw new VireError("a file path must be text", line);
+            throw new VireError("a file path must be text", line, column);
         if (raw.IndexOf('\0') >= 0)
-            throw new VireError("files stay inside the program folder", line);
+            throw new VireError("files stay inside the program folder", line, column);
         if (Path.IsPathRooted(raw))
-            throw new VireError("files stay inside the program folder", line);
+            throw new VireError("files stay inside the program folder", line, column);
         if (raw.IndexOf(':') >= 0)
-            throw new VireError("files stay inside the program folder", line);
+            throw new VireError("files stay inside the program folder", line, column);
         string slash = raw.Replace('\\', '/');
         if (slash.StartsWith("/") || slash.StartsWith("//"))
-            throw new VireError("files stay inside the program folder", line);
+            throw new VireError("files stay inside the program folder", line, column);
         string[] parts = slash.Split('/');
         if (parts.Length == 0)
-            throw new VireError("files stay inside the program folder", line);
+            throw new VireError("files stay inside the program folder", line, column);
         for (int i = 0; i < parts.Length; i++)
         {
             string part = parts[i];
             if (part.Length == 0)
             {
                 if (i == 0 || i == parts.Length - 1) continue;
-                throw new VireError("files stay inside the program folder", line);
+                throw new VireError("files stay inside the program folder", line, column);
             }
             if (part == "." || part == "..")
-                throw new VireError("files stay inside the program folder", line);
+                throw new VireError("files stay inside the program folder", line, column);
             if (part.EndsWith(".") || part.EndsWith(" "))
-                throw new VireError("files stay inside the program folder", line);
+                throw new VireError("files stay inside the program folder", line, column);
             for (int n = 0; n < part.Length; n++)
             {
                 char ch = part[n];
                 if (ch < 32 || ch == '<' || ch == '>' || ch == '"' || ch == '|' || ch == '?' || ch == '*')
-                    throw new VireError("files stay inside the program folder", line);
+                    throw new VireError("files stay inside the program folder", line, column);
             }
             if (IsDeviceName(part))
-                throw new VireError("files stay inside the program folder", line);
+                throw new VireError("files stay inside the program folder", line, column);
         }
     }
 
@@ -93,58 +98,88 @@ static class VirePaths
 
     public static string CombineUnder(string root, string rel, int line)
     {
-        CheckName(rel, line);
+        return CombineUnder(root, rel, line, 1);
+    }
+
+    public static string CombineUnder(string root, string rel, int line, int column)
+    {
+        CheckName(rel, line, column);
         string full;
         try { full = Path.GetFullPath(Path.Combine(root, rel)); }
-        catch (ArgumentException) { throw new VireError("files stay inside the program folder", line); }
-        catch (NotSupportedException) { throw new VireError("files stay inside the program folder", line); }
+        catch (ArgumentException) { throw new VireError("files stay inside the program folder", line, column); }
+        catch (NotSupportedException) { throw new VireError("files stay inside the program folder", line, column); }
         string baseFull = Path.GetFullPath(root);
         if (!InFolder(baseFull, full))
-            throw new VireError("files stay inside the program folder", line);
-        RefuseReparse(full, baseFull, line);
+            throw new VireError("files stay inside the program folder", line, column);
+        RefuseReparse(full, baseFull, line, column);
         return full;
     }
 
     public static string DataOrSite(string root, string rel, int line)
     {
-        string full = CombineUnder(root, rel, line);
+        return DataOrSite(root, rel, line, 1);
+    }
+
+    public static string DataOrSite(string root, string rel, int line, int column)
+    {
+        string full = CombineUnder(root, rel, line, column);
         if (!UnderWritableZone(root, full))
-            throw new VireError("files stay in data or site", line);
+            throw new VireError("files stay in data or site", line, column);
         return full;
     }
 
     public static string ProgramFile(string root, string rel, int line)
     {
+        return ProgramFile(root, rel, line, 1);
+    }
+
+    public static string ProgramFile(string root, string rel, int line, int column)
+    {
         if (rel == null || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-            throw new VireError("run needs a vire file in this folder", line);
-        string full = CombineUnder(root, rel, line);
+            throw new VireError("run needs a vire file in this folder", line, column);
+        string full = CombineUnder(root, rel, line, column);
         if (UnderWritableZone(root, full))
-            throw new VireError("run stays out of data and site", line);
+            throw new VireError("run stays out of data and site", line, column);
         return full;
     }
 
     public static string UseFile(string root, string rel, int line)
     {
-        CheckName(rel, line);
+        return UseFile(root, rel, line, 1);
+    }
+
+    public static string UseFile(string root, string rel, int line, int column)
+    {
+        CheckName(rel, line, column);
         if (!rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-            throw new VireError("use stays inside the program folder and only opens .vire files", line);
-        string full = CombineUnder(root, rel, line);
+            throw new VireError("use stays inside the program folder and only opens .vire files", line, column);
+        string full = CombineUnder(root, rel, line, column);
         if (UnderWritableZone(root, full))
-            throw new VireError("use stays out of data and site", line);
+            throw new VireError("use stays out of data and site", line, column);
         return full;
     }
 
     public static void RefuseProgram(string path, int line)
     {
+        RefuseProgram(path, line, 1);
+    }
+
+    public static void RefuseProgram(string path, int line, int column)
+    {
         string ext = NormalizedExtension(path);
         for (int i = 0; i < BlockedWriteExt.Length; i++)
         {
             if (ext == BlockedWriteExt[i])
-                throw new VireError("vire will not write a program file", line);
+                throw new VireError("vire will not write a program file", line, column);
         }
     }
 
     public static void RefuseReparse(string path, string root, int line)
+    {
+        RefuseReparse(path, root, line, 1);
+    }
+
+    public static void RefuseReparse(string path, string root, int line, int column)
     {
         string cursor = path;
         string rootFull = Path.GetFullPath(root);
@@ -154,11 +189,11 @@ static class VirePaths
             {
                 if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
                     (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                    throw new VireError("files stay inside the program folder", line);
+                    throw new VireError("files stay inside the program folder", line, column);
             }
             catch (VireError) { throw; }
-            catch (IOException) { throw new VireError("files stay inside the program folder", line); }
-            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", line); }
+            catch (IOException) { throw new VireError("files stay inside the program folder", line, column); }
+            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", line, column); }
             string parent = Path.GetDirectoryName(cursor);
             if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
             cursor = parent;

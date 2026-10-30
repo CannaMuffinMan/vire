@@ -86,63 +86,73 @@ static class VireNet
 
     internal static IPAddress DemandPublic(string url, int line)
     {
+        return DemandPublic(url, line, 1);
+    }
+
+    internal static IPAddress DemandPublic(string url, int line, int column)
+    {
         Uri parsed;
         if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
-            throw new VireError("that address is not allowed", line);
+            throw new VireError("that address is not allowed", line, column);
         if (parsed.Scheme != "http" && parsed.Scheme != "https")
-            throw new VireError("that address is not allowed", line);
+            throw new VireError("that address is not allowed", line, column);
         if (!string.IsNullOrEmpty(parsed.UserInfo))
-            throw new VireError("that address is not allowed", line);
+            throw new VireError("that address is not allowed", line, column);
         string host = parsed.IdnHost;
         if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-            throw new VireError("fetch stays off this machine and private networks", line);
+            throw new VireError("fetch stays off this machine and private networks", line, column);
         bool testOrigin = IsTestOrigin(host);
         IPAddress literal;
         if (IPAddress.TryParse(host, out literal))
         {
             if (testOrigin) return literal;
             if (!IsPublicAddress(literal))
-                throw new VireError("fetch stays off this machine and private networks", line);
+                throw new VireError("fetch stays off this machine and private networks", line, column);
             if (parsed.Scheme != "https")
-                throw new VireError("fetch allows https only", line);
+                throw new VireError("fetch allows https only", line, column);
             return literal;
         }
         if (!testOrigin && parsed.Scheme != "https")
-            throw new VireError("fetch allows https only", line);
+            throw new VireError("fetch allows https only", line, column);
         IPAddress[] addresses;
         try { addresses = ResolveHost(host); }
-        catch (Exception) { throw new VireError("could not check that address", line); }
+        catch (Exception) { throw new VireError("could not check that address", line, column); }
         if (addresses == null || addresses.Length == 0)
-            throw new VireError("could not check that address", line);
+            throw new VireError("could not check that address", line, column);
         IPAddress chosen = null;
         for (int i = 0; i < addresses.Length; i++)
         {
             IPAddress address = addresses[i];
             if (!testOrigin && !IsPublicAddress(address))
-                throw new VireError("fetch stays off this machine and private networks", line);
+                throw new VireError("fetch stays off this machine and private networks", line, column);
             if (chosen == null) chosen = address;
         }
-        if (chosen == null) throw new VireError("could not check that address", line);
+        if (chosen == null) throw new VireError("could not check that address", line, column);
         return chosen;
     }
 
     internal static string SendWeb(HttpMethod method, string url, string body, int line)
+    {
+        return SendWeb(method, url, body, line, 1);
+    }
+
+    internal static string SendWeb(HttpMethod method, string url, string body, int line, int column)
     {
         string current = url;
         HttpMethod verb = method;
         string payload = body;
         for (int hop = 0; hop <= MaxRedirects; hop++)
         {
-            IPAddress pinned = DemandPublic(current, line);
+            IPAddress pinned = DemandPublic(current, line, column);
             int code;
             string location;
-            string text = SendPinned(verb, current, payload, pinned, line, out code, out location);
+            string text = SendPinned(verb, current, payload, pinned, line, column, out code, out location);
             if (code >= 300 && code <= 399)
             {
                 if (hop == MaxRedirects)
-                    throw new VireError("too many redirects", line);
+                    throw new VireError("too many redirects", line, column);
                 if (string.IsNullOrEmpty(location))
-                    throw new VireError("that address is not allowed", line);
+                    throw new VireError("that address is not allowed", line, column);
                 Uri nextAbs;
                 if (!Uri.TryCreate(location, UriKind.Absolute, out nextAbs))
                     nextAbs = new Uri(new Uri(current), location);
@@ -151,13 +161,13 @@ static class VireNet
                 verb = HttpMethod.Get;
                 continue;
             }
-            if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
+            if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line, column);
             return text;
         }
-        throw new VireError("too many redirects", line);
+        throw new VireError("too many redirects", line, column);
     }
 
-    static string SendPinned(HttpMethod method, string url, string body, IPAddress pinned, int line, out int code, out string location)
+    static string SendPinned(HttpMethod method, string url, string body, IPAddress pinned, int line, int column, out int code, out string location)
     {
         SocketsHttpHandler handler = new SocketsHttpHandler();
         handler.AllowAutoRedirect = false;
@@ -172,18 +182,18 @@ static class VireNet
                 HttpResponseMessage response;
                 try { response = client.SendAsync(message).GetAwaiter().GetResult(); }
                 catch (VireError) { throw; }
-                catch (Exception) { throw new VireError("could not reach that address", line); }
+                catch (Exception) { throw new VireError("could not reach that address", line, column); }
                 using (response)
                 {
                     code = (int)response.StatusCode;
                     location = response.Headers.Location == null ? null : response.Headers.Location.ToString();
-                    return ReadLimited(response, line);
+                    return ReadLimited(response, line, column);
                 }
             }
         }
     }
 
-    static string ReadLimited(HttpResponseMessage response, int line)
+    static string ReadLimited(HttpResponseMessage response, int line, int column)
     {
         using (Stream stream = response.Content.ReadAsStream())
         {
@@ -195,7 +205,7 @@ static class VireNet
                 int n = stream.Read(chunk, 0, chunk.Length);
                 if (n <= 0) break;
                 total += n;
-                if (total > MaxResponse) throw new VireError("the response is too large", line);
+                if (total > MaxResponse) throw new VireError("the response is too large", line, column);
                 buffer.Write(chunk, 0, n);
             }
             return Encoding.UTF8.GetString(buffer.ToArray());
