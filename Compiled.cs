@@ -24,7 +24,7 @@ sealed class CompiledProgram
             funcs[(string)func["name"]] = func;
         }
         Budget budget = new Budget();
-        budget.MaxSteps = Program.BudgetOf("");
+        budget.ApplyStepLimit(Program.BudgetOf(""));
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
         machine.Call("main", new List<object>());
     }

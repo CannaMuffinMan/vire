@@ -31,6 +31,24 @@ public class HarnessTests
     }
 
     [Fact]
+    public void DockerfileCopiesEveryRootCsharpFile()
+    {
+        string root = FindRoot();
+        string docker = File.ReadAllText(Path.Combine(root, "Dockerfile"));
+        Match copy = Regex.Match(docker, @"^COPY (.+) \./\s*$", RegexOptions.Multiline);
+        Assert.True(copy.Success, "expected a COPY ... ./ line");
+        string spec = copy.Groups[1].Value;
+        foreach (string path in Directory.GetFiles(root, "*.cs"))
+        {
+            string name = Path.GetFileName(path);
+            Assert.True(
+                spec.Contains("*.cs") || (" " + spec + " ").Contains(" " + name + " "),
+                "Dockerfile must copy " + name);
+        }
+        Assert.Contains("vire.csproj", spec);
+    }
+
+    [Fact]
     public void GitTracksNoBinaries()
     {
         string root = FindRoot();
