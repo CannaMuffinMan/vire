@@ -212,7 +212,8 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt",
+        "random", "token", "hmac", "samebytes", "encrypt", "decrypt"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -307,6 +308,7 @@ sealed class Machine
     object Builtin(string name, List<object> args, int line, int col)
     {
         Step(line);
+        if (VireCrypto.IsName(name)) return VireCrypto.Builtin(name, args, line, col);
         int need = 1;
         if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
@@ -315,7 +317,12 @@ sealed class Machine
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
         if (name == "slice") need = 3;
-        if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
+        if (name == "parse")
+        {
+            if (args.Count != 1 && args.Count != 2)
+                throw new VireError("parse takes 1 or 2 values, got " + args.Count, line, col);
+        }
+        else if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "length")
         {
             if (args[0] is string) return ((string)args[0]).Length;
@@ -558,7 +565,9 @@ sealed class Machine
         {
             string raw = args[0] as string;
             if (raw == null) throw new VireError("parse needs text", line, col);
-            return Json.Read(raw, line);
+            object value = Json.Read(raw, line);
+            if (args.Count == 2) Json.Check(value, args[1], line);
+            return value;
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "fetch")
@@ -2080,8 +2089,14 @@ sealed class Json
         return chars.ToString();
     }
 
+    public const int MaxChars = 1000000;
+    public const int MaxDepth = 256;
+    public const int MaxItems = 100000;
+
     public static object Read(string text, int line)
     {
+        if (text == null) throw new VireError("parse needs text", line);
+        if (text.Length > MaxChars) throw new VireError("json is too large", line);
         int i = 0;
         object value = ReadValue(text, ref i, line);
         Skip(text, ref i);
@@ -2089,9 +2104,95 @@ sealed class Json
         return value;
     }
 
+    public static void Check(object value, object schema, int line)
+    {
+        CheckValue(value, schema, line, 0);
+    }
+
+    static void CheckValue(object value, object schema, int line, int depth)
+    {
+        if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
+        Dictionary<string, object> spec = schema as Dictionary<string, object>;
+        if (spec == null) throw new VireError("json schema must be a map", line);
+        string kind = null;
+        if (spec.ContainsKey("kind")) kind = spec["kind"] as string;
+        if (kind == null) throw new VireError("json schema needs a kind", line);
+        if (kind == "text")
+        {
+            if (!(value is string)) throw new VireError("json has the wrong type", line);
+            return;
+        }
+        if (kind == "number")
+        {
+            if (!(value is int || value is double)) throw new VireError("json has the wrong type", line);
+            return;
+        }
+        if (kind == "bool")
+        {
+            if (!(value is bool)) throw new VireError("json has the wrong type", line);
+            return;
+        }
+        if (kind == "none")
+        {
+            if (value != null) throw new VireError("json has the wrong type", line);
+            return;
+        }
+        if (kind == "list")
+        {
+            List<object> list = value as List<object>;
+            if (list == null) throw new VireError("json has the wrong type", line);
+            if (spec.ContainsKey("items"))
+            {
+                for (int i = 0; i < list.Count; i++)
+                    CheckValue(list[i], spec["items"], line, depth + 1);
+            }
+            return;
+        }
+        if (kind == "map")
+        {
+            Dictionary<string, object> map = value as Dictionary<string, object>;
+            if (map == null) throw new VireError("json has the wrong type", line);
+            bool closed = spec.ContainsKey("closed") && TrueOf(spec["closed"]);
+            Dictionary<string, object> keys = null;
+            if (spec.ContainsKey("keys")) keys = spec["keys"] as Dictionary<string, object>;
+            if (spec.ContainsKey("need"))
+            {
+                List<object> need = spec["need"] as List<object>;
+                if (need == null) throw new VireError("json schema need must be a list", line);
+                foreach (object item in need)
+                {
+                    string name = item as string;
+                    if (name == null) throw new VireError("json schema need must be text", line);
+                    if (!map.ContainsKey(name)) throw new VireError("json is missing a required key", line);
+                }
+            }
+            if (keys != null)
+            {
+                foreach (KeyValuePair<string, object> pair in map)
+                {
+                    if (!keys.ContainsKey(pair.Key))
+                    {
+                        if (closed) throw new VireError("json has an extra key", line);
+                        continue;
+                    }
+                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1);
+                }
+            }
+            else if (closed && map.Count > 0)
+                throw new VireError("json has an extra key", line);
+            return;
+        }
+        throw new VireError("json schema has an unknown kind", line);
+    }
+
+    static bool TrueOf(object value)
+    {
+        return value is bool && (bool)value;
+    }
+
     static object ReadValue(string text, ref int i, int line, int depth = 0)
     {
-        if (depth > 256) throw new VireError("json is nested too deeply", line);
+        if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
         Skip(text, ref i);
         if (i >= text.Length) throw new VireError("json ended early", line);
         char ch = text[i];
@@ -2110,7 +2211,7 @@ sealed class Json
         if (i < text.Length && text[i] == '}') { i++; return map; }
         while (i < text.Length)
         {
-            if (map.Count > 100000) throw new VireError("json is too large", line);
+            if (map.Count > MaxItems) throw new VireError("json is too large", line);
             string key = ReadString(text, ref i, line);
             Skip(text, ref i);
             if (i >= text.Length || text[i] != ':') throw new VireError("json needs a colon", line);
@@ -2132,7 +2233,7 @@ sealed class Json
         if (i < text.Length && text[i] == ']') { i++; return list; }
         while (i < text.Length)
         {
-            if (list.Count > 100000) throw new VireError("json is too large", line);
+            if (list.Count > MaxItems) throw new VireError("json is too large", line);
             list.Add(ReadValue(text, ref i, line, depth));
             Skip(text, ref i);
             if (i < text.Length && text[i] == ',') { i++; continue; }
