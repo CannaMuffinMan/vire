@@ -1,0 +1,4 @@
+~ expect line 3 col 7
+define main
+  say missing
+end

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 
 sealed class CompiledProgram
 {
@@ -45,6 +46,18 @@ sealed class CompiledMachine
     int inkR;
     int inkG;
     int inkB;
+    List<string> termLines = new List<string>();
+    List<string> termFields = new List<string>();
+    Dictionary<string, string> termValues = new Dictionary<string, string>();
+    List<string> termButtons = new List<string>();
+    List<string> termActions = new List<string>();
+    string watchName;
+    int watchLine;
+    int nextTop = 16;
+    int nextLeft = 16;
+    internal int ListenPort;
+    const int MaxItems = 100000;
+    const int MaxText = 1000000;
 
     public CompiledMachine(Dictionary<string, object> funcs, string root, List<object> args, Budget budget)
     {
@@ -57,6 +70,12 @@ sealed class CompiledMachine
     public object Call(string name, List<object> args)
     {
         return Call(name, args, 1, 1);
+    }
+
+    internal void ListenCore(int port, int line, CancellationToken stop)
+    {
+        if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
+        VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p);
     }
 
     public object Call(string name, List<object> args, int line, int col)
@@ -241,7 +260,7 @@ sealed class CompiledMachine
                 List<object> names = (List<object>)named["params"];
                 if (names.Count == 0) return Call(called, new List<object>(), AsLine(expr), AsCol(expr));
             }
-            Fail("there is no value named " + called, expr);
+            Fail(called + " has no value", expr);
         }
         if (op == "list") return Values((List<object>)expr[1], env);
         if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env), AsLine(expr), AsCol(expr));
@@ -446,6 +465,7 @@ sealed class CompiledMachine
         {
             List<object> list = args[0] as List<object>;
             if (list == null) throw new VireError("push needs a list", line, col);
+            if (list.Count >= MaxItems) throw new VireError("list is too large", line, col);
             list.Add(args[1]);
             return args[0];
         }
@@ -484,7 +504,12 @@ sealed class CompiledMachine
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {
-            try { return File.ReadAllText(Safe(args[0], line, col)); }
+            try
+            {
+                string text = File.ReadAllText(Safe(args[0], line, col));
+                if (text.Length > MaxText) throw new VireError("file is too large", line, col);
+                return text;
+            }
             catch (VireError) { throw; }
             catch (IOException) { throw new VireError("could not read that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not read that file", line, col); }
@@ -492,8 +517,9 @@ sealed class CompiledMachine
         if (name == "write")
         {
             string path = Safe(args[0], line, col);
-            VirePaths.RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line, col);
             string payload = Show(args[1]);
+            if (payload.Length > MaxText) throw new VireError("text is too large to write", line, col);
             try
             {
                 string parent = Path.GetDirectoryName(path);
@@ -611,7 +637,7 @@ sealed class CompiledMachine
         if (name == "erase")
         {
             string path = Safe(args[0], line, col);
-            VirePaths.RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line, col);
             VireFiles.Erase(path);
             return true;
         }
@@ -619,7 +645,7 @@ sealed class CompiledMachine
         {
             string from = Safe(args[0], line, col);
             string to = Safe(args[1], line, col);
-            VirePaths.RefuseProgram(to, line);
+            VirePaths.RefuseProgram(to, line, col);
             try { VireFiles.Copy(from, to); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
@@ -628,8 +654,9 @@ sealed class CompiledMachine
         if (name == "append")
         {
             string path = Safe(args[0], line, col);
-            VirePaths.RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line, col);
             string text = Show(args[1]);
+            if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
             try { VireFiles.AppendAllText(path, text); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
@@ -640,14 +667,14 @@ sealed class CompiledMachine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line, col);
-            try { return VireNet.SendWeb(HttpMethod.Get, url, null, line); }
+            try { return VireNet.SendWeb(HttpMethod.Get, url, null, line, col); }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not fetch that address", line, col); }
         }
         if (name == "run")
         {
             string rel = args[0] as string;
-            string full = VirePaths.ProgramFile(root, rel, line);
+            string full = VirePaths.ProgramFile(root, rel, line, col);
             budget.Runs++;
             System.IO.StringWriter sink = new System.IO.StringWriter();
             System.IO.TextWriter previous = Console.Out;
@@ -674,8 +701,8 @@ sealed class CompiledMachine
             string rel = args[0] as string;
             if (rel == null || rel.Length == 0 || rel.IndexOf('/') >= 0 || rel.IndexOf('\\') >= 0)
                 throw new VireError("sources needs one folder name inside this program", line, col);
-            VirePaths.CheckName(rel, line);
-            string dir = VirePaths.CombineUnder(root, rel, line);
+            VirePaths.CheckName(rel, line, col);
+            string dir = VirePaths.CombineUnder(root, rel, line, col);
             if (!Directory.Exists(dir))
                 throw new VireError("sources needs one folder name inside this program", line, col);
             if (VirePaths.UnderWritableZone(root, dir))
@@ -753,7 +780,234 @@ sealed class CompiledMachine
             }
             return list;
         }
+        if (name == "ask")
+        {
+            if (!(args[0] is string)) throw new VireError("ask needs text", line, col);
+            Console.Write((string)args[0]);
+            return Console.ReadLine() ?? "";
+        }
+        if (name == "span")
+        {
+            if (!(args[0] is int) || !(args[1] is int)) throw new VireError("span needs two whole numbers", line, col);
+            int from = (int)args[0];
+            int to = (int)args[1];
+            long count = (long)to - (long)from;
+            if (count < 0 || count > MaxItems) throw new VireError("span is too large", line, col);
+            List<object> items = new List<object>();
+            int n = from;
+            while (true)
+            {
+                items.Add(n);
+                if (n == to) break;
+                n++;
+            }
+            return items;
+        }
+        if (name == "drop")
+        {
+            List<object> list = args[0] as List<object>;
+            if (list == null || list.Count == 0) throw new VireError("drop needs a non-empty list", line, col);
+            object last = list[list.Count - 1];
+            list.RemoveAt(list.Count - 1);
+            return last;
+        }
+        if (name == "sort")
+        {
+            List<object> list = args[0] as List<object>;
+            if (list == null) throw new VireError("sort needs a list of numbers", line, col);
+            foreach (object item in list)
+                if (!IsNum(item)) throw new VireError("sort needs a list of numbers", line, col);
+            List<object> copy = new List<object>(list);
+            copy.Sort(delegate(object a, object b) { return ToDouble(a).CompareTo(ToDouble(b)); });
+            return copy;
+        }
+        if (name == "post")
+        {
+            string postUrl = args[0] as string;
+            if (postUrl == null || !(postUrl.StartsWith("https://") || postUrl.StartsWith("http://")))
+                throw new VireError("post needs an http or https address", line, col);
+            try
+            {
+                string payload = Show(args[1]);
+                if (payload.Length > 1000000) throw new VireError("text is too large to send", line, col);
+                return VireNet.SendWeb(HttpMethod.Post, postUrl, payload, line, col);
+            }
+            catch (VireError) { throw; }
+            catch (Exception) { throw new VireError("could not post to that address", line, col); }
+        }
+        if (name == "files")
+        {
+            string path = Safe(args[0], line, col);
+            if (!Directory.Exists(path)) throw new VireError("there is no folder by that name", line, col);
+            List<object> names = new List<object>();
+            foreach (string file in Directory.GetFiles(path)) names.Add(Path.GetFileName(file));
+            return names;
+        }
+        if (name == "folders")
+        {
+            string path = Safe(args[0], line, col);
+            if (!Directory.Exists(path)) throw new VireError("there is no folder by that name", line, col);
+            List<object> names = new List<object>();
+            foreach (string dir in Directory.GetDirectories(path)) names.Add(Path.GetFileName(dir));
+            return names;
+        }
+        if (name == "min" || name == "max")
+        {
+            if (!IsNum(args[0]) || !IsNum(args[1])) throw new VireError(name + " needs two numbers", line, col);
+            bool left = ToDouble(args[0]) <= ToDouble(args[1]);
+            return name == "min" ? (left ? args[0] : args[1]) : (left ? args[1] : args[0]);
+        }
+        if (name == "lower" || name == "upper")
+        {
+            string raw = args[0] as string;
+            if (raw == null) throw new VireError(name + " needs text", line, col);
+            return name == "lower" ? raw.ToLowerInvariant() : raw.ToUpperInvariant();
+        }
+        if (name == "listen")
+        {
+            if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
+            int port = Machine.RequirePort(args[0], line);
+            VireListen.WithCancel(port, line, root, DispatchRoute, Show, p => ListenPort = p);
+            return null;
+        }
+        if (name == "line")
+        {
+            string text = args[0] as string;
+            if (text == null) text = Show(args[0]);
+            if (title == null) throw new VireError("open a window first", line, col);
+            termLines.Add(text);
+            return 0;
+        }
+        if (name == "field")
+        {
+            string fieldName = args[0] as string;
+            if (fieldName == null) throw new VireError("field needs a name", line, col);
+            if (title == null) throw new VireError("open a window first", line, col);
+            termFields.Add(fieldName);
+            termValues[fieldName] = "";
+            return 0;
+        }
+        if (name == "button")
+        {
+            string label = args[0] as string;
+            string func = args[1] as string;
+            if (label == null || func == null) throw new VireError("button needs a label and a definition name", line, col);
+            if (title == null) throw new VireError("open a window first", line, col);
+            if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line, col);
+            termButtons.Add(label);
+            termActions.Add(func);
+            return 0;
+        }
+        if (name == "place")
+        {
+            if (!(args[0] is int) || !(args[1] is int)) throw new VireError("place needs two whole numbers", line, col);
+            if (title == null) throw new VireError("open a window first", line, col);
+            nextLeft = (int)args[0];
+            nextTop = (int)args[1];
+            return 0;
+        }
+        if (name == "mark")
+        {
+            if (args.Count < 5 || !(args[0] is int) || !(args[1] is int) || !(args[2] is int) || !(args[3] is int))
+                throw new VireError("mark needs four whole numbers and a definition name", line, col);
+            string func = args[4] as string;
+            if (func == null) throw new VireError("mark needs four whole numbers and a definition name", line, col);
+            if (title == null) throw new VireError("open a window first", line, col);
+            if (!funcs.ContainsKey(func)) throw new VireError("there is no definition named " + func, line, col);
+            termButtons.Add("mark");
+            termActions.Add(func);
+            return 0;
+        }
+        if (name == "watch")
+        {
+            string func = args[0] as string;
+            if (func == null || !funcs.ContainsKey(func)) throw new VireError("watch needs a definition name", line, col);
+            if (!termSheet) throw new VireError("open a sheet first", line, col);
+            watchName = func;
+            watchLine = line;
+            return 0;
+        }
+        if (name == "value")
+        {
+            string fieldName = args[0] as string;
+            if (fieldName == null || !termValues.ContainsKey(fieldName))
+                throw new VireError("there is no field by that name", line, col);
+            return termValues[fieldName];
+        }
+        if (name == "show")
+        {
+            if (title == null) throw new VireError("open a window before show", line, col);
+            TermShow();
+            return 0;
+        }
+        if (name == "screen") return string.Join("\n", termLines.ToArray());
+        if (name == "clear")
+        {
+            termOps.Clear();
+            return 0;
+        }
+        if (name == "serve")
+            throw new VireError("serve was removed; use listen", line, col);
         throw new VireError("compiled builtin missing: " + name, line, col);
+    }
+
+    object DispatchRoute(string method, string path, string body, int line, out int maxOutput)
+    {
+        CompiledMachine worker = new CompiledMachine(funcs, root, programArgs, Budget.ForRequest(budget));
+        maxOutput = worker.budget.MaxOutput;
+        List<object> call = new List<object>();
+        call.Add(method);
+        call.Add(path);
+        call.Add(body);
+        object result = worker.Call("route", call, line, 1);
+        string text = result as string;
+        if (text == null) text = Show(result);
+        if (text == null) text = "null";
+        worker.budget.Output = text.Length;
+        return result;
+    }
+
+    void TermShow()
+    {
+        while (true)
+        {
+            Console.WriteLine(title);
+            foreach (string row in termLines) Console.WriteLine(row);
+            foreach (string name in termFields)
+            {
+                Console.Write(name + ": ");
+                string typed = Console.ReadLine();
+                termValues[name] = typed == null ? "" : typed;
+            }
+            if (termSheet) Console.WriteLine("sheet " + termOps.Count);
+            for (int i = 0; i < termButtons.Count; i++) Console.WriteLine((i + 1) + " " + termButtons[i]);
+            Console.WriteLine("0 close");
+            string choice = Console.ReadLine();
+            if (choice == null || choice == "0" || choice == "") return;
+            int pick;
+            if (int.TryParse(choice, out pick) && pick >= 1 && pick <= termActions.Count)
+            {
+                try { Call(termActions[pick - 1], new List<object>(), watchLine, 1); }
+                catch (VireError exc) { Console.WriteLine(exc.Message); }
+                continue;
+            }
+            string[] bits = choice.Split(' ');
+            int x, y;
+            if (termSheet && bits.Length == 2 && int.TryParse(bits[0], out x) && int.TryParse(bits[1], out y))
+                HitSheet(x, y);
+        }
+    }
+
+    void HitSheet(int x, int y)
+    {
+        if (watchName == null) return;
+        Dictionary<string, object> named = (Dictionary<string, object>)funcs[watchName];
+        List<object> names = (List<object>)named["params"];
+        List<object> args = new List<object>();
+        if (names.Count >= 1) args.Add(x);
+        if (names.Count >= 2) args.Add(y);
+        try { Call(watchName, args, watchLine, 1); }
+        catch (VireError exc) { Console.WriteLine(exc.Message); }
     }
 
     static bool Same(object left, object right)
@@ -809,7 +1063,7 @@ sealed class CompiledMachine
         string rel = value as string;
         if (rel == null || rel.Length == 0)
             throw new VireError("files stay inside the program folder", line, col);
-        string full = VirePaths.CombineUnder(root, rel, line);
+        string full = VirePaths.CombineUnder(root, rel, line, col);
         if (!VirePaths.UnderWritableZone(root, full) && !RootIsDataOrSite())
             throw new VireError("files stay in data or site", line, col);
         if (RootIsDataOrSite() && !VirePaths.InFolder(root, full))
