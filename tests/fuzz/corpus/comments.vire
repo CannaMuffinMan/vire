@@ -1,0 +1,9 @@
+~ a comment
+define main with n
+  let x be n + 1
+  if x > 0
+    say x
+  else
+    say 0
+  end
+end

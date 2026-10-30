@@ -6,8 +6,8 @@
 # Stage 2+ run with the .vc sandbox root = data/, so remaining args are
 # relative to data/ (compiler.vire and stageN.vc names only).
 # Seal: throwaway 32-byte key in VIRE_SEAL_KEY (base64). VC2 uses a random
-# nonce, so this script compares unsealed payload SHA-256 via:
-#   vire payload-sha256 data/stageN.vc
+# nonce, so sealed files differ. This script compares unsealed payloads
+# byte-for-byte via payload-write + cmp, and also payload-sha256.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -43,6 +43,17 @@ echo "stage2 $hash2"
 echo "stage3 $hash3"
 if [[ "$hash1" != "$hash2" || "$hash2" != "$hash3" ]]; then
   echo "selfhost hashes differ" >&2
+  exit 1
+fi
+run_vire payload-write data/stage1.vc data/stage1.bin
+run_vire payload-write data/stage2.vc data/stage2.bin
+run_vire payload-write data/stage3.vc data/stage3.bin
+if ! cmp -s data/stage1.bin data/stage2.bin; then
+  echo "stage-1 payload bytes != stage-2 payload bytes" >&2
+  exit 1
+fi
+if ! cmp -s data/stage2.bin data/stage3.bin; then
+  echo "stage-2 payload bytes != stage-3 payload bytes" >&2
   exit 1
 fi
 echo "selfhost ok"

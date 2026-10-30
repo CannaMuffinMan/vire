@@ -1,11 +1,68 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using Xunit;
 
 public class CrashTests
 {
+    [Fact]
+    public void CrashCorpusRunsInOneProcess()
+    {
+        int pid = Environment.ProcessId;
+        string root = RepoRoot();
+        string crash = Path.Combine(root, "tests", "crash");
+        string[] files = Directory.GetFiles(crash, "*.vire");
+        Assert.True(files.Length >= 8, "expected the on-disk crash corpus");
+        foreach (string program in files)
+        {
+            string name = Path.GetFileName(program);
+            string budget = name == "nest-run.vire" ? "50" : "5000000";
+            RunResult result = Run(root, program, budget);
+            Assert.Equal(pid, Environment.ProcessId);
+            Assert.NotEqual(3, result.Code);
+            Assert.InRange(result.Code, 0, 2);
+            Assert.DoesNotContain("internal error", result.StdErr);
+        }
+
+        string deepProgram = Path.Combine(crash, "deep-json.vire");
+        File.WriteAllText(deepProgram, "define main\n  parse with \"" + new string('[', 100000) + new string(']', 100000) + "\"\n  say \"lived\"\nend\n");
+        string wide = Path.Combine(crash, "wide-expr.vire");
+        File.WriteAllText(wide, "define main\n  say " + new string('(', 200) + "1" + new string(')', 200) + "\nend\n");
+        string tooWide = Path.Combine(crash, "too-wide-expr.vire");
+        File.WriteAllText(tooWide, "define main\n  say " + new string('(', 10000) + "1" + new string(')', 10000) + "\nend\n");
+        string huge = Path.Combine(crash, "huge-num.vire");
+        File.WriteAllText(huge, "define main\n  say " + new string('9', 400) + "\nend\n");
+        string many = Path.Combine(crash, "many-while.vire");
+        File.WriteAllText(many, "define main\n  let n be 0\n  while n < 120000\n    let n be n + 1\n  end\n  say \"ok\"\nend\n");
+        string runaway = Path.Combine(crash, "runaway-while.vire");
+        File.WriteAllText(runaway, "define main\n  while 1\n  end\n  say \"escaped\"\nend\n");
+        try
+        {
+            RunResult deep = Run(root, deepProgram, null);
+            Assert.Equal(1, deep.Code);
+            RunResult okWide = Run(root, wide, null);
+            Assert.Equal(0, okWide.Code);
+            RunResult badWide = Run(root, tooWide, null);
+            Assert.Equal(1, badWide.Code);
+            RunResult hugeRun = Run(root, huge, null);
+            Assert.Equal(1, hugeRun.Code);
+            RunResult manyRun = Run(root, many, "5000000");
+            Assert.Equal(0, manyRun.Code);
+            RunResult runawayRun = Run(root, runaway, "200");
+            Assert.Equal(1, runawayRun.Code);
+        }
+        finally
+        {
+            File.Delete(deepProgram);
+            File.Delete(wide);
+            File.Delete(tooWide);
+            File.Delete(huge);
+            File.Delete(many);
+            File.Delete(runaway);
+        }
+        Assert.Equal(pid, Environment.ProcessId);
+    }
+
     [Fact]
     public void CrashFixturesStayAlive()
     {
@@ -267,22 +324,29 @@ public class CrashTests
 
     static RunResult Run(string root, string program, string budget)
     {
-        string dll = typeof(Program).Assembly.Location;
-        string dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        if (string.IsNullOrEmpty(dotnet)) dotnet = "dotnet";
-        ProcessStartInfo info = new ProcessStartInfo();
-        info.FileName = dotnet;
-        info.Arguments = "exec \"" + dll + "\" \"" + program + "\"";
-        info.WorkingDirectory = root;
-        info.RedirectStandardOutput = true;
-        info.RedirectStandardError = true;
-        info.UseShellExecute = false;
-        if (budget != null) info.Environment["VIRE_BUDGET"] = budget;
-        Process process = Process.Start(info);
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30000), "crash fixture timed out");
-        return new RunResult(process.ExitCode, stdout, stderr);
+        string previousBudget = Environment.GetEnvironmentVariable("VIRE_BUDGET");
+        TextWriter previousOut = Console.Out;
+        TextWriter previousErr = Console.Error;
+        StringWriter stdout = new StringWriter();
+        StringWriter stderr = new StringWriter();
+        string previousDir = Directory.GetCurrentDirectory();
+        Console.SetOut(stdout);
+        Console.SetError(stderr);
+        if (budget != null) Environment.SetEnvironmentVariable("VIRE_BUDGET", budget);
+        else Environment.SetEnvironmentVariable("VIRE_BUDGET", null);
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            int code = Program.Execute(new string[] { program });
+            return new RunResult(code, stdout.ToString(), stderr.ToString());
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previousDir);
+            Console.SetOut(previousOut);
+            Console.SetError(previousErr);
+            Environment.SetEnvironmentVariable("VIRE_BUDGET", previousBudget);
+        }
     }
 
     static string RepoRoot()

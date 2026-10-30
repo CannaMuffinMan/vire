@@ -5,8 +5,8 @@
 # Stage 2+ run with the .vc sandbox root = data/, so remaining args are
 # relative to data/ (compiler.vire and stageN.vc names only).
 # Seal: throwaway 32-byte key in VIRE_SEAL_KEY (base64). VC2 uses a random
-# nonce, so this script compares unsealed payload SHA-256 via:
-#   vire payload-sha256 data/stageN.vc
+# nonce, so sealed files differ. This script compares unsealed payloads
+# byte-for-byte via payload-write + Compare-Object, and also payload-sha256.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -56,6 +56,20 @@ Write-Output "stage2 $hash2"
 Write-Output "stage3 $hash3"
 if ($hash1 -ne $hash2 -or $hash2 -ne $hash3) {
     Write-Error "selfhost hashes differ"
+    exit 1
+}
+Invoke-Vire payload-write data/stage1.vc data/stage1.bin
+Invoke-Vire payload-write data/stage2.vc data/stage2.bin
+Invoke-Vire payload-write data/stage3.vc data/stage3.bin
+$p1 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage1.bin"))
+$p2 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage2.bin"))
+$p3 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage3.bin"))
+if (Compare-Object $p1 $p2) {
+    Write-Error "stage-1 payload bytes != stage-2 payload bytes"
+    exit 1
+}
+if (Compare-Object $p2 $p3) {
+    Write-Error "stage-2 payload bytes != stage-3 payload bytes"
     exit 1
 }
 Write-Output "selfhost ok"

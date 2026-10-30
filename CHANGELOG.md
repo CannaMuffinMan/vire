@@ -15,6 +15,10 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - C8. `serve` removed. `listen` GET/HEAD of `site/` with SafePath, no listing, 404 on traversal, symlink, and `.vire`.
 - C9. `SECURITY.md`, GUIDE limits/seal/`listen`/paths/.NET 10, this changelog.
 
+- Close-out. `PHASE0-DONE.md` maps each Phase 0 done-criterion to a test or CI job. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
+
+- Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Findings in `PHASE0-FUZZ.md`.
+
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
 
 ## Phase 3A (compiler grammar, first cut)

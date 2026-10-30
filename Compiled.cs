@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
@@ -15,20 +16,46 @@ sealed class CompiledProgram
         try { packed = File.ReadAllBytes(file); }
         catch (IOException) { throw new VireError("could not read that file", 1); }
         catch (UnauthorizedAccessException) { throw new VireError("could not read that file", 1); }
-        string text = Encoding.UTF8.GetString(VireSeal.OpenBytes(packed));
-        object tree = Json.Read(text, 1);
-        Dictionary<string, object> root = tree as Dictionary<string, object>;
-        if (root == null || !root.ContainsKey("funcs")) throw new VireError("compiled file has no funcs", 1);
-        Dictionary<string, object> funcs = new Dictionary<string, object>();
-        foreach (object item in (List<object>)root["funcs"])
-        {
-            Dictionary<string, object> func = (Dictionary<string, object>)item;
-            funcs[(string)func["name"]] = func;
-        }
+        Dictionary<string, object> funcs = LoadFuncs(packed);
         Budget budget = new Budget();
         budget.ApplyStepLimit(Program.BudgetOf(""));
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
         machine.Call("main", new List<object>(), 1, 1);
+    }
+
+    internal static Dictionary<string, object> LoadFuncs(byte[] packed)
+    {
+        byte[] plain = VireSeal.OpenBytes(packed);
+        string text;
+        try { text = Encoding.UTF8.GetString(plain); }
+        finally { CryptographicOperations.ZeroMemory(plain); }
+        object tree;
+        try { tree = Json.Read(text, 1); }
+        catch (VireError)
+        {
+            throw new VireError("compiled file is damaged", 1);
+        }
+        Dictionary<string, object> root = tree as Dictionary<string, object>;
+        if (root == null || !root.ContainsKey("funcs")) throw new VireError("compiled file has no funcs", 1);
+        List<object> items = root["funcs"] as List<object>;
+        if (items == null) throw new VireError("compiled file has no funcs", 1);
+        Dictionary<string, object> funcs = new Dictionary<string, object>();
+        foreach (object item in items)
+        {
+            Dictionary<string, object> func = item as Dictionary<string, object>;
+            if (func == null) throw new VireError("compiled file is damaged", 1);
+            object nameObj;
+            object paramsObj;
+            object bodyObj;
+            if (!func.TryGetValue("name", out nameObj) || !(nameObj is string))
+                throw new VireError("compiled file is damaged", 1);
+            if (!func.TryGetValue("params", out paramsObj) || !(paramsObj is List<object>))
+                throw new VireError("compiled file is damaged", 1);
+            if (!func.TryGetValue("body", out bodyObj) || !(bodyObj is List<object>))
+                throw new VireError("compiled file is damaged", 1);
+            funcs[(string)nameObj] = func;
+        }
+        return funcs;
     }
 }
 
