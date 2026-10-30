@@ -14,7 +14,11 @@ static class PortGuard
             listener.Start();
             int port = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
-            if (!IsBanned(port)) return port;
+            if (!IsBanned(port))
+            {
+                AssertAllowedPort(port);
+                return port;
+            }
         }
         throw new InvalidOperationException("could not get an allowed loopback port");
     }

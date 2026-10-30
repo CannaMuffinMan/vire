@@ -25,7 +25,7 @@ sealed class CompiledProgram
             funcs[(string)func["name"]] = func;
         }
         Budget budget = new Budget();
-        budget.MaxSteps = Program.BudgetOf("");
+        budget.ApplyStepLimit(Program.BudgetOf(""));
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
         machine.Call("main", new List<object>());
     }
@@ -91,11 +91,10 @@ sealed class CompiledMachine
         }
         if (op == "while")
         {
-            int guard = 0;
             while (Truth(Eval((List<object>)step[1], env)))
             {
-                guard++;
-                if (guard > 100000) throw new VireError("while ran too long", 1);
+                budget.WhilePasses++;
+                if (budget.WhilePasses > budget.MaxWhilePasses) throw new VireError("while ran too long", 1);
                 object[] hit = Block((List<object>)step[2], env);
                 if (hit != null && hit.Length > 1 && (string)hit[1] == "stop") break;
                 if (hit != null) return hit;
@@ -141,7 +140,7 @@ sealed class CompiledMachine
         exprDepth++;
         try
         {
-        if (exprDepth > 64) throw new VireError("expression is too deep", 1);
+        if (exprDepth > 256) throw new VireError("expression is too deep", 1);
         string op = (string)expr[0];
         if (op == "num") return expr[1];
         if (op == "text") return expr[1];
@@ -165,7 +164,17 @@ sealed class CompiledMachine
         if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env));
         if (op == "at") return At(Eval((List<object>)expr[1], env), Eval((List<object>)expr[2], env));
         if (op == "not") return !Truth(Eval((List<object>)expr[1], env));
-        if (op == "neg") return -ToDouble(Eval((List<object>)expr[1], env));
+        if (op == "neg")
+        {
+            object value = Eval((List<object>)expr[1], env);
+            if (value is int)
+            {
+                int whole = (int)value;
+                if (whole == int.MinValue) return -(double)whole;
+                return -whole;
+            }
+            return -ToDouble(value);
+        }
         if (op == "and")
         {
             if (!Truth(Eval((List<object>)expr[1], env))) return false;
@@ -192,10 +201,16 @@ sealed class CompiledMachine
         if (op == "+")
         {
             if (left is string || right is string) return Show(left) + Show(right);
-            return ToDouble(left) + ToDouble(right);
+            if (left is List<object> && right is List<object>)
+            {
+                List<object> joined = new List<object>((List<object>)left);
+                joined.AddRange((List<object>)right);
+                return joined;
+            }
+            return Add(left, right);
         }
-        if (op == "-") return ToDouble(left) - ToDouble(right);
-        if (op == "*") return ToDouble(left) * ToDouble(right);
+        if (op == "-") return Sub(left, right);
+        if (op == "*") return Mul(left, right);
         if (op == "/")
         {
             if (ToDouble(right) == 0) throw new VireError("division by zero", 1);
@@ -204,6 +219,11 @@ sealed class CompiledMachine
         if (op == "%")
         {
             if (ToDouble(right) == 0) throw new VireError("division by zero", 1);
+            if (left is int && right is int)
+            {
+                if ((int)right == -1) return 0;
+                return ((int)left) % ((int)right);
+            }
             return ToDouble(left) % ToDouble(right);
         }
         if (op == "==") return Same(left, right);
@@ -439,6 +459,26 @@ sealed class CompiledMachine
         return true;
     }
 
+    static object Widen(long value)
+    {
+        if (value > int.MaxValue || value < int.MinValue) return (double)value;
+        return (int)value;
+    }
+    static object Add(object left, object right)
+    {
+        if (left is int && right is int) return Widen((long)(int)left + (int)right);
+        return ToDouble(left) + ToDouble(right);
+    }
+    static object Sub(object left, object right)
+    {
+        if (left is int && right is int) return Widen((long)(int)left - (int)right);
+        return ToDouble(left) - ToDouble(right);
+    }
+    static object Mul(object left, object right)
+    {
+        if (left is int && right is int) return Widen((long)(int)left * (int)right);
+        return ToDouble(left) * ToDouble(right);
+    }
     static double ToDouble(object value)
     {
         if (value is int) return (int)value;
@@ -512,30 +552,7 @@ sealed class CompiledMachine
 
     static string Show(object value)
     {
-        if (value == null) return "none";
-        if (value is bool) return (bool)value ? "true" : "false";
-        if (value is double)
-        {
-            double real = (double)value;
-            if (real == Math.Floor(real) && !double.IsInfinity(real) && !double.IsNaN(real) && real >= -9223372036854775808d && real < 9223372036854775808d)
-                return ((long)real).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return real.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-        if (value is List<object>)
-        {
-            List<object> list = (List<object>)value;
-            string[] parts = new string[list.Count];
-            for (int i = 0; i < list.Count; i++) parts[i] = Show(list[i]);
-            return "[" + string.Join(", ", parts) + "]";
-        }
-        if (value is Dictionary<string, object>)
-        {
-            Dictionary<string, object> map = (Dictionary<string, object>)value;
-            List<string> parts = new List<string>();
-            foreach (KeyValuePair<string, object> pair in map) parts.Add(pair.Key + ": " + Show(pair.Value));
-            return "{" + string.Join(", ", parts.ToArray()) + "}";
-        }
-        return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return Machine.Show(value);
     }
 }
 

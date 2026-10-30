@@ -2,7 +2,7 @@
 
 This is the manual for Vire. A person or a coding agent can follow it from a blank folder to a working program.
 
-Vire is one language. Source files use the extension `.vire`. The runner is `vire.exe`. Definitions, data, packages, and windows are all written in Vire.
+Vire is one language. Source files use the extension `.vire`. The runner is built with `dotnet build` (or a published `vire` / `vire.exe` from CI artifacts). Definitions, data, packages, and windows are all written in Vire.
 
 ## 1. What a program is
 
@@ -19,18 +19,20 @@ define main
 end
 ```
 
-Run it from the folder that contains `vire.exe`:
+Run it from the program folder:
 
 ```text
-vire.exe count.vire
+dotnet run -c Release -- count.vire
 ```
+
+Or use a published runner from GitHub Actions artifacts: `vire count.vire` (Linux) or `vire.exe count.vire` (Windows).
 
 If `main` is missing, Vire stops before running anything.
 
 ## 2. Step by step: first program
 
-1. Install nothing beyond Windows. The built `vire.exe` is the runner.
-2. Create `hello.vire` in the same folder as `vire.exe`.
+1. Install the .NET 10 SDK, or download a published runner from GitHub Actions artifacts.
+2. Create `hello.vire` in the folder you will run from.
 3. Put this in the file:
 
 ```vire
@@ -40,7 +42,7 @@ end
 ```
 
 4. Open a terminal in that folder.
-5. Run `vire.exe hello.vire`.
+5. Run `dotnet run -c Release -- hello.vire` (or `vire.exe hello.vire` if you published).
 6. The terminal prints `hello from vire`.
 
 To rebuild the runner from source (.NET 10 SDK):
@@ -74,7 +76,7 @@ Text escapes: `\"` `\\` `\n` `\t`.
 
 Arithmetic: `+ - * / %`. `/` is ordinary division, so `5 / 2` is `2.5`. Comparisons: `== != < > <= >=`. Logic: `and`, `or`, `not`. Parentheses group expressions: `(1 + 2) * 3`.
 
-`+`, `-`, and `*` on whole numbers that do not fit in a whole result become decimals instead of wrapping. The remainder when dividing by `-1` is `0`, including the smallest whole number. Remainder or division by zero is an error. `abs` of the smallest whole number is a decimal, not a negative whole number.
+`+`, `-`, and `*` on whole numbers that do not fit in a whole result become decimals instead of wrapping. The remainder when dividing by `-1` is `0`, including the smallest whole number. Remainder or division by zero is an error. `abs` of the smallest whole number is a decimal, not a negative whole number. Parsed expressions may nest 256 levels. Compiled evaluation uses the same 256 cap, measured per evaluation (not as a lifetime total).
 
 `+` joins text, and also joins two lists. A call argument stops before `+`, so this prints `Vire</p>`:
 
@@ -309,7 +311,7 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 
 ## 14. Security
 
-A program cannot grant itself more steps. The cap is 1000000. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
+A program cannot grant itself more steps. The cap is 1000000. While-loop passes share that same cap. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
 
 `listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token`. The compare does not stop at the first differing character. A token sitting in the body does not count. The body limit is 65536 bytes. A path that contains `..` is refused.
 
@@ -319,14 +321,14 @@ A compiled program is a sealed `VIRE1` file, not readable source. A file that is
 
 ## 15. Rules an agent should follow
 
-- Put every program in the folder with `vire.exe`, or pass a path to a `.vire` file. The file's folder is the sandbox root.
-- Start every runnable file with definitions, and include `define main` in the file you pass to `vire.exe`. Packages must not require their own `main`.
+- Put every program in the folder you run from, or pass a path to a `.vire` file. The file's folder is the sandbox root.
+- Start every runnable file with definitions, and include `define main` in the file you pass to the runner. Packages must not require their own `main`.
 - Call definitions as `name with arg`. A bare name with no parameters, and the words `now` and `show`, run with no `with`.
 - A call argument stops before `+`. Parenthesize an argument that itself uses `+`.
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
 - Prefer the window operations for an application. Use `serve` only when the result must be a browser page.
-- After changing `Vire.cs`, rebuild `vire.exe` with the `csc` command in section 2 before running samples.
+- After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
 
 ## 15. Limits
 

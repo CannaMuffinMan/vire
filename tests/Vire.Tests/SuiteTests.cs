@@ -27,6 +27,8 @@ public class SuiteTests
         programs.Add(Path.Combine(root, "tests.vire"));
         AddMains(programs, Path.Combine(root, "checks"));
         AddMains(programs, Path.Combine(root, "systems"));
+        // Local programs declare success as a line that is exactly "pass"
+        // or that ends with " pass" (for example "net pass").
         Assert.Contains(programs, path => path.EndsWith("tests.vire", StringComparison.OrdinalIgnoreCase));
         Assert.True(File.Exists(Path.Combine(root, "checks", "core.vire")));
         foreach (string program in programs)
