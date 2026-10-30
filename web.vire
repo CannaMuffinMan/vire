@@ -1,4 +1,5 @@
 need "ui"
+~ serve was removed. This writes site/; open the folder with listen (serve.vire) or any static server.
 
 define main
   let markup be page with "Vire notes", "<h1>Notes</h1><p>A small app built by Vire.</p><textarea id=\"note\"></textarea><button id=\"save\">Save</button><script src=\"app.js\"></script>"

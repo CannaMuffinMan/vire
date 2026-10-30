@@ -8,7 +8,6 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 #if WINDOWS
 using System.Windows.Forms;
 #endif
@@ -16,7 +15,13 @@ using System.Windows.Forms;
 sealed class VireError : Exception
 {
     public int Line;
-    public VireError(string message, int line) : base(message) { Line = line; }
+    public int Column;
+    public VireError(string message, int line) : this(message, line, 1) { }
+    public VireError(string message, int line, int column) : base(message)
+    {
+        Line = line;
+        Column = column;
+    }
 }
 
 sealed class ReturnSignal : Exception
@@ -116,6 +121,9 @@ sealed class Budget
     public int MaxWhilePasses = 1000000;
     public int Runs;
     public int MaxRuns = 8;
+    public int Output;
+    public int MaxOutput = 1000000;
+    public long DeadlineUtcTicks;
 
     public void ApplyStepLimit(int limit)
     {
@@ -123,13 +131,44 @@ sealed class Budget
         MaxSteps = limit;
         MaxWhilePasses = limit;
     }
+
+    public static Budget ForRequest(Budget parent)
+    {
+        Budget fresh = new Budget();
+        if (parent != null)
+        {
+            fresh.MaxSteps = parent.MaxSteps;
+            fresh.MaxCalls = parent.MaxCalls;
+            fresh.MaxWhilePasses = parent.MaxWhilePasses;
+            fresh.MaxRuns = parent.MaxRuns;
+            fresh.MaxOutput = parent.MaxOutput;
+        }
+        fresh.DeadlineUtcTicks = DateTime.UtcNow.AddSeconds(5).Ticks;
+        return fresh;
+    }
+
+    public bool DeadlinePassed()
+    {
+        return DeadlineUtcTicks != 0 && DateTime.UtcNow.Ticks > DeadlineUtcTicks;
+    }
+}
+
+static class ListenHooks
+{
+    internal static Exception RouteException;
+    internal static readonly object ChainRouteLock = new object();
+
+    internal static void Reset()
+    {
+        RouteException = null;
+    }
 }
 
 sealed class Machine
 {
     const int MaxItems = 100000;
     const int MaxText = 1000000;
-    Budget budget = new Budget();
+    internal Budget budget = new Budget();
     List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
     string root;
@@ -157,6 +196,7 @@ sealed class Machine
     int inkR, inkG, inkB;
     string watchName;
     int watchLine;
+    internal int ListenPort;
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
@@ -195,13 +235,19 @@ sealed class Machine
         else if (value is double) whole = (int)(double)value;
         else if (value is string && int.TryParse((string)value, out whole)) { }
         else throw new VireError("port must be a whole number", line);
-        if (whole < 1024 || whole > 65535) throw new VireError("port must be from 1024 to 65535", line);
-        if (whole == 7099 || whole == 8778) throw new VireError("that port is reserved", line);
+        if (whole != 0 && (whole < 1024 || whole > 65535)) throw new VireError("port must be from 1024 to 65535", line);
+        if (IsReservedListenPort(whole)) throw new VireError("that port is reserved", line);
         return whole;
+    }
+
+    static bool IsReservedListenPort(int port)
+    {
+        return port == 7099 || port == 8778 || port == 7071 || port == 7072 || port == 7093 || port == 17841 || port == 17843;
     }
 
     void Step(int line)
     {
+        if (budget.DeadlinePassed()) throw new VireError("request ran too long", line);
         budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
         if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
     }
@@ -211,109 +257,7 @@ sealed class Machine
         string rawText = text as string;
         if (rawText == null || rawText.Trim().Length == 0)
             throw new VireError("a file path must be text", line);
-        if (Path.IsPathRooted(rawText) || rawText.Contains("..") || rawText.IndexOf(':') >= 0 || rawText.IndexOf('\0') >= 0)
-            throw new VireError("files stay inside the program folder", line);
-        string path = Path.GetFullPath(Path.Combine(root, rawText));
-        string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(path, root, StringComparison.OrdinalIgnoreCase))
-            throw new VireError("files stay inside the program folder", line);
-        string dataRoot = Path.GetFullPath(Path.Combine(root, "data"));
-        string siteRoot = Path.GetFullPath(Path.Combine(root, "site"));
-        if (!InFolder(dataRoot, path) && !InFolder(siteRoot, path))
-            throw new VireError("files stay in data or site", line);
-        RefuseReparse(path, line);
-        return path;
-    }
-
-    static bool InFolder(string folder, string path)
-    {
-        string full = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return string.Equals(path, folder, StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith(full, StringComparison.OrdinalIgnoreCase);
-    }
-
-    void RefuseReparse(string path, int line)
-    {
-        string cursor = path;
-        string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        while (!string.IsNullOrEmpty(cursor) &&
-            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(cursor, root, StringComparison.OrdinalIgnoreCase)))
-        {
-            if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                throw new VireError("files stay inside the program folder", line);
-            string parent = Path.GetDirectoryName(cursor);
-            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
-            cursor = parent;
-        }
-    }
-
-    static IPAddress DemandPublic(string url, int line)
-    {
-        Uri parsed;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
-            throw new VireError("that address is not allowed", line);
-        if (parsed.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-            throw new VireError("fetch stays off this machine and private networks", line);
-        IPAddress literal;
-        if (IPAddress.TryParse(parsed.IdnHost, out literal) && !IsPublicAddress(literal))
-            throw new VireError("fetch stays off this machine and private networks", line);
-        IPAddress[] addresses;
-        try { addresses = Dns.GetHostAddresses(parsed.Host); }
-        catch (Exception) { throw new VireError("could not check that address", line); }
-        if (addresses.Length == 0) throw new VireError("could not check that address", line);
-        IPAddress chosen = null;
-        foreach (IPAddress address in addresses)
-        {
-            if (!IsPublicAddress(address))
-                throw new VireError("fetch stays off this machine and private networks", line);
-            if (chosen == null) chosen = address;
-        }
-        if (chosen == null) throw new VireError("could not check that address", line);
-        if (parsed.Scheme != "https")
-            throw new VireError("fetch allows https only", line);
-        return chosen;
-    }
-
-    static bool IsPublicAddress(IPAddress address)
-    {
-        if (IPAddress.IsLoopback(address)) return false;
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            byte[] part = address.GetAddressBytes();
-            if (part[0] == 0 || part[0] == 10 || part[0] == 127) return false;
-            if (part[0] == 169 && part[1] == 254) return false;
-            if (part[0] == 172 && part[1] >= 16 && part[1] <= 31) return false;
-            if (part[0] == 192 && part[1] == 168) return false;
-            if (part[0] == 100 && part[1] >= 64 && part[1] <= 127) return false;
-            if (part[0] == 198 && (part[1] == 18 || part[1] == 19)) return false;
-            if (part[0] >= 224) return false;
-            return true;
-        }
-        if (address.IsIPv4MappedToIPv6) return IsPublicAddress(address.MapToIPv4());
-        byte[] bits = address.GetAddressBytes();
-        if (bits.Length != 16) return false;
-        if (Zeros(bits, 0, 12)) return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (Zeros(bits, 0, 8) && bits[8] == 0xff && bits[9] == 0xff && bits[10] == 0 && bits[11] == 0)
-            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (bits[0] == 0x20 && bits[1] == 0x02)
-            return IsPublicAddress(new IPAddress(new byte[] { bits[2], bits[3], bits[4], bits[5] }));
-        if (bits[0] == 0x00 && bits[1] == 0x64 && bits[2] == 0xff && bits[3] == 0x9b && Zeros(bits, 4, 8))
-            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x00 && bits[3] == 0x00) return false;
-        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x0d && bits[3] == 0xb8) return false;
-        if (bits[0] == 0xff) return false;
-        if (bits[0] == 0xfe && (bits[1] & 0xc0) == 0x80) return false;
-        if ((bits[0] & 0xfe) == 0xfc) return false;
-        return true;
-    }
-
-    static bool Zeros(byte[] bits, int at, int count)
-    {
-        for (int n = 0; n < count; n++) if (bits[at + n] != 0) return false;
-        return true;
+        return VirePaths.DataOrSite(root, rawText, line);
     }
 
     public object Call(string name, List<object> args, int line)
@@ -397,12 +341,13 @@ sealed class Machine
             string path = SafePath(args[0], line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
-            RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line);
             try
             {
                 string parent = Path.GetDirectoryName(path);
                 if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-                File.WriteAllText(path, text);
+                if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, text);
+                else VireFiles.WriteAllText(path, text);
             }
             catch (IOException) { throw new VireError("could not write that file", line); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
@@ -456,13 +401,7 @@ sealed class Machine
         if (name == "run")
         {
             string rel = args[0] as string;
-            if (rel == null || rel.Contains("..") || rel.IndexOf(':') >= 0 || rel.IndexOf('\0') >= 0 || Path.IsPathRooted(rel) || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-                throw new VireError("run needs a vire file in this folder", line);
-            string full = Path.GetFullPath(Path.Combine(root, rel));
-            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
-                throw new VireError("run stays inside the program folder", line);
-            RefuseReparse(full, line);
+            string full = VirePaths.ProgramFile(root, rel, line);
             budget.Runs++;
             StringWriter sink = new StringWriter();
             TextWriter previous = Console.Out;
@@ -567,11 +506,7 @@ sealed class Machine
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
         if (name == "serve")
-        {
-            if (!(args[0] is int)) throw new VireError("serve needs a port number", line);
-            Serve((int)args[0], line);
-            return 0;
-        }
+            throw new VireError("serve was removed; use listen", line);
         if (name == "files")
         {
             string path = SafePath(args[0], line);
@@ -583,14 +518,14 @@ sealed class Machine
         if (name == "sources")
         {
             string rel = args[0] as string;
-            if (rel == null || rel.Length == 0 || rel.Contains("..") || rel.Contains(":") || rel.Contains("/") || rel.Contains("\\") || Path.IsPathRooted(rel))
+            if (rel == null || rel.Length == 0 || rel.IndexOf('/') >= 0 || rel.IndexOf('\\') >= 0)
                 throw new VireError("sources needs one folder name inside this program", line);
-            string dir = Path.GetFullPath(Path.Combine(root, rel));
-            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!dir.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(dir))
+            VirePaths.CheckName(rel, line);
+            string dir = VirePaths.CombineUnder(root, rel, line);
+            if (!Directory.Exists(dir))
                 throw new VireError("sources needs one folder name inside this program", line);
-            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
-                throw new VireError("sources stays inside the program folder", line);
+            if (VirePaths.UnderWritableZone(root, dir))
+                throw new VireError("sources stays out of data and site", line);
             List<object> found = new List<object>();
             foreach (string file in Directory.GetFiles(dir, "*.vire")) found.Add(Path.GetFileName(file));
             return found;
@@ -608,9 +543,9 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line);
-            try { return SendWeb(HttpMethod.Get, url, null, line); }
+            try { return VireNet.SendWeb(HttpMethod.Get, url, null, line); }
             catch (VireError) { throw; }
-            catch (Exception exc) { throw new VireError(exc.GetBaseException().Message, line); }
+            catch (Exception) { throw new VireError("could not fetch that address", line); }
         }
         if (name == "post")
         {
@@ -621,7 +556,7 @@ sealed class Machine
             {
                 string payload = Show(args[1]);
                 if (payload.Length > 1000000) throw new VireError("text is too large to send", line);
-                return SendWeb(HttpMethod.Post, url, payload, line);
+                return VireNet.SendWeb(HttpMethod.Post, url, payload, line);
             }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not post to that address", line); }
@@ -778,29 +713,29 @@ sealed class Machine
         if (name == "erase")
         {
             string path = SafePath(args[0], line);
-            RefuseProgram(path, line);
-            if (File.Exists(path)) File.Delete(path);
+            VirePaths.RefuseProgram(path, line);
+            VireFiles.Erase(path);
             return true;
         }
         if (name == "copy")
         {
             string from = SafePath(args[0], line);
             string to = SafePath(args[1], line);
-            RefuseProgram(to, line);
-            string parent = Path.GetDirectoryName(to);
-            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-            File.Copy(from, to, true);
+            VirePaths.RefuseProgram(to, line);
+            try { VireFiles.Copy(from, to); }
+            catch (IOException) { throw new VireError("could not write that file", line); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
             return args[1];
         }
         if (name == "append")
         {
             string path = SafePath(args[0], line);
-            RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
-            string parent = Path.GetDirectoryName(path);
-            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-            File.AppendAllText(path, text, Encoding.UTF8);
+            try { VireFiles.AppendAllText(path, text); }
+            catch (IOException) { throw new VireError("could not write that file", line); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
             return text;
         }
         if (name == "round")
@@ -1010,13 +945,6 @@ sealed class Machine
 #endif
     }
 
-    static void RefuseProgram(string path, int line)
-    {
-        string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi" || ext == ".vire" || ext == ".cs" || ext == ".sh")
-            throw new VireError("vire will not write a program file", line);
-    }
-
     List<Stroke> ActiveOps()
     {
 #if WINDOWS
@@ -1075,46 +1003,29 @@ sealed class Machine
         }
     }
 
-    static string SendWeb(HttpMethod method, string url, string body, int line)
-    {
-        IPAddress pinned = DemandPublic(url, line);
-        SocketsHttpHandler handler = new SocketsHttpHandler();
-        handler.AllowAutoRedirect = false;
-        handler.ConnectCallback = (context, token) => ConnectPinned(pinned, context.DnsEndPoint.Port);
-        using (HttpClient client = new HttpClient(handler))
-        {
-            client.Timeout = TimeSpan.FromSeconds(8);
-            using (HttpRequestMessage message = new HttpRequestMessage(method, url))
-            {
-                if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
-                using (HttpResponseMessage response = client.SendAsync(message).Result)
-                {
-                    string text = response.Content.ReadAsStringAsync().Result;
-                    int code = (int)response.StatusCode;
-                    if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
-                    if (text.Length > 1000000) throw new VireError("the response is too large", line);
-                    return text;
-                }
-            }
-        }
-    }
 
-    static ValueTask<Stream> ConnectPinned(IPAddress pinned, int port)
-    {
-        Socket socket = new Socket(pinned.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        try
-        {
-            socket.Connect(pinned, port);
-            return new ValueTask<Stream>(new NetworkStream(socket, true));
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
+    const int ListenSlotsMax = 64;
+    const int MaxHeaderBlock = 16384;
+    const int MaxRequestLine = 8192;
+    const int MaxRequestBody = 1000000;
+    static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
 
     void Listen(int port, int line)
+    {
+        using (CancellationTokenSource cts = new CancellationTokenSource())
+        {
+            ConsoleCancelEventHandler onCancel = delegate (object sender, ConsoleCancelEventArgs e)
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+            Console.CancelKeyPress += onCancel;
+            try { ListenCore(port, line, cts.Token); }
+            finally { Console.CancelKeyPress -= onCancel; }
+        }
+    }
+
+    internal void ListenCore(int port, int line, CancellationToken stop)
     {
         if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
         string envPort = Environment.GetEnvironmentVariable("PORT");
@@ -1123,34 +1034,85 @@ sealed class Machine
         string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
         if (publish && (string.IsNullOrEmpty(token) || token.Length < 16))
             throw new VireError("a public listener needs FCG_API_TOKEN of at least 16 characters", line);
-        System.Net.IPAddress bind = publish ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
-        System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(bind, port);
-        listener.Start();
-        Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + port);
+        IPAddress bind = publish ? IPAddress.Any : IPAddress.Loopback;
+        TcpListener listener = BindListen(bind, port);
+        int actual = ((IPEndPoint)listener.LocalEndpoint).Port;
+        if (IsReservedListenPort(actual))
+        {
+            listener.Stop();
+            throw new VireError("that port is reserved", line);
+        }
+        ListenPort = actual;
+        Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + actual);
         try
         {
-            while (true)
+            while (!stop.IsCancellationRequested)
             {
-                System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
-                client.ReceiveTimeout = 5000;
-                client.SendTimeout = 5000;
-                try { AnswerApi(client, line); }
-                catch (IOException)
+                IAsyncResult pending = listener.BeginAcceptTcpClient(null, null);
+                WaitHandle[] wait = new WaitHandle[] { pending.AsyncWaitHandle, stop.WaitHandle };
+                int which = WaitHandle.WaitAny(wait);
+                if (which != 0)
                 {
-                    Console.Error.WriteLine("vire: internal error (IOException)");
+                    try { listener.EndAcceptTcpClient(pending).Close(); } catch (Exception) { }
+                    break;
                 }
-                catch (VireError)
+                TcpClient client;
+                try { client = listener.EndAcceptTcpClient(pending); }
+                catch (ObjectDisposedException) { break; }
+                catch (SocketException) { continue; }
+                if (!ListenSlots.Wait(0))
                 {
-                    try { Send(client.GetStream(), 500, "application/json", "{\"error\":\"route failed\"}"); }
-                    catch (Exception sendError)
+                    try { SendApi(client.GetStream(), 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n"); }
+                    catch (Exception) { }
+                    try { client.Close(); } catch (Exception) { }
+                    continue;
+                }
+                ThreadPool.QueueUserWorkItem(delegate (object state)
+                {
+                    TcpClient held = (TcpClient)state;
+                    try { AnswerApi(held, line, token, publish, stop); }
+                    catch (IOException)
                     {
-                        Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
+                        Console.Error.WriteLine("vire: internal error (IOException)");
                     }
-                }
-                finally { client.Close(); }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
+                    }
+                    finally
+                    {
+                        try { held.Close(); } catch (Exception) { }
+                        ListenSlots.Release();
+                    }
+                }, client);
             }
+            DateTime drain = DateTime.UtcNow.AddSeconds(5);
+            while (ListenSlots.CurrentCount < ListenSlotsMax && DateTime.UtcNow < drain)
+                Thread.Sleep(50);
         }
-        finally { listener.Stop(); }
+        finally
+        {
+            try { listener.Stop(); } catch (Exception) { }
+        }
+    }
+
+    static TcpListener BindListen(IPAddress bind, int port)
+    {
+        if (port != 0)
+        {
+            TcpListener once = new TcpListener(bind, port);
+            once.Start();
+            return once;
+        }
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            TcpListener listener = new TcpListener(bind, 0);
+            listener.Start();
+            int actual = ((IPEndPoint)listener.LocalEndpoint).Port;
+            if (!IsReservedListenPort(actual)) return listener;
+            listener.Stop();
+        }
+        throw new VireError("that port is reserved", 1);
     }
 
     static int HeaderEnd(byte[] buffer, int got)
@@ -1168,231 +1130,448 @@ sealed class Machine
             if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
             {
                 int value;
-                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return 65537;
+                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return -2;
                 return value;
             }
         }
         return -1;
     }
 
-    void AnswerApi(System.Net.Sockets.TcpClient client, int line)
+    static bool HasChunked(string head)
+    {
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
+                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+        return false;
+    }
+
+    static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
+    {
+        while (got < want)
+        {
+            int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
+            if (remain <= 0) return false;
+            stream.ReadTimeout = Math.Max(1, remain);
+            int n;
+            try { n = stream.Read(buffer, got, want - got); }
+            catch (IOException) { return false; }
+            if (n <= 0) return false;
+            got += n;
+        }
+        return true;
+    }
+
+    static bool ReadOnce(NetworkStream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
+    {
+        if (got >= maxGot) return false;
+        int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
+        if (remain <= 0) return false;
+        stream.ReadTimeout = Math.Max(1, remain);
+        int n;
+        try { n = stream.Read(buffer, got, maxGot - got); }
+        catch (IOException) { return false; }
+        if (n <= 0) return false;
+        got += n;
+        return true;
+    }
+
+    Machine ForkRequest()
+    {
+        Machine child = new Machine(funcs, root);
+        child.UseShared(Budget.ForRequest(budget));
+        child.UseArgs(programArgs);
+        return child;
+    }
+
+    void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop)
     {
         NetworkStream stream = client.GetStream();
-        byte[] buffer = new byte[65536 + 8192];
+        DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
+        byte[] buffer = new byte[MaxHeaderBlock + MaxRequestBody + 16];
         int got = 0;
         int headerEnd = -1;
-        while (got < buffer.Length && headerEnd < 0)
+        while (headerEnd < 0)
         {
-            int n = stream.Read(buffer, got, buffer.Length - got);
-            if (n <= 0) break;
-            got += n;
+            if (stop.IsCancellationRequested) return;
+            if (got >= MaxHeaderBlock)
+            {
+                SendApi(stream, 431, "{\"error\":\"headers too large\"}", null);
+                return;
+            }
+            int before = got;
+            if (!ReadOnce(stream, buffer, ref got, MaxHeaderBlock, headerDead))
+            {
+                if (HeaderEnd(buffer, got) >= 0) break;
+                SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
+                return;
+            }
+            if (got == before) { SendApi(stream, 408, "{\"error\":\"timeout\"}", null); return; }
             headerEnd = HeaderEnd(buffer, got);
         }
-        if (headerEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
-        string head = Encoding.UTF8.GetString(buffer, 0, headerEnd);
+        if (headerEnd < 0)
+        {
+            SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
+            return;
+        }
+        int lineEnd = -1;
+        for (int i = 0; i + 1 < headerEnd; i++)
+        {
+            if (buffer[i] == 13 && buffer[i + 1] == 10) { lineEnd = i; break; }
+        }
+        if (lineEnd < 0 || lineEnd > MaxRequestLine)
+        {
+            SendApi(stream, 431, "{\"error\":\"request line too large\"}", null);
+            return;
+        }
+        string head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
+        string requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
+        string[] bits = requestLine.Split(' ');
+        if (bits.Length < 2)
+        {
+            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
+        }
+        if (bits[1].IndexOf("..") >= 0)
+        {
+            if (bits[0] == "GET" || bits[0] == "HEAD")
+                SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
+            else
+                SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
+        }
+        if (HasChunked(head))
+        {
+            SendApi(stream, 501, "{\"error\":\"chunked encoding is not supported\"}", null);
+            return;
+        }
         int bodyAt = headerEnd + 4;
         int contentLength = ContentLengthOf(head);
-        if (contentLength > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-        if (contentLength >= 0)
+        if (contentLength == -2)
         {
-            int need = bodyAt + contentLength;
-            if (need > buffer.Length) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-            while (got < need)
-            {
-                int n = stream.Read(buffer, got, need - got);
-                if (n <= 0) break;
-                got += n;
-            }
-            if (got < need) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
         }
-        string request = Encoding.UTF8.GetString(buffer, 0, got);
-        int lineEnd = request.IndexOf("\r\n");
-        if (lineEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
-        string[] bits = request.Substring(0, lineEnd).Split(' ');
-        if (bits.Length < 2 || bits[1].IndexOf("..") >= 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        string method = bits[0];
+        bool expectsBody = method == "POST" || method == "PUT" || method == "PATCH";
+        if (expectsBody && contentLength < 0)
+        {
+            SendApi(stream, 411, "{\"error\":\"content length required\"}", null);
+            return;
+        }
+        if (contentLength > MaxRequestBody)
+        {
+            SendApi(stream, 413, "{\"error\":\"body too large\"}", null);
+            return;
+        }
+        if (contentLength < 0) contentLength = 0;
+        int need = bodyAt + contentLength;
+        DateTime bodyDead = DateTime.UtcNow.AddSeconds(10);
+        if (got < need)
+        {
+            if (!ReadTimed(stream, buffer, ref got, need, bodyDead))
+            {
+                SendApi(stream, got < need ? 408 : 400, "{\"error\":\"timeout\"}", null);
+                return;
+            }
+        }
         string path = bits[1];
         int queryAt = path.IndexOf('?');
         if (queryAt >= 0) path = path.Substring(0, queryAt);
-        string body = Encoding.UTF8.GetString(buffer, bodyAt, got - bodyAt);
-        if (body.Length > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-        string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
-        bool health = path == "/health" && (bits[0] == "GET" || bits[0] == "HEAD");
-        if (!health && !Program.HeaderTokenMatches(head, token))
+        string body = Encoding.UTF8.GetString(buffer, bodyAt, contentLength);
+        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line))
+            return;
+        bool health = path == "/health" && (method == "GET" || method == "HEAD");
+        bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
+        if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
         {
-            Send(stream, 401, "application/json", "{\"error\":\"unauthorized\"}");
+            SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
+            return;
+        }
+        if (!health && publish && !tokenOn)
+        {
+            SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
         List<object> call = new List<object>();
-        call.Add(bits[0]);
+        call.Add(method);
         call.Add(path);
         call.Add(body);
+        Machine worker = ForkRequest();
         object result;
-        try { result = Call("route", call, line); }
-        catch (VireError) { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); return; }
+        bool chain = path == "/block" || path == "/chain";
+        if (chain) Monitor.Enter(ListenHooks.ChainRouteLock);
+        try
+        {
+            if (ListenHooks.RouteException != null && path == "/boom")
+                throw ListenHooks.RouteException;
+            result = worker.Call("route", call, line);
+        }
+        catch (VireError err)
+        {
+            if (IsRequestBudget(err))
+                SendApi(stream, 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n");
+            else
+                SendApi(stream, 500, "{\"error\":\"route failed\"}", null);
+            return;
+        }
+        catch (HaltSignal)
+        {
+            SendApi(stream, 500, "{\"error\":\"route failed\"}", null);
+            return;
+        }
         catch (Exception ex)
         {
             if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
                 Console.Error.WriteLine(ex.ToString());
             else
                 Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
-            try { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); }
+            try { SendApi(stream, 500, "{\"error\":\"route failed\"}", null); }
             catch (Exception sendError)
             {
                 Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
             }
             return;
         }
+        finally
+        {
+            if (chain) Monitor.Exit(ListenHooks.ChainRouteLock);
+        }
         string text = result as string;
         if (text == null) text = Show(result);
-        int code = 200;
-        if (text != null && text.IndexOf("\"status\":404") >= 0) code = 404;
-        if (text != null && text.IndexOf("\"status\":403") >= 0) code = 403;
-        Send(stream, code, "application/json", text ?? "null");
+        if (text == null) text = "null";
+        if (text.Length > worker.budget.MaxOutput) text = "{\"error\":\"response too large\"}";
+        worker.budget.Output = text.Length;
+        int code = StatusOf(text, 200);
+        SendApi(stream, code, text, null);
     }
 
-    void Serve(int port, int line)
+    static bool IsRequestBudget(VireError err)
     {
-        if (port < 1024 || port > 65535) throw new VireError("port must be from 1024 to 65535", line);
+        string msg = err.Message;
+        return msg.IndexOf("request ran too long", StringComparison.Ordinal) >= 0
+            || msg.IndexOf("program ran too long", StringComparison.Ordinal) >= 0
+            || msg.IndexOf("while ran too long", StringComparison.Ordinal) >= 0;
+    }
+
+    static int StatusOf(string text, int fallback)
+    {
+        if (text == null) return fallback;
+        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400 };
+        for (int i = 0; i < codes.Length; i++)
+        {
+            string needle = "\"status\":" + codes[i];
+            if (text.IndexOf(needle, StringComparison.Ordinal) >= 0) return codes[i];
+        }
+        return fallback;
+    }
+
+    static string ReasonOf(int code)
+    {
+        if (code == 200) return "OK";
+        if (code == 206) return "Partial Content";
+        if (code == 400) return "Bad Request";
+        if (code == 401) return "Unauthorized";
+        if (code == 403) return "Forbidden";
+        if (code == 404) return "Not Found";
+        if (code == 408) return "Request Timeout";
+        if (code == 411) return "Length Required";
+        if (code == 413) return "Payload Too Large";
+        if (code == 416) return "Range Not Satisfiable";
+        if (code == 431) return "Request Header Fields Too Large";
+        if (code == 500) return "Internal Server Error";
+        if (code == 501) return "Not Implemented";
+        if (code == 503) return "Service Unavailable";
+        if (code == 507) return "Insufficient Storage";
+        return "OK";
+    }
+
+    static void SendApi(NetworkStream stream, int code, string body, string extra)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(body ?? "");
+        string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
+            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Length: " + data.Length + "\r\n"
+            + "Connection: close\r\n"
+            + "X-Content-Type-Options: nosniff\r\n"
+            + "Cache-Control: no-store\r\n"
+            + (extra ?? "")
+            + "\r\n";
+        byte[] prefix = Encoding.ASCII.GetBytes(head);
+        stream.Write(prefix, 0, prefix.Length);
+        if (data.Length > 0) stream.Write(data, 0, data.Length);
+    }
+
+    bool TrySite(NetworkStream stream, string method, string url, string head, int line)
+    {
         string site = Path.Combine(root, "site");
-        if (!Directory.Exists(site)) throw new VireError("there is no site folder to serve", line);
-        System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
-        listener.Start();
-        string key = Guid.NewGuid().ToString("N");
-        Console.WriteLine("key " + key);
-        Console.WriteLine("open http://127.0.0.1:" + port + "/?key=" + key);
+        if (!Directory.Exists(site)) return false;
+        string rel;
+        if (!SiteRelative(url, out rel))
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        string type;
+        long limit;
+        if (!SiteType(rel, out type, out limit))
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        string full;
+        try { full = VirePaths.DataOrSite(root, "site/" + rel, line); }
+        catch (VireError)
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        if (!File.Exists(full) || Directory.Exists(full)) return false;
         try
         {
-            while (true)
+            if ((File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0)
             {
-                System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
-                client.ReceiveTimeout = 2000;
-                client.SendTimeout = 2000;
-                try { Answer(client, site, key); }
-                catch (IOException)
-                {
-                    Console.Error.WriteLine("vire: internal error (IOException)");
-                }
-                finally { client.Close(); }
+                SendSiteEmpty(stream, 404, "text/plain", "not found");
+                return true;
             }
         }
-        finally { listener.Stop(); }
-    }
-
-    static string gate = "";
-
-    static bool QueryHas(string query, string key)
-    {
-        string[] parts = query.Split('&');
-        foreach (string part in parts)
-            if (part == "key=" + key) return true;
-        return false;
-    }
-
-    static void Answer(System.Net.Sockets.TcpClient client, string site, string key)
-    {
-        NetworkStream stream = client.GetStream();
-        byte[] buffer = new byte[4096];
-        int got = stream.Read(buffer, 0, buffer.Length);
-        string request = Encoding.ASCII.GetString(buffer, 0, got);
-        int lineEnd = request.IndexOf("\r\n");
-        if (lineEnd < 0) { Send(stream, 400, "text/plain", "bad request"); return; }
-        string[] bits = request.Substring(0, lineEnd).Split(' ');
-        if (bits.Length < 2) { Send(stream, 400, "text/plain", "bad request"); return; }
-        string url = bits[1];
-        string query = "";
-        int queryAt = url.IndexOf('?');
-        if (queryAt >= 0)
+        catch (IOException)
         {
-            query = url.Substring(queryAt + 1);
-            url = url.Substring(0, queryAt);
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
         }
-        bool keyed = QueryHas(query, key) || request.IndexOf("X-Vire-Key: " + key) >= 0 || request.IndexOf("vire=" + key) >= 0;
-        if (!keyed) { Send(stream, 401, "text/plain", "key required"); return; }
-        gate = QueryHas(query, key) ? "Set-Cookie: vire=" + key + "; HttpOnly; Path=/\r\n" : "";
-        if (bits[0] == "POST" && url == "/inbox")
+        long length = new FileInfo(full).Length;
+        if (length > limit)
         {
-            int split = request.IndexOf("\r\n\r\n");
-            string posted = split >= 0 ? request.Substring(split + 4) : "";
-            if (posted.Length > 1000000) posted = posted.Substring(0, 1000000);
-            File.WriteAllText(Path.Combine(site, "inbox.txt"), posted, Encoding.UTF8);
-            Send(stream, 200, "text/plain", "saved");
-            return;
+            SendSiteEmpty(stream, 413, "text/plain", "too large");
+            return true;
         }
-        if (bits[0] != "GET" && bits[0] != "HEAD") { Send(stream, 405, "text/plain", "method not allowed"); return; }
-        if (url == "/") url = "/index.html";
-        url = url.Replace('/', Path.DirectorySeparatorChar);
-        if (url.Contains("..") || url.IndexOf(':') >= 0) { Send(stream, 403, "text/plain", "forbidden"); return; }
-        string ext = Path.GetExtension(url).ToLowerInvariant();
-        string type = null;
-        int limit = 1000000;
-        if (ext == ".html") type = "text/html";
-        else if (ext == ".css") type = "text/css";
-        else if (ext == ".js") type = "text/javascript";
-        else if (ext == ".svg") type = "image/svg+xml";
-        else if (ext == ".json") type = "application/json";
-        else if (ext == ".txt") type = "text/plain";
-        else if (ext == ".mp4") { type = "video/mp4"; limit = 512000000; }
-        else if (ext == ".webm") { type = "video/webm"; limit = 512000000; }
-        else if (ext == ".ogv") { type = "video/ogg"; limit = 512000000; }
-        if (type == null) { SendBytes(stream, 403, "text/plain", Encoding.UTF8.GetBytes("forbidden"), 0, 9, false, 9); return; }
-        string path = Path.GetFullPath(Path.Combine(site, url.TrimStart(Path.DirectorySeparatorChar)));
-        string siteFull = Path.GetFullPath(site).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(siteFull, StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) { Send(stream, 404, "text/plain", "not found"); return; }
-        long length = new FileInfo(path).Length;
-        if (length > limit) { Send(stream, 413, "text/plain", "too large"); return; }
         long start = 0;
         long count = length;
         bool partial = false;
-        int rangeAt = request.IndexOf("Range: bytes=");
-        if (rangeAt >= 0 && length > 0)
+        bool video = type.StartsWith("video/", StringComparison.Ordinal);
+        if (video)
         {
-            int rangeEnd = request.IndexOf("\r\n", rangeAt);
-            string spec = request.Substring(rangeAt + 13, (rangeEnd < 0 ? request.Length : rangeEnd) - (rangeAt + 13));
-            int dash = spec.IndexOf('-');
-            if (dash >= 0)
+            int rangeStatus = SiteRange(head, length, out start, out count, out partial);
+            if (rangeStatus == 416)
             {
-                long from = 0;
-                long to = length - 1;
-                if (dash > 0) long.TryParse(spec.Substring(0, dash), out from);
-                if (dash + 1 < spec.Length) long.TryParse(spec.Substring(dash + 1), out to);
-                if (from < 0) from = 0;
-                if (to >= length) to = length - 1;
-                if (from <= to)
-                {
-                    start = from;
-                    count = to - from + 1;
-                    partial = true;
-                }
+                SendSiteRangeFail(stream, type, length);
+                return true;
             }
         }
-        if (bits[0] == "HEAD") count = 0;
-        using (FileStream file = File.OpenRead(path))
-            SendFile(stream, partial ? 206 : 200, type, file, start, count, partial, length);
+        if (method == "HEAD") count = 0;
+        using (FileStream file = File.OpenRead(full))
+            SendSiteFile(stream, partial ? 206 : 200, type, file, start, count, partial, length, video);
+        return true;
     }
 
-    static void Send(NetworkStream stream, int code, string type, string body)
+    static bool SiteRelative(string url, out string rel)
     {
-        byte[] data = Encoding.UTF8.GetBytes(body);
-        SendBytes(stream, code, type, data, 0, data.Length, false, data.Length);
+        rel = null;
+        if (url == null) return false;
+        string decoded;
+        try { decoded = Uri.UnescapeDataString(url); }
+        catch (UriFormatException) { return false; }
+        if (decoded.IndexOf('\0') >= 0) return false;
+        decoded = decoded.Replace('\\', '/');
+        if (decoded.IndexOf("://", StringComparison.Ordinal) >= 0) return false;
+        while (decoded.StartsWith("/", StringComparison.Ordinal)) decoded = decoded.Substring(1);
+        if (decoded.Length == 0) decoded = "index.html";
+        if (decoded.IndexOf(':') >= 0) return false;
+        try { VirePaths.CheckName(decoded, 1); }
+        catch (VireError) { return false; }
+        rel = decoded;
+        return true;
     }
 
-    static void SendBytes(NetworkStream stream, int code, string type, byte[] data, int start, int count, bool partial, int total)
+    static bool SiteType(string rel, out string type, out long limit)
     {
-        string reason = code == 206 ? "Partial Content" : "OK";
-        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
-        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += gate + "Connection: close\r\n\r\n";
+        type = null;
+        limit = 1000000;
+        string ext = VirePaths.NormalizedExtension(rel);
+        if (ext == ".html") type = "text/html; charset=utf-8";
+        else if (ext == ".css") type = "text/css; charset=utf-8";
+        else if (ext == ".js") type = "text/javascript; charset=utf-8";
+        else if (ext == ".svg") type = "image/svg+xml";
+        else if (ext == ".json") type = "application/json; charset=utf-8";
+        else if (ext == ".txt") type = "text/plain; charset=utf-8";
+        else if (ext == ".mp4") { type = "video/mp4"; limit = 512000000; }
+        else if (ext == ".webm") { type = "video/webm"; limit = 512000000; }
+        else if (ext == ".ogv") { type = "video/ogg"; limit = 512000000; }
+        return type != null;
+    }
+
+    static int SiteRange(string head, long length, out long start, out long count, out bool partial)
+    {
+        start = 0;
+        count = length;
+        partial = false;
+        if (length <= 0) return 200;
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        string spec = null;
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Range:", StringComparison.OrdinalIgnoreCase))
+            {
+                spec = lines[i].Substring(6).Trim();
+                break;
+            }
+        }
+        if (spec == null) return 200;
+        if (!spec.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase)) return 416;
+        spec = spec.Substring(6);
+        int dash = spec.IndexOf('-');
+        if (dash < 0) return 416;
+        string left = spec.Substring(0, dash).Trim();
+        string right = spec.Substring(dash + 1).Trim();
+        long from;
+        long to;
+        if (left.Length == 0)
+        {
+            long suffix;
+            if (!long.TryParse(right, out suffix) || suffix <= 0) return 416;
+            from = Math.Max(0, length - suffix);
+            to = length - 1;
+        }
+        else
+        {
+            if (!long.TryParse(left, out from)) return 416;
+            if (right.Length == 0) to = length - 1;
+            else if (!long.TryParse(right, out to)) return 416;
+        }
+        if (from < 0 || to < from || from >= length) return 416;
+        if (to >= length) to = length - 1;
+        start = from;
+        count = to - from + 1;
+        partial = true;
+        return 206;
+    }
+
+    static void SendSiteEmpty(NetworkStream stream, int code, string type, string body)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(body ?? "");
+        string head = SiteHead(code, type, data.Length, "", false);
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
-        if (count > 0) stream.Write(data, start, count);
+        if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static void SendFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total)
+    static void SendSiteRangeFail(NetworkStream stream, string type, long total)
     {
-        string reason = code == 206 ? "Partial Content" : "OK";
-        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
-        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += gate + "Connection: close\r\n\r\n";
+        string extra = "Content-Range: bytes */" + total + "\r\n";
+        string head = SiteHead(416, type, 0, extra, true);
+        byte[] prefix = Encoding.ASCII.GetBytes(head);
+        stream.Write(prefix, 0, prefix.Length);
+    }
+
+    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total, bool video)
+    {
+        string extra = "";
+        if (partial) extra += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
+        string head = SiteHead(code, type, count, extra, video);
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
         if (count <= 0) return;
@@ -1406,6 +1585,19 @@ sealed class Machine
             stream.Write(buf, 0, n);
             left -= n;
         }
+    }
+
+    static string SiteHead(int code, string type, long length, string extra, bool acceptRanges)
+    {
+        return "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
+            + "Content-Type: " + type + "\r\n"
+            + "Content-Length: " + length + "\r\n"
+            + "Connection: close\r\n"
+            + "X-Content-Type-Options: nosniff\r\n"
+            + "Content-Security-Policy: default-src 'self'\r\n"
+            + (acceptRanges ? "Accept-Ranges: bytes\r\n" : "")
+            + (extra ?? "")
+            + "\r\n";
     }
 
     static string SliceText(string value, int start, int end)
@@ -1469,6 +1661,7 @@ sealed class Machine
             {
                 while (Truth(Eval(stmt[1], env)))
                 {
+                    if (budget.DeadlinePassed()) throw new VireError("request ran too long", (int)stmt[3]);
                     budget.WhilePasses++;
                     if (budget.WhilePasses > budget.MaxWhilePasses) throw new VireError("while ran too long", (int)stmt[3]);
                     try { ExecBlock((List<object>)stmt[2], env); }
@@ -2287,10 +2480,10 @@ sealed class Json
 {
     public static string Write(object value)
     {
-        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, new int[1]);
+        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0);
     }
 
-    static string WriteValue(object value, HashSet<object> path, int nest, int[] used)
+    static string WriteValue(object value, HashSet<object> path, int nest)
     {
         if (nest > 256) throw new VireError("json is nested too deeply", 1);
         string text;
@@ -2315,7 +2508,7 @@ sealed class Json
                 for (int i = 0; i < list.Count; i++)
                 {
                     if (i > 0) body.Append(',');
-                    body.Append(WriteValue(list[i], path, nest + 1, used));
+                    body.Append(WriteValue(list[i], path, nest + 1));
                 }
                 body.Append(']');
                 text = body.ToString();
@@ -2335,9 +2528,9 @@ sealed class Json
                 {
                     if (!first) body.Append(',');
                     first = false;
-                    body.Append(WriteValue(pair.Key, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Key, path, nest + 1));
                     body.Append(':');
-                    body.Append(WriteValue(pair.Value, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Value, path, nest + 1));
                 }
                 body.Append('}');
                 text = body.ToString();
@@ -2345,8 +2538,7 @@ sealed class Json
             finally { path.Remove(map); }
         }
         else text = WriteString(Machine.Show(value));
-        used[0] += text.Length;
-        if (used[0] > 1000000) throw new VireError("text is too large to write", 1);
+        if (text.Length > 1000000) throw new VireError("text is too large to write", 1);
         return text;
     }
 
@@ -2541,7 +2733,7 @@ sealed class Program
         machine.Run();
     }
 
-    static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
+    internal static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
     {
         string full = Path.GetFullPath(program);
         if (!full.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
@@ -2554,16 +2746,14 @@ sealed class Program
         string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
-        RefuseReparsePath(full, folder);
+        VirePaths.RefuseReparse(full, folder, 1);
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
         Unit unit = new Parser(Lexer.Tokenize(File.ReadAllText(full))).Parse();
         foreach (string used in unit.Uses)
         {
-            if (Path.IsPathRooted(used) || used.Contains("..") || used.IndexOf(':') >= 0 || used.IndexOf('\0') >= 0 || !used.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-                throw new VireError("use stays inside the program folder and only opens .vire files", 1);
-            string next = Path.GetFullPath(Path.Combine(folder, used));
+            string next = VirePaths.UseFile(folder, used, 1);
             Dictionary<string, Func> imported = Load(next, folder, seen);
             Merge(unit, imported);
         }
@@ -2571,35 +2761,12 @@ sealed class Program
         {
             if (!IsPackage(package))
                 throw new VireError("package names are plain words", 1);
-            string next = Path.Combine(folder, "deps", package, "lib.vire");
+            string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
             Merge(unit, Load(next, folder, seen));
         }
         return unit.Funcs;
         }
         finally { seen.Remove(full); }
-    }
-
-    static void RefuseReparsePath(string path, string folder)
-    {
-        string cursor = path;
-        string rootFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        while (!string.IsNullOrEmpty(cursor) &&
-            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(cursor, folder, StringComparison.OrdinalIgnoreCase)))
-        {
-            try
-            {
-                if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                    (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                    throw new VireError("files stay inside the program folder", 1);
-            }
-            catch (VireError) { throw; }
-            catch (IOException) { throw new VireError("files stay inside the program folder", 1); }
-            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", 1); }
-            string parent = Path.GetDirectoryName(cursor);
-            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
-            cursor = parent;
-        }
     }
 
     public static int BudgetOf(string source)
@@ -2680,16 +2847,30 @@ sealed class Program
         if (failure == null) return code;
         if (failure is HaltSignal halt) return halt.Code;
         if (failure is VireError exc)
-        {
-            string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
-            Console.Error.WriteLine("vire: " + where + exc.Message);
-            return 1;
-        }
+            return WriteVireError(exc);
         if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
             Console.Error.WriteLine(failure.ToString());
         else
             Console.Error.WriteLine("vire: internal error (" + failure.GetType().Name + ")");
         return 3;
+    }
+
+    static int WriteVireError(VireError exc)
+    {
+        if (VireSeal.MissingKeyExit(exc.Message))
+        {
+            Console.Error.WriteLine("vire: " + exc.Message);
+            return 2;
+        }
+        string where = "";
+        if (exc.Line > 0)
+        {
+            where = "line " + exc.Line;
+            if (exc.Column > 0) where += " col " + exc.Column;
+            where += ": ";
+        }
+        Console.Error.WriteLine("vire: " + where + exc.Message);
+        return 1;
     }
 
     static int ExecuteBody(string[] args)
@@ -2698,30 +2879,72 @@ sealed class Program
         {
             Console.Error.WriteLine("usage: vire program.vire [args...]");
             Console.Error.WriteLine("       vire run file.vc [args...]");
+            Console.Error.WriteLine("       vire keygen --out <path>");
             return 2;
         }
         try
         {
-            if (args[0] == "run")
+            string keyFile;
+            string[] rest = StripKeyFile(args, out keyFile);
+            if (rest.Length >= 1 && rest[0] == "keygen")
             {
-                if (args.Length < 2) throw new VireError("usage: vire run file.vc", 1);
-                string compiled = Path.GetFullPath(args[1]);
+                string outPath = null;
+                for (int i = 1; i < rest.Length; i++)
+                {
+                    if (rest[i] == "--out" && i + 1 < rest.Length) { outPath = rest[i + 1]; i++; continue; }
+                    if (outPath == null) outPath = rest[i];
+                }
+                return VireSeal.Keygen(outPath);
+            }
+            string programFolder = null;
+            if (rest.Length >= 2 && rest[0] == "run")
+                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[1]));
+            else if (rest.Length >= 1)
+                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[0]));
+            VireSeal.ClearKey();
+            if (!string.IsNullOrEmpty(keyFile)) VireSeal.LoadFromFile(keyFile, programFolder);
+            else VireSeal.LoadFromEnvironment();
+            if (rest.Length < 1)
+            {
+                Console.Error.WriteLine("usage: vire program.vire [args...]");
+                return 2;
+            }
+            if (rest[0] == "payload-sha256")
+            {
+                if (rest.Length < 2) throw new VireError("usage: vire payload-sha256 file.vc", 1);
+                byte[] packed = File.ReadAllBytes(Path.GetFullPath(rest[1]));
+                Console.WriteLine(VireSeal.PayloadSha256(packed));
+                return 0;
+            }
+            if (rest[0] == "payload-write")
+            {
+                if (rest.Length < 3) throw new VireError("usage: vire payload-write file.vc dest.bin", 1);
+                byte[] packed = File.ReadAllBytes(Path.GetFullPath(rest[1]));
+                byte[] plain = VireSeal.OpenBytes(packed);
+                try { File.WriteAllBytes(Path.GetFullPath(rest[2]), plain); }
+                finally { CryptographicOperations.ZeroMemory(plain); }
+                return 0;
+            }
+            if (rest[0] == "run")
+            {
+                if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);
+                string compiled = Path.GetFullPath(rest[1]);
                 string compiledFolder = Path.GetDirectoryName(compiled);
                 List<object> compiledArgs = new List<object>();
-                for (int i = 2; i < args.Length; i++) compiledArgs.Add(args[i]);
+                for (int i = 2; i < rest.Length; i++) compiledArgs.Add(rest[i]);
                 CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
                 return 0;
             }
-            string program = Path.GetFullPath(args[0]);
+            string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
             int budget = BudgetOf(File.ReadAllText(program));
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseBudget(budget);
-            List<object> rest = new List<object>();
-            for (int i = 1; i < args.Length; i++) rest.Add(args[i]);
-            machine.UseArgs(rest);
+            List<object> extra = new List<object>();
+            for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
+            machine.UseArgs(extra);
             machine.Run();
             return 0;
         }
@@ -2731,9 +2954,7 @@ sealed class Program
         }
         catch (VireError exc)
         {
-            string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
-            Console.Error.WriteLine("vire: " + where + exc.Message);
-            return 1;
+            return WriteVireError(exc);
         }
         catch (Exception ex)
         {
@@ -2743,5 +2964,23 @@ sealed class Program
                 Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
             return 3;
         }
+    }
+
+    static string[] StripKeyFile(string[] args, out string keyFile)
+    {
+        keyFile = null;
+        List<string> rest = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--seal-key-file")
+            {
+                if (i + 1 >= args.Length) throw new VireError("usage: --seal-key-file <path>", 1);
+                keyFile = args[i + 1];
+                i++;
+                continue;
+            }
+            rest.Add(args[i]);
+        }
+        return rest.ToArray();
     }
 }

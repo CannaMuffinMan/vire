@@ -6,7 +6,7 @@ The downloaded apps are a web browser with the Forever Couch Gang skin. They ope
 
 The chain address is `forevercouchgang.blockchain`. Each downloaded app is its own node. The app mines inside itself with Proof of Rot and then `POST /block` here. There is no mining network. `POST /mine` is refused. Payments stay off.
 
-`GET /health` and `GET /info` describe that split. `GET /chain` returns blocks this API has accepted. `POST /block` accepts one block only when `previousHash` is the current tip and the block carries a Proof of Rot (`action`, `engagement`, `timestamp`, `userId`).
+`GET /health` and `GET /info` describe that split. `GET /chain` returns blocks this API has accepted. `POST /block` accepts `{"text": ...}`; the server computes `index`, `previous`, and `proof`. Client-supplied `previous`/`proof` must match. Authorization for `POST /block` is out of scope for Phase 0.
 
 Railway sets `PORT`. `listen` uses that port and binds all interfaces when `PORT` is set. On a laptop, with `PORT` unset, it binds `127.0.0.1:8080`.
 

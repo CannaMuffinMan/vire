@@ -4,13 +4,15 @@
 #   dotnet exec vire.dll run data/stage1.vc compiler.vire stage2.vc
 # Stage 2+ run with the .vc sandbox root = data/, so remaining args are
 # relative to data/ (compiler.vire and stageN.vc names only).
-# Seal: throwaway VIRE_SEAL for this process only. The current VIRE1 XOR seal is
-# deterministic, so sealed .vc hashes match. If C5 adds a random nonce, compare
-# unsealed payloads instead of the files.
+# Seal: throwaway 32-byte key in VIRE_SEAL_KEY (base64). VC2 uses a random
+# nonce, so sealed files differ. This script compares unsealed payloads
+# byte-for-byte via payload-write + Compare-Object, and also payload-sha256.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
-$env:VIRE_SEAL = "selfhost-test-seal-not-a-secret"
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$env:VIRE_SEAL_KEY = [Convert]::ToBase64String($bytes)
 if (-not $env:VIRE_BUDGET) { $env:VIRE_BUDGET = "5000000" }
 $Work = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
@@ -41,17 +43,33 @@ Invoke-Vire run data/stage1.vc compiler.vire stage2.vc
 Write-Output "stage 3: stage2.vc compiles compiler.vire"
 Invoke-Vire run data/stage2.vc compiler.vire stage3.vc
 
-function Get-Sha256([string]$Path) {
-    (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+function Get-PayloadSha([string]$Path) {
+    $out = Invoke-Vire payload-sha256 $Path
+    if ($out -is [array]) { return $out[-1].ToString().Trim() }
+    return $out.ToString().Trim()
 }
-$hash1 = Get-Sha256 "data/stage1.vc"
-$hash2 = Get-Sha256 "data/stage2.vc"
-$hash3 = Get-Sha256 "data/stage3.vc"
+$hash1 = Get-PayloadSha "data/stage1.vc"
+$hash2 = Get-PayloadSha "data/stage2.vc"
+$hash3 = Get-PayloadSha "data/stage3.vc"
 Write-Output "stage1 $hash1"
 Write-Output "stage2 $hash2"
 Write-Output "stage3 $hash3"
 if ($hash1 -ne $hash2 -or $hash2 -ne $hash3) {
     Write-Error "selfhost hashes differ"
+    exit 1
+}
+Invoke-Vire payload-write data/stage1.vc data/stage1.bin
+Invoke-Vire payload-write data/stage2.vc data/stage2.bin
+Invoke-Vire payload-write data/stage3.vc data/stage3.bin
+$p1 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage1.bin"))
+$p2 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage2.bin"))
+$p3 = [System.IO.File]::ReadAllBytes((Join-Path $Work "stage3.bin"))
+if (Compare-Object $p1 $p2) {
+    Write-Error "stage-1 payload bytes != stage-2 payload bytes"
+    exit 1
+}
+if (Compare-Object $p2 $p3) {
+    Write-Error "stage-2 payload bytes != stage-3 payload bytes"
     exit 1
 }
 Write-Output "selfhost ok"

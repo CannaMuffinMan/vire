@@ -1,3 +1,8 @@
+~ Static files live in site/. listen serves GET/HEAD of allowed types from that folder.
+define route with method, path, body
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
 define main
-  serve with 8080
+  listen with 0
 end
