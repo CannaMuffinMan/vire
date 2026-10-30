@@ -1,0 +1,8 @@
+define main
+  write with "data/note.txt", "hi"
+  write with "data/box/keep.txt", "x"
+  let names be files with "data"
+  let dirs be folders with "data"
+  say (find with (join with names, ","), "note.txt")
+  say (find with (join with dirs, ","), "box")
+end

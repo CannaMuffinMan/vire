@@ -1,0 +1,4 @@
+~ expect line 3 col 11
+define main
+  say [1] at 5
+end

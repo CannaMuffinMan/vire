@@ -1,0 +1,6 @@
+~ expect line 5 col 9
+define main
+  let a be 1
+  let b be 0
+  say a / b
+end
