@@ -24,15 +24,22 @@ public class HarnessTests
     [Fact]
     public void WorkflowPinsActionsToFullShas()
     {
-        string yml = File.ReadAllText(Path.Combine(FindRoot(), ".github", "workflows", "check.yml"));
-        MatchCollection uses = Regex.Matches(yml, @"^\s+- uses:\s+(\S+)", RegexOptions.Multiline);
-        Assert.True(uses.Count >= 3, "expected pinned uses: lines");
-        foreach (Match match in uses)
+        string root = FindRoot();
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        string workflows = Path.Combine(root, ".github", "workflows");
+        foreach (string path in Directory.GetFiles(workflows, "*.yml"))
         {
-            string spec = match.Groups[1].Value;
-            Match pin = Regex.Match(spec, @"^[A-Za-z0-9_./-]+@([0-9a-f]{40})$");
-            Assert.True(pin.Success, "unpinned or short SHA action: " + spec);
+            string text = File.ReadAllText(path);
+            MatchCollection uses = Regex.Matches(text, @"^\s+- uses:\s+(\S+)", RegexOptions.Multiline);
+            foreach (Match match in uses)
+            {
+                string spec = match.Groups[1].Value;
+                Match pin = Regex.Match(spec, @"^[A-Za-z0-9_./-]+@([0-9a-f]{40})$");
+                Assert.True(pin.Success, "unpinned or short SHA action: " + spec + " in " + Path.GetFileName(path));
+            }
         }
+        MatchCollection checkUses = Regex.Matches(yml, @"^\s+- uses:\s+(\S+)", RegexOptions.Multiline);
+        Assert.True(checkUses.Count >= 3, "expected pinned uses: lines");
         Assert.Contains("dotnet-version: 10.0.x", yml);
         Assert.Contains("bash tools/check-tracked-binaries.sh", yml);
         Assert.Contains("bash tools/selfhost-check.sh", yml);
