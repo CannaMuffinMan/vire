@@ -24,6 +24,35 @@ sealed class VireError : Exception
     }
 }
 
+static class VireLimits
+{
+    public const int SourceNest = 256;
+    public const int JsonNest = 2048;
+    public const int MaxLiteralDigits = 100;
+    public const int CompilerCalls = 8192;
+    public const string NestError = "source is nested too deeply";
+    public const string NumberError = "that number is too large";
+
+    public static void Enter(ref int nest, int line, int col)
+    {
+        nest++;
+        if (nest > SourceNest) throw new VireError(NestError, line, col);
+    }
+
+    public static void Leave(ref int nest)
+    {
+        if (nest > 0) nest--;
+    }
+
+    public static bool IsCompilerHost(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        string name = Path.GetFileName(path);
+        return string.Equals(name, "compiler.vire", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "compiler.vc", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
 sealed class ReturnSignal : Exception
 {
     public object Value;
@@ -213,7 +242,7 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "fail"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -311,7 +340,7 @@ sealed class Machine
         int need = 1;
         if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
-        if (name == "ink" || name == "dot" || name == "replace") need = 3;
+        if (name == "fail" || name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
@@ -340,8 +369,11 @@ sealed class Machine
             if (raw == null) throw new VireError("number needs text or a number", line, col);
             int whole;
             double real;
-            if (raw.IndexOf('.') < 0 && int.TryParse(raw, out whole)) return whole;
-            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real)) return real;
+            if (raw.Length > VireLimits.MaxLiteralDigits) throw new VireError(VireLimits.NumberError, line, col);
+            if (raw.IndexOf('.') < 0 && int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out whole)) return whole;
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real) && !double.IsInfinity(real) && !double.IsNaN(real))
+                return real;
+            if (raw.Length > 0 && char.IsDigit(raw[0])) throw new VireError(VireLimits.NumberError, line, col);
             throw new VireError("that text is not a number", line, col);
         }
         if (name == "ask")
@@ -407,6 +439,13 @@ sealed class Machine
         {
             if (!(args[0] is int)) throw new VireError("halt needs a whole number", line, col);
             throw new HaltSignal((int)args[0]);
+        }
+        if (name == "fail")
+        {
+            string msg = args[0] as string;
+            if (msg == null || !(args[1] is int) || !(args[2] is int))
+                throw new VireError("fail needs text and two whole numbers", line, col);
+            throw new VireError(msg, (int)args[1], (int)args[2]);
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
         if (name == "kind") return KindOf(args[0]);
@@ -1238,10 +1277,17 @@ sealed class Machine
 
     object Eval(object node, Env env)
     {
+        return Eval(node, env, 0);
+    }
+
+    object Eval(object node, Env env, int depth)
+    {
         object[] tree = (object[])node;
         string kind = (string)tree[0];
         int line = NodeLine(tree);
         int col = NodeCol(tree);
+        depth++;
+        if (depth > VireLimits.SourceNest) throw new VireError("expression is too deep", line, col);
         if (kind == "num" || kind == "str" || kind == "bool") return tree[1];
         if (kind == "none") return null;
         if (kind == "now") return Builtin("now", new List<object>(), line, col);
@@ -1257,7 +1303,7 @@ sealed class Machine
         if (kind == "call")
         {
             List<object> args = new List<object>();
-            foreach (object arg in (List<object>)tree[2]) args.Add(Eval(arg, env));
+            foreach (object arg in (List<object>)tree[2]) args.Add(Eval(arg, env, depth));
             return Call((string)tree[1], args, line, col);
         }
         if (kind == "list")
@@ -1266,7 +1312,7 @@ sealed class Machine
             foreach (object item in (List<object>)tree[1])
             {
                 if (items.Count >= MaxItems) throw new VireError("list is too large", line, col);
-                items.Add(Eval(item, env));
+                items.Add(Eval(item, env, depth));
             }
             return items;
         }
@@ -1276,15 +1322,15 @@ sealed class Machine
             foreach (object[] pair in (List<object[]>)tree[1])
             {
                 if (made.Count >= MaxItems) throw new VireError("map is too large", line, col);
-                made[KeyOf(Eval(pair[0], env), line)] = Eval(pair[1], env);
+                made[KeyOf(Eval(pair[0], env, depth), line)] = Eval(pair[1], env, depth);
             }
             return made;
         }
-        if (kind == "at") return Lookup(Eval(tree[1], env), Eval(tree[2], env), line, col);
-        if (kind == "not") return !Truth(Eval(tree[1], env));
+        if (kind == "at") return Lookup(Eval(tree[1], env, depth), Eval(tree[2], env, depth), line, col);
+        if (kind == "not") return !Truth(Eval(tree[1], env, depth));
         if (kind == "neg")
         {
-            object value = Eval(tree[1], env);
+            object value = Eval(tree[1], env, depth);
             if (!IsNum(value)) throw new VireError("minus applies to numbers", line, col);
             if (value is int)
             {
@@ -1294,7 +1340,7 @@ sealed class Machine
             }
             return -((double)value);
         }
-        if (kind == "bin") return Binary(tree, env);
+        if (kind == "bin") return Binary(tree, env, depth);
         throw new VireError("unknown expression", 0);
     }
 
@@ -1325,15 +1371,15 @@ sealed class Machine
         throw new VireError("at needs a list, text, or map", line, col);
     }
 
-    object Binary(object[] node, Env env)
+    object Binary(object[] node, Env env, int depth)
     {
         string op = (string)node[1];
         int line = NodeLine(node);
         int col = NodeCol(node);
-        if (op == "and") return Truth(Eval(node[2], env)) && Truth(Eval(node[3], env));
-        if (op == "or") return Truth(Eval(node[2], env)) || Truth(Eval(node[3], env));
-        object left = Eval(node[2], env);
-        object right = Eval(node[3], env);
+        if (op == "and") return Truth(Eval(node[2], env, depth)) && Truth(Eval(node[3], env, depth));
+        if (op == "or") return Truth(Eval(node[2], env, depth)) || Truth(Eval(node[3], env, depth));
+        object left = Eval(node[2], env, depth);
+        object right = Eval(node[3], env, depth);
         if (op == "==") return ValuesMatch(left, right);
         if (op == "!=") return !ValuesMatch(left, right);
         if (op == "+")
@@ -1654,25 +1700,38 @@ sealed class Parser
         if (tok.Kind == "while")
         {
             Eat("while");
-            object test = Expression();
-            List<object> body = LoopBody();
-            Eat("end");
-            return new object[] { "while", test, body, tok.Line, tok.Column };
+            PushNest();
+            try
+            {
+                object test = Expression();
+                List<object> body = LoopBody();
+                Eat("end");
+                return new object[] { "while", test, body, tok.Line, tok.Column };
+            }
+            finally { VireLimits.Leave(ref nest); }
         }
         if (tok.Kind == "for")
         {
             Eat("for");
-            string name = (string)Eat("name").Value;
-            Eat("in");
-            object seq = Expression();
-            List<object> body = LoopBody();
-            Eat("end");
-            return new object[] { "for", name, seq, body, tok.Line, tok.Column };
+            PushNest();
+            try
+            {
+                string name = (string)Eat("name").Value;
+                Eat("in");
+                object seq = Expression();
+                List<object> body = LoopBody();
+                Eat("end");
+                return new object[] { "for", name, seq, body, tok.Line, tok.Column };
+            }
+            finally { VireLimits.Leave(ref nest); }
         }
         if (tok.Kind == "if") return IfStmt(tok.Line, tok.Column, true);
         if (tok.Kind == "try")
         {
             Eat("try");
+            PushNest();
+            try
+            {
             List<object> body = Block();
             object caught = null;
             object handler = null;
@@ -1684,6 +1743,8 @@ sealed class Parser
             }
             Eat("end");
             return new object[] { "try", body, caught, handler, tok.Line, tok.Column };
+            }
+            finally { VireLimits.Leave(ref nest); }
         }
         if (tok.Kind == "name")
         {
@@ -1696,22 +1757,27 @@ sealed class Parser
     object IfStmt(int line, int col, bool close)
     {
         Eat("if");
-        object test = Expression();
-        List<object> body = Block();
-        object other = null;
-        if (At("else"))
+        PushNest();
+        try
         {
-            Eat("else");
-            if (At("if"))
+            object test = Expression();
+            List<object> body = Block();
+            object other = null;
+            if (At("else"))
             {
-                List<object> wrapped = new List<object>();
-                wrapped.Add(IfStmt(Peek().Line, Peek().Column, false));
-                other = wrapped;
+                Eat("else");
+                if (At("if"))
+                {
+                    List<object> wrapped = new List<object>();
+                    wrapped.Add(IfStmt(Peek().Line, Peek().Column, false));
+                    other = wrapped;
+                }
+                else other = Block();
             }
-            else other = Block();
+            if (close) Eat("end");
+            return new object[] { "if", test, body, other, line, col };
         }
-        if (close) Eat("end");
-        return new object[] { "if", test, body, other, line, col };
+        finally { VireLimits.Leave(ref nest); }
     }
 
     List<object> Arguments()
@@ -1728,74 +1794,115 @@ sealed class Parser
         return args;
     }
 
+    void PushNest()
+    {
+        VireLimits.Enter(ref nest, Peek().Line, Peek().Column);
+    }
+
     object Expression()
     {
-        nest++;
-        if (nest > 256) throw new VireError("expression is too deep", Peek().Line, Peek().Column);
-        try { return ParseOr(); }
-        finally { nest--; }
+        return ParseOr();
     }
     object ParseOr()
     {
         object node = ParseAnd();
-        while (At("or"))
+        int added = 0;
+        try
         {
-            Token op = Eat("or");
-            node = new object[] { "bin", "or", node, ParseAnd(), op.Line, op.Column };
+            while (At("or"))
+            {
+                Token op = Eat("or");
+                PushNest();
+                added++;
+                node = new object[] { "bin", "or", node, ParseAnd(), op.Line, op.Column };
+            }
+            return node;
         }
-        return node;
+        finally { for (int n = 0; n < added; n++) VireLimits.Leave(ref nest); }
     }
     object ParseAnd()
     {
         object node = ParseCmp();
-        while (At("and"))
+        int added = 0;
+        try
         {
-            Token op = Eat("and");
-            node = new object[] { "bin", "and", node, ParseCmp(), op.Line, op.Column };
+            while (At("and"))
+            {
+                Token op = Eat("and");
+                PushNest();
+                added++;
+                node = new object[] { "bin", "and", node, ParseCmp(), op.Line, op.Column };
+            }
+            return node;
         }
-        return node;
+        finally { for (int n = 0; n < added; n++) VireLimits.Leave(ref nest); }
     }
     object ParseCmp()
     {
         object node = ParseSum();
-        while (At("==", "!=", "<", ">", "<=", ">="))
+        int added = 0;
+        try
         {
-            Token op = Eat(Peek().Kind);
-            node = new object[] { "bin", op.Kind, node, ParseSum(), op.Line, op.Column };
+            while (At("==", "!=", "<", ">", "<=", ">="))
+            {
+                Token op = Eat(Peek().Kind);
+                PushNest();
+                added++;
+                node = new object[] { "bin", op.Kind, node, ParseSum(), op.Line, op.Column };
+            }
+            return node;
         }
-        return node;
+        finally { for (int n = 0; n < added; n++) VireLimits.Leave(ref nest); }
     }
     object ParseSum()
     {
         object node = ParseProduct();
-        while (At("+", "-"))
+        int added = 0;
+        try
         {
-            Token op = Eat(Peek().Kind);
-            node = new object[] { "bin", op.Kind, node, ParseProduct(), op.Line, op.Column };
+            while (At("+", "-"))
+            {
+                Token op = Eat(Peek().Kind);
+                PushNest();
+                added++;
+                node = new object[] { "bin", op.Kind, node, ParseProduct(), op.Line, op.Column };
+            }
+            return node;
         }
-        return node;
+        finally { for (int n = 0; n < added; n++) VireLimits.Leave(ref nest); }
     }
     object ParseProduct()
     {
         object node = ParseUnary();
-        while (At("*", "/", "%"))
+        int added = 0;
+        try
         {
-            Token op = Eat(Peek().Kind);
-            node = new object[] { "bin", op.Kind, node, ParseUnary(), op.Line, op.Column };
+            while (At("*", "/", "%"))
+            {
+                Token op = Eat(Peek().Kind);
+                PushNest();
+                added++;
+                node = new object[] { "bin", op.Kind, node, ParseUnary(), op.Line, op.Column };
+            }
+            return node;
         }
-        return node;
+        finally { for (int n = 0; n < added; n++) VireLimits.Leave(ref nest); }
     }
     object ParseUnary()
     {
         if (At("not"))
         {
             Token op = Eat("not");
-            return new object[] { "not", ParseUnary(), op.Line, op.Column };
+            PushNest();
+            try { return new object[] { "not", ParseUnary(), op.Line, op.Column }; }
+            finally { VireLimits.Leave(ref nest); }
         }
         if (At("-"))
         {
             Token op = Eat("-");
-            return new object[] { "neg", ParseUnary(), op.Line, op.Column };
+            PushNest();
+            try { return new object[] { "neg", ParseUnary(), op.Line, op.Column }; }
+            finally { VireLimits.Leave(ref nest); }
         }
         return ParsePrimary();
     }
@@ -1827,7 +1934,10 @@ sealed class Parser
         if (tok.Kind == "(")
         {
             Eat("(");
-            object node = Expression();
+            PushNest();
+            object node;
+            try { node = Expression(); }
+            finally { VireLimits.Leave(ref nest); }
             Eat(")");
             return node;
         }
@@ -1838,6 +1948,13 @@ sealed class Parser
     object ListLiteral(int line, int col)
     {
         Eat("[");
+        PushNest();
+        try { return FinishList(line, col); }
+        finally { VireLimits.Leave(ref nest); }
+    }
+
+    object FinishList(int line, int col)
+    {
         List<object> items = new List<object>();
         if (!At("]"))
         {
@@ -1855,6 +1972,13 @@ sealed class Parser
     object MapLiteral(int line, int col)
     {
         Eat("{");
+        PushNest();
+        try { return FinishMap(line, col); }
+        finally { VireLimits.Leave(ref nest); }
+    }
+
+    object FinishMap(int line, int col)
+    {
         List<object[]> pairs = new List<object[]>();
         if (!At("}"))
         {
@@ -1889,6 +2013,7 @@ static class Lexer
         int i = 0;
         int line = 1;
         int col = 1;
+        int nest = 0;
         while (i < source.Length)
         {
             char ch = source[i];
@@ -1931,12 +2056,24 @@ static class Lexer
             if (char.IsDigit(ch))
             {
                 int start = i;
-                while (i < source.Length && char.IsDigit(source[i])) i++;
+                int digits = 0;
+                while (i < source.Length && char.IsDigit(source[i]))
+                {
+                    digits++;
+                    if (digits > VireLimits.MaxLiteralDigits) throw new VireError(VireLimits.NumberError, line, here);
+                    i++;
+                }
                 if (i + 1 < source.Length && source[i] == '.' && char.IsDigit(source[i + 1]))
                 {
                     i++;
-                    while (i < source.Length && char.IsDigit(source[i])) i++;
+                    while (i < source.Length && char.IsDigit(source[i]))
+                    {
+                        digits++;
+                        if (digits > VireLimits.MaxLiteralDigits) throw new VireError(VireLimits.NumberError, line, here);
+                        i++;
+                    }
                     double real = double.Parse(source.Substring(start, i - start), CultureInfo.InvariantCulture);
+                    if (double.IsInfinity(real) || double.IsNaN(real)) throw new VireError(VireLimits.NumberError, line, here);
                     tokens.Add(new Token("number", real, line, here));
                 }
                 else
@@ -1948,8 +2085,8 @@ static class Lexer
                     else
                     {
                         double real;
-                        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real) || double.IsInfinity(real))
-                            throw new VireError("that number is too large", line, here);
+                        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real) || double.IsInfinity(real) || double.IsNaN(real))
+                            throw new VireError(VireLimits.NumberError, line, here);
                         tokens.Add(new Token("number", real, line, here));
                     }
                 }
@@ -1961,7 +2098,11 @@ static class Lexer
                 int start = i;
                 while (i < source.Length && (char.IsLetterOrDigit(source[i]) || source[i] == '_')) i++;
                 string word = source.Substring(start, i - start);
-                tokens.Add(new Token(Keywords.Contains(word) ? word : "name", word, line, here));
+                string kind = Keywords.Contains(word) ? word : "name";
+                if (kind == "if" || kind == "while" || kind == "for" || kind == "try")
+                    VireLimits.Enter(ref nest, line, here);
+                if (kind == "end") VireLimits.Leave(ref nest);
+                tokens.Add(new Token(kind, word, line, here));
                 col = here + (i - start);
                 continue;
             }
@@ -1979,6 +2120,8 @@ static class Lexer
             string one = ch.ToString();
             if ("+-*/%<>=(),[]{}:".IndexOf(ch) >= 0)
             {
+                if (ch == '(' || ch == '[' || ch == '{') VireLimits.Enter(ref nest, line, here);
+                if (ch == ')' || ch == ']' || ch == '}') VireLimits.Leave(ref nest);
                 tokens.Add(new Token(one, one, line, here));
                 i++;
                 col = here + 1;
@@ -2000,7 +2143,7 @@ sealed class Json
 
     static string WriteValue(object value, HashSet<object> path, int nest)
     {
-        if (nest > 256) throw new VireError("json is nested too deeply", 1);
+        if (nest > VireLimits.JsonNest) throw new VireError("json is nested too deeply", 1);
         string text;
         if (value == null) text = "null";
         else if (value is bool) text = (bool)value ? "true" : "false";
@@ -2092,7 +2235,7 @@ sealed class Json
 
     static object ReadValue(string text, ref int i, int line, int depth = 0)
     {
-        if (depth > 256) throw new VireError("json is nested too deeply", line);
+        if (depth > VireLimits.JsonNest) throw new VireError("json is nested too deeply", line);
         Skip(text, ref i);
         if (i >= text.Length) throw new VireError("json ended early", line);
         char ch = text[i];
@@ -2448,6 +2591,7 @@ sealed class Program
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseBudget(budget);
+            if (VireLimits.IsCompilerHost(program)) machine.budget.MaxCalls = VireLimits.CompilerCalls;
             List<object> extra = new List<object>();
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);

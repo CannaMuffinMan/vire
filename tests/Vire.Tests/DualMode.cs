@@ -79,7 +79,10 @@ static class DualMode
         Proc compile = RunVire(root, new string[] { "compiler.vire", relSrc, relVc }, root, "5000000");
         if (compile.Code != 0)
         {
-            return new DualRun(false, interp.Code, compile.Code, interp.Out, compile.Out, interp.Err, compile.Err);
+            bool sameFail = interp.Code == compile.Code
+                && Norm(interp.Out) == Norm(compile.Out)
+                && Norm(interp.Err) == Norm(compile.Err);
+            return new DualRun(sameFail, interp.Code, compile.Code, interp.Out, compile.Out, interp.Err, compile.Err);
         }
         Proc compiled = RunVire(root, new string[] { "run", relVc }, root, runBudget);
         bool matched = interp.Code == compiled.Code

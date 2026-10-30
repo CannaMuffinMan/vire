@@ -175,6 +175,29 @@ define tokCol with tok
   return 1
 end
 
+define growNest with nest, line, col
+  let nest be nest + 1
+  if nest > 256
+    fail with "source is nested too deeply", line, col
+  end
+  return nest
+end
+
+define enterNest with state
+  put ((state at "nest") + 1) into state at "nest"
+  if (state at "nest") > 256
+    fail with "source is nested too deeply", (tokLine with (peek with state)), (tokCol with (peek with state))
+  end
+  return true
+end
+
+define leaveNest with state
+  if (state at "nest") > 0
+    put ((state at "nest") - 1) into state at "nest"
+  end
+  return true
+end
+
 define skipLine with source, i
   let n be length with source
   while i < n
@@ -193,6 +216,7 @@ define tokenize with source
   let n be length with source
   let line be 1
   let col be 1
+  let nest be 0
   while i < n
     let ch be source at i
     if isSpace with ch
@@ -305,10 +329,14 @@ define tokenize with source
       end
       if isDigit with ch
         let start be i
-        let i be i + 1
+        let digits be 0
         while i < n
           if not (isDigit with (source at i))
             stop
+          end
+          let digits be digits + 1
+          if digits > 100
+            fail with "that number is too large", line, here
           end
           let i be i + 1
         end
@@ -319,6 +347,10 @@ define tokenize with source
               while i < n
                 if not (isDigit with (source at i))
                   stop
+                end
+                let digits be digits + 1
+                if digits > 100
+                  fail with "that number is too large", line, here
                 end
                 let i be i + 1
               end
@@ -351,6 +383,23 @@ define tokenize with source
         end
         let word be slice with source, start, i
         if keyword with word
+          if word == "if"
+            let nest be growNest with nest, line, here
+          end
+          if word == "while"
+            let nest be growNest with nest, line, here
+          end
+          if word == "for"
+            let nest be growNest with nest, line, here
+          end
+          if word == "try"
+            let nest be growNest with nest, line, here
+          end
+          if word == "end"
+            if nest > 0
+              let nest be nest - 1
+            end
+          end
           push with out, [word, word, line, here]
         end
         if not (keyword with word)
@@ -386,6 +435,30 @@ define tokenize with source
                   if not (two == "!=")
                     if not (two == "<=")
                       if not (two == ">=")
+                        if ch == "("
+                          let nest be growNest with nest, line, here
+                        end
+                        if ch == "["
+                          let nest be growNest with nest, line, here
+                        end
+                        if ch == "{"
+                          let nest be growNest with nest, line, here
+                        end
+                        if ch == ")"
+                          if nest > 0
+                            let nest be nest - 1
+                          end
+                        end
+                        if ch == "]"
+                          if nest > 0
+                            let nest be nest - 1
+                          end
+                        end
+                        if ch == "}"
+                          if nest > 0
+                            let nest be nest - 1
+                          end
+                        end
                         push with out, [ch, ch, line, here]
                         let i be i + 1
                       end
@@ -483,12 +556,15 @@ define parseAtom with state
   end
   if k == "("
     bump with state
+    enterNest with state
     let inner be parseExpr with state
+    leaveNest with state
     eat with state, ")"
     return inner
   end
   if k == "{"
     bump with state
+    enterNest with state
     let pairs be []
     if not ((tokenKind with state) == "}")
       let key be parseExpr with state
@@ -504,10 +580,12 @@ define parseAtom with state
       end
     end
     eat with state, "}"
+    leaveNest with state
     return ["map", pairs, line, col]
   end
   if k == "["
     bump with state
+    enterNest with state
     let items be []
     if not ((tokenKind with state) == "]")
       push with items, (parseExpr with state)
@@ -517,6 +595,7 @@ define parseAtom with state
       end
     end
     eat with state, "]"
+    leaveNest with state
     return ["list", items, line, col]
   end
   say "bad token " + (tokenKind with state)
@@ -542,37 +621,50 @@ define parseUnary with state
     let line be tokLine with (peek with state)
     let col be tokCol with (peek with state)
     bump with state
-    return ["not", (parseUnary with state), line, col]
+    enterNest with state
+    let node be ["not", (parseUnary with state), line, col]
+    leaveNest with state
+    return node
   end
   if (tokenKind with state) == "-"
     let line be tokLine with (peek with state)
     let col be tokCol with (peek with state)
     bump with state
-    return ["neg", (parseUnary with state), line, col]
+    enterNest with state
+    let node be ["neg", (parseUnary with state), line, col]
+    leaveNest with state
+    return node
   end
   return parsePrimary with state
 end
 
 define parseProduct with state
   let left be parseUnary with state
+  let added be 0
   while true
     let k be tokenKind with state
     if k == "*"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["*", left, (parseUnary with state), line, col]
     end
     if k == "/"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["/", left, (parseUnary with state), line, col]
     end
     if k == "%"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["%", left, (parseUnary with state), line, col]
     end
     if not (k == "*")
@@ -583,23 +675,32 @@ define parseProduct with state
       end
     end
   end
+  while added > 0
+    leaveNest with state
+    let added be added - 1
+  end
   return left
 end
 
 define parseSum with state
   let left be parseProduct with state
+  let added be 0
   while true
     let k be tokenKind with state
     if k == "+"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["+", left, (parseProduct with state), line, col]
     end
     if k == "-"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["-", left, (parseProduct with state), line, col]
     end
     if not (k == "+")
@@ -608,47 +709,64 @@ define parseSum with state
       end
     end
   end
+  while added > 0
+    leaveNest with state
+    let added be added - 1
+  end
   return left
 end
 
 define parseCmp with state
   let left be parseSum with state
+  let added be 0
   while true
     let k be tokenKind with state
     if k == "=="
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["==", left, (parseSum with state), line, col]
     end
     if k == "!="
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["!=", left, (parseSum with state), line, col]
     end
     if k == "<"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["<", left, (parseSum with state), line, col]
     end
     if k == ">"
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be [">", left, (parseSum with state), line, col]
     end
     if k == "<="
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be ["<=", left, (parseSum with state), line, col]
     end
     if k == ">="
       let line be tokLine with (peek with state)
       let col be tokCol with (peek with state)
       bump with state
+      enterNest with state
+      let added be added + 1
       let left be [">=", left, (parseSum with state), line, col]
     end
     if not (k == "==")
@@ -665,27 +783,45 @@ define parseCmp with state
       end
     end
   end
+  while added > 0
+    leaveNest with state
+    let added be added - 1
+  end
   return left
 end
 
 define parseAnd with state
   let left be parseCmp with state
+  let added be 0
   while (tokenKind with state) == "and"
     let line be tokLine with (peek with state)
     let col be tokCol with (peek with state)
     bump with state
+    enterNest with state
+    let added be added + 1
     let left be ["and", left, (parseCmp with state), line, col]
+  end
+  while added > 0
+    leaveNest with state
+    let added be added - 1
   end
   return left
 end
 
 define parseOr with state
   let left be parseAnd with state
+  let added be 0
   while (tokenKind with state) == "or"
     let line be tokLine with (peek with state)
     let col be tokCol with (peek with state)
     bump with state
-    let left be ["or", left, (parseOr with state), line, col]
+    enterNest with state
+    let added be added + 1
+    let left be ["or", left, (parseAnd with state), line, col]
+  end
+  while added > 0
+    leaveNest with state
+    let added be added - 1
   end
   return left
 end
@@ -740,6 +876,7 @@ define parseIf with state, close
   let line be tokLine with (peek with state)
   let col be tokCol with (peek with state)
   bump with state
+  enterNest with state
   let test be parseExpr with state
   let yes be parseBlock with state
   let no be []
@@ -759,6 +896,7 @@ define parseIf with state, close
   if close
     eat with state, "end"
   end
+  leaveNest with state
   return ["if", test, yes, no, line, col]
 end
 
@@ -803,23 +941,28 @@ define parseStmt with state
   end
   if k == "while"
     bump with state
+    enterNest with state
     let test be parseExpr with state
     let body be parseLoopBlock with state
     eat with state, "end"
+    leaveNest with state
     return ["while", test, body, line, col]
   end
   if k == "for"
     bump with state
+    enterNest with state
     let name be spelling with state
     bump with state
     eat with state, "in"
     let seq be parseExpr with state
     let body be parseLoopBlock with state
     eat with state, "end"
+    leaveNest with state
     return ["for", name, seq, body, line, col]
   end
   if k == "try"
     bump with state
+    enterNest with state
     let body be parseBlock with state
     let caught be none
     let handler be none
@@ -832,6 +975,7 @@ define parseStmt with state
       let handler be parseBlock with state
     end
     eat with state, "end"
+    leaveNest with state
     return ["try", body, caught, handler, line, col]
   end
   if k == "name"
@@ -916,7 +1060,7 @@ define compileUnit with path, seen, state
   put 1 into seen at path
   let source be read with path
   let tokens be tokenize with source
-  let inner be {"i": 0, "toks": tokens, "bad": false}
+  let inner be {"i": 0, "toks": tokens, "bad": false, "nest": 0}
   let funcs be []
   let folder be dirOf with path
   while not ((tokenKind with inner) == "eof")
@@ -984,7 +1128,7 @@ define compileUnit with path, seen, state
 end
 
 define assemble with tokens
-  let state be {"i": 0, "toks": tokens, "bad": false}
+  let state be {"i": 0, "toks": tokens, "bad": false, "nest": 0}
   let funcs be []
   while not ((tokenKind with state) == "eof")
     if (tokenKind with state) == "bad"

@@ -46,22 +46,23 @@ sealed class CompiledCheck
             if (names == null || body == null) throw BadOperand();
             foreach (object name in names)
                 if (!(name is string)) throw BadOperand();
-            CheckBlock(body);
+            CheckBlock(body, 0);
         }
     }
 
-    void CheckBlock(List<object> body)
+    void CheckBlock(List<object> body, int depth)
     {
+        if (depth > VireLimits.SourceNest) throw new VireError(VireLimits.NestError, 1, 1);
         if (body == null) throw BadOperand();
         for (int i = 0; i < body.Count; i++)
         {
             List<object> step = body[i] as List<object>;
             if (step == null) throw BadOperand();
-            CheckStep(step, body.Count);
+            CheckStep(step, body.Count, depth);
         }
     }
 
-    void CheckStep(List<object> step, int blockCount)
+    void CheckStep(List<object> step, int blockCount, int depth)
     {
         steps++;
         if (steps > MaxSteps) throw new VireError("compiled program is too large", 1, 1);
@@ -81,72 +82,73 @@ sealed class CompiledCheck
         {
             Need(step, 3);
             if (!(step[1] is string)) throw BadOperand();
-            CheckExpr(AsExpr(step[2]));
+            CheckExpr(AsExpr(step[2]), 0);
             return;
         }
         if (op == "say" || op == "return")
         {
             Need(step, 2);
-            CheckExpr(AsExpr(step[1]));
+            CheckExpr(AsExpr(step[1]), 0);
             return;
         }
         if (op == "stop" || op == "skip") return;
         if (op == "if")
         {
             Need(step, 3);
-            CheckExpr(AsExpr(step[1]));
-            CheckBlock(AsBlock(step[2]));
-            if (step.Count > 3 && step[3] is List<object>) CheckBlock((List<object>)step[3]);
+            CheckExpr(AsExpr(step[1]), 0);
+            CheckBlock(AsBlock(step[2]), depth + 1);
+            if (step.Count > 3 && step[3] is List<object>) CheckBlock((List<object>)step[3], depth + 1);
             return;
         }
         if (op == "while")
         {
             Need(step, 3);
-            CheckExpr(AsExpr(step[1]));
-            CheckBlock(AsBlock(step[2]));
+            CheckExpr(AsExpr(step[1]), 0);
+            CheckBlock(AsBlock(step[2]), depth + 1);
             return;
         }
         if (op == "for")
         {
             Need(step, 4);
             if (!(step[1] is string)) throw BadOperand();
-            CheckExpr(AsExpr(step[2]));
-            CheckBlock(AsBlock(step[3]));
+            CheckExpr(AsExpr(step[2]), 0);
+            CheckBlock(AsBlock(step[3]), depth + 1);
             return;
         }
         if (op == "try")
         {
             Need(step, 2);
-            CheckBlock(AsBlock(step[1]));
-            if (step.Count >= 4 && step[3] is List<object>) CheckBlock((List<object>)step[3]);
+            CheckBlock(AsBlock(step[1]), depth + 1);
+            if (step.Count >= 4 && step[3] is List<object>) CheckBlock((List<object>)step[3], depth + 1);
             return;
         }
         if (op == "call")
         {
             Need(step, 3);
             if (!(step[1] is string)) throw BadOperand();
-            CheckExprList(AsBlock(step[2]));
+            CheckExprList(AsBlock(step[2]), 0);
             return;
         }
         if (op == "put")
         {
             Need(step, 4);
-            CheckExpr(AsExpr(step[1]));
+            CheckExpr(AsExpr(step[1]), 0);
             if (!(step[2] is string)) throw BadOperand();
-            CheckExpr(AsExpr(step[3]));
+            CheckExpr(AsExpr(step[3]), 0);
             return;
         }
         throw new VireError("unknown compiled step " + op, 1, 1);
     }
 
-    void CheckExprList(List<object> exprs)
+    void CheckExprList(List<object> exprs, int depth)
     {
         if (exprs == null) throw BadOperand();
-        foreach (object item in exprs) CheckExpr(AsExpr(item));
+        foreach (object item in exprs) CheckExpr(AsExpr(item), depth);
     }
 
-    void CheckExpr(List<object> expr)
+    void CheckExpr(List<object> expr, int depth)
     {
+        if (depth > VireLimits.SourceNest) throw new VireError(VireLimits.NestError, 1, 1);
         exprNodes++;
         if (exprNodes > MaxExprNodes) throw new VireError("compiled expression is too large", 1, 1);
         if (expr == null) throw BadOperand();
@@ -168,28 +170,28 @@ sealed class CompiledCheck
         if (op == "list")
         {
             Need(expr, 2);
-            CheckExprList(AsBlock(expr[1]));
+            CheckExprList(AsBlock(expr[1]), depth + 1);
             return;
         }
         if (op == "call")
         {
             Need(expr, 3);
             if (!(expr[1] is string)) throw BadOperand();
-            CheckExprList(AsBlock(expr[2]));
+            CheckExprList(AsBlock(expr[2]), depth + 1);
             return;
         }
         if (op == "at" || op == "and" || op == "or" || op == "+" || op == "-" || op == "*" || op == "/" || op == "%"
             || op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=")
         {
             Need(expr, 3);
-            CheckExpr(AsExpr(expr[1]));
-            CheckExpr(AsExpr(expr[2]));
+            CheckExpr(AsExpr(expr[1]), depth + 1);
+            CheckExpr(AsExpr(expr[2]), depth + 1);
             return;
         }
         if (op == "not" || op == "neg")
         {
             Need(expr, 2);
-            CheckExpr(AsExpr(expr[1]));
+            CheckExpr(AsExpr(expr[1]), depth + 1);
             return;
         }
         if (op == "map")
@@ -201,8 +203,8 @@ sealed class CompiledCheck
             {
                 List<object> item = pair as List<object>;
                 if (item == null || item.Count < 2) throw Underflow();
-                CheckExpr(AsExpr(item[0]));
-                CheckExpr(AsExpr(item[1]));
+                CheckExpr(AsExpr(item[0]), depth + 1);
+                CheckExpr(AsExpr(item[1]), depth + 1);
             }
             return;
         }
