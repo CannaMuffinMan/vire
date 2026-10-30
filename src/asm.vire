@@ -1,0 +1,151 @@
+~ Byte helpers for the native Vire compiler. This file is Vire.
+
+define whole with n
+  let raw be text with n
+  let dot be find with raw, "."
+  if dot >= 0
+    let raw be slice with raw, 0, dot
+  end
+  if raw == ""
+    return 0
+  end
+  if raw == "-"
+    return 0
+  end
+  return number with raw
+end
+
+define floorDiv with n, d
+  let q be 0
+  let rest be n
+  let acc be d
+  let bit be 1
+  let accs be []
+  let bits be []
+  while acc <= rest
+    push with accs, acc
+    push with bits, bit
+    if acc > 9007199254740992 - acc
+      stop
+    end
+    let next be acc + acc
+    if next <= acc
+      stop
+    end
+    let acc be next
+    let bit be bit + bit
+  end
+  let i be (length with accs) - 1
+  while i >= 0
+    let piece be accs at i
+    if piece <= rest
+      let rest be rest - piece
+      let q be q + (bits at i)
+    end
+    let i be i - 1
+  end
+  return whole with q
+end
+
+define emitU8 with buf, n
+  let x be n
+  if x < 0
+    let x be x + 256
+  end
+  while x >= 256
+    let x be x - 256
+  end
+  push with buf, (whole with x)
+  return buf
+end
+
+define emitU32 with buf, n
+  let x be n
+  if x < 0
+    let x be x + 4294967296
+  end
+  let i be 0
+  while i < 4
+    let byte be x - ((floorDiv with x, 256) * 256)
+    if byte < 0
+      let byte be 0
+    end
+    push with buf, byte
+    let x be floorDiv with x, 256
+    let i be i + 1
+  end
+  return buf
+end
+
+define emitU64 with buf, n
+  emitU32 with buf, n
+  let high be floorDiv with n, 4294967296
+  if n < 0
+    let high be 0
+  end
+  emitU32 with buf, high
+  return buf
+end
+
+define emitRel with buf, fixes, name
+  let pos be length with buf
+  emitU32 with buf, 0
+  push with fixes, {"at": pos, "to": name}
+  return buf
+end
+
+define pin with labels, name, buf
+  put (length with buf) into labels at name
+  return true
+end
+
+define patchRel with buf, labels, fixes
+  let i be 0
+  let n be length with fixes
+  while i < n
+    let fix be fixes at i
+    let pos be fix at "at"
+    let dest be labels at (fix at "to")
+    let rel be dest - (pos + 4)
+    let x be rel
+    if x < 0
+      let x be x + 4294967296
+    end
+    let b0 be 0
+    let k be 0
+    while k < 4
+      let q be floorDiv with x, 256
+      let byte be x - (q * 256)
+      put byte into buf at (pos + k)
+      let x be q
+      let k be k + 1
+    end
+    let i be i + 1
+  end
+  return buf
+end
+
+define hexByte with n
+  let digits be "0123456789abcdef"
+  let x be n
+  while x >= 256
+    let x be x - 256
+  end
+  if x < 0
+    let x be 0
+  end
+  let hi be floorDiv with x, 16
+  let lo be whole with (x - (hi * 16))
+  return (digits at hi) + (digits at lo)
+end
+
+define hexOf with buf
+  let out be ""
+  let i be 0
+  let n be length with buf
+  while i < n
+    let out be out + (hexByte with (buf at i))
+    let i be i + 1
+  end
+  return out
+end

@@ -1,0 +1,708 @@
+~ budget 30000000
+~ Vire compiler. The compiler source is Vire. The .NET file is only the bootstrap.
+
+define isSpace with ch
+  if ch == " "
+    return true
+  end
+  if ch == "\n"
+    return true
+  end
+  if ch == "\r"
+    return true
+  end
+  if ch == "\t"
+    return true
+  end
+  return false
+end
+
+define isDigit with ch
+  if (find with "0123456789", ch) >= 0
+    return true
+  end
+  return false
+end
+
+define isLetter with ch
+  if (find with "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", ch) >= 0
+    return true
+  end
+  return false
+end
+
+define keyword with word
+  if word == "define"
+    return true
+  end
+  if word == "end"
+    return true
+  end
+  if word == "let"
+    return true
+  end
+  if word == "be"
+    return true
+  end
+  if word == "say"
+    return true
+  end
+  if word == "return"
+    return true
+  end
+  if word == "if"
+    return true
+  end
+  if word == "not"
+    return true
+  end
+  if word == "else"
+    return true
+  end
+  if word == "while"
+    return true
+  end
+  if word == "stop"
+    return true
+  end
+  if word == "with"
+    return true
+  end
+  if word == "true"
+    return true
+  end
+  if word == "false"
+    return true
+  end
+  if word == "none"
+    return true
+  end
+  if word == "and"
+    return true
+  end
+  if word == "or"
+    return true
+  end
+  if word == "put"
+    return true
+  end
+  if word == "into"
+    return true
+  end
+  if word == "at"
+    return true
+  end
+  return false
+end
+
+define skipLine with source, i
+  let n be length with source
+  while i < n
+    let mark be source at i
+    let i be i + 1
+    if mark == "\n"
+      stop
+    end
+  end
+  return i
+end
+
+define tokenize with source
+  let out be []
+  let i be 0
+  let n be length with source
+  while i < n
+    let ch be source at i
+    if isSpace with ch
+      let i be i + 1
+    end
+    if not (isSpace with ch)
+      if ch == "~"
+        let i be i + 1
+        while i < n
+          let mark be source at i
+          let i be i + 1
+          if mark == "\n"
+            stop
+          end
+        end
+      end
+      if ch == "\""
+        let i be i + 1
+        let text be ""
+        let broken be false
+        let closed be false
+        while i < n
+          if broken
+            stop
+          end
+          let mark be source at i
+          if mark == "\n"
+            push with out, ["bad", "broken string"]
+            let broken be true
+            let i be skipLine with source, i
+            stop
+          end
+          if mark == "\\"
+            let i be i + 1
+            if i >= n
+              push with out, ["bad", "broken string"]
+              let broken be true
+              let i be skipLine with source, i
+              stop
+            end
+            let esc be source at i
+            let known be false
+            if esc == "n"
+              let text be text + "\n"
+              let known be true
+            end
+            if esc == "r"
+              let text be text + "\r"
+              let known be true
+            end
+            if esc == "t"
+              let text be text + "\t"
+              let known be true
+            end
+            if esc == "\""
+              let text be text + "\""
+              let known be true
+            end
+            if esc == "\\"
+              let text be text + "\\"
+              let known be true
+            end
+            if not known
+              push with out, ["bad", "broken string"]
+              let broken be true
+              let i be skipLine with source, i
+              stop
+            end
+            let i be i + 1
+          end
+          if not (mark == "\\")
+            if mark == "\""
+              let i be i + 1
+              let closed be true
+              stop
+            end
+            if not (mark == "\"")
+              let text be text + mark
+              let i be i + 1
+            end
+          end
+        end
+        if not broken
+          if not closed
+            push with out, ["bad", "broken string"]
+            let broken be true
+          end
+        end
+        if not broken
+          push with out, ["text", text]
+        end
+      end
+      if isDigit with ch
+        let start be i
+        let i be i + 1
+        while i < n
+          if not (isDigit with (source at i))
+            stop
+          end
+          let i be i + 1
+        end
+        if i + 1 < n
+          if (source at i) == "."
+            if isDigit with (source at (i + 1))
+              let i be i + 1
+              while i < n
+                if not (isDigit with (source at i))
+                  stop
+                end
+                let i be i + 1
+              end
+            end
+          end
+        end
+        push with out, ["num", number with (slice with source, start, i)]
+      end
+      if isLetter with ch
+        let start be i
+        while i < n
+          if i >= n
+            stop
+          end
+          let ch be source at i
+          let go be false
+          if isLetter with ch
+            let go be true
+          end
+          if isDigit with ch
+            let go be true
+          end
+          if go
+            let i be i + 1
+          end
+          if not go
+            stop
+          end
+        end
+        let word be slice with source, start, i
+        if keyword with word
+          push with out, [word]
+        end
+        if not (keyword with word)
+          push with out, ["name", word]
+        end
+      end
+      if not (isSpace with ch)
+        if not (ch == "~")
+          if not (ch == "\"")
+            if not (isDigit with ch)
+              if not (isLetter with ch)
+                let two be ""
+                if i + 1 < n
+                  let two be ch + (source at (i + 1))
+                end
+                if two == "=="
+                  push with out, ["=="]
+                  let i be i + 2
+                end
+                if two == "!="
+                  push with out, ["!="]
+                  let i be i + 2
+                end
+                if two == "<="
+                  push with out, ["<="]
+                  let i be i + 2
+                end
+                if two == ">="
+                  push with out, [">="]
+                  let i be i + 2
+                end
+                if not (two == "==")
+                  if not (two == "!=")
+                    if not (two == "<=")
+                      if not (two == ">=")
+                        push with out, [ch]
+                        let i be i + 1
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  push with out, ["eof"]
+  return out
+end
+
+define peek with state
+  let toks be state at "toks"
+  return toks at (state at "i")
+end
+
+define tokenKind with state
+  let tok be peek with state
+  return tok at 0
+end
+
+define bump with state
+  put ((state at "i") + 1) into state at "i"
+  return true
+end
+
+define spelling with state
+  let tok be peek with state
+  return tok at 1
+end
+
+define eat with state, want
+  if (tokenKind with state) == want
+    bump with state
+    return true
+  end
+  say "expected " + want
+  put true into state at "bad"
+  return false
+end
+
+define parseAtom with state
+  let k be tokenKind with state
+  if k == "bad"
+    say spelling with state
+    put true into state at "bad"
+    bump with state
+    return ["none"]
+  end
+  if k == "num"
+    let saved be spelling with state
+    bump with state
+    return ["num", saved]
+  end
+  if k == "text"
+    let saved be spelling with state
+    bump with state
+    return ["text", saved]
+  end
+  if k == "true"
+    bump with state
+    return ["bool", true]
+  end
+  if k == "false"
+    bump with state
+    return ["bool", false]
+  end
+  if k == "none"
+    bump with state
+    return ["none"]
+  end
+  if k == "name"
+    let name be spelling with state
+    bump with state
+    if (tokenKind with state) == "with"
+      bump with state
+      let args be []
+      push with args, (parseProduct with state)
+      while (tokenKind with state) == ","
+        bump with state
+        push with args, (parseProduct with state)
+      end
+      return ["call", name, args]
+    end
+    return ["name", name]
+  end
+  if k == "("
+    bump with state
+    let inner be parseExpr with state
+    eat with state, ")"
+    return inner
+  end
+  if k == "{"
+    bump with state
+    let pairs be []
+    if not ((tokenKind with state) == "}")
+      let key be parseExpr with state
+      eat with state, ":"
+      let field be parseExpr with state
+      push with pairs, [key, field]
+      while (tokenKind with state) == ","
+        bump with state
+        let key be parseExpr with state
+        eat with state, ":"
+        let field be parseExpr with state
+        push with pairs, [key, field]
+      end
+    end
+    eat with state, "}"
+    return ["map", pairs]
+  end
+  if k == "["
+    bump with state
+    let items be []
+    if not ((tokenKind with state) == "]")
+      push with items, (parseExpr with state)
+      while (tokenKind with state) == ","
+        bump with state
+        push with items, (parseExpr with state)
+      end
+    end
+    eat with state, "]"
+    return ["list", items]
+  end
+  say "bad token " + (tokenKind with state)
+  put true into state at "bad"
+  bump with state
+  return ["none"]
+end
+
+define parsePrimary with state
+  let node be parseAtom with state
+  while (tokenKind with state) == "at"
+    bump with state
+    let idx be parseUnary with state
+    let node be ["at", node, idx]
+  end
+  return node
+end
+
+define parseUnary with state
+  if (tokenKind with state) == "not"
+    bump with state
+    return ["not", parseUnary with state]
+  end
+  if (tokenKind with state) == "-"
+    bump with state
+    return ["neg", parseUnary with state]
+  end
+  return parsePrimary with state
+end
+
+define parseProduct with state
+  let left be parseUnary with state
+  while true
+    let k be tokenKind with state
+    if k == "*"
+      bump with state
+      let left be ["*", left, parseUnary with state]
+    end
+    if k == "/"
+      bump with state
+      let left be ["/", left, parseUnary with state]
+    end
+    if k == "%"
+      bump with state
+      let left be ["%", left, parseUnary with state]
+    end
+    if not (k == "*")
+      if not (k == "/")
+        if not (k == "%")
+          stop
+        end
+      end
+    end
+  end
+  return left
+end
+
+define parseSum with state
+  let left be parseProduct with state
+  while true
+    let k be tokenKind with state
+    if k == "+"
+      bump with state
+      let left be ["+", left, parseProduct with state]
+    end
+    if k == "-"
+      bump with state
+      let left be ["-", left, parseProduct with state]
+    end
+    if not (k == "+")
+      if not (k == "-")
+        stop
+      end
+    end
+  end
+  return left
+end
+
+define parseCmp with state
+  let left be parseSum with state
+  while true
+    let k be tokenKind with state
+    if k == "=="
+      bump with state
+      let left be ["==", left, parseSum with state]
+    end
+    if k == "!="
+      bump with state
+      let left be ["!=", left, parseSum with state]
+    end
+    if k == "<"
+      bump with state
+      let left be ["<", left, parseSum with state]
+    end
+    if k == ">"
+      bump with state
+      let left be [">", left, parseSum with state]
+    end
+    if k == "<="
+      bump with state
+      let left be ["<=", left, parseSum with state]
+    end
+    if k == ">="
+      bump with state
+      let left be [">=", left, parseSum with state]
+    end
+    if not (k == "==")
+      if not (k == "!=")
+        if not (k == "<")
+          if not (k == ">")
+            if not (k == "<=")
+              if not (k == ">=")
+                stop
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  return left
+end
+
+define parseAnd with state
+  let left be parseCmp with state
+  while (tokenKind with state) == "and"
+    bump with state
+    let left be ["and", left, parseCmp with state]
+  end
+  return left
+end
+
+define parseOr with state
+  let left be parseAnd with state
+  while (tokenKind with state) == "or"
+    bump with state
+    let left be ["or", left, parseOr with state]
+  end
+  return left
+end
+
+define parseExpr with state
+  return parseOr with state
+end
+
+define parseBlock with state
+  let body be []
+  while true
+    let k be tokenKind with state
+    if k == "end"
+      stop
+    end
+    if k == "else"
+      stop
+    end
+    if k == "eof"
+      stop
+    end
+    if state at "bad"
+      stop
+    end
+    push with body, (parseStmt with state)
+  end
+  return body
+end
+
+define parseIf with state, close
+  bump with state
+  let test be parseExpr with state
+  let yes be parseBlock with state
+  let no be []
+  let follow be ""
+  if (tokenKind with state) == "else"
+    bump with state
+    let follow be tokenKind with state
+  end
+  if follow == "if"
+    push with no, (parseIf with state, false)
+  end
+  if not (follow == "")
+    if not (follow == "if")
+      let no be parseBlock with state
+    end
+  end
+  if close
+    eat with state, "end"
+  end
+  return ["if", test, yes, no]
+end
+
+define parseStmt with state
+  let k be tokenKind with state
+  if k == "let"
+    bump with state
+    let name be spelling with state
+    bump with state
+    eat with state, "be"
+    return ["let", name, parseExpr with state]
+  end
+  if k == "say"
+    bump with state
+    return ["say", parseExpr with state]
+  end
+  if k == "return"
+    bump with state
+    return ["return", parseExpr with state]
+  end
+  if k == "if"
+    return parseIf with state, true
+  end
+  if k == "put"
+    bump with state
+    let stored be parseExpr with state
+    eat with state, "into"
+    let name be spelling with state
+    bump with state
+    eat with state, "at"
+    return ["put", stored, name, parseExpr with state]
+  end
+  if k == "stop"
+    bump with state
+    return ["stop"]
+  end
+  if k == "while"
+    bump with state
+    let test be parseExpr with state
+    let body be parseBlock with state
+    eat with state, "end"
+    return ["while", test, body]
+  end
+  let expr be parseExpr with state
+  if (expr at 0) == "call"
+    return ["call", expr at 1, expr at 2]
+  end
+  say "bad statement"
+  put true into state at "bad"
+  return ["stop"]
+end
+
+define parseDefine with state
+  eat with state, "define"
+  let name be spelling with state
+  bump with state
+  let params be []
+  if (tokenKind with state) == "with"
+    bump with state
+    push with params, (spelling with state)
+    bump with state
+    while (tokenKind with state) == ","
+      bump with state
+      push with params, (spelling with state)
+      bump with state
+    end
+  end
+  let body be parseBlock with state
+  eat with state, "end"
+  return {"name": name, "params": params, "body": body}
+end
+
+define assemble with tokens
+  let state be {"i": 0, "toks": tokens, "bad": false}
+  let funcs be []
+  while not ((tokenKind with state) == "eof")
+    if (tokenKind with state) == "bad"
+      say spelling with state
+      put true into state at "bad"
+      stop
+    end
+    if state at "bad"
+      stop
+    end
+    push with funcs, (parseDefine with state)
+  end
+  return {"funcs": funcs, "bad": state at "bad"}
+end
+
+define main
+  let files be args
+  let source be read with (files at 0)
+  let tokens be tokenize with source
+  let program be assemble with tokens
+  if program at "bad"
+    say "compile failed"
+    halt with 1
+  end
+  if not (program at "bad")
+    let funcs be program at "funcs"
+    let out be {}
+    put funcs into out at "funcs"
+    write with (files at 1), seal with (json with out)
+    say "compiled"
+  end
+end

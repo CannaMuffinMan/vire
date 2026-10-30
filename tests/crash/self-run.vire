@@ -1,0 +1,3 @@
+define main
+  run with "self-run.vire"
+end

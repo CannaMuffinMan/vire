@@ -7,6 +7,8 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 #if WINDOWS
 using System.Windows.Forms;
 #endif
@@ -25,6 +27,11 @@ sealed class ReturnSignal : Exception
 
 sealed class StopSignal : Exception { }
 sealed class SkipSignal : Exception { }
+sealed class HaltSignal : Exception
+{
+    public int Code;
+    public HaltSignal(int code) { Code = code; }
+}
 
 sealed class Token
 {
@@ -99,17 +106,27 @@ sealed class SheetBox : Panel
 }
 #endif
 
+sealed class Budget
+{
+    public int Steps;
+    public int MaxSteps = 1000000;
+    public int Calls;
+    public int MaxCalls = 64;
+    public int WhilePasses;
+    public int MaxWhilePasses = 100000;
+    public int Runs;
+    public int MaxRuns = 8;
+}
+
 sealed class Machine
 {
-    const int MaxCalls = 64;
     const int MaxItems = 100000;
     const int MaxText = 1000000;
-    const int MaxSteps = 1000000;
-    int steps;
+    Budget budget = new Budget();
+    List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
     string root;
     int depth;
-    int calls;
     int nextTop = 16;
     int nextLeft = 16;
 #if WINDOWS
@@ -140,7 +157,7 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "run", "sources"
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -151,10 +168,36 @@ sealed class Machine
 
     public void Run() { Call("main", new List<object>(), 1); }
 
+    public void UseBudget(int limit)
+    {
+        if (limit < 1 || limit > 50000000) throw new VireError("budget must be from 1 to 50000000", 1);
+        budget.MaxSteps = limit;
+    }
+
+    public void UseShared(Budget shared)
+    {
+        if (shared == null) throw new VireError("budget must be from 1 to 50000000", 1);
+        budget = shared;
+    }
+
+    public void UseArgs(List<object> values) { programArgs = values; }
+
+    static int RequirePort(object value, int line)
+    {
+        int whole;
+        if (value is int) whole = (int)value;
+        else if (value is double) whole = (int)(double)value;
+        else if (value is string && int.TryParse((string)value, out whole)) { }
+        else throw new VireError("port must be a whole number", line);
+        if (whole < 1024 || whole > 65535) throw new VireError("port must be from 1024 to 65535", line);
+        if (whole == 7099 || whole == 8778) throw new VireError("that port is reserved", line);
+        return whole;
+    }
+
     void Step(int line)
     {
-        steps = System.Threading.Interlocked.Increment(ref steps);
-        if (steps > MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
+        if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
     }
 
     string SafePath(object text, int line)
@@ -162,7 +205,7 @@ sealed class Machine
         string rawText = text as string;
         if (rawText == null || rawText.Trim().Length == 0)
             throw new VireError("a file path must be text", line);
-        if (Path.IsPathRooted(rawText) || rawText.Contains(".."))
+        if (Path.IsPathRooted(rawText) || rawText.Contains("..") || rawText.IndexOf(':') >= 0 || rawText.IndexOf('\0') >= 0)
             throw new VireError("files stay inside the program folder", line);
         string path = Path.GetFullPath(Path.Combine(root, rawText));
         string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -201,20 +244,31 @@ sealed class Machine
         }
     }
 
-    static void DemandPublic(string url, int line)
+    static IPAddress DemandPublic(string url, int line)
     {
         Uri parsed;
         if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
             throw new VireError("that address is not allowed", line);
         if (parsed.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
             throw new VireError("fetch stays off this machine and private networks", line);
+        IPAddress literal;
+        if (IPAddress.TryParse(parsed.IdnHost, out literal) && !IsPublicAddress(literal))
+            throw new VireError("fetch stays off this machine and private networks", line);
         IPAddress[] addresses;
         try { addresses = Dns.GetHostAddresses(parsed.Host); }
         catch (Exception) { throw new VireError("could not check that address", line); }
         if (addresses.Length == 0) throw new VireError("could not check that address", line);
+        IPAddress chosen = null;
         foreach (IPAddress address in addresses)
+        {
             if (!IsPublicAddress(address))
                 throw new VireError("fetch stays off this machine and private networks", line);
+            if (chosen == null) chosen = address;
+        }
+        if (chosen == null) throw new VireError("could not check that address", line);
+        if (parsed.Scheme != "https")
+            throw new VireError("fetch allows https only", line);
+        return chosen;
     }
 
     static bool IsPublicAddress(IPAddress address)
@@ -227,13 +281,32 @@ sealed class Machine
             if (part[0] == 169 && part[1] == 254) return false;
             if (part[0] == 172 && part[1] >= 16 && part[1] <= 31) return false;
             if (part[0] == 192 && part[1] == 168) return false;
+            if (part[0] == 100 && part[1] >= 64 && part[1] <= 127) return false;
+            if (part[0] == 198 && (part[1] == 18 || part[1] == 19)) return false;
             if (part[0] >= 224) return false;
             return true;
         }
+        if (address.IsIPv4MappedToIPv6) return IsPublicAddress(address.MapToIPv4());
         byte[] bits = address.GetAddressBytes();
-        if (bits.Length < 2) return false;
+        if (bits.Length != 16) return false;
+        if (Zeros(bits, 0, 12)) return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
+        if (Zeros(bits, 0, 8) && bits[8] == 0xff && bits[9] == 0xff && bits[10] == 0 && bits[11] == 0)
+            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
+        if (bits[0] == 0x20 && bits[1] == 0x02)
+            return IsPublicAddress(new IPAddress(new byte[] { bits[2], bits[3], bits[4], bits[5] }));
+        if (bits[0] == 0x00 && bits[1] == 0x64 && bits[2] == 0xff && bits[3] == 0x9b && Zeros(bits, 4, 8))
+            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
+        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x00 && bits[3] == 0x00) return false;
+        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x0d && bits[3] == 0xb8) return false;
+        if (bits[0] == 0xff) return false;
         if (bits[0] == 0xfe && (bits[1] & 0xc0) == 0x80) return false;
         if ((bits[0] & 0xfe) == 0xfc) return false;
+        return true;
+    }
+
+    static bool Zeros(byte[] bits, int at, int count)
+    {
+        for (int n = 0; n < count; n++) if (bits[at + n] != 0) return false;
         return true;
     }
 
@@ -245,24 +318,24 @@ sealed class Machine
         Func func = funcs[name];
         if (args.Count != func.Params.Count)
             throw new VireError(name + " takes " + func.Params.Count + " values, got " + args.Count, line);
-        calls++;
+        budget.Calls++;
         try
         {
-            if (calls > MaxCalls) throw new VireError("definitions called too deeply", line);
+            if (budget.Calls > budget.MaxCalls) throw new VireError("definitions called too deeply", line);
             Env env = new Env();
             for (int i = 0; i < func.Params.Count; i++) env.Declare(func.Params[i], args[i]);
             try { ExecBlock(func.Body, env); }
             catch (ReturnSignal signal) { return signal.Value; }
             return null;
         }
-        finally { calls--; }
+        finally { budget.Calls--; }
     }
 
     object Builtin(string name, List<object> args, int line)
     {
         Step(line);
         int need = 1;
-        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear") need = 0;
+        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -354,36 +427,50 @@ sealed class Machine
             if (map == null) throw new VireError("has needs a map", line);
             return map.ContainsKey(KeyOf(args[1], line));
         }
+        if (name == "args") return programArgs;
+        if (name == "halt")
+        {
+            if (!(args[0] is int)) throw new VireError("halt needs a whole number", line);
+            throw new HaltSignal((int)args[0]);
+        }
+        if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
         if (name == "kind") return KindOf(args[0]);
         if (name == "hash")
         {
             string raw = args[0] as string;
             if (raw == null) raw = Show(args[0]);
-            using (SHA256 sha = SHA256.Create())
-            {
-                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
-                StringBuilder hex = new StringBuilder();
-                foreach (byte piece in bytes) hex.Append(piece.ToString("x2"));
-                return hex.ToString();
-            }
+            return VireSeal.HashText(raw);
+        }
+        if (name == "seal")
+        {
+            string raw = args[0] as string;
+            if (raw == null) throw new VireError("seal needs text", line);
+            return VireSeal.Seal(raw);
         }
         if (name == "run")
         {
             string rel = args[0] as string;
-            if (rel == null || rel.Contains("..") || Path.IsPathRooted(rel) || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
+            if (rel == null || rel.Contains("..") || rel.IndexOf(':') >= 0 || rel.IndexOf('\0') >= 0 || Path.IsPathRooted(rel) || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
                 throw new VireError("run needs a vire file in this folder", line);
             string full = Path.GetFullPath(Path.Combine(root, rel));
             string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
                 throw new VireError("run stays inside the program folder", line);
+            RefuseReparse(full, line);
+            budget.Runs++;
             StringWriter sink = new StringWriter();
             TextWriter previous = Console.Out;
             try
             {
+                if (budget.Runs > budget.MaxRuns) throw new VireError("run went too deep", line);
                 Console.SetOut(sink);
-                Program.RunFile(full, root);
+                Program.RunFile(full, root, budget);
             }
-            finally { Console.SetOut(previous); }
+            finally
+            {
+                Console.SetOut(previous);
+                budget.Runs--;
+            }
             string text = sink.ToString().Replace("\r", "");
             Console.Write(text);
             string last = "";
@@ -394,7 +481,12 @@ sealed class Machine
         if (name == "abs")
         {
             if (!IsNum(args[0])) throw new VireError("abs needs a number", line);
-            if (args[0] is int) { int n = (int)args[0]; return n < 0 ? -n : n; }
+            if (args[0] is int)
+            {
+                int n = (int)args[0];
+                if (n == int.MinValue) return -(double)n;
+                return n < 0 ? -n : n;
+            }
             double real = (double)args[0];
             return real < 0 ? -real : real;
         }
@@ -432,9 +524,16 @@ sealed class Machine
             if (!(args[0] is int) || !(args[1] is int)) throw new VireError("span needs two whole numbers", line);
             int from = (int)args[0];
             int to = (int)args[1];
-            if (to < from || to - from > MaxItems) throw new VireError("span is too large", line);
+            long count = (long)to - (long)from;
+            if (count < 0 || count > MaxItems) throw new VireError("span is too large", line);
             List<object> items = new List<object>();
-            for (int n = from; n <= to; n++) items.Add(n);
+            int n = from;
+            while (true)
+            {
+                items.Add(n);
+                if (n == to) break;
+                n++;
+            }
             return items;
         }
         if (name == "drop")
@@ -449,12 +548,10 @@ sealed class Machine
         {
             List<object> list = args[0] as List<object>;
             if (list == null) throw new VireError("sort needs a list of numbers", line);
+            foreach (object item in list)
+                if (!IsNum(item)) throw new VireError("sort needs a list of numbers", line);
             List<object> copy = new List<object>(list);
-            copy.Sort(delegate(object a, object b)
-            {
-                if (!IsNum(a) || !IsNum(b)) throw new VireError("sort needs a list of numbers", line);
-                return ToDouble(a).CompareTo(ToDouble(b));
-            });
+            copy.Sort(delegate(object a, object b) { return ToDouble(a).CompareTo(ToDouble(b)); });
             return copy;
         }
         if (name == "escape")
@@ -505,7 +602,6 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line);
-            DemandPublic(url, line);
             try { return SendWeb(HttpMethod.Get, url, null, line); }
             catch (VireError) { throw; }
             catch (Exception exc) { throw new VireError(exc.GetBaseException().Message, line); }
@@ -515,7 +611,6 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("post needs an http or https address", line);
-            DemandPublic(url, line);
             try
             {
                 string payload = Show(args[1]);
@@ -705,7 +800,11 @@ sealed class Machine
         if (name == "round")
         {
             if (!IsNum(args[0])) throw new VireError("round needs a number", line);
-            return (int)Math.Round(ToDouble(args[0]), MidpointRounding.AwayFromZero);
+            double real = ToDouble(args[0]);
+            if (double.IsNaN(real) || double.IsInfinity(real)) throw new VireError("round needs a number", line);
+            double rounded = Math.Round(real, MidpointRounding.AwayFromZero);
+            if (rounded > int.MaxValue || rounded < int.MinValue) return rounded;
+            return (int)rounded;
         }
         if (name == "pick")
         {
@@ -908,7 +1007,7 @@ sealed class Machine
     static void RefuseProgram(string path, int line)
     {
         string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi")
+        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi" || ext == ".vire" || ext == ".cs" || ext == ".sh")
             throw new VireError("vire will not write a program file", line);
     }
 
@@ -970,30 +1069,173 @@ sealed class Machine
         }
     }
 
-    static readonly HttpClient web = CreateWeb();
-
-    static HttpClient CreateWeb()
-    {
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-        HttpClient client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(8);
-        return client;
-    }
-
     static string SendWeb(HttpMethod method, string url, string body, int line)
     {
-        using (HttpRequestMessage message = new HttpRequestMessage(method, url))
+        IPAddress pinned = DemandPublic(url, line);
+        SocketsHttpHandler handler = new SocketsHttpHandler();
+        handler.AllowAutoRedirect = false;
+        handler.ConnectCallback = (context, token) => ConnectPinned(pinned, context.DnsEndPoint.Port);
+        using (HttpClient client = new HttpClient(handler))
         {
-            if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
-            using (HttpResponseMessage response = web.SendAsync(message).Result)
+            client.Timeout = TimeSpan.FromSeconds(8);
+            using (HttpRequestMessage message = new HttpRequestMessage(method, url))
             {
-                string text = response.Content.ReadAsStringAsync().Result;
-                int code = (int)response.StatusCode;
-                if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
-                if (text.Length > 1000000) throw new VireError("the response is too large", line);
-                return text;
+                if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
+                using (HttpResponseMessage response = client.SendAsync(message).Result)
+                {
+                    string text = response.Content.ReadAsStringAsync().Result;
+                    int code = (int)response.StatusCode;
+                    if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
+                    if (text.Length > 1000000) throw new VireError("the response is too large", line);
+                    return text;
+                }
             }
         }
+    }
+
+    static ValueTask<Stream> ConnectPinned(IPAddress pinned, int port)
+    {
+        Socket socket = new Socket(pinned.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            socket.Connect(pinned, port);
+            return new ValueTask<Stream>(new NetworkStream(socket, true));
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    void Listen(int port, int line)
+    {
+        if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
+        string envPort = Environment.GetEnvironmentVariable("PORT");
+        if (!string.IsNullOrWhiteSpace(envPort)) port = RequirePort(envPort.Trim(), line);
+        bool publish = string.Equals(Environment.GetEnvironmentVariable("VIRE_BIND"), "public", StringComparison.Ordinal);
+        string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
+        if (publish && (string.IsNullOrEmpty(token) || token.Length < 16))
+            throw new VireError("a public listener needs FCG_API_TOKEN of at least 16 characters", line);
+        System.Net.IPAddress bind = publish ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
+        System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(bind, port);
+        listener.Start();
+        Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + port);
+        try
+        {
+            while (true)
+            {
+                System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
+                client.ReceiveTimeout = 5000;
+                client.SendTimeout = 5000;
+                try { AnswerApi(client, line); }
+                catch (IOException) { }
+                catch (VireError)
+                {
+                    try { Send(client.GetStream(), 500, "application/json", "{\"error\":\"route failed\"}"); }
+                    catch (Exception) { }
+                }
+                finally { client.Close(); }
+            }
+        }
+        finally { listener.Stop(); }
+    }
+
+    static int HeaderEnd(byte[] buffer, int got)
+    {
+        for (int i = 0; i + 3 < got; i++)
+            if (buffer[i] == 13 && buffer[i + 1] == 10 && buffer[i + 2] == 13 && buffer[i + 3] == 10) return i;
+        return -1;
+    }
+
+    static int ContentLengthOf(string head)
+    {
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+            {
+                int value;
+                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return 65537;
+                return value;
+            }
+        }
+        return -1;
+    }
+
+    void AnswerApi(System.Net.Sockets.TcpClient client, int line)
+    {
+        NetworkStream stream = client.GetStream();
+        byte[] buffer = new byte[65536 + 8192];
+        int got = 0;
+        int headerEnd = -1;
+        while (got < buffer.Length && headerEnd < 0)
+        {
+            int n = stream.Read(buffer, got, buffer.Length - got);
+            if (n <= 0) break;
+            got += n;
+            headerEnd = HeaderEnd(buffer, got);
+        }
+        if (headerEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        string head = Encoding.UTF8.GetString(buffer, 0, headerEnd);
+        int bodyAt = headerEnd + 4;
+        int contentLength = ContentLengthOf(head);
+        if (contentLength > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
+        if (contentLength >= 0)
+        {
+            int need = bodyAt + contentLength;
+            if (need > buffer.Length) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
+            while (got < need)
+            {
+                int n = stream.Read(buffer, got, need - got);
+                if (n <= 0) break;
+                got += n;
+            }
+            if (got < need) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        }
+        string request = Encoding.UTF8.GetString(buffer, 0, got);
+        int lineEnd = request.IndexOf("\r\n");
+        if (lineEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        string[] bits = request.Substring(0, lineEnd).Split(' ');
+        if (bits.Length < 2 || bits[1].IndexOf("..") >= 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        string path = bits[1];
+        int queryAt = path.IndexOf('?');
+        if (queryAt >= 0) path = path.Substring(0, queryAt);
+        string body = Encoding.UTF8.GetString(buffer, bodyAt, got - bodyAt);
+        if (body.Length > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
+        string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
+        bool health = path == "/health" && (bits[0] == "GET" || bits[0] == "HEAD");
+        if (!health && !Program.HeaderTokenMatches(head, token))
+        {
+            Send(stream, 401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        List<object> call = new List<object>();
+        call.Add(bits[0]);
+        call.Add(path);
+        call.Add(body);
+        object result;
+        try { result = Call("route", call, line); }
+        catch (VireError) { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); return; }
+        catch (Exception ex)
+        {
+            if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
+                Console.Error.WriteLine(ex.ToString());
+            else
+                Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
+            try { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); }
+            catch (Exception sendError)
+            {
+                Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
+            }
+            return;
+        }
+        string text = result as string;
+        if (text == null) text = Show(result);
+        int code = 200;
+        if (text != null && text.IndexOf("\"status\":404") >= 0) code = 404;
+        if (text != null && text.IndexOf("\"status\":403") >= 0) code = 403;
+        Send(stream, code, "application/json", text ?? "null");
     }
 
     void Serve(int port, int line)
@@ -1207,14 +1449,13 @@ sealed class Machine
         }
         if (kind == "while")
         {
-            int guard = 0;
             depth++;
             try
             {
                 while (Truth(Eval(stmt[1], env)))
                 {
-                    guard++;
-                    if (guard > 100000) throw new VireError("while ran too long", (int)stmt[3]);
+                    budget.WhilePasses++;
+                    if (budget.WhilePasses > budget.MaxWhilePasses) throw new VireError("while ran too long", (int)stmt[3]);
                     try { ExecBlock((List<object>)stmt[2], env); }
                     catch (SkipSignal) { }
                     catch (StopSignal) { break; }
@@ -1304,7 +1545,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args"))
                 return Builtin(name, new List<object>(), (int)tree[2]);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), (int)tree[2]);
@@ -1342,7 +1583,12 @@ sealed class Machine
         {
             object value = Eval(tree[1], env);
             if (!IsNum(value)) throw new VireError("minus applies to numbers", (int)tree[2]);
-            if (value is int) return -((int)value);
+            if (value is int)
+            {
+                int whole = (int)value;
+                if (whole == int.MinValue) return -(double)whole;
+                return -whole;
+            }
             return -((double)value);
         }
         if (kind == "bin") return Binary(tree, env);
@@ -1404,7 +1650,11 @@ sealed class Machine
         if (op == "%")
         {
             if (ToDouble(right) == 0) throw new VireError("division by zero", line);
-            if (left is int && right is int) return ((int)left) % ((int)right);
+            if (left is int && right is int)
+            {
+                if ((int)right == -1) return 0;
+                return ((int)left) % ((int)right);
+            }
             return ToDouble(left) % ToDouble(right);
         }
         double a = ToDouble(left);
@@ -1423,19 +1673,24 @@ sealed class Machine
         return left.Equals(right);
     }
 
+    static object Widen(long value)
+    {
+        if (value > int.MaxValue || value < int.MinValue) return (double)value;
+        return (int)value;
+    }
     static object Add(object left, object right)
     {
-        if (left is int && right is int) return (int)left + (int)right;
+        if (left is int && right is int) return Widen((long)(int)left + (int)right);
         return ToDouble(left) + ToDouble(right);
     }
     static object Sub(object left, object right)
     {
-        if (left is int && right is int) return (int)left - (int)right;
+        if (left is int && right is int) return Widen((long)(int)left - (int)right);
         return ToDouble(left) - ToDouble(right);
     }
     static object Mul(object left, object right)
     {
-        if (left is int && right is int) return (int)left * (int)right;
+        if (left is int && right is int) return Widen((long)(int)left * (int)right);
         return ToDouble(left) * ToDouble(right);
     }
     static double ToDouble(object value)
@@ -1483,29 +1738,69 @@ sealed class Machine
     }
     public static string Show(object value)
     {
-        if (value is bool) return (bool)value ? "true" : "false";
-        if (value == null) return "none";
+        return ShowValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, new int[1]);
+    }
+
+    static string ShowValue(object value, HashSet<object> path, int nest, int[] used)
+    {
+        if (nest > 256) return FinishShow("...", used);
+        if (value is bool) return FinishShow((bool)value ? "true" : "false", used);
+        if (value == null) return FinishShow("none", used);
         if (value is double)
         {
             double real = (double)value;
-            if (real == Math.Floor(real) && !double.IsInfinity(real)) return ((long)real).ToString();
-            return real.ToString(CultureInfo.InvariantCulture);
+            if (real == Math.Floor(real) && !double.IsInfinity(real) && !double.IsNaN(real) && real >= -9223372036854775808d && real < 9223372036854775808d)
+                return FinishShow(((long)real).ToString(CultureInfo.InvariantCulture), used);
+            return FinishShow(real.ToString(CultureInfo.InvariantCulture), used);
         }
         if (value is List<object>)
         {
             List<object> list = (List<object>)value;
-            string[] parts = new string[list.Count];
-            for (int i = 0; i < list.Count; i++) parts[i] = Show(list[i]);
-            return "[" + string.Join(", ", parts) + "]";
+            if (!path.Add(list)) return FinishShow("[...]", used);
+            try
+            {
+                StringBuilder text = new StringBuilder();
+                text.Append('[');
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (i > 0) text.Append(", ");
+                    text.Append(ShowValue(list[i], path, nest + 1, used));
+                }
+                text.Append(']');
+                return FinishShow(text.ToString(), used);
+            }
+            finally { path.Remove(list); }
         }
         if (value is Dictionary<string, object>)
         {
             Dictionary<string, object> map = (Dictionary<string, object>)value;
-            List<string> parts = new List<string>();
-            foreach (KeyValuePair<string, object> pair in map) parts.Add(Show(pair.Key) + ": " + Show(pair.Value));
-            return "{" + string.Join(", ", parts.ToArray()) + "}";
+            if (!path.Add(map)) return FinishShow("{...}", used);
+            try
+            {
+                StringBuilder text = new StringBuilder();
+                text.Append('{');
+                bool first = true;
+                foreach (KeyValuePair<string, object> pair in map)
+                {
+                    if (!first) text.Append(", ");
+                    first = false;
+                    text.Append(ShowValue(pair.Key, path, nest + 1, used));
+                    text.Append(": ");
+                    text.Append(ShowValue(pair.Value, path, nest + 1, used));
+                }
+                text.Append('}');
+                return FinishShow(text.ToString(), used);
+            }
+            finally { path.Remove(map); }
         }
-        return Convert.ToString(value, CultureInfo.InvariantCulture);
+        return FinishShow(Convert.ToString(value, CultureInfo.InvariantCulture), used);
+    }
+
+    static string FinishShow(string text, int[] used)
+    {
+        used[0] += text.Length;
+        if (used[0] > 1000000) throw new VireError("text is too large to write", 1);
+        return text;
     }
     static string KindOf(object value)
     {
@@ -1530,6 +1825,7 @@ sealed class Parser
 {
     List<Token> tokens;
     int i;
+    int nest;
     static readonly HashSet<string> Stoppers = new HashSet<string>(new string[] { "end", "else", "miss", "eof" });
 
     public Parser(List<Token> tokens) { this.tokens = tokens; }
@@ -1600,8 +1896,19 @@ sealed class Parser
 
     List<object> Block()
     {
+        return Collect(true, true);
+    }
+
+    List<object> LoopBody()
+    {
+        return Collect(false, false);
+    }
+
+    List<object> Collect(bool stopOnElse, bool stopOnMiss)
+    {
         List<object> stmts = new List<object>();
-        while (!At("end", "else", "miss", "eof")) stmts.Add(Statement());
+        while (!At("end") && !At("eof") && !(stopOnElse && At("else")) && !(stopOnMiss && At("miss")))
+            stmts.Add(Statement());
         if (At("eof")) throw new VireError("block is missing end", Peek().Line);
         return stmts;
     }
@@ -1633,7 +1940,7 @@ sealed class Parser
         {
             Eat("while");
             object test = Expression();
-            List<object> body = Block();
+            List<object> body = LoopBody();
             Eat("end");
             return new object[] { "while", test, body, tok.Line };
         }
@@ -1643,7 +1950,7 @@ sealed class Parser
             string name = (string)Eat("name").Value;
             Eat("in");
             object seq = Expression();
-            List<object> body = Block();
+            List<object> body = LoopBody();
             Eat("end");
             return new object[] { "for", name, seq, body, tok.Line };
         }
@@ -1706,7 +2013,13 @@ sealed class Parser
         return args;
     }
 
-    object Expression() { return ParseOr(); }
+    object Expression()
+    {
+        nest++;
+        if (nest > 256) throw new VireError("expression is too deep", Peek().Line);
+        try { return ParseOr(); }
+        finally { nest--; }
+    }
     object ParseOr()
     {
         object node = ParseAnd();
@@ -1883,6 +2196,7 @@ static class Lexer
                         if (i >= source.Length) throw new VireError("broken escape in string", line);
                         char esc = source[i];
                         if (esc == 'n') chars.Append('\n');
+                        else if (esc == 'r') chars.Append('\r');
                         else if (esc == 't') chars.Append('\t');
                         else if (esc == '"' || esc == '\\') chars.Append(esc);
                         else throw new VireError("unknown escape in string", line);
@@ -1906,7 +2220,20 @@ static class Lexer
                     double real = double.Parse(source.Substring(start, i - start), CultureInfo.InvariantCulture);
                     tokens.Add(new Token("number", real, line));
                 }
-                else tokens.Add(new Token("number", int.Parse(source.Substring(start, i - start)), line));
+                else
+                {
+                    string raw = source.Substring(start, i - start);
+                    int whole;
+                    if (int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out whole))
+                        tokens.Add(new Token("number", whole, line));
+                    else
+                    {
+                        double real;
+                        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real) || double.IsInfinity(real))
+                            throw new VireError("that number is too large", line);
+                        tokens.Add(new Token("number", real, line));
+                    }
+                }
                 continue;
             }
             if (char.IsLetter(ch) || ch == '_')
@@ -1945,25 +2272,91 @@ sealed class Json
 {
     public static string Write(object value)
     {
-        if (value == null) return "null";
-        if (value is bool) return (bool)value ? "true" : "false";
-        if (value is int) return value.ToString();
-        if (value is double) return ((double)value).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (value is string) return "\"" + ((string)value).Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
-        if (value is List<object>)
+        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, new int[1]);
+    }
+
+    static string WriteValue(object value, HashSet<object> path, int nest, int[] used)
+    {
+        if (nest > 256) throw new VireError("json is nested too deeply", 1);
+        string text;
+        if (value == null) text = "null";
+        else if (value is bool) text = (bool)value ? "true" : "false";
+        else if (value is int) text = value.ToString();
+        else if (value is double)
         {
-            List<string> parts = new List<string>();
-            foreach (object item in (List<object>)value) parts.Add(Write(item));
-            return "[" + string.Join(",", parts.ToArray()) + "]";
+            double real = (double)value;
+            if (double.IsNaN(real) || double.IsInfinity(real)) throw new VireError("json can't write that number", 1);
+            text = real.ToString("R", CultureInfo.InvariantCulture);
         }
-        if (value is Dictionary<string, object>)
+        else if (value is string) text = WriteString((string)value);
+        else if (value is List<object>)
         {
-            List<string> parts = new List<string>();
-            foreach (KeyValuePair<string, object> pair in (Dictionary<string, object>)value)
-                parts.Add(Write(pair.Key) + ":" + Write(pair.Value));
-            return "{" + string.Join(",", parts.ToArray()) + "}";
+            List<object> list = (List<object>)value;
+            if (!path.Add(list)) throw new VireError("json can't write a list or map that contains itself", 1);
+            try
+            {
+                StringBuilder body = new StringBuilder();
+                body.Append('[');
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (i > 0) body.Append(',');
+                    body.Append(WriteValue(list[i], path, nest + 1, used));
+                }
+                body.Append(']');
+                text = body.ToString();
+            }
+            finally { path.Remove(list); }
         }
-        return Write(Machine.Show(value));
+        else if (value is Dictionary<string, object>)
+        {
+            Dictionary<string, object> map = (Dictionary<string, object>)value;
+            if (!path.Add(map)) throw new VireError("json can't write a list or map that contains itself", 1);
+            try
+            {
+                StringBuilder body = new StringBuilder();
+                body.Append('{');
+                bool first = true;
+                foreach (KeyValuePair<string, object> pair in map)
+                {
+                    if (!first) body.Append(',');
+                    first = false;
+                    body.Append(WriteValue(pair.Key, path, nest + 1, used));
+                    body.Append(':');
+                    body.Append(WriteValue(pair.Value, path, nest + 1, used));
+                }
+                body.Append('}');
+                text = body.ToString();
+            }
+            finally { path.Remove(map); }
+        }
+        else text = WriteString(Machine.Show(value));
+        used[0] += text.Length;
+        if (used[0] > 1000000) throw new VireError("text is too large to write", 1);
+        return text;
+    }
+
+    static string WriteString(string text)
+    {
+        StringBuilder chars = new StringBuilder(text.Length + 2);
+        chars.Append('"');
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            if (ch == '\\' || ch == '"') { chars.Append('\\'); chars.Append(ch); }
+            else if (ch == '\b') chars.Append("\\b");
+            else if (ch == '\f') chars.Append("\\f");
+            else if (ch == '\n') chars.Append("\\n");
+            else if (ch == '\r') chars.Append("\\r");
+            else if (ch == '\t') chars.Append("\\t");
+            else if (ch < 0x20 || char.IsSurrogate(ch))
+            {
+                chars.Append("\\u");
+                chars.Append(((int)ch).ToString("x4"));
+            }
+            else chars.Append(ch);
+        }
+        chars.Append('"');
+        return chars.ToString();
     }
 
     public static object Read(string text, int line)
@@ -1975,19 +2368,20 @@ sealed class Json
         return value;
     }
 
-    static object ReadValue(string text, ref int i, int line)
+    static object ReadValue(string text, ref int i, int line, int depth = 0)
     {
+        if (depth > 256) throw new VireError("json is nested too deeply", line);
         Skip(text, ref i);
         if (i >= text.Length) throw new VireError("json ended early", line);
         char ch = text[i];
         if (ch == '"') return ReadString(text, ref i, line);
-        if (ch == '{') return ReadMap(text, ref i, line);
-        if (ch == '[') return ReadList(text, ref i, line);
+        if (ch == '{') return ReadMap(text, ref i, line, depth + 1);
+        if (ch == '[') return ReadList(text, ref i, line, depth + 1);
         if (ch == 't' || ch == 'f' || ch == 'n') return ReadWord(text, ref i, line);
         return ReadNumber(text, ref i, line);
     }
 
-    static Dictionary<string, object> ReadMap(string text, ref int i, int line)
+    static Dictionary<string, object> ReadMap(string text, ref int i, int line, int depth)
     {
         i++;
         Dictionary<string, object> map = new Dictionary<string, object>();
@@ -2000,7 +2394,7 @@ sealed class Json
             Skip(text, ref i);
             if (i >= text.Length || text[i] != ':') throw new VireError("json needs a colon", line);
             i++;
-            map[key] = ReadValue(text, ref i, line);
+            map[key] = ReadValue(text, ref i, line, depth);
             Skip(text, ref i);
             if (i < text.Length && text[i] == ',') { i++; continue; }
             if (i < text.Length && text[i] == '}') { i++; return map; }
@@ -2009,7 +2403,7 @@ sealed class Json
         throw new VireError("json map is unfinished", line);
     }
 
-    static List<object> ReadList(string text, ref int i, int line)
+    static List<object> ReadList(string text, ref int i, int line, int depth)
     {
         i++;
         List<object> list = new List<object>();
@@ -2018,7 +2412,7 @@ sealed class Json
         while (i < text.Length)
         {
             if (list.Count > 100000) throw new VireError("json is too large", line);
-            list.Add(ReadValue(text, ref i, line));
+            list.Add(ReadValue(text, ref i, line, depth));
             Skip(text, ref i);
             if (i < text.Length && text[i] == ',') { i++; continue; }
             if (i < text.Length && text[i] == ']') { i++; return list; }
@@ -2041,8 +2435,26 @@ sealed class Json
                 if (i >= text.Length) break;
                 char esc = text[i++];
                 if (esc == '"' || esc == '\\' || esc == '/') chars.Append(esc);
+                else if (esc == 'b') chars.Append('\b');
+                else if (esc == 'f') chars.Append('\f');
                 else if (esc == 'n') chars.Append('\n');
+                else if (esc == 'r') chars.Append('\r');
                 else if (esc == 't') chars.Append('\t');
+                else if (esc == 'u')
+                {
+                    if (i + 4 > text.Length) throw new VireError("json has a bad escape", line);
+                    int code = 0;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        char hex = text[i++];
+                        code <<= 4;
+                        if (hex >= '0' && hex <= '9') code += hex - '0';
+                        else if (hex >= 'a' && hex <= 'f') code += hex - 'a' + 10;
+                        else if (hex >= 'A' && hex <= 'F') code += hex - 'A' + 10;
+                        else throw new VireError("json has a bad escape", line);
+                    }
+                    chars.Append((char)code);
+                }
                 else throw new VireError("json has a bad escape", line);
             }
             else chars.Append(ch);
@@ -2070,14 +2482,24 @@ sealed class Json
             i++;
             while (i < text.Length && char.IsDigit(text[i])) i++;
         }
+        if (i < text.Length && (text[i] == 'e' || text[i] == 'E'))
+        {
+            frac = true;
+            i++;
+            if (i < text.Length && (text[i] == '+' || text[i] == '-')) i++;
+            int expAt = i;
+            while (i < text.Length && char.IsDigit(text[i])) i++;
+            if (i == expAt) throw new VireError("json has a bad number", line);
+        }
         string raw = text.Substring(start, i - start);
+        if (raw.Length == 0 || raw == "-") throw new VireError("json has a bad number", line);
         if (!frac)
         {
             int whole;
             if (int.TryParse(raw, out whole)) return whole;
         }
         double real;
-        if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out real))
+        if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out real) && !double.IsInfinity(real) && !double.IsNaN(real))
             return real;
         throw new VireError("json has a bad number", line);
     }
@@ -2092,9 +2514,16 @@ sealed class Program
 {
     public static void RunFile(string program, string folder)
     {
+        RunFile(program, folder, null);
+    }
+
+    public static void RunFile(string program, string folder, Budget budget)
+    {
         Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
         if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
-        new Machine(funcs, folder).Run();
+        Machine machine = new Machine(funcs, folder);
+        if (budget != null) machine.UseShared(budget);
+        machine.Run();
     }
 
     static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
@@ -2110,13 +2539,14 @@ sealed class Program
         string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
+        RefuseReparsePath(full, folder);
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
         Unit unit = new Parser(Lexer.Tokenize(File.ReadAllText(full))).Parse();
         foreach (string used in unit.Uses)
         {
-            if (Path.IsPathRooted(used) || used.Contains("..") || !used.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
+            if (Path.IsPathRooted(used) || used.Contains("..") || used.IndexOf(':') >= 0 || used.IndexOf('\0') >= 0 || !used.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
                 throw new VireError("use stays inside the program folder and only opens .vire files", 1);
             string next = Path.GetFullPath(Path.Combine(folder, used));
             Dictionary<string, Func> imported = Load(next, folder, seen);
@@ -2132,6 +2562,68 @@ sealed class Program
         return unit.Funcs;
         }
         finally { seen.Remove(full); }
+    }
+
+    static void RefuseReparsePath(string path, string folder)
+    {
+        string cursor = path;
+        string rootFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        while (!string.IsNullOrEmpty(cursor) &&
+            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(cursor, folder, StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
+                    (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
+                    throw new VireError("files stay inside the program folder", 1);
+            }
+            catch (VireError) { throw; }
+            catch (IOException) { throw new VireError("files stay inside the program folder", 1); }
+            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", 1); }
+            string parent = Path.GetDirectoryName(cursor);
+            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
+            cursor = parent;
+        }
+    }
+
+    public static int BudgetOf(string source)
+    {
+        int budget = 1000000;
+        string chosen = Environment.GetEnvironmentVariable("VIRE_BUDGET");
+        if (!string.IsNullOrWhiteSpace(chosen))
+        {
+            int value;
+            if (!int.TryParse(chosen.Trim(), out value) || value < 1 || value > 5000000)
+                throw new VireError("VIRE_BUDGET must be from 1 to 5000000", 1);
+            budget = value;
+        }
+        return budget;
+    }
+
+    public static bool HeaderTokenMatches(string head, string expected)
+    {
+        if (string.IsNullOrEmpty(expected) || expected.Length < 16) return false;
+        string provided = "";
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("X-FCG-Token:", StringComparison.OrdinalIgnoreCase))
+            {
+                provided = lines[i].Substring(12).Trim();
+                break;
+            }
+        }
+        byte[] left;
+        byte[] right;
+        using (SHA256 sha = SHA256.Create())
+        {
+            left = sha.ComputeHash(Encoding.UTF8.GetBytes(provided));
+            right = sha.ComputeHash(Encoding.UTF8.GetBytes(expected));
+        }
+        int diff = 0;
+        for (int i = 0; i < left.Length; i++) diff |= left[i] ^ right[i];
+        return diff == 0;
     }
 
     static bool IsPackage(string name)
@@ -2155,25 +2647,75 @@ sealed class Program
     [STAThread]
     static int Main(string[] args)
     {
-        if (args.Length != 1)
+        return Execute(args);
+    }
+
+    internal static int Execute(string[] args)
+    {
+        int code = 0;
+        Exception failure = null;
+        Thread thread = new Thread(delegate ()
         {
-            Console.Error.WriteLine("usage: vire program.vire");
+            try { code = ExecuteBody(args); }
+            catch (Exception ex) { failure = ex; }
+        }, 64 * 1024 * 1024);
+        thread.IsBackground = true;
+        thread.Start();
+        thread.Join();
+        if (failure != null) throw failure;
+        return code;
+    }
+
+    static int ExecuteBody(string[] args)
+    {
+        if (args.Length < 1)
+        {
+            Console.Error.WriteLine("usage: vire program.vire [args...]");
+            Console.Error.WriteLine("       vire run file.vc [args...]");
             return 2;
         }
         try
         {
+            if (args[0] == "run")
+            {
+                if (args.Length < 2) throw new VireError("usage: vire run file.vc", 1);
+                string compiled = Path.GetFullPath(args[1]);
+                string compiledFolder = Path.GetDirectoryName(compiled);
+                List<object> compiledArgs = new List<object>();
+                for (int i = 2; i < args.Length; i++) compiledArgs.Add(args[i]);
+                CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
+                return 0;
+            }
             string program = Path.GetFullPath(args[0]);
             string folder = Path.GetDirectoryName(program);
+            int budget = BudgetOf(File.ReadAllText(program));
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
-            new Machine(funcs, folder).Run();
+            Machine machine = new Machine(funcs, folder);
+            machine.UseBudget(budget);
+            List<object> rest = new List<object>();
+            for (int i = 1; i < args.Length; i++) rest.Add(args[i]);
+            machine.UseArgs(rest);
+            machine.Run();
             return 0;
+        }
+        catch (HaltSignal halt)
+        {
+            return halt.Code;
         }
         catch (VireError exc)
         {
             string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
             Console.Error.WriteLine("vire: " + where + exc.Message);
             return 1;
+        }
+        catch (Exception ex)
+        {
+            if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
+                Console.Error.WriteLine(ex.ToString());
+            else
+                Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
+            return 3;
         }
     }
 }

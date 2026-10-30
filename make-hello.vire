@@ -1,0 +1,248 @@
+use "src/asm.vire"
+
+define ord with ch
+  let all be " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+  return (find with all, ch) + 32
+end
+
+define emitStr with buf, text
+  let i be 0
+  let n be length with text
+  while i < n
+    emitU8 with buf, (ord with (text at i))
+    let i be i + 1
+  end
+  emitU8 with buf, 0
+  return buf
+end
+
+define poke32 with buf, pos, n
+  let x be n
+  if x < 0
+    let x be x + 4294967296
+  end
+  let k be 0
+  while k < 4
+    let q be floorDiv with x, 256
+    let byte be x - (q * 256)
+    put byte into buf at (pos + k)
+    let x be q
+    let k be k + 1
+  end
+  return buf
+end
+
+define poke16 with buf, pos, n
+  let x be n
+  if x < 0
+    let x be x + 65536
+  end
+  let q be floorDiv with x, 256
+  let lo be x - (q * 256)
+  put lo into buf at pos
+  put q into buf at (pos + 1)
+  return buf
+end
+
+define zeros with n
+  let buf be []
+  let i be 0
+  while i < n
+    push with buf, 0
+    let i be i + 1
+  end
+  return buf
+end
+
+define alignTo with buf, n
+  while ((length with buf) - ((floorDiv with (length with buf), n) * n)) != 0
+    emitU8 with buf, 0
+  end
+  return buf
+end
+
+define buildImage
+  let image be []
+  let labels be {}
+  let fixes be []
+  pin with labels, "ilt", image
+  pin with labels, "ilt_gs", image
+  emitU64 with image, 0
+  pin with labels, "ilt_wf", image
+  emitU64 with image, 0
+  pin with labels, "ilt_ep", image
+  emitU64 with image, 0
+  emitU64 with image, 0
+  pin with labels, "iat_gs", image
+  emitU64 with image, 0
+  pin with labels, "iat_wf", image
+  emitU64 with image, 0
+  pin with labels, "iat_ep", image
+  emitU64 with image, 0
+  emitU64 with image, 0
+  pin with labels, "desc", image
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  emitU32 with image, 0
+  pin with labels, "dll", image
+  emitStr with image, "kernel32.dll"
+  alignTo with image, 2
+  pin with labels, "hint_gs", image
+  emitU8 with image, 0
+  emitU8 with image, 0
+  emitStr with image, "GetStdHandle"
+  alignTo with image, 2
+  pin with labels, "hint_wf", image
+  emitU8 with image, 0
+  emitU8 with image, 0
+  emitStr with image, "WriteFile"
+  alignTo with image, 2
+  pin with labels, "hint_ep", image
+  emitU8 with image, 0
+  emitU8 with image, 0
+  emitStr with image, "ExitProcess"
+  alignTo with image, 16
+  pin with labels, "code", image
+  emitU8 with image, 72
+  emitU8 with image, 131
+  emitU8 with image, 236
+  emitU8 with image, 40
+  emitU8 with image, 185
+  emitU32 with image, 4294967285
+  emitU8 with image, 255
+  emitU8 with image, 21
+  emitRel with image, fixes, "iat_gs"
+  emitU8 with image, 72
+  emitU8 with image, 137
+  emitU8 with image, 193
+  emitU8 with image, 72
+  emitU8 with image, 141
+  emitU8 with image, 21
+  emitRel with image, fixes, "msg"
+  emitU8 with image, 65
+  emitU8 with image, 184
+  emitU32 with image, 16
+  emitU8 with image, 76
+  emitU8 with image, 141
+  emitU8 with image, 13
+  emitRel with image, fixes, "written"
+  emitU8 with image, 72
+  emitU8 with image, 199
+  emitU8 with image, 68
+  emitU8 with image, 36
+  emitU8 with image, 32
+  emitU32 with image, 0
+  emitU8 with image, 255
+  emitU8 with image, 21
+  emitRel with image, fixes, "iat_wf"
+  emitU8 with image, 49
+  emitU8 with image, 201
+  emitU8 with image, 255
+  emitU8 with image, 21
+  emitRel with image, fixes, "iat_ep"
+  pin with labels, "msg", image
+  let hi be 0
+  let hello be "hello from vire"
+  while hi < (length with hello)
+    emitU8 with image, (ord with (hello at hi))
+    let hi be hi + 1
+  end
+  emitU8 with image, 10
+  pin with labels, "written", image
+  emitU64 with image, 0
+  patchRel with image, labels, fixes
+  poke32 with image, (labels at "ilt_gs"), (4096 + (labels at "hint_gs"))
+  poke32 with image, (labels at "ilt_wf"), (4096 + (labels at "hint_wf"))
+  poke32 with image, (labels at "ilt_ep"), (4096 + (labels at "hint_ep"))
+  poke32 with image, (labels at "iat_gs"), (4096 + (labels at "hint_gs"))
+  poke32 with image, (labels at "iat_wf"), (4096 + (labels at "hint_wf"))
+  poke32 with image, (labels at "iat_ep"), (4096 + (labels at "hint_ep"))
+  let desc be labels at "desc"
+  poke32 with image, desc, (4096 + (labels at "ilt_gs"))
+  poke32 with image, (desc + 12), (4096 + (labels at "dll"))
+  poke32 with image, (desc + 16), (4096 + (labels at "iat_gs"))
+  return {"image": image, "code": labels at "code"}
+end
+
+define buildExe with image, entry
+  let head be zeros with 512
+  poke32 with head, 0, 23117
+  poke32 with head, 60, 128
+  poke32 with head, 128, 17744
+  poke16 with head, 132, 34404
+  poke16 with head, 134, 1
+  poke16 with head, 148, 240
+  poke16 with head, 150, 34
+  poke16 with head, 152, 523
+  poke32 with head, 168, (4096 + entry)
+  poke32 with head, 172, 4096
+  poke32 with head, 176, 1073741824
+  poke32 with head, 180, 1
+  poke32 with head, 184, 4096
+  poke32 with head, 188, 512
+  poke16 with head, 192, 6
+  poke16 with head, 200, 6
+  let raw be length with image
+  alignTo with image, 512
+  let rawSize be length with image
+  let pages be floorDiv with ((length with image) + 4095), 4096
+  if pages < 1
+    let pages be 1
+  end
+  poke32 with head, 208, (4096 + (pages * 4096))
+  poke32 with head, 212, 512
+  poke16 with head, 220, 3
+  poke16 with head, 222, 352
+  poke32 with head, 224, 1048576
+  poke32 with head, 232, 4096
+  poke32 with head, 240, 1048576
+  poke32 with head, 248, 4096
+  poke32 with head, 260, 16
+  poke32 with head, 272, (4096 + 64)
+  poke32 with head, 276, 40
+  let nameAt be 392
+  put 46 into head at nameAt
+  put 116 into head at (nameAt + 1)
+  put 101 into head at (nameAt + 2)
+  put 120 into head at (nameAt + 3)
+  put 116 into head at (nameAt + 4)
+  poke32 with head, 400, raw
+  poke32 with head, 404, 4096
+  poke32 with head, 408, rawSize
+  poke32 with head, 412, 512
+  poke32 with head, 428, 3758096416
+  let i be 0
+  while i < rawSize
+    push with head, (image at i)
+    let i be i + 1
+  end
+  return head
+end
+
+define main
+  let q be floorDiv with 1000, 256
+  if q != 3
+    say "div fail"
+    halt with 1
+  end
+  let big be floorDiv with 5368709120, 4294967296
+  if big != 1
+    say "big fail"
+    halt with 1
+  end
+  if (ord with "A") != 65
+    say "ord fail"
+    halt with 1
+  end
+  let built be buildImage
+  let exe be buildExe with (built at "image"), (built at "code")
+  write with "data/hello-native.hex", (hexOf with exe)
+  say "wrote hex"
+end

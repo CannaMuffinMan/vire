@@ -1,0 +1,7 @@
+define main
+  let n be 0 - 2147483647 - 1
+  say n % (0 - 1)
+  say n / (0 - 1)
+  say abs with n
+  say 2147483647 + 1
+end

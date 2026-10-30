@@ -1,0 +1,220 @@
+~ Windows x64 console image builder. Used by the native compiler.
+
+use "src/asm.vire"
+use "src/rt.vire"
+
+define alphabet
+  return " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+end
+
+define ord with ch
+  return (find with (alphabet), ch) + 32
+end
+
+define codeOf with ch
+  if ch == "\n"
+    return 10
+  end
+  if ch == "\r"
+    return 13
+  end
+  if ch == "\t"
+    return 9
+  end
+  if (find with (alphabet), ch) < 0
+    return -1
+  end
+  return ord with ch
+end
+
+define emitStr with buf, raw
+  let i be 0
+  let n be length with raw
+  while i < n
+    emitU8 with buf, (ord with (raw at i))
+    let i be i + 1
+  end
+  emitU8 with buf, 0
+  return buf
+end
+
+define poke32 with buf, pos, n
+  let x be n
+  if x < 0
+    let x be x + 4294967296
+  end
+  let k be 0
+  while k < 4
+    let q be floorDiv with x, 256
+    let byte be x - (q * 256)
+    put byte into buf at (pos + k)
+    let x be q
+    let k be k + 1
+  end
+  return buf
+end
+
+define poke16 with buf, pos, n
+  let x be n
+  if x < 0
+    let x be x + 65536
+  end
+  let q be floorDiv with x, 256
+  let lo be x - (q * 256)
+  put q into buf at (pos + 1)
+  put lo into buf at pos
+  return buf
+end
+
+define zeros with n
+  let buf be []
+  let i be 0
+  while i < n
+    push with buf, 0
+    let i be i + 1
+  end
+  return buf
+end
+
+define alignTo with buf, n
+  while ((length with buf) - ((floorDiv with (length with buf), n) * n)) != 0
+    emitU8 with buf, 0
+  end
+  return buf
+end
+
+define openImage
+  let image be []
+  let labels be {}
+  let fixes be []
+  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA"]
+  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl"]
+  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl"]
+  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl"]
+  let i be 0
+  while i < (length with names)
+    pin with labels, (ilts at i), image
+    emitU64 with image, 0
+    let i be i + 1
+  end
+  emitU64 with image, 0
+  let i be 0
+  while i < (length with iats)
+    pin with labels, (iats at i), image
+    emitU64 with image, 0
+    let i be i + 1
+  end
+  emitU64 with image, 0
+  pin with labels, "desc", image
+  let i be 0
+  while i < 10
+    emitU32 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "dll", image
+  emitStr with image, "kernel32.dll"
+  alignTo with image, 2
+  let i be 0
+  while i < (length with hints)
+    pin with labels, (hints at i), image
+    emitU8 with image, 0
+    emitU8 with image, 0
+    emitStr with image, (names at i)
+    alignTo with image, 2
+    let i be i + 1
+  end
+  alignTo with image, 16
+  emitRuntime with image, fixes, labels
+  return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats}
+end
+
+define parkPool with image, labels, pool
+  let i be 0
+  let n be length with pool
+  while i < n
+    let item be pool at i
+    pin with labels, (item at "name"), image
+    let raw be item at "raw"
+    emitU64 with image, (length with raw)
+    let k be 0
+    let m be length with raw
+    while k < m
+      emitU8 with image, (codeOf with (raw at k))
+      let k be k + 1
+    end
+    emitU8 with image, 0
+    let i be i + 1
+  end
+  return image
+end
+
+define finishImage with image, labels, fixes, hints, ilts, iats
+  patchRel with image, labels, fixes
+  let i be 0
+  while i < (length with hints)
+    let target be 4096 + (labels at (hints at i))
+    poke32 with image, (labels at (ilts at i)), target
+    poke32 with image, (labels at (iats at i)), target
+    let i be i + 1
+  end
+  let desc be labels at "desc"
+  poke32 with image, desc, (4096 + (labels at "ilt_gs"))
+  poke32 with image, (desc + 12), (4096 + (labels at "dll"))
+  poke32 with image, (desc + 16), (4096 + (labels at "iat_gs"))
+  return image
+end
+
+define buildExe with image, entry, imp
+  let head be zeros with 512
+  poke32 with head, 0, 23117
+  poke32 with head, 60, 128
+  poke32 with head, 128, 17744
+  poke16 with head, 132, 34404
+  poke16 with head, 134, 1
+  poke16 with head, 148, 240
+  poke16 with head, 150, 34
+  poke16 with head, 152, 523
+  poke32 with head, 168, (4096 + entry)
+  poke32 with head, 172, 4096
+  poke32 with head, 176, 1073741824
+  poke32 with head, 180, 1
+  poke32 with head, 184, 4096
+  poke32 with head, 188, 512
+  poke16 with head, 192, 6
+  poke16 with head, 200, 6
+  let raw be length with image
+  alignTo with image, 512
+  let rawSize be length with image
+  let pages be floorDiv with ((length with image) + 4095), 4096
+  if pages < 1
+    let pages be 1
+  end
+  poke32 with head, 208, (4096 + (pages * 4096))
+  poke32 with head, 212, 512
+  poke16 with head, 220, 3
+  poke16 with head, 222, 352
+  poke32 with head, 224, 1048576
+  poke32 with head, 232, 4096
+  poke32 with head, 240, 1048576
+  poke32 with head, 248, 4096
+  poke32 with head, 260, 16
+  poke32 with head, 272, (4096 + imp)
+  poke32 with head, 276, 40
+  let nameAt be 392
+  put 46 into head at nameAt
+  put 116 into head at (nameAt + 1)
+  put 101 into head at (nameAt + 2)
+  put 120 into head at (nameAt + 3)
+  put 116 into head at (nameAt + 4)
+  poke32 with head, 400, raw
+  poke32 with head, 408, rawSize
+  poke32 with head, 404, 4096
+  poke32 with head, 412, 512
+  poke32 with head, 428, 3758096416
+  let i be 0
+  while i < rawSize
+    push with head, (image at i)
+    let i be i + 1
+  end
+  return head
+end

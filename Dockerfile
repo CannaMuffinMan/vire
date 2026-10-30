@@ -1,13 +1,12 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS build
 WORKDIR /src
-COPY Vire.cs vire.csproj ./
-RUN dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o /out
+COPY Vire.cs Compiled.cs vire.csproj ./
+RUN dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=none -o /out
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends libicu72 && rm -rf /var/lib/apt/lists/*
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0@sha256:62028293921f5bd6db3d9f9119cd29cd926dfd3c2336da23b09f425e40c3c832
 COPY --from=build /out/vire /usr/local/bin/vire
-RUN useradd --create-home --uid 1000 vire \
- && chown -R vire:vire /usr/local/bin/vire
+RUN useradd --create-home vire \
+ && chown vire:vire /usr/local/bin/vire
 WORKDIR /work
 COPY checks ./checks/
 COPY systems ./systems/

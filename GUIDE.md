@@ -43,10 +43,18 @@ end
 5. Run `vire.exe hello.vire`.
 6. The terminal prints `hello from vire`.
 
-To rebuild the runner from source:
+To rebuild the runner from source (.NET 10 SDK):
 
 ```text
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /out:vire.exe Vire.cs
+dotnet build -c Release
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64
+```
+
+A desktop window needs the Windows project:
+
+```text
+dotnet build windows/vire.windows.csproj -c Release
+dotnet publish windows/vire.windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64-windows
 ```
 
 ## 3. Names and values
@@ -65,6 +73,8 @@ Values are numbers (whole or decimal), text in double quotes, `true`, `false`, a
 Text escapes: `\"` `\\` `\n` `\t`.
 
 Arithmetic: `+ - * / %`. `/` is ordinary division, so `5 / 2` is `2.5`. Comparisons: `== != < > <= >=`. Logic: `and`, `or`, `not`. Parentheses group expressions: `(1 + 2) * 3`.
+
+`+`, `-`, and `*` on whole numbers that do not fit in a whole result become decimals instead of wrapping. The remainder when dividing by `-1` is `0`, including the smallest whole number. Remainder or division by zero is an error. `abs` of the smallest whole number is a decimal, not a negative whole number.
 
 `+` joins text, and also joins two lists. A call argument stops before `+`, so this prints `Vire</p>`:
 
@@ -297,7 +307,17 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open them through `serve`.
 14. Run the small systems under `systems/`. `tests.vire` runs every `.vire` file in that folder, so a new file there is part of the suite. `optional/live.vire` reads a public block and a public page, and it is not part of that scan.
 
-## 14. Rules an agent should follow
+## 14. Security
+
+A program cannot grant itself more steps. The cap is 1000000. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
+
+`listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token`. The compare does not stop at the first differing character. A token sitting in the body does not count. The body limit is 65536 bytes. A path that contains `..` is refused.
+
+`fetch` and `post` allow `https` only, refuse redirects, and refuse localhost, private ranges, link-local, shared carrier space `100.64.0.0/10`, and IPv4 addresses hidden inside IPv6. `write`, `append`, and `copy` refuse executable, script, `.vire`, `.cs`, and `.sh` files, plus `..` and links.
+
+A compiled program is a sealed `VIRE1` file, not readable source. A file that is not a `VIRE1` seal is refused with `sealed program is damaged`. The runner checks a hash of the whole program before it runs, so a patched file stops with `sealed program was changed`. Set `VIRE_SEAL` to a long private value when you compile, and use that same value when you run. A copied file then stays shut on a machine that does not have the seal. A person who has your runner and your seal can still study the program. The seal stops casual reading and casual patches. It does not stop every attack.
+
+## 15. Rules an agent should follow
 
 - Put every program in the folder with `vire.exe`, or pass a path to a `.vire` file. The file's folder is the sandbox root.
 - Start every runnable file with definitions, and include `define main` in the file you pass to `vire.exe`. Packages must not require their own `main`.

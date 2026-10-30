@@ -1,0 +1,1159 @@
+~ Compile let, if, calls, and read into a native Windows executable.
+
+use "src/pe.vire"
+
+define isLetter with ch
+  let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+  if (find with letters, ch) >= 0
+    return true
+  end
+  return false
+end
+
+define isDigit with ch
+  if (find with "0123456789", ch) >= 0
+    return true
+  end
+  return false
+end
+
+define gap with source, i
+  let n be length with source
+  while i < n
+    let ch be source at i
+    if ch == "~"
+      let i be i + 1
+      while i < n
+        let mark be source at i
+        let i be i + 1
+        if mark == "\n"
+          stop
+        end
+      end
+    end
+    if ch == " "
+      let i be i + 1
+    end
+    if ch == "\n"
+      let i be i + 1
+    end
+    if ch == "\r"
+      let i be i + 1
+    end
+    if ch == "\t"
+      let i be i + 1
+    end
+    if ch != " " and ch != "\n" and ch != "\r" and ch != "\t" and ch != "~"
+      stop
+    end
+  end
+  return i
+end
+
+define readString with source, i
+  let n be length with source
+  let i be i + 1
+  let piece be ""
+  while i < n
+    let ch be source at i
+    if ch == "\n"
+      return {"bad": true, "i": i, "text": ""}
+    end
+    if ch == "\""
+      return {"bad": false, "i": i + 1, "text": piece}
+    end
+    if ch == "\\"
+      let i be i + 1
+      if i >= n
+        return {"bad": true, "i": i, "text": ""}
+      end
+      let esc be source at i
+      if esc == "n"
+        let piece be piece + "\n"
+      end
+      if esc == "r"
+        let piece be piece + "\r"
+      end
+      if esc == "t"
+        let piece be piece + "\t"
+      end
+      if esc == "\""
+        let piece be piece + "\""
+      end
+      if esc == "\\"
+        let piece be piece + "\\"
+      end
+      if esc != "n" and esc != "r" and esc != "t" and esc != "\"" and esc != "\\"
+        return {"bad": true, "i": i, "text": ""}
+      end
+      let i be i + 1
+    end
+    if ch != "\\" and ch != "\"" and ch != "\n"
+      let piece be piece + ch
+      let i be i + 1
+    end
+  end
+  return {"bad": true, "i": i, "text": ""}
+end
+
+define keyword with word
+  if word == "define" or word == "with" or word == "end" or word == "let" or word == "be"
+    return word
+  end
+  if word == "say" or word == "if" or word == "else" or word == "return"
+    return word
+  end
+  if word == "while" or word == "stop" or word == "skip" or word == "put" or word == "into" or word == "at"
+    return word
+  end
+  if word == "and" or word == "or" or word == "not" or word == "true" or word == "false" or word == "none"
+    return word
+  end
+  return "name"
+end
+
+define tokenize with source
+  let toks be []
+  let i be gap with source, 0
+  let n be length with source
+  while i < n
+    let ch be source at i
+    if ch == "\""
+      let item be readString with source, i
+      if item at "bad"
+        return {"bad": true, "why": "broken string", "toks": toks}
+      end
+      push with toks, {"k": "text", "s": item at "text", "n": 0}
+      let i be gap with source, (item at "i")
+    end
+    if ch != "\""
+      if isDigit with ch
+        let start be i
+        while i < n
+          if not (isDigit with (source at i))
+            stop
+          end
+          let i be i + 1
+        end
+        if i < n
+          if (source at i) == "."
+            return {"bad": true, "why": "that number is not ready", "toks": toks}
+          end
+        end
+        let raw be slice with source, start, i
+        push with toks, {"k": "num", "s": raw, "n": number with raw}
+        let i be gap with source, i
+      end
+      if not (isDigit with ch)
+        if isLetter with ch
+          let start be i
+          while i < n
+            let mark be source at i
+            if not (isLetter with mark) and not (isDigit with mark)
+              stop
+            end
+            let i be i + 1
+          end
+          let word be slice with source, start, i
+          let key be keyword with word
+          push with toks, {"k": key, "s": word, "n": 0}
+          let i be gap with source, i
+        end
+        if not (isLetter with ch)
+          let two be ""
+          if i + 1 < n
+            let two be slice with source, i, (i + 2)
+          end
+          if two == "==" or two == "!=" or two == "<=" or two == ">="
+            push with toks, {"k": two, "s": two, "n": 0}
+            let i be gap with source, (i + 2)
+          end
+          if two != "==" and two != "!=" and two != "<=" and two != ">="
+            if (find with "+-*/%<>=(),[]{}:", ch) >= 0
+              push with toks, {"k": ch, "s": ch, "n": 0}
+              let i be gap with source, (i + 1)
+            end
+            if (find with "+-*/%<>=(),[]{}:", ch) < 0
+              return {"bad": true, "why": "that expression is not ready", "toks": toks}
+            end
+          end
+        end
+      end
+    end
+  end
+  return {"bad": false, "why": "", "toks": toks}
+end
+
+define form with state
+  let toks be state at "toks"
+  if (state at "i") >= (length with toks)
+    return "eof"
+  end
+  return (toks at (state at "i")) at "k"
+end
+
+define spell with state
+  return ((state at "toks") at (state at "i")) at "s"
+end
+
+define valueOf with state
+  return ((state at "toks") at (state at "i")) at "n"
+end
+
+define bump with state
+  put ((state at "i") + 1) into state at "i"
+  return true
+end
+
+define markBad with state, why
+  if state at "bad"
+    return ["none"]
+  end
+  put true into state at "bad"
+  put why into state at "why"
+  return ["none"]
+end
+
+define parseExpr with state, func
+  return parseOr with state, func
+end
+
+define parseOr with state, func
+  let left be parseAnd with state, func
+  while (form with state) == "or"
+    bump with state
+    let left be ["or", left, parseAnd with state, func]
+  end
+  return left
+end
+
+define parseAnd with state, func
+  let left be parseCmp with state, func
+  while (form with state) == "and"
+    bump with state
+    let left be ["and", left, parseCmp with state, func]
+  end
+  return left
+end
+
+define parseCmp with state, func
+  let left be parseSum with state, func
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    if k == "==" or k == "!=" or k == "<" or k == ">" or k == "<=" or k == ">="
+      bump with state
+      let left be [k, left, parseSum with state, func]
+    end
+    if k != "==" and k != "!=" and k != "<" and k != ">" and k != "<=" and k != ">="
+      stop
+    end
+  end
+  return left
+end
+
+define parseSum with state, func
+  let left be parseProduct with state, func
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    if k == "+" or k == "-"
+      bump with state
+      let left be [k, left, parseProduct with state, func]
+    end
+    if k != "+" and k != "-"
+      stop
+    end
+  end
+  return left
+end
+
+define parseProduct with state, func
+  let left be parseUnary with state, func
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    if k == "*" or k == "/" or k == "%"
+      bump with state
+      let left be [k, left, parseUnary with state, func]
+    end
+    if k != "*" and k != "/" and k != "%"
+      stop
+    end
+  end
+  return left
+end
+
+define parseUnary with state, func
+  if (form with state) == "not"
+    bump with state
+    return ["not", parseUnary with state, func]
+  end
+  if (form with state) == "-"
+    bump with state
+    return ["neg", parseUnary with state, func]
+  end
+  return parsePrimary with state, func
+end
+
+define parseAtom with state, func
+  if state at "bad"
+    return ["none"]
+  end
+  let k be form with state
+  if k == "num"
+    let n be valueOf with state
+    bump with state
+    return ["num", n]
+  end
+  if k == "text"
+    let raw be spell with state
+    bump with state
+    return ["text", raw]
+  end
+  if k == "true"
+    bump with state
+    return ["bool", 1]
+  end
+  if k == "false"
+    bump with state
+    return ["bool", 0]
+  end
+  if k == "none"
+    bump with state
+    return ["none"]
+  end
+  if k == "name"
+    let nm be spell with state
+    bump with state
+    if (form with state) == "with"
+      bump with state
+      if (form with state) == "eof" or (form with state) == "end" or (form with state) == "else"
+        return markBad with state, "that call is missing a value"
+      end
+      let args be []
+      push with args, (parseProduct with state, func)
+      while (form with state) == ","
+        bump with state
+        push with args, (parseProduct with state, func)
+      end
+      return ["call", nm, args]
+    end
+    return ["name", nm]
+  end
+  if k == "("
+    bump with state
+    let inner be parseExpr with state, func
+    if (form with state) != ")"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return inner
+  end
+  if k == "["
+    bump with state
+    let items be []
+    if (form with state) == "]"
+      bump with state
+      return ["list", items]
+    end
+    push with items, (parseExpr with state, func)
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "]"
+        stop
+      end
+      push with items, (parseExpr with state, func)
+    end
+    if (form with state) != "]"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return ["list", items]
+  end
+  if k == "{"
+    bump with state
+    let pairs be []
+    if (form with state) == "}"
+      bump with state
+      return ["map", pairs]
+    end
+    let key be parseExpr with state, func
+    if (form with state) != ":"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    let val be parseExpr with state, func
+    push with pairs, ["pair", key, val]
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "}"
+        stop
+      end
+      let key be parseExpr with state, func
+      if (form with state) != ":"
+        return markBad with state, "that expression is not ready"
+      end
+      bump with state
+      let val be parseExpr with state, func
+      push with pairs, ["pair", key, val]
+    end
+    if (form with state) != "}"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return ["map", pairs]
+  end
+  return markBad with state, "that expression is not ready"
+end
+
+define parsePrimary with state, func
+  let left be parseAtom with state, func
+  while (form with state) == "at"
+    if state at "bad"
+      stop
+    end
+    bump with state
+    let left be ["at", left, parseAtom with state, func]
+  end
+  return left
+end
+
+define parseLoop with state, func
+  let body be []
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    if k == "end" or k == "eof"
+      stop
+    end
+    push with body, (parseStmt with state, func)
+  end
+  return body
+end
+
+define parseBlock with state, func
+  let body be []
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    if k == "end" or k == "else" or k == "eof"
+      stop
+    end
+    push with body, (parseStmt with state, func)
+  end
+  return body
+end
+
+define parseIf with state, func, close
+  bump with state
+  let test be parseExpr with state, func
+  let yes be parseBlock with state, func
+  let no be []
+  let follow be ""
+  if (form with state) == "else"
+    bump with state
+    let follow be form with state
+  end
+  if follow == "if"
+    push with no, (parseIf with state, func, false)
+  end
+  if follow != "" and follow != "if"
+    let no be parseBlock with state, func
+  end
+  if close
+    if (form with state) != "end"
+      return markBad with state, "the program needs end"
+    end
+    bump with state
+  end
+  return ["if", test, yes, no]
+end
+
+define bind with func, nm
+  let locals be func at "locals"
+  if has with locals, nm
+    return locals at nm
+  end
+  let slot be func at "n"
+  put slot into locals at nm
+  put (slot + 1) into func at "n"
+  return slot
+end
+
+define parseStmt with state, func
+  if state at "bad"
+    return ["none"]
+  end
+  let k be form with state
+  if k == "let"
+    bump with state
+    if (form with state) != "name"
+      return markBad with state, "let needs a name"
+    end
+    let nm be spell with state
+    bump with state
+    if (form with state) != "be"
+      return markBad with state, "let needs be"
+    end
+    bump with state
+    let expr be parseExpr with state, func
+    let slot be bind with func, nm
+    return ["let", slot, expr]
+  end
+  if k == "say"
+    bump with state
+    return ["say", parseExpr with state, func]
+  end
+  if k == "return"
+    bump with state
+    return ["return", parseExpr with state, func]
+  end
+  if k == "if"
+    return parseIf with state, func, true
+  end
+  if k == "while"
+    bump with state
+    let test be parseExpr with state, func
+    let body be parseLoop with state, func
+    if (form with state) != "end"
+      return markBad with state, "the program needs end"
+    end
+    bump with state
+    return ["while", test, body]
+  end
+  if k == "stop"
+    bump with state
+    return ["stop"]
+  end
+  if k == "skip"
+    bump with state
+    return ["skip"]
+  end
+  if k == "put"
+    bump with state
+    let val be parseExpr with state, func
+    if (form with state) != "into"
+      return markBad with state, "put needs into"
+    end
+    bump with state
+    if (form with state) != "name"
+      return markBad with state, "put needs a name"
+    end
+    let nm be spell with state
+    bump with state
+    if (form with state) != "at"
+      return markBad with state, "put needs at"
+    end
+    bump with state
+    let key be parseExpr with state, func
+    if not (has with (func at "locals"), nm)
+      return markBad with state, (nm + " has no value")
+    end
+    return ["put", (func at "locals") at nm, val, key]
+  end
+  if k == "else"
+    return markBad with state, "that statement is not ready"
+  end
+  let expr be parseExpr with state, func
+  if state at "bad"
+    return ["none"]
+  end
+  if (expr at 0) == "call"
+    return expr
+  end
+  if (expr at 0) == "name"
+    let bare be []
+    return ["call", expr at 1, bare]
+  end
+  return markBad with state, "that statement is not ready"
+end
+
+define parseDefine with state
+  bump with state
+  if (form with state) != "name"
+    return {"bad": true}
+  end
+  let nm be spell with state
+  if nm == "read"
+    markBad with state, "read is part of the language"
+    return {"bad": true}
+  end
+  bump with state
+  let params be []
+  let locals be {}
+  let n be 0
+  if (form with state) == "with"
+    bump with state
+    if (form with state) != "name"
+      markBad with state, "define needs a name"
+      return {"bad": true}
+    end
+    push with params, (spell with state)
+    put n into locals at (spell with state)
+    let n be n + 1
+    bump with state
+    while (form with state) == ","
+      bump with state
+      if (form with state) != "name"
+        markBad with state, "define needs a name"
+        return {"bad": true}
+      end
+      if has with locals, (spell with state)
+        markBad with state, "that name is already defined"
+        return {"bad": true}
+      end
+      push with params, (spell with state)
+      put n into locals at (spell with state)
+      let n be n + 1
+      bump with state
+    end
+  end
+  let func be {"name": nm, "params": params, "nparams": n, "locals": locals, "n": n, "body": []}
+  let body be parseBlock with state, func
+  if state at "bad"
+    return {"bad": true}
+  end
+  if (form with state) != "end"
+    markBad with state, "the program needs end"
+    return {"bad": true}
+  end
+  bump with state
+  put body into func at "body"
+  return func
+end
+
+define parseProgram with toks
+  let state be {"toks": toks, "i": 0, "bad": false, "why": ""}
+  let funcs be []
+  while (form with state) != "eof"
+    if state at "bad"
+      stop
+    end
+    if (form with state) != "define"
+      markBad with state, "a vire program needs define main"
+      stop
+    end
+    let func be parseDefine with state
+    if state at "bad"
+      stop
+    end
+    let i be 0
+    while i < (length with funcs)
+      if ((funcs at i) at "name") == (func at "name")
+        markBad with state, "that name is already defined"
+        stop
+      end
+      let i be i + 1
+    end
+    push with funcs, func
+  end
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs}
+end
+
+define emitOp with gen, bytes
+  emitList with (gen at "image"), bytes
+  return true
+end
+
+define emitCall with gen, name
+  emitU8 with (gen at "image"), 232
+  emitRel with (gen at "image"), (gen at "fixes"), name
+  return true
+end
+
+define emitJmp with gen, name
+  emitU8 with (gen at "image"), 233
+  emitRel with (gen at "image"), (gen at "fixes"), name
+  return true
+end
+
+define emitJz with gen, name
+  emitOp with gen, [15, 132]
+  emitRel with (gen at "image"), (gen at "fixes"), name
+  return true
+end
+
+define pinHere with gen, name
+  pin with (gen at "labels"), name, (gen at "image")
+  return true
+end
+
+define fresh with gen
+  let n be gen at "j"
+  put (n + 1) into gen at "j"
+  return "j" + (text with n)
+end
+
+define pool with gen, raw
+  let i be 0
+  let n be length with raw
+  while i < n
+    if (codeOf with (raw at i)) < 0
+      put true into gen at "bad"
+      put "that text cannot be written yet" into gen at "why"
+      return ""
+    end
+    let i be i + 1
+  end
+  let id be gen at "s"
+  put (id + 1) into gen at "s"
+  let name be "s" + (text with id)
+  push with (gen at "pool"), {"name": name, "raw": raw}
+  return name
+end
+
+define findFunc with funcs, nm
+  let i be 0
+  let n be length with funcs
+  while i < n
+    if ((funcs at i) at "name") == nm
+      return {"ok": true, "func": funcs at i}
+    end
+    let i be i + 1
+  end
+  return {"ok": false}
+end
+
+define emitBoolAcc with gen
+  emitOp with gen, [137, 193]
+  emitCall with gen, "rt_push_bool"
+  return true
+end
+
+define builtinArity with nm
+  if nm == "args"
+    return 0
+  end
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read"
+    return 1
+  end
+  if nm == "push" or nm == "find" or nm == "has" or nm == "write"
+    return 2
+  end
+  if nm == "slice"
+    return 3
+  end
+  return -1
+end
+
+define freshCounter with gen
+  let n be gen at "c"
+  put (n + 1) into gen at "c"
+  let name be "ctr" + (text with n)
+  push with (gen at "counters"), name
+  return name
+end
+
+define parkCounters with image, labels, counters
+  let i be 0
+  let n be length with counters
+  while i < n
+    pin with labels, (counters at i), image
+    emitU64 with image, 0
+    let i be i + 1
+  end
+  return true
+end
+
+define jumpLoop with gen, word, edge
+  let stack be gen at "breaks"
+  if (length with stack) == 0
+    put true into gen at "bad"
+    put (word + " is only valid inside while or for") into gen at "why"
+    return true
+  end
+  let frame be stack at ((length with stack) - 1)
+  emitJmp with gen, (frame at edge)
+  return true
+end
+
+define emitExpr with gen, funcs, func, expr
+  if gen at "bad"
+    return true
+  end
+  let k be expr at 0
+  if k == "num"
+    emitOp with gen, [72, 199, 193]
+    emitU32 with (gen at "image"), (expr at 1)
+    emitCall with gen, "rt_push_int"
+    return true
+  end
+  if k == "text"
+    let name be pool with gen, (expr at 1)
+    if gen at "bad"
+      return true
+    end
+    emitOp with gen, [72, 141, 13]
+    emitRel with (gen at "image"), (gen at "fixes"), name
+    emitCall with gen, "rt_push_text"
+    return true
+  end
+  if k == "bool"
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), (expr at 1)
+    emitCall with gen, "rt_push_bool"
+    return true
+  end
+  if k == "none"
+    emitCall with gen, "rt_push_none"
+    return true
+  end
+  if k == "name"
+    let nm be expr at 1
+    if has with (func at "locals"), nm
+      emitU8 with (gen at "image"), 185
+      emitU32 with (gen at "image"), ((func at "locals") at nm)
+      emitCall with gen, "rt_load"
+      return true
+    end
+    if nm == "args"
+      emitCall with gen, "rt_args"
+      return true
+    end
+    let found be findFunc with funcs, nm
+    if found at "ok"
+      if ((found at "func") at "nparams") == 0
+        emitCall with gen, "rt_save_frame"
+        emitCall with gen, ("fn_" + nm)
+        emitCall with gen, "rt_restore_frame"
+        return true
+      end
+    end
+    put true into gen at "bad"
+    put (nm + " has no value") into gen at "why"
+    return true
+  end
+  if k == "call"
+    let nm be expr at 1
+    let args be expr at 2
+    let arity be builtinArity with nm
+    if arity >= 0
+      if (length with args) != arity
+        put true into gen at "bad"
+        put (nm + " takes " + (text with arity) + " values, got " + (text with (length with args))) into gen at "why"
+        return true
+      end
+      let i be 0
+      while i < (length with args)
+        emitExpr with gen, funcs, func, (args at i)
+        let i be i + 1
+      end
+      emitCall with gen, ("rt_" + nm)
+      return true
+    end
+    let found be findFunc with funcs, nm
+    if not (found at "ok")
+      put true into gen at "bad"
+      put ("there is no definition named " + nm) into gen at "why"
+      return true
+    end
+    if ((found at "func") at "nparams") != (length with args)
+      put true into gen at "bad"
+      put (nm + " takes " + (text with ((found at "func") at "nparams")) + " values, got " + (text with (length with args))) into gen at "why"
+      return true
+    end
+    emitCall with gen, "rt_save_frame"
+    let i be 0
+    while i < (length with args)
+      emitExpr with gen, funcs, func, (args at i)
+      let i be i + 1
+    end
+    emitCall with gen, ("fn_" + nm)
+    emitCall with gen, "rt_restore_frame"
+    return true
+  end
+  if k == "not"
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitCall with gen, "rt_not"
+    return true
+  end
+  if k == "and"
+    let no be fresh with gen
+    let done be fresh with gen
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitCall with gen, "rt_truth"
+    emitOp with gen, [133, 192]
+    emitJz with gen, no
+    emitExpr with gen, funcs, func, (expr at 2)
+    emitCall with gen, "rt_truth"
+    emitBoolAcc with gen
+    emitJmp with gen, done
+    pinHere with gen, no
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), 0
+    emitCall with gen, "rt_push_bool"
+    pinHere with gen, done
+    return true
+  end
+  if k == "or"
+    let yes be fresh with gen
+    let done be fresh with gen
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitCall with gen, "rt_truth"
+    emitOp with gen, [133, 192]
+    emitU8 with (gen at "image"), 15
+    emitU8 with (gen at "image"), 133
+    emitRel with (gen at "image"), (gen at "fixes"), yes
+    emitExpr with gen, funcs, func, (expr at 2)
+    emitCall with gen, "rt_truth"
+    emitBoolAcc with gen
+    emitJmp with gen, done
+    pinHere with gen, yes
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), 1
+    emitCall with gen, "rt_push_bool"
+    pinHere with gen, done
+    return true
+  end
+  if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">="
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitExpr with gen, funcs, func, (expr at 2)
+    let op be 0
+    if k == "!="
+      let op be 1
+    end
+    if k == "<"
+      let op be 2
+    end
+    if k == "<="
+      let op be 3
+    end
+    if k == ">"
+      let op be 4
+    end
+    if k == ">="
+      let op be 5
+    end
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), op
+    emitCall with gen, "rt_cmp"
+    return true
+  end
+  if k == "neg"
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitCall with gen, "rt_neg"
+    return true
+  end
+  if k == "+" or k == "-" or k == "*" or k == "/" or k == "%" or k == "at"
+    emitExpr with gen, funcs, func, (expr at 1)
+    emitExpr with gen, funcs, func, (expr at 2)
+    if k == "+"
+      emitCall with gen, "rt_add"
+    end
+    if k == "-"
+      emitCall with gen, "rt_sub"
+    end
+    if k == "*"
+      emitCall with gen, "rt_mul"
+    end
+    if k == "/"
+      emitCall with gen, "rt_div"
+    end
+    if k == "%"
+      emitCall with gen, "rt_mod"
+    end
+    if k == "at"
+      emitCall with gen, "rt_at"
+    end
+    return true
+  end
+  if k == "list"
+    emitCall with gen, "rt_list_new"
+    let items be expr at 1
+    let i be 0
+    while i < (length with items)
+      emitExpr with gen, funcs, func, (items at i)
+      emitCall with gen, "rt_push"
+      let i be i + 1
+    end
+    return true
+  end
+  if k == "map"
+    emitCall with gen, "rt_map_new"
+    let pairs be expr at 1
+    let i be 0
+    while i < (length with pairs)
+      let pair be pairs at i
+      emitExpr with gen, funcs, func, (pair at 1)
+      emitExpr with gen, funcs, func, (pair at 2)
+      emitCall with gen, "rt_map_put"
+      let i be i + 1
+    end
+    return true
+  end
+  put true into gen at "bad"
+  put "that expression is not ready" into gen at "why"
+  return true
+end
+
+define emitBlock with gen, funcs, func, body
+  let i be 0
+  let n be length with body
+  while i < n
+    emitStmt with gen, funcs, func, (body at i)
+    let i be i + 1
+  end
+  return true
+end
+
+define emitStmt with gen, funcs, func, stmt
+  if gen at "bad"
+    return true
+  end
+  let k be stmt at 0
+  if k == "let"
+    emitExpr with gen, funcs, func, (stmt at 2)
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), (stmt at 1)
+    emitCall with gen, "rt_store"
+    return true
+  end
+  if k == "say"
+    emitExpr with gen, funcs, func, (stmt at 1)
+    emitCall with gen, "rt_say"
+    return true
+  end
+  if k == "return"
+    emitExpr with gen, funcs, func, (stmt at 1)
+    emitCall with gen, "rt_return"
+    emitOp with gen, [72, 131, 196, 40, 195]
+    return true
+  end
+  if k == "if"
+    let no be fresh with gen
+    let done be fresh with gen
+    emitExpr with gen, funcs, func, (stmt at 1)
+    emitCall with gen, "rt_truth"
+    emitOp with gen, [133, 192]
+    emitJz with gen, no
+    emitBlock with gen, funcs, func, (stmt at 2)
+    emitJmp with gen, done
+    pinHere with gen, no
+    emitBlock with gen, funcs, func, (stmt at 3)
+    pinHere with gen, done
+    return true
+  end
+  if k == "while"
+    let head be fresh with gen
+    let done be fresh with gen
+    let ctr be freshCounter with gen
+    push with (gen at "breaks"), {"head": head, "done": done}
+    pinHere with gen, head
+    emitExpr with gen, funcs, func, (stmt at 1)
+    emitCall with gen, "rt_truth"
+    emitOp with gen, [133, 192]
+    emitJz with gen, done
+    emitOp with gen, [72, 141, 13]
+    emitRel with (gen at "image"), (gen at "fixes"), ctr
+    emitCall with gen, "rt_loop_tick"
+    emitBlock with gen, funcs, func, (stmt at 2)
+    emitJmp with gen, head
+    pinHere with gen, done
+    drop with (gen at "breaks")
+    return true
+  end
+  if k == "stop"
+    jumpLoop with gen, "stop", "done"
+    return true
+  end
+  if k == "skip"
+    jumpLoop with gen, "skip", "head"
+    return true
+  end
+  if k == "put"
+    emitExpr with gen, funcs, func, (stmt at 2)
+    emitExpr with gen, funcs, func, (stmt at 3)
+    emitU8 with (gen at "image"), 185
+    emitU32 with (gen at "image"), (stmt at 1)
+    emitCall with gen, "rt_set_slot"
+    return true
+  end
+  if k == "call"
+    emitExpr with gen, funcs, func, stmt
+    emitCall with gen, "rt_drop"
+    return true
+  end
+  put true into gen at "bad"
+  put "that statement is not ready" into gen at "why"
+  return true
+end
+
+define emitFunc with gen, funcs, func
+  pinHere with gen, ("fn_" + (func at "name"))
+  emitOp with gen, [72, 131, 236, 40]
+  emitU8 with (gen at "image"), 185
+  emitU32 with (gen at "image"), (func at "nparams")
+  emitU8 with (gen at "image"), 186
+  emitU32 with (gen at "image"), ((func at "n") - (func at "nparams"))
+  emitCall with gen, "rt_begin"
+  emitBlock with gen, funcs, func, (func at "body")
+  emitCall with gen, "rt_push_none"
+  emitCall with gen, "rt_return"
+  emitOp with gen, [72, 131, 196, 40, 195]
+  return true
+end
+
+define main
+  let files be args
+  if (length with files) < 2
+    say "usage: compile-native source.vire out.hex"
+    say "compile failed"
+    halt with 1
+  end
+  let scanned be tokenize with (read with (files at 0))
+  if scanned at "bad"
+    say scanned at "why"
+    say "compile failed"
+    halt with 1
+  end
+  let parsed be parseProgram with (scanned at "toks")
+  if parsed at "bad"
+    say parsed at "why"
+    say "compile failed"
+    halt with 1
+  end
+  let funcs be parsed at "funcs"
+  let saw be false
+  let i be 0
+  while i < (length with funcs)
+    if ((funcs at i) at "name") == "main"
+      let saw be true
+    end
+    let i be i + 1
+  end
+  if not saw
+    say "a vire program needs define main"
+    say "compile failed"
+    halt with 1
+  end
+  let opened be openImage
+  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
+  let i be 0
+  while i < (length with funcs)
+    emitFunc with gen, funcs, (funcs at i)
+    let i be i + 1
+  end
+  if gen at "bad"
+    say gen at "why"
+    say "compile failed"
+    halt with 1
+  end
+  parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")
+  parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
+  parkRuntime with (gen at "image"), (gen at "labels")
+  finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")
+  let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc")
+  write with (files at 1), (hexOf with exe)
+  say "compiled"
+end

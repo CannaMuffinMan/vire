@@ -1,0 +1,7 @@
+define main
+  let n be 0
+  while n < 100000
+    let n be n + 1
+  end
+  say "burned"
+end

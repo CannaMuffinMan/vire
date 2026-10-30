@@ -1,6 +1,6 @@
 # Vire
 
-Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 8 SDK, can run them. A Windows desktop build can also open a window.
+Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 10 SDK, can run them. A Windows desktop build can also open a window. Binaries are not stored in git. GitHub Actions uploads single-file builds as workflow artifacts.
 
 The manual is [GUIDE.md](GUIDE.md).
 
@@ -23,9 +23,11 @@ docker run --rm -v "$PWD":/work vire my.vire
 
 On Windows PowerShell, if Docker cannot mount the drive, copy the program into a folder on `C:` or keep using the files already in the image: `tests.vire`, `count.vire`, `term.vire`, and `vault.vire`.
 
-## Run with .NET 8
+## Run with .NET 10
 
 ```text
+dotnet build -c Release
+dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release
 dotnet run -c Release -- tests.vire
 ```
 
@@ -43,10 +45,11 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ## Windows desktop window
 
-`vire.exe` in a Windows build opens a real window for `work.vire` and `board.vire`. Build it with:
+`vire.windows.csproj` opens a real window for `work.vire` and `board.vire`. Build it with:
 
 ```text
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /define:WINDOWS /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Net.Http.dll /out:vire.exe Vire.cs
+dotnet build windows/vire.windows.csproj -c Release
+dotnet publish windows/vire.windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64-windows
 ```
 
 ## License

@@ -1,0 +1,41 @@
+define main
+  let fails be 0
+  try
+    write with "data/plant.vire", "define main\nend\n"
+    let fails be fails + 1
+  miss problem
+    if (find with problem, "program file") < 0
+      let fails be fails + 1
+    end
+  end
+  try
+    fetch with "http://10.1.1.1/"
+    let fails be fails + 1
+  miss problem
+    if (find with problem, "private") < 0
+      let fails be fails + 1
+    end
+  end
+  try
+    fetch with "http://example.com/"
+    let fails be fails + 1
+  miss problem
+    if (find with problem, "https") < 0
+      let fails be fails + 1
+    end
+  end
+  try
+    read with "../Vire.cs"
+    let fails be fails + 1
+  miss problem
+    if (find with problem, "program folder") < 0
+      let fails be fails + 1
+    end
+  end
+  if fails == 0
+    say "secure pass"
+  end
+  if not (fails == 0)
+    say "secure fail"
+  end
+end

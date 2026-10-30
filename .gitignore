@@ -6,3 +6,20 @@ out.txt
 bin/
 obj/
 dist/
+# build output and binaries
+publish/
+*.exe
+*.dll
+*.pdb
+*.hex
+
+# secrets, keys, wallets
+.env
+.env.*
+.env*
+*.vc.key
+*.fcgbc
+*.pem
+*.key
+*.pfx
+*.p12

@@ -1,0 +1,81 @@
+~ The web2 door. Apps mine on their own with Proof of Rot. This process does not mine.
+
+define genesis
+  return {"index": 0, "previousHash": "0", "hash": "genesis", "miner": "forevercouchgang.blockchain", "por": none}
+end
+
+define tipHash with chain
+  let last be (length with chain) - 1
+  let tip be chain at last
+  return tip at "hash"
+end
+
+define porOk with por
+  if por == none
+    return false
+  end
+  if not (has with por, "action")
+    return false
+  end
+  if not (has with por, "engagement")
+    return false
+  end
+  if not (has with por, "timestamp")
+    return false
+  end
+  if not (has with por, "userId")
+    return false
+  end
+  return true
+end
+
+define loadChain
+  return parse with (read with "data/chain.json")
+end
+
+define route with method, path, body
+  if path == "/health"
+    return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+  end
+  if path == "/payments"
+    return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\"}"
+  end
+  if path == "/info"
+    return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"forevercouchgang.blockchain\",\"chainId\":\"local-demo\",\"mining\":\"local-por\",\"miningNetwork\":false,\"payments\":false}"
+  end
+  if path == "/connect"
+    return "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
+  end
+  if path == "/chain"
+    if method == "GET"
+      return json with (loadChain)
+    end
+  end
+  if path == "/block"
+    if method == "POST"
+      let chain be loadChain
+      let block be parse with body
+      let previous be block at "previousHash"
+      if not (previous == (tipHash with chain))
+        return "{\"ok\":false,\"status\":403,\"error\":\"block does not link to the tip\"}"
+      end
+      if not (porOk with (block at "por"))
+        return "{\"ok\":false,\"status\":403,\"error\":\"block needs a local Proof of Rot\"}"
+      end
+      push with chain, block
+      write with "data/chain.json", json with chain
+      return "{\"ok\":true,\"accepted\":true}"
+    end
+  end
+  if path == "/mine"
+    return "{\"ok\":false,\"status\":403,\"error\":\"mining stays inside the app\"}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  let chain be []
+  push with chain, genesis
+  write with "data/chain.json", json with chain
+  listen with 8080
+end

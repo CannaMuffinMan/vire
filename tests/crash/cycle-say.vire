@@ -1,0 +1,5 @@
+define main
+  let box be []
+  push with box, box
+  say box
+end

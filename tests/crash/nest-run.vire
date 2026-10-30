@@ -1,0 +1,4 @@
+define main
+  run with "burn.vire"
+  say "parent"
+end
