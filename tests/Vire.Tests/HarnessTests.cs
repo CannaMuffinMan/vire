@@ -31,13 +31,31 @@ public class HarnessTests
     }
 
     [Fact]
+    public void DockerfileCopiesEveryRootCsharpFile()
+    {
+        string root = FindRoot();
+        string docker = File.ReadAllText(Path.Combine(root, "Dockerfile"));
+        Match copy = Regex.Match(docker, @"^COPY (.+) \./\s*$", RegexOptions.Multiline);
+        Assert.True(copy.Success, "expected a COPY ... ./ line");
+        string spec = copy.Groups[1].Value;
+        foreach (string path in Directory.GetFiles(root, "*.cs"))
+        {
+            string name = Path.GetFileName(path);
+            Assert.True(
+                spec.Contains("*.cs") || (" " + spec + " ").Contains(" " + name + " "),
+                "Dockerfile must copy " + name);
+        }
+        Assert.Contains("vire.csproj", spec);
+    }
+
+    [Fact]
     public void NativeSmokeKeepsVireStdoutOffTheExitCode()
     {
         string text = File.ReadAllText(Path.Combine(FindRoot(), "tools", "native-smoke.ps1"));
         Assert.Contains("$code = Invoke-Vire", text);
-        Assert.Matches(
-            @"function Invoke-Vire[\s\S]*Write-Host[\s\S]*\$LASTEXITCODE",
-            text);
+        Assert.Contains("$out = &", text);
+        Assert.Contains("Write-Host", text);
+        Assert.Contains("$LASTEXITCODE", text);
     }
 
     [Fact]
