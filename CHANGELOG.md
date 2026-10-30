@@ -16,3 +16,9 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - C9. `SECURITY.md`, GUIDE limits/seal/`listen`/paths/.NET 10, this changelog.
 
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
+
+## Phase 3A (compiler grammar, first cut)
+
+- Dual-mode conformance harness: each suite program runs in the interpreter and as compiled `.vc`; stdout must match, and stderr matches after normalizing columns.
+- `compiler.vire` parses `for`/`skip`, `else if`, `try`/`miss`, `use`/`need`, map literals, decimals, and emits line/column on the tree.
+- `CompiledMachine` executes those steps, fills in more builtins used by the suite, and reports the real line and column on errors.
