@@ -112,12 +112,19 @@ sealed class Budget
     public int Calls;
     public int MaxCalls = 64;
     public int WhilePasses;
-    public int MaxWhilePasses = 100000;
+    public int MaxWhilePasses = 1000000;
     public int Runs;
     public int MaxRuns = 8;
     public int Output;
     public int MaxOutput = 1000000;
     public long DeadlineUtcTicks;
+
+    public void ApplyStepLimit(int limit)
+    {
+        if (limit < 1 || limit > 50000000) throw new VireError("budget must be from 1 to 50000000", 1);
+        MaxSteps = limit;
+        MaxWhilePasses = limit;
+    }
 
     public static Budget ForRequest(Budget parent)
     {
@@ -204,8 +211,7 @@ sealed class Machine
 
     public void UseBudget(int limit)
     {
-        if (limit < 1 || limit > 50000000) throw new VireError("budget must be from 1 to 50000000", 1);
-        budget.MaxSteps = limit;
+        budget.ApplyStepLimit(limit);
     }
 
     public void UseShared(Budget shared)

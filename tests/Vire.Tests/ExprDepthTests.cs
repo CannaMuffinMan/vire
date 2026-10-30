@@ -49,7 +49,7 @@ public class ExprDepthTests
     static Budget FreshBudget()
     {
         Budget budget = new Budget();
-        budget.MaxSteps = 5000000;
+        budget.ApplyStepLimit(5000000);
         return budget;
     }
 
