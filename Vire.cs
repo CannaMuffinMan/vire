@@ -2904,6 +2904,15 @@ sealed class Program
                 Console.WriteLine(VireSeal.PayloadSha256(packed));
                 return 0;
             }
+            if (rest[0] == "payload-write")
+            {
+                if (rest.Length < 3) throw new VireError("usage: vire payload-write file.vc dest.bin", 1);
+                byte[] packed = File.ReadAllBytes(Path.GetFullPath(rest[1]));
+                byte[] plain = VireSeal.OpenBytes(packed);
+                try { File.WriteAllBytes(Path.GetFullPath(rest[2]), plain); }
+                finally { CryptographicOperations.ZeroMemory(plain); }
+                return 0;
+            }
             if (rest[0] == "run")
             {
                 if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);

@@ -105,6 +105,30 @@ public class SealTests
     }
 
     [Fact]
+    public void PayloadWriteDumpsUnsealedBytes()
+    {
+        WithKey(TestKeyB64(), () =>
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "vire-payload-" + Guid.NewGuid().ToString("n"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                byte[] packed = VireSeal.SealBytes(Encoding.UTF8.GetBytes("compiler-bytes"));
+                string vc = Path.Combine(dir, "stage.vc");
+                string dest = Path.Combine(dir, "stage.bin");
+                File.WriteAllBytes(vc, packed);
+                int code = Program.Execute(new string[] { "payload-write", vc, dest });
+                Assert.Equal(0, code);
+                Assert.Equal("compiler-bytes", Encoding.UTF8.GetString(File.ReadAllBytes(dest)));
+            }
+            finally
+            {
+                try { Directory.Delete(dir, true); } catch (IOException) { }
+            }
+        });
+    }
+
+    [Fact]
     public void OldXorSealIsRefused()
     {
         WithKey(TestKeyB64(), () =>
