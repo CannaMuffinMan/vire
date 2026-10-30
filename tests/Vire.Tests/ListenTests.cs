@@ -242,6 +242,7 @@ public class ListenTests : IDisposable
 sealed class ListenHost : IDisposable
 {
     public int Port;
+    public string Folder;
     CancellationTokenSource cts;
     Thread thread;
     string folder;
@@ -250,6 +251,7 @@ sealed class ListenHost : IDisposable
     {
         ListenHost host = new ListenHost();
         host.folder = Path.Combine(Path.GetTempPath(), "vire-listen-" + Guid.NewGuid().ToString("N"));
+        host.Folder = host.folder;
         Directory.CreateDirectory(host.folder);
         Directory.CreateDirectory(Path.Combine(host.folder, "data"));
         string program = Path.Combine(host.folder, "listen.vire");

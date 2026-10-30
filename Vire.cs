@@ -2424,10 +2424,10 @@ sealed class Json
 {
     public static string Write(object value)
     {
-        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, new int[1]);
+        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0);
     }
 
-    static string WriteValue(object value, HashSet<object> path, int nest, int[] used)
+    static string WriteValue(object value, HashSet<object> path, int nest)
     {
         if (nest > 256) throw new VireError("json is nested too deeply", 1);
         string text;
@@ -2452,7 +2452,7 @@ sealed class Json
                 for (int i = 0; i < list.Count; i++)
                 {
                     if (i > 0) body.Append(',');
-                    body.Append(WriteValue(list[i], path, nest + 1, used));
+                    body.Append(WriteValue(list[i], path, nest + 1));
                 }
                 body.Append(']');
                 text = body.ToString();
@@ -2472,9 +2472,9 @@ sealed class Json
                 {
                     if (!first) body.Append(',');
                     first = false;
-                    body.Append(WriteValue(pair.Key, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Key, path, nest + 1));
                     body.Append(':');
-                    body.Append(WriteValue(pair.Value, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Value, path, nest + 1));
                 }
                 body.Append('}');
                 text = body.ToString();
@@ -2482,8 +2482,7 @@ sealed class Json
             finally { path.Remove(map); }
         }
         else text = WriteString(Machine.Show(value));
-        used[0] += text.Length;
-        if (used[0] > 1000000) throw new VireError("text is too large to write", 1);
+        if (text.Length > 1000000) throw new VireError("text is too large to write", 1);
         return text;
     }
 
