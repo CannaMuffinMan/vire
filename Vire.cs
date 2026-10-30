@@ -500,11 +500,7 @@ sealed class Machine
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
         if (name == "serve")
-        {
-            if (!(args[0] is int)) throw new VireError("serve needs a port number", line);
-            Serve((int)args[0], line);
-            return 0;
-        }
+            throw new VireError("serve was removed; use listen", line);
         if (name == "files")
         {
             string path = SafePath(args[0], line);
@@ -1228,9 +1224,17 @@ sealed class Machine
         string head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
         string requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
         string[] bits = requestLine.Split(' ');
-        if (bits.Length < 2 || bits[1].IndexOf("..") >= 0)
+        if (bits.Length < 2)
         {
             SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
+        }
+        if (bits[1].IndexOf("..") >= 0)
+        {
+            if (bits[0] == "GET" || bits[0] == "HEAD")
+                SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
+            else
+                SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
             return;
         }
         if (HasChunked(head))
@@ -1272,6 +1276,8 @@ sealed class Machine
         int queryAt = path.IndexOf('?');
         if (queryAt >= 0) path = path.Substring(0, queryAt);
         string body = Encoding.UTF8.GetString(buffer, bodyAt, contentLength);
+        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line))
+            return;
         bool health = path == "/health" && (method == "GET" || method == "HEAD");
         bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
         if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
@@ -1368,6 +1374,7 @@ sealed class Machine
         if (code == 408) return "Request Timeout";
         if (code == 411) return "Length Required";
         if (code == 413) return "Payload Too Large";
+        if (code == 416) return "Range Not Satisfiable";
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";
@@ -1392,149 +1399,173 @@ sealed class Machine
         if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    void Serve(int port, int line)
+    bool TrySite(NetworkStream stream, string method, string url, string head, int line)
     {
-        if (port < 1024 || port > 65535) throw new VireError("port must be from 1024 to 65535", line);
         string site = Path.Combine(root, "site");
-        if (!Directory.Exists(site)) throw new VireError("there is no site folder to serve", line);
-        System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
-        listener.Start();
-        string key = Guid.NewGuid().ToString("N");
-        Console.WriteLine("key " + key);
-        Console.WriteLine("open http://127.0.0.1:" + port + "/?key=" + key);
+        if (!Directory.Exists(site)) return false;
+        string rel;
+        if (!SiteRelative(url, out rel))
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        string type;
+        long limit;
+        if (!SiteType(rel, out type, out limit))
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        string full;
+        try { full = VirePaths.DataOrSite(root, "site/" + rel, line); }
+        catch (VireError)
+        {
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
+        }
+        if (!File.Exists(full) || Directory.Exists(full)) return false;
         try
         {
-            while (true)
+            if ((File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0)
             {
-                System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
-                client.ReceiveTimeout = 2000;
-                client.SendTimeout = 2000;
-                try { Answer(client, site, key); }
-                catch (IOException)
-                {
-                    Console.Error.WriteLine("vire: internal error (IOException)");
-                }
-                finally { client.Close(); }
+                SendSiteEmpty(stream, 404, "text/plain", "not found");
+                return true;
             }
         }
-        finally { listener.Stop(); }
-    }
-
-    static string gate = "";
-
-    static bool QueryHas(string query, string key)
-    {
-        string[] parts = query.Split('&');
-        foreach (string part in parts)
-            if (part == "key=" + key) return true;
-        return false;
-    }
-
-    static void Answer(System.Net.Sockets.TcpClient client, string site, string key)
-    {
-        NetworkStream stream = client.GetStream();
-        byte[] buffer = new byte[4096];
-        int got = stream.Read(buffer, 0, buffer.Length);
-        string request = Encoding.ASCII.GetString(buffer, 0, got);
-        int lineEnd = request.IndexOf("\r\n");
-        if (lineEnd < 0) { Send(stream, 400, "text/plain", "bad request"); return; }
-        string[] bits = request.Substring(0, lineEnd).Split(' ');
-        if (bits.Length < 2) { Send(stream, 400, "text/plain", "bad request"); return; }
-        string url = bits[1];
-        string query = "";
-        int queryAt = url.IndexOf('?');
-        if (queryAt >= 0)
+        catch (IOException)
         {
-            query = url.Substring(queryAt + 1);
-            url = url.Substring(0, queryAt);
+            SendSiteEmpty(stream, 404, "text/plain", "not found");
+            return true;
         }
-        bool keyed = QueryHas(query, key) || request.IndexOf("X-Vire-Key: " + key) >= 0 || request.IndexOf("vire=" + key) >= 0;
-        if (!keyed) { Send(stream, 401, "text/plain", "key required"); return; }
-        gate = QueryHas(query, key) ? "Set-Cookie: vire=" + key + "; HttpOnly; Path=/\r\n" : "";
-        if (bits[0] == "POST" && url == "/inbox")
+        long length = new FileInfo(full).Length;
+        if (length > limit)
         {
-            int split = request.IndexOf("\r\n\r\n");
-            string posted = split >= 0 ? request.Substring(split + 4) : "";
-            if (posted.Length > 1000000) posted = posted.Substring(0, 1000000);
-            File.WriteAllText(Path.Combine(site, "inbox.txt"), posted, Encoding.UTF8);
-            Send(stream, 200, "text/plain", "saved");
-            return;
+            SendSiteEmpty(stream, 413, "text/plain", "too large");
+            return true;
         }
-        if (bits[0] != "GET" && bits[0] != "HEAD") { Send(stream, 405, "text/plain", "method not allowed"); return; }
-        if (url == "/") url = "/index.html";
-        url = url.Replace('/', Path.DirectorySeparatorChar);
-        if (url.Contains("..") || url.IndexOf(':') >= 0) { Send(stream, 403, "text/plain", "forbidden"); return; }
-        string ext = Path.GetExtension(url).ToLowerInvariant();
-        string type = null;
-        int limit = 1000000;
-        if (ext == ".html") type = "text/html";
-        else if (ext == ".css") type = "text/css";
-        else if (ext == ".js") type = "text/javascript";
-        else if (ext == ".svg") type = "image/svg+xml";
-        else if (ext == ".json") type = "application/json";
-        else if (ext == ".txt") type = "text/plain";
-        else if (ext == ".mp4") { type = "video/mp4"; limit = 512000000; }
-        else if (ext == ".webm") { type = "video/webm"; limit = 512000000; }
-        else if (ext == ".ogv") { type = "video/ogg"; limit = 512000000; }
-        if (type == null) { SendBytes(stream, 403, "text/plain", Encoding.UTF8.GetBytes("forbidden"), 0, 9, false, 9); return; }
-        string path = Path.GetFullPath(Path.Combine(site, url.TrimStart(Path.DirectorySeparatorChar)));
-        string siteFull = Path.GetFullPath(site).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(siteFull, StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) { Send(stream, 404, "text/plain", "not found"); return; }
-        long length = new FileInfo(path).Length;
-        if (length > limit) { Send(stream, 413, "text/plain", "too large"); return; }
         long start = 0;
         long count = length;
         bool partial = false;
-        int rangeAt = request.IndexOf("Range: bytes=");
-        if (rangeAt >= 0 && length > 0)
+        bool video = type.StartsWith("video/", StringComparison.Ordinal);
+        if (video)
         {
-            int rangeEnd = request.IndexOf("\r\n", rangeAt);
-            string spec = request.Substring(rangeAt + 13, (rangeEnd < 0 ? request.Length : rangeEnd) - (rangeAt + 13));
-            int dash = spec.IndexOf('-');
-            if (dash >= 0)
+            int rangeStatus = SiteRange(head, length, out start, out count, out partial);
+            if (rangeStatus == 416)
             {
-                long from = 0;
-                long to = length - 1;
-                if (dash > 0) long.TryParse(spec.Substring(0, dash), out from);
-                if (dash + 1 < spec.Length) long.TryParse(spec.Substring(dash + 1), out to);
-                if (from < 0) from = 0;
-                if (to >= length) to = length - 1;
-                if (from <= to)
-                {
-                    start = from;
-                    count = to - from + 1;
-                    partial = true;
-                }
+                SendSiteRangeFail(stream, type, length);
+                return true;
             }
         }
-        if (bits[0] == "HEAD") count = 0;
-        using (FileStream file = File.OpenRead(path))
-            SendFile(stream, partial ? 206 : 200, type, file, start, count, partial, length);
+        if (method == "HEAD") count = 0;
+        using (FileStream file = File.OpenRead(full))
+            SendSiteFile(stream, partial ? 206 : 200, type, file, start, count, partial, length, video);
+        return true;
     }
 
-    static void Send(NetworkStream stream, int code, string type, string body)
+    static bool SiteRelative(string url, out string rel)
     {
-        byte[] data = Encoding.UTF8.GetBytes(body);
-        SendBytes(stream, code, type, data, 0, data.Length, false, data.Length);
+        rel = null;
+        if (url == null) return false;
+        string decoded;
+        try { decoded = Uri.UnescapeDataString(url); }
+        catch (UriFormatException) { return false; }
+        if (decoded.IndexOf('\0') >= 0) return false;
+        decoded = decoded.Replace('\\', '/');
+        if (decoded.IndexOf("://", StringComparison.Ordinal) >= 0) return false;
+        while (decoded.StartsWith("/", StringComparison.Ordinal)) decoded = decoded.Substring(1);
+        if (decoded.Length == 0) decoded = "index.html";
+        if (decoded.IndexOf(':') >= 0) return false;
+        try { VirePaths.CheckName(decoded, 1); }
+        catch (VireError) { return false; }
+        rel = decoded;
+        return true;
     }
 
-    static void SendBytes(NetworkStream stream, int code, string type, byte[] data, int start, int count, bool partial, int total)
+    static bool SiteType(string rel, out string type, out long limit)
     {
-        string reason = code == 206 ? "Partial Content" : "OK";
-        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
-        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += gate + "Connection: close\r\n\r\n";
+        type = null;
+        limit = 1000000;
+        string ext = VirePaths.NormalizedExtension(rel);
+        if (ext == ".html") type = "text/html; charset=utf-8";
+        else if (ext == ".css") type = "text/css; charset=utf-8";
+        else if (ext == ".js") type = "text/javascript; charset=utf-8";
+        else if (ext == ".svg") type = "image/svg+xml";
+        else if (ext == ".json") type = "application/json; charset=utf-8";
+        else if (ext == ".txt") type = "text/plain; charset=utf-8";
+        else if (ext == ".mp4") { type = "video/mp4"; limit = 512000000; }
+        else if (ext == ".webm") { type = "video/webm"; limit = 512000000; }
+        else if (ext == ".ogv") { type = "video/ogg"; limit = 512000000; }
+        return type != null;
+    }
+
+    static int SiteRange(string head, long length, out long start, out long count, out bool partial)
+    {
+        start = 0;
+        count = length;
+        partial = false;
+        if (length <= 0) return 200;
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        string spec = null;
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Range:", StringComparison.OrdinalIgnoreCase))
+            {
+                spec = lines[i].Substring(6).Trim();
+                break;
+            }
+        }
+        if (spec == null) return 200;
+        if (!spec.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase)) return 416;
+        spec = spec.Substring(6);
+        int dash = spec.IndexOf('-');
+        if (dash < 0) return 416;
+        string left = spec.Substring(0, dash).Trim();
+        string right = spec.Substring(dash + 1).Trim();
+        long from;
+        long to;
+        if (left.Length == 0)
+        {
+            long suffix;
+            if (!long.TryParse(right, out suffix) || suffix <= 0) return 416;
+            from = Math.Max(0, length - suffix);
+            to = length - 1;
+        }
+        else
+        {
+            if (!long.TryParse(left, out from)) return 416;
+            if (right.Length == 0) to = length - 1;
+            else if (!long.TryParse(right, out to)) return 416;
+        }
+        if (from < 0 || to < from || from >= length) return 416;
+        if (to >= length) to = length - 1;
+        start = from;
+        count = to - from + 1;
+        partial = true;
+        return 206;
+    }
+
+    static void SendSiteEmpty(NetworkStream stream, int code, string type, string body)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(body ?? "");
+        string head = SiteHead(code, type, data.Length, "", false);
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
-        if (count > 0) stream.Write(data, start, count);
+        if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static void SendFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total)
+    static void SendSiteRangeFail(NetworkStream stream, string type, long total)
     {
-        string reason = code == 206 ? "Partial Content" : "OK";
-        string head = "HTTP/1.0 " + code + " " + reason + "\r\nContent-Type: " + type + "\r\nAccept-Ranges: bytes\r\nContent-Length: " + count + "\r\n";
-        if (partial) head += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
-        head += gate + "Connection: close\r\n\r\n";
+        string extra = "Content-Range: bytes */" + total + "\r\n";
+        string head = SiteHead(416, type, 0, extra, true);
+        byte[] prefix = Encoding.ASCII.GetBytes(head);
+        stream.Write(prefix, 0, prefix.Length);
+    }
+
+    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total, bool video)
+    {
+        string extra = "";
+        if (partial) extra += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
+        string head = SiteHead(code, type, count, extra, video);
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
         if (count <= 0) return;
@@ -1548,6 +1579,19 @@ sealed class Machine
             stream.Write(buf, 0, n);
             left -= n;
         }
+    }
+
+    static string SiteHead(int code, string type, long length, string extra, bool acceptRanges)
+    {
+        return "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
+            + "Content-Type: " + type + "\r\n"
+            + "Content-Length: " + length + "\r\n"
+            + "Connection: close\r\n"
+            + "X-Content-Type-Options: nosniff\r\n"
+            + "Content-Security-Policy: default-src 'self'\r\n"
+            + (acceptRanges ? "Accept-Ranges: bytes\r\n" : "")
+            + (extra ?? "")
+            + "\r\n";
     }
 
     static string SliceText(string value, int start, int end)

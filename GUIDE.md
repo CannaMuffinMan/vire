@@ -112,7 +112,7 @@ for item in [1, 2, 3]
 end
 ```
 
-`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 100,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped.
+`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 100,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000. Each `listen` request gets a fresh copy of that budget and a 5 second wall-clock deadline.
 
 ## 5. Definitions
 
@@ -277,18 +277,18 @@ Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.tx
 
 ## 12. Step by step: a local site
 
-Vire writes the browser files, then serves that one folder on this computer only. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire.
+Vire writes the browser files into `site/`. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire. The old `serve` builtin is gone; calling it errors with `serve was removed; use listen`.
 
 `vault.vire` is the one-shot local experiment:
 
-1. Run `vire.exe vault.vire`.
+1. Run `dotnet run -c Release -- vault.vire`.
 2. It lists `site/videos` with `files`, keeps names that end in `.mp4`, `.webm`, or `.ogv`, and writes `site/catalog.json`.
 3. It writes `site/index.html`, `site/vault.css`, and `site/vault.js`. The page has a player, a playlist, and a search box. The script loads the catalog and points the player at `videos/` plus the file name.
 4. It also writes a branching story (`site/story.html`, `site/story.json`) that remembers the last room in the browser, and a dashboard (`site/dash.html`, `site/data.json`) that loads its numbers with `fetch`.
-5. Run `vire.exe serve.vire` and open `http://127.0.0.1:8080/`.
-6. Press Ctrl+C to stop the server.
+5. Run `dotnet run -c Release -- serve.vire`. That file calls `listen`, which binds `127.0.0.1` on an OS-assigned port and serves GET and HEAD of `site/`. Or put any static server in front of `site/` behind a reverse proxy.
+6. Press Ctrl+C to stop the listener.
 
-Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. The server allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 512 MB and are read from disk in pieces, including a byte range for seeking. Other files stay at 1 MB. The listener is `127.0.0.1` only. A run prints a key. Open `http://127.0.0.1:8080/?key=` plus that key. The browser then sends the key as a cookie. A request without the key is refused, including a post to `/inbox`. `fetch` and `post` refuse localhost and private network addresses. `read`, `write`, `append`, `copy`, `erase`, `files`, and `folders` work only in `data` and `site`. A link or junction in the folder is refused. `..` is refused. The port must be from 1024 through 65535.
+Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. `listen` allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 512 MB and are read from disk in pieces. A valid `Range` on video returns 206; an invalid range returns 416. Other files stay at 1 MB. There is no directory listing. A symlink, a `..` path, or a `.vire` source request returns 404. Responses include `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'self'`. The listener is `127.0.0.1` only. There is no access key in the URL, no cookie gate, and no `/inbox` write. `fetch` and `post` refuse localhost and private network addresses. `read`, `write`, `append`, `copy`, `erase`, `files`, and `folders` work only in `data` and `site`. A link or junction in the folder is refused. `..` is refused. The port must be from 1024 through 65535, or `0` so the OS assigns one.
 
 The window in section 11 stays inside Vire. The site path is for a browser.
 
@@ -305,19 +305,21 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 9. Catch a bad conversion with `try` and `miss`.
 10. Open a small desktop tool with `open`, `field`, `button`, and `show`, as `work.vire` does.
 11. Save a list of records as JSON, then build a page from those records.
-12. Serve that page on this computer with `serve`.
-13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open them through `serve`.
+12. Write that page into `site/`, then open it with `listen` (see `serve.vire`) or any static server behind a reverse proxy.
+13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open `site/` through `listen`.
 14. Run the small systems under `systems/`. `tests.vire` runs every `.vire` file in that folder, so a new file there is part of the suite. `optional/live.vire` reads a public block and a public page, and it is not part of that scan.
 
 ## 14. Security
 
-A program cannot grant itself more steps. The cap is 1000000. While-loop passes share that same cap. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
+A program cannot grant itself more steps. The default cap is 1,000,000. While-loop passes share that same cap. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap. `listen` does not share leftover steps across requests: each request gets a fresh budget and a 5 second deadline checked inside `Step`.
 
-`listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token`. The compare does not stop at the first differing character. A token sitting in the body does not count. The body limit is 65536 bytes. A path that contains `..` is refused.
+`listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token` when a token is set. The compare does not stop at the first differing character. A token sitting in the body does not count. Headers must finish within 5 seconds (16 KB block, 8 KB request line). Bodies need `Content-Length`, at most 1 MB, and 10 seconds to arrive. Chunked encoding is refused. At most 64 requests run at once; extra connections get 503. Responses include `Content-Length`, `Connection: close`, and `X-Content-Type-Options: nosniff`. GET and HEAD of `site/` use the static rules in section 12. A path that contains `..` is refused.
 
-`fetch` and `post` allow `https` only, refuse redirects, and refuse localhost, private ranges, link-local, shared carrier space `100.64.0.0/10`, and IPv4 addresses hidden inside IPv6. `write`, `append`, and `copy` refuse executable, script, `.vire`, `.cs`, and `.sh` files, plus `..` and links.
+`fetch` and `post` allow `http` and `https` only, with no userinfo. Redirects are followed at most three times, and every hop is checked again. Localhost, private ranges, link-local, shared carrier space `100.64.0.0/10`, `198.18.0.0/15`, documentation prefixes, NAT64, 6to4, and IPv4 addresses hidden inside IPv6 are refused. The connect uses the address that was just checked. The body is capped at 1 MB while it streams.
 
-A compiled program is a sealed `VIRE1` file, not readable source. A file that is not a `VIRE1` seal is refused with `sealed program is damaged`. The runner checks a hash of the whole program before it runs, so a patched file stops with `sealed program was changed`. Set `VIRE_SEAL` to a long private value when you compile, and use that same value when you run. A copied file then stays shut on a machine that does not have the seal. A person who has your runner and your seal can still study the program. The seal stops casual reading and casual patches. It does not stop every attack.
+Paths use one `SafeName` gate (`SafePath`, `run`, `use`, `need`, writes, compiled file builtins). Refused: rooted paths, `..` segments, a segment ending in `.` or space, `:`, control characters, `<>"|?*`, Windows device names on every OS, and reparse points. Writes cannot create `.vire`, `.vc`, or executable/script extensions (`.js` in `site/` is still allowed). `run` and `use` stay out of `data/` and `site/`.
+
+A compiled program is a `VC2` file: magic `VIRE-VC2`, version 2, a random 12-byte nonce, AES-256-GCM ciphertext, and a 16-byte tag. A seal key is required: environment `VIRE_SEAL_KEY` (base64 of exactly 32 bytes) or `--seal-key-file` pointing at 32 raw bytes or that same base64, outside the program folder. Missing or invalid key: exit 2, message `vire: a seal key is required (set VIRE_SEAL_KEY or --seal-key-file)`. The key is never printed. Allowed output: `seal key fingerprint` plus the first 8 hex characters of SHA-256 of the key. `vire keygen --out <path>` writes a new key file with owner-only permissions. An old XOR `.vc` is refused with `this .vc uses the old seal; recompile it`. A person who has your runner and your seal key can still study the program. The seal stops casual reading and casual patches. It does not stop every attack.
 
 ## 15. Rules an agent should follow
 
@@ -327,9 +329,11 @@ A compiled program is a sealed `VIRE1` file, not readable source. A file that is
 - A call argument stops before `+`. Parenthesize an argument that itself uses `+`.
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
-- Prefer the window operations for an application. Use `serve` only when the result must be a browser page.
+- Prefer the window operations for an application. Write browser files into `site/` and open them with `listen` or a static server.
 - After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
 
-## 15. Limits
+## 16. Limits
 
 Vire is a general-purpose language for programs, files, packages, windows, and a local site. It does not ship a public package index, a phone store, or device-driver tooling. File and package access stays in the program folder so a sample cannot wander across the disk.
+
+Build commands use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`.
