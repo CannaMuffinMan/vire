@@ -1,0 +1,10 @@
+define main
+  let n be 2
+  if n == 1
+    say "one"
+  else if n == 2
+    say "two"
+  else
+    say "other"
+  end
+end

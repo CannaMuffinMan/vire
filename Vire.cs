@@ -15,7 +15,13 @@ using System.Windows.Forms;
 sealed class VireError : Exception
 {
     public int Line;
-    public VireError(string message, int line) : base(message) { Line = line; }
+    public int Column;
+    public VireError(string message, int line) : this(message, line, 1) { }
+    public VireError(string message, int line, int column) : base(message)
+    {
+        Line = line;
+        Column = column;
+    }
 }
 
 sealed class ReturnSignal : Exception
@@ -2984,7 +2990,13 @@ sealed class Program
             Console.Error.WriteLine("vire: " + exc.Message);
             return 2;
         }
-        string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
+        string where = "";
+        if (exc.Line > 0)
+        {
+            where = "line " + exc.Line;
+            if (exc.Column > 0) where += " col " + exc.Column;
+            where += ": ";
+        }
         Console.Error.WriteLine("vire: " + where + exc.Message);
         return 1;
     }

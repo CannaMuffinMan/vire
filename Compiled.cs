@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -18,7 +19,7 @@ sealed class CompiledProgram
         Budget budget = new Budget();
         budget.ApplyStepLimit(Program.BudgetOf(""));
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
-        machine.Call("main", new List<object>());
+        machine.Call("main", new List<object>(), 1, 1);
     }
 
     internal static Dictionary<string, object> LoadFuncs(byte[] packed)
@@ -65,6 +66,12 @@ sealed class CompiledMachine
     Budget budget;
     int depth;
     int exprDepth;
+    string title;
+    List<Stroke> termOps = new List<Stroke>();
+    bool termSheet;
+    int inkR;
+    int inkG;
+    int inkB;
 
     public CompiledMachine(Dictionary<string, object> funcs, string root, List<object> args, Budget budget)
     {
@@ -76,14 +83,19 @@ sealed class CompiledMachine
 
     public object Call(string name, List<object> args)
     {
-        if (!funcs.ContainsKey(name)) return Builtin(name, args);
+        return Call(name, args, 1, 1);
+    }
+
+    public object Call(string name, List<object> args, int line, int col)
+    {
+        if (!funcs.ContainsKey(name)) return Builtin(name, args, line, col);
         Dictionary<string, object> func = (Dictionary<string, object>)funcs[name];
         List<object> names = (List<object>)func["params"];
-        if (names.Count != args.Count) throw new VireError(name + " argument count", 1);
+        if (names.Count != args.Count) throw new VireError(name + " argument count", 1, 1);
         Dictionary<string, object> env = new Dictionary<string, object>();
         for (int i = 0; i < names.Count; i++) env[(string)names[i]] = args[i];
         depth++;
-        if (depth > 64) throw new VireError("definitions called too deeply", 1);
+        if (depth > 64) throw new VireError("definitions called too deeply", 1, 1);
         try
         {
             foreach (object step in (List<object>)func["body"])
@@ -91,7 +103,8 @@ sealed class CompiledMachine
                 object[] hit = Run((List<object>)step, env);
                 if (hit != null)
                 {
-                    if (hit.Length > 1 && (string)hit[1] == "stop") throw new VireError("stop is outside a loop", 1);
+                    if (hit.Length > 1 && (string)hit[1] == "skip") throw new VireError("skip is only valid inside while or for", 1, 1);
+                    if (hit.Length > 1 && (string)hit[1] == "stop") throw new VireError("stop is only valid inside while or for", 1, 1);
                     return hit[0];
                 }
             }
@@ -102,18 +115,19 @@ sealed class CompiledMachine
 
     object[] Run(List<object> step, Dictionary<string, object> env)
     {
-        if (budget.DeadlinePassed()) throw new VireError("request ran too long", 1);
+        if (budget.DeadlinePassed()) Fail("request ran too long", step);
         budget.Steps++;
-        if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", 1);
+        if (budget.Steps > budget.MaxSteps) Fail("program ran too long and was stopped", step);
         string op = (string)step[0];
         if (op == "let") { env[(string)step[1]] = Eval((List<object>)step[2], env); return null; }
         if (op == "say") { Console.WriteLine(Show(Eval((List<object>)step[1], env))); return null; }
         if (op == "return") return new object[] { Eval((List<object>)step[1], env), "return" };
         if (op == "stop") return new object[] { null, "stop" };
+        if (op == "skip") return new object[] { null, "skip" };
         if (op == "if")
         {
             if (Truth(Eval((List<object>)step[1], env))) return Block((List<object>)step[2], env);
-            if (step.Count > 3 && step[3] != null) return Block((List<object>)step[3], env);
+            if (step.Count > 3 && step[3] is List<object>) return Block((List<object>)step[3], env);
             return null;
         }
         if (op == "while")
@@ -121,28 +135,96 @@ sealed class CompiledMachine
             while (Truth(Eval((List<object>)step[1], env)))
             {
                 budget.WhilePasses++;
-                if (budget.WhilePasses > budget.MaxWhilePasses) throw new VireError("while ran too long", 1);
+                if (budget.WhilePasses > budget.MaxWhilePasses) Fail("while ran too long", step);
                 object[] hit = Block((List<object>)step[2], env);
+                if (hit != null && hit.Length > 1 && (string)hit[1] == "skip") continue;
                 if (hit != null && hit.Length > 1 && (string)hit[1] == "stop") break;
                 if (hit != null) return hit;
             }
             return null;
         }
+        if (op == "for")
+        {
+            object values = Eval((List<object>)step[2], env);
+            List<object> items = new List<object>();
+            if (values is Dictionary<string, object>) items = new List<object>(((Dictionary<string, object>)values).Keys);
+            else if (values is string)
+            {
+                foreach (char ch in (string)values) items.Add(ch.ToString());
+            }
+            else if (values is List<object>) items = (List<object>)values;
+            else Fail("for walks a list, map, or text", step);
+            foreach (object item in items)
+            {
+                env[(string)step[1]] = item;
+                object[] hit = Block((List<object>)step[3], env);
+                if (hit != null && hit.Length > 1 && (string)hit[1] == "skip") continue;
+                if (hit != null && hit.Length > 1 && (string)hit[1] == "stop") break;
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+        if (op == "try")
+        {
+            try { return Block((List<object>)step[1], env); }
+            catch (VireError exc)
+            {
+                if (step.Count < 4 || step[3] == null || !(step[3] is List<object>)) throw;
+                if (step[2] != null) env[Show(step[2])] = exc.Message;
+                return Block((List<object>)step[3], env);
+            }
+        }
         if (op == "call")
         {
-            Call((string)step[1], Values((List<object>)step[2], env));
+            Call((string)step[1], Values((List<object>)step[2], env), AsLine(step), AsCol(step));
             return null;
         }
         if (op == "put")
         {
             object target;
-            if (!env.TryGetValue((string)step[2], out target)) throw new VireError("put needs a list or a map", 1);
+            if (!env.TryGetValue((string)step[2], out target)) Fail("put needs a list or a map", step);
             object key = Eval((List<object>)step[3], env);
             object stored = Eval((List<object>)step[1], env);
-            Put(target, key, stored);
+            Put(target, key, stored, AsLine(step), AsCol(step));
             return null;
         }
-        throw new VireError("unknown compiled step " + op, 1);
+        Fail("unknown compiled step " + op, step);
+        return null;
+    }
+
+    static bool IsWholeNum(object value)
+    {
+        if (value is int) return true;
+        if (value is double)
+        {
+            double real = (double)value;
+            return !double.IsNaN(real) && !double.IsInfinity(real) && real == Math.Floor(real);
+        }
+        return false;
+    }
+
+    static int AsLine(List<object> node)
+    {
+        if (node == null || node.Count < 2) return 1;
+        object prev = node[node.Count - 2];
+        object last = node[node.Count - 1];
+        if (IsWholeNum(prev) && IsWholeNum(last)) return Convert.ToInt32(prev);
+        if (IsWholeNum(last)) return Convert.ToInt32(last);
+        return 1;
+    }
+
+    static int AsCol(List<object> node)
+    {
+        if (node == null || node.Count < 2) return 1;
+        object prev = node[node.Count - 2];
+        object last = node[node.Count - 1];
+        if (IsWholeNum(prev) && IsWholeNum(last)) return Convert.ToInt32(last);
+        return 1;
+    }
+
+    static void Fail(string message, List<object> node)
+    {
+        throw new VireError(message, AsLine(node), AsCol(node));
     }
 
     object[] Block(List<object> steps, Dictionary<string, object> env)
@@ -167,7 +249,7 @@ sealed class CompiledMachine
         exprDepth++;
         try
         {
-        if (exprDepth > 256) throw new VireError("expression is too deep", 1);
+        if (exprDepth > 256) Fail("expression is too deep", expr);
         string op = (string)expr[0];
         if (op == "num") return expr[1];
         if (op == "text") return expr[1];
@@ -178,18 +260,19 @@ sealed class CompiledMachine
             string called = (string)expr[1];
             object found;
             if (env.TryGetValue(called, out found)) return found;
-            if (called == "args" || called == "now") return Builtin(called, new List<object>());
+            if (called == "args" || called == "now" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
+                return Builtin(called, new List<object>(), AsLine(expr), AsCol(expr));
             if (funcs.ContainsKey(called))
             {
                 Dictionary<string, object> named = (Dictionary<string, object>)funcs[called];
                 List<object> names = (List<object>)named["params"];
-                if (names.Count == 0) return Call(called, new List<object>());
+                if (names.Count == 0) return Call(called, new List<object>(), AsLine(expr), AsCol(expr));
             }
-            throw new VireError("there is no value named " + called, 1);
+            Fail("there is no value named " + called, expr);
         }
         if (op == "list") return Values((List<object>)expr[1], env);
-        if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env));
-        if (op == "at") return At(Eval((List<object>)expr[1], env), Eval((List<object>)expr[2], env));
+        if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env), AsLine(expr), AsCol(expr));
+        if (op == "at") return At(Eval((List<object>)expr[1], env), Eval((List<object>)expr[2], env), expr);
         if (op == "not") return !Truth(Eval((List<object>)expr[1], env));
         if (op == "neg")
         {
@@ -219,7 +302,7 @@ sealed class CompiledMachine
             foreach (object pair in (List<object>)expr[1])
             {
                 List<object> item = (List<object>)pair;
-                map[KeyOf(Eval((List<object>)item[0], env))] = Eval((List<object>)item[1], env);
+                map[KeyOf(Eval((List<object>)item[0], env), expr)] = Eval((List<object>)item[1], env);
             }
             return map;
         }
@@ -240,12 +323,12 @@ sealed class CompiledMachine
         if (op == "*") return Mul(left, right);
         if (op == "/")
         {
-            if (ToDouble(right) == 0) throw new VireError("division by zero", 1);
+            if (ToDouble(right) == 0) Fail("division by zero", expr);
             return ToDouble(left) / ToDouble(right);
         }
         if (op == "%")
         {
-            if (ToDouble(right) == 0) throw new VireError("division by zero", 1);
+            if (ToDouble(right) == 0) Fail("division by zero", expr);
             if (left is int && right is int)
             {
                 if ((int)right == -1) return 0;
@@ -259,43 +342,46 @@ sealed class CompiledMachine
         if (op == "<=") return ToDouble(left) <= ToDouble(right);
         if (op == ">") return ToDouble(left) > ToDouble(right);
         if (op == ">=") return ToDouble(left) >= ToDouble(right);
-        throw new VireError("unknown compiled expression " + op, 1);
+        Fail("unknown compiled expression " + op, expr);
+        return null;
         }
         finally { exprDepth--; }
     }
 
-    object At(object target, object index)
+    object At(object target, object index, List<object> expr)
     {
         string text = target as string;
-        if (text != null) return text.Substring(WholeIndex(index, text.Length), 1);
+        if (text != null) return text.Substring(WholeIndex(index, text.Length, expr), 1);
         List<object> list = target as List<object>;
-        if (list != null) return list[WholeIndex(index, list.Count)];
+        if (list != null) return list[WholeIndex(index, list.Count, expr)];
         Dictionary<string, object> map = target as Dictionary<string, object>;
         if (map != null)
         {
-            string key = KeyOf(index);
+            string key = KeyOf(index, expr);
             object found;
-            if (!map.TryGetValue(key, out found)) throw new VireError("map has no key " + key, 1);
+            if (!map.TryGetValue(key, out found)) Fail("map has no key " + key, expr);
             return found;
         }
-        throw new VireError("at needs a list, text, or map", 1);
+        Fail("at needs a list, text, or map", expr);
+        return null;
     }
 
-    void Put(object target, object key, object value)
+    void Put(object target, object key, object value, int line, int col)
     {
+        List<object> loc = new List<object> { "put", line, col };
         List<object> list = target as List<object>;
         if (list != null)
         {
-            list[WholeIndex(key, list.Count)] = value;
+            list[WholeIndex(key, list.Count, loc)] = value;
             return;
         }
         Dictionary<string, object> map = target as Dictionary<string, object>;
         if (map != null)
         {
-            map[KeyOf(key)] = value;
+            map[KeyOf(key, loc)] = value;
             return;
         }
-        throw new VireError("put needs a list or a map", 1);
+        throw new VireError("put needs a list or a map", line, col);
     }
 
     static int AsWhole(object value)
@@ -330,40 +416,41 @@ sealed class CompiledMachine
         return value.GetRange(start, end - start);
     }
 
-    static int WholeIndex(object value, int size)
+    static int WholeIndex(object value, int size, List<object> expr)
     {
-        int index;
+        int index = 0;
         if (value is int) index = (int)value;
         else if (value is double)
         {
             double real = (double)value;
             if (double.IsNaN(real) || double.IsInfinity(real) || real != Math.Floor(real))
-                throw new VireError("an index must be a whole number", 1);
-            if (real < int.MinValue || real > int.MaxValue) throw new VireError("an index must be a whole number", 1);
+                Fail("an index must be a whole number", expr);
+            if (real < int.MinValue || real > int.MaxValue) Fail("an index must be a whole number", expr);
             index = (int)real;
         }
-        else throw new VireError("an index must be a whole number", 1);
+        else Fail("an index must be a whole number", expr);
         if (index < 0) index += size;
-        if (index < 0 || index >= size) throw new VireError("index is outside the value", 1);
+        if (index < 0 || index >= size) Fail("index is outside the value", expr);
         return index;
     }
 
-    static string KeyOf(object value)
+    static string KeyOf(object value, List<object> expr)
     {
         if (value is int) return value.ToString();
         if (value is double)
         {
             double real = (double)value;
-            if (double.IsNaN(real) || double.IsInfinity(real)) throw new VireError("map keys must be text or numbers", 1);
+            if (double.IsNaN(real) || double.IsInfinity(real)) Fail("map keys must be text or numbers", expr);
             if (real == Math.Floor(real)) return ((long)real).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return real.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
         string text = value as string;
         if (text != null) return text;
-        throw new VireError("map keys must be text or numbers", 1);
+        Fail("map keys must be text or numbers", expr);
+        return "";
     }
 
-    object Builtin(string name, List<object> args)
+    object Builtin(string name, List<object> args, int line, int col)
     {
         if (name == "args") return programArgs;
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -380,12 +467,12 @@ sealed class CompiledMachine
             if (args[0] is List<object>) return ((List<object>)args[0]).Count;
             Dictionary<string, object> map = args[0] as Dictionary<string, object>;
             if (map != null) return map.Count;
-            throw new VireError("length needs text, a list, or a map", 1);
+            throw new VireError("length needs text, a list, or a map", line, col);
         }
         if (name == "push")
         {
             List<object> list = args[0] as List<object>;
-            if (list == null) throw new VireError("push needs a list", 1);
+            if (list == null) throw new VireError("push needs a list", line, col);
             list.Add(args[1]);
             return args[0];
         }
@@ -394,13 +481,13 @@ sealed class CompiledMachine
         {
             if (args[0] is int || args[0] is double) return args[0];
             string raw = args[0] as string;
-            if (raw == null) throw new VireError("number needs text or a number", 1);
+            if (raw == null) throw new VireError("number needs text or a number", line, col);
             int whole;
             double real;
             if (raw.IndexOf('.') < 0 && int.TryParse(raw, out whole)) return whole;
             if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out real))
                 return real;
-            throw new VireError("that text is not a number", 1);
+            throw new VireError("that text is not a number", line, col);
         }
         if (name == "slice")
         {
@@ -409,14 +496,14 @@ sealed class CompiledMachine
             string text = args[0] as string;
             if (text != null) return SliceText(text, start, end);
             List<object> list = args[0] as List<object>;
-            if (list == null) throw new VireError("slice needs text or a list", 1);
+            if (list == null) throw new VireError("slice needs text or a list", line, col);
             return SliceList(list, start, end);
         }
         if (name == "find")
         {
             string raw = args[0] as string;
             string needle = args[1] as string;
-            if (raw == null || needle == null) throw new VireError("find needs two texts", 1);
+            if (raw == null || needle == null) throw new VireError("find needs two texts", line, col);
             return raw.IndexOf(needle);
         }
         if (name == "json") return Json.Write(args[0]);
@@ -424,15 +511,15 @@ sealed class CompiledMachine
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {
-            try { return File.ReadAllText(Safe(args[0])); }
+            try { return File.ReadAllText(Safe(args[0], line, col)); }
             catch (VireError) { throw; }
-            catch (IOException) { throw new VireError("could not read that file", 1); }
-            catch (UnauthorizedAccessException) { throw new VireError("could not read that file", 1); }
+            catch (IOException) { throw new VireError("could not read that file", line, col); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not read that file", line, col); }
         }
         if (name == "write")
         {
-            string path = Safe(args[0]);
-            RefuseProgram(path);
+            string path = Safe(args[0], line, col);
+            VirePaths.RefuseProgram(path, line);
             string payload = Show(args[1]);
             try
             {
@@ -441,29 +528,259 @@ sealed class CompiledMachine
                 if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, payload);
                 else VireFiles.WriteAllText(path, payload);
             }
-            catch (IOException) { throw new VireError("could not write that file", 1); }
-            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", 1); }
+            catch (IOException) { throw new VireError("could not write that file", line, col); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
             return payload;
         }
-        if (name == "has") return Has(args[0], args[1]);
-        throw new VireError("compiled builtin missing: " + name, 1);
-    }
-
-    object Has(object target, object key)
-    {
-        Dictionary<string, object> map = target as Dictionary<string, object>;
-        if (map != null) return map.ContainsKey(Show(key));
-        List<object> pairs = target as List<object>;
-        if (pairs != null)
+        if (name == "has")
         {
-            foreach (object item in pairs)
-            {
-                List<object> pair = item as List<object>;
-                if (pair != null && pair.Count >= 2 && Same(pair[0], key)) return true;
-            }
-            return false;
+            Dictionary<string, object> map = args[0] as Dictionary<string, object>;
+            if (map == null) throw new VireError("has needs a map", line, col);
+            return map.ContainsKey(KeyOf(args[1], new List<object> { "has", line, col }));
         }
-        throw new VireError("has needs a map", 1);
+        if (name == "parse")
+        {
+            string raw = args[0] as string;
+            if (raw == null) throw new VireError("parse needs text", line, col);
+            return Json.Read(raw, line);
+        }
+        if (name == "kind")
+        {
+            if (args[0] is bool) return "bool";
+            if (args[0] == null) return "none";
+            if (args[0] is int || args[0] is double) return "number";
+            if (args[0] is string) return "text";
+            if (args[0] is List<object>) return "list";
+            if (args[0] is Dictionary<string, object>) return "map";
+            return "value";
+        }
+        if (name == "join")
+        {
+            List<object> parts = args[0] as List<object>;
+            string joiner = args[1] as string;
+            if (parts == null || joiner == null) throw new VireError("join needs a list of text", line, col);
+            string[] joined = new string[parts.Count];
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (!(parts[i] is string)) throw new VireError("join needs a list of text", line, col);
+                joined[i] = (string)parts[i];
+            }
+            return string.Join(joiner, joined);
+        }
+        if (name == "split")
+        {
+            string raw = args[0] as string;
+            string sep = args[1] as string;
+            if (raw == null || sep == null || sep.Length == 0) throw new VireError("split needs text and a separator", line, col);
+            string[] bits = raw.Split(new string[] { sep }, StringSplitOptions.None);
+            List<object> items = new List<object>();
+            foreach (string bit in bits) items.Add(bit);
+            return items;
+        }
+        if (name == "escape")
+        {
+            string raw = args[0] as string;
+            if (raw == null) raw = Show(args[0]);
+            return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        }
+        if (name == "replace")
+        {
+            string raw = args[0] as string;
+            string oldText = args[1] as string;
+            string newer = args[2] as string;
+            if (raw == null || oldText == null || newer == null) throw new VireError("replace needs three texts", line, col);
+            return raw.Replace(oldText, newer);
+        }
+        if (name == "begins" || name == "ends")
+        {
+            string raw = args[0] as string;
+            string edge = args[1] as string;
+            if (raw == null || edge == null) throw new VireError(name + " needs two texts", line, col);
+            return name == "begins" ? raw.StartsWith(edge) : raw.EndsWith(edge);
+        }
+        if (name == "keys")
+        {
+            Dictionary<string, object> map = args[0] as Dictionary<string, object>;
+            if (map == null) throw new VireError("keys needs a map", line, col);
+            return new List<object>(map.Keys);
+        }
+        if (name == "abs")
+        {
+            if (!(args[0] is int) && !(args[0] is double)) throw new VireError("abs needs a number", line, col);
+            if (args[0] is int)
+            {
+                int n = (int)args[0];
+                if (n == int.MinValue) return -(double)n;
+                return n < 0 ? -n : n;
+            }
+            double real = (double)args[0];
+            return real < 0 ? -real : real;
+        }
+        if (name == "round")
+        {
+            if (!(args[0] is int) && !(args[0] is double)) throw new VireError("round needs a number", line, col);
+            double real = args[0] is int ? (int)args[0] : (double)args[0];
+            if (double.IsNaN(real) || double.IsInfinity(real)) throw new VireError("round needs a number", line, col);
+            double rounded = Math.Round(real, MidpointRounding.AwayFromZero);
+            if (rounded > int.MaxValue || rounded < int.MinValue) return rounded;
+            return (int)rounded;
+        }
+        if (name == "pick")
+        {
+            if (!(args[0] is int) || (int)args[0] < 1) throw new VireError("pick needs a whole number above zero", line, col);
+            return new Random().Next((int)args[0]);
+        }
+        if (name == "exists")
+        {
+            string path = Safe(args[0], line, col);
+            return File.Exists(path) || Directory.Exists(path);
+        }
+        if (name == "erase")
+        {
+            string path = Safe(args[0], line, col);
+            VirePaths.RefuseProgram(path, line);
+            VireFiles.Erase(path);
+            return true;
+        }
+        if (name == "copy")
+        {
+            string from = Safe(args[0], line, col);
+            string to = Safe(args[1], line, col);
+            VirePaths.RefuseProgram(to, line);
+            try { VireFiles.Copy(from, to); }
+            catch (IOException) { throw new VireError("could not write that file", line, col); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
+            return args[1];
+        }
+        if (name == "append")
+        {
+            string path = Safe(args[0], line, col);
+            VirePaths.RefuseProgram(path, line);
+            string text = Show(args[1]);
+            try { VireFiles.AppendAllText(path, text); }
+            catch (IOException) { throw new VireError("could not write that file", line, col); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
+            return text;
+        }
+        if (name == "fetch")
+        {
+            string url = args[0] as string;
+            if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
+                throw new VireError("fetch needs an http or https address", line, col);
+            try { return VireNet.SendWeb(HttpMethod.Get, url, null, line); }
+            catch (VireError) { throw; }
+            catch (Exception) { throw new VireError("could not fetch that address", line, col); }
+        }
+        if (name == "run")
+        {
+            string rel = args[0] as string;
+            string full = VirePaths.ProgramFile(root, rel, line);
+            budget.Runs++;
+            System.IO.StringWriter sink = new System.IO.StringWriter();
+            System.IO.TextWriter previous = Console.Out;
+            try
+            {
+                if (budget.Runs > budget.MaxRuns) throw new VireError("run went too deep", line, col);
+                Console.SetOut(sink);
+                Program.RunFile(full, root, budget);
+            }
+            finally
+            {
+                Console.SetOut(previous);
+                budget.Runs--;
+            }
+            string text = sink.ToString().Replace("\r", "");
+            Console.Write(text);
+            string last = "";
+            foreach (string row in text.Split('\n'))
+                if (row.Trim().Length > 0) last = row.Trim();
+            return last;
+        }
+        if (name == "sources")
+        {
+            string rel = args[0] as string;
+            if (rel == null || rel.Length == 0 || rel.IndexOf('/') >= 0 || rel.IndexOf('\\') >= 0)
+                throw new VireError("sources needs one folder name inside this program", line, col);
+            VirePaths.CheckName(rel, line);
+            string dir = VirePaths.CombineUnder(root, rel, line);
+            if (!Directory.Exists(dir))
+                throw new VireError("sources needs one folder name inside this program", line, col);
+            if (VirePaths.UnderWritableZone(root, dir))
+                throw new VireError("sources stays out of data and site", line, col);
+            List<object> found = new List<object>();
+            foreach (string file in Directory.GetFiles(dir, "*.vire")) found.Add(Path.GetFileName(file));
+            return found;
+        }
+        if (name == "term")
+        {
+            return "term";
+        }
+        if (name == "open")
+        {
+            string heading = args[0] as string;
+            if (heading == null) throw new VireError("open needs a window title", line, col);
+            title = heading;
+            termOps = new List<Stroke>();
+            termSheet = false;
+            return 0;
+        }
+        if (name == "sheet")
+        {
+            if (!(args[0] is int) || !(args[1] is int)) throw new VireError("sheet needs a width and a height", line, col);
+            if (title == null) throw new VireError("open a window first", line, col);
+            int width = (int)args[0];
+            int height = (int)args[1];
+            if (width < 1 || height < 1 || width > 2000 || height > 2000) throw new VireError("sheet size is out of range", line, col);
+            termSheet = true;
+            return 0;
+        }
+        if (name == "ink")
+        {
+            if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int))
+                throw new VireError("ink needs three whole numbers", line, col);
+            int rr = (int)args[0];
+            int gg = (int)args[1];
+            int bb = (int)args[2];
+            if (rr < 0 || rr > 255 || gg < 0 || gg > 255 || bb < 0 || bb > 255)
+                throw new VireError("ink numbers run from 0 to 255", line, col);
+            inkR = rr; inkG = gg; inkB = bb;
+            return 0;
+        }
+        if (name == "fill" || name == "stroke")
+        {
+            if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int) || !(args[3] is int))
+                throw new VireError(name + " needs four whole numbers", line, col);
+            if (!termSheet) throw new VireError("open a sheet first", line, col);
+            if (termOps.Count > 10000) throw new VireError("the sheet has too many marks", line, col);
+            termOps.Add(new Stroke(name, (int)args[0], (int)args[1], (int)args[2], (int)args[3], inkR, inkG, inkB));
+            return 0;
+        }
+        if (name == "dot")
+        {
+            if (!(args[0] is int) || !(args[1] is int) || !(args[2] is int)) throw new VireError("dot needs three whole numbers", line, col);
+            if (!termSheet) throw new VireError("open a sheet first", line, col);
+            termOps.Add(new Stroke("dot", (int)args[0], (int)args[1], (int)args[2], 0, inkR, inkG, inkB));
+            return 0;
+        }
+        if (name == "marks")
+        {
+            List<object> list = new List<object>();
+            foreach (Stroke mark in termOps)
+            {
+                Dictionary<string, object> row = new Dictionary<string, object>();
+                row["kind"] = mark.Kind;
+                row["a"] = mark.A;
+                row["b"] = mark.B;
+                row["c"] = mark.C;
+                row["d"] = mark.D;
+                row["r"] = mark.R;
+                row["g"] = mark.G;
+                row["blue"] = mark.Blue;
+                list.Add(row);
+            }
+            return list;
+        }
+        throw new VireError("compiled builtin missing: " + name, line, col);
     }
 
     static bool Same(object left, object right)
@@ -514,16 +831,16 @@ sealed class CompiledMachine
         throw new VireError("that value is not a number", 1);
     }
 
-    string Safe(object value)
+    string Safe(object value, int line, int col)
     {
         string rel = value as string;
         if (rel == null || rel.Length == 0)
-            throw new VireError("files stay inside the program folder", 1);
-        string full = VirePaths.CombineUnder(root, rel, 1);
+            throw new VireError("files stay inside the program folder", line, col);
+        string full = VirePaths.CombineUnder(root, rel, line);
         if (!VirePaths.UnderWritableZone(root, full) && !RootIsDataOrSite())
-            throw new VireError("files stay in data or site", 1);
+            throw new VireError("files stay in data or site", line, col);
         if (RootIsDataOrSite() && !VirePaths.InFolder(root, full))
-            throw new VireError("files stay in data or site", 1);
+            throw new VireError("files stay in data or site", line, col);
         return full;
     }
 
@@ -533,11 +850,6 @@ sealed class CompiledMachine
         string name = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         return name.Equals("data", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("site", StringComparison.OrdinalIgnoreCase);
-    }
-
-    static void RefuseProgram(string path)
-    {
-        VirePaths.RefuseProgram(path, 1);
     }
 
     static string Show(object value)

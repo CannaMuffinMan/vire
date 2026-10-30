@@ -1,0 +1,13 @@
+define main
+  let total be 0
+  for n in [1, 2, 3, 4]
+    if n == 2
+      skip
+    end
+    if n == 4
+      stop
+    end
+    let total be total + n
+  end
+  say total
+end
