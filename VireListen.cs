@@ -10,9 +10,6 @@ static class VireListen
     public delegate object RouteCall(string method, string path, string body, int line, out int maxOutput);
 
     const int ListenSlotsMax = 64;
-    const int MaxHeaderBlock = 16384;
-    const int MaxRequestLine = 8192;
-    const int MaxRequestBody = 1000000;
     static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
 
     public static void WithCancel(int port, int line, string root, RouteCall route, Func<object, string> show, Action<int> setPort)
@@ -121,36 +118,7 @@ static class VireListen
 
     static int HeaderEnd(byte[] buffer, int got)
     {
-        for (int i = 0; i + 3 < got; i++)
-            if (buffer[i] == 13 && buffer[i + 1] == 10 && buffer[i + 2] == 13 && buffer[i + 3] == 10) return i;
-        return -1;
-    }
-
-    static int ContentLengthOf(string head)
-    {
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-            {
-                int value;
-                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return -2;
-                return value;
-            }
-        }
-        return -1;
-    }
-
-    static bool HasChunked(string head)
-    {
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
-                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-        }
-        return false;
+        return HttpWire.HeaderEnd(buffer, got);
     }
 
     static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
@@ -187,19 +155,20 @@ static class VireListen
     {
         NetworkStream stream = client.GetStream();
         DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
-        byte[] buffer = new byte[MaxHeaderBlock + MaxRequestBody + 16];
+        byte[] buffer = new byte[HttpWire.MaxHeaderBlock + HttpWire.MaxRequestBody + 16];
         int got = 0;
         int headerEnd = -1;
         while (headerEnd < 0)
         {
             if (stop.IsCancellationRequested) return;
-            if (got >= MaxHeaderBlock)
+            if (got >= HttpWire.MaxHeaderBlock)
             {
-                SendApi(stream, 431, "{\"error\":\"headers too large\"}", null);
+                HttpWire.Result oversized = HttpWire.ParseHeaders(buffer, got);
+                SendParseFail(stream, oversized.Status == 0 ? 431 : oversized.Status, oversized);
                 return;
             }
             int before = got;
-            if (!ReadOnce(stream, buffer, ref got, MaxHeaderBlock, headerDead))
+            if (!ReadOnce(stream, buffer, ref got, HttpWire.MaxHeaderBlock, headerDead))
             {
                 if (HeaderEnd(buffer, got) >= 0) break;
                 SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
@@ -208,62 +177,14 @@ static class VireListen
             if (got == before) { SendApi(stream, 408, "{\"error\":\"timeout\"}", null); return; }
             headerEnd = HeaderEnd(buffer, got);
         }
-        if (headerEnd < 0)
+        HttpWire.Result headers = HttpWire.ParseHeaders(buffer, got);
+        if (headers.Status != 0)
         {
-            SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
+            SendParseFail(stream, headers.Status, headers);
             return;
         }
-        int lineEnd = -1;
-        for (int i = 0; i + 1 < headerEnd; i++)
-        {
-            if (buffer[i] == 13 && buffer[i + 1] == 10) { lineEnd = i; break; }
-        }
-        if (lineEnd < 0 || lineEnd > MaxRequestLine)
-        {
-            SendApi(stream, 431, "{\"error\":\"request line too large\"}", null);
-            return;
-        }
-        string head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
-        string requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
-        string[] bits = requestLine.Split(' ');
-        if (bits.Length < 2)
-        {
-            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
-            return;
-        }
-        if (bits[1].IndexOf("..") >= 0)
-        {
-            if (bits[0] == "GET" || bits[0] == "HEAD")
-                SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
-            else
-                SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
-            return;
-        }
-        if (HasChunked(head))
-        {
-            SendApi(stream, 501, "{\"error\":\"chunked encoding is not supported\"}", null);
-            return;
-        }
-        int bodyAt = headerEnd + 4;
-        int contentLength = ContentLengthOf(head);
-        if (contentLength == -2)
-        {
-            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
-            return;
-        }
-        string method = bits[0];
-        bool expectsBody = method == "POST" || method == "PUT" || method == "PATCH";
-        if (expectsBody && contentLength < 0)
-        {
-            SendApi(stream, 411, "{\"error\":\"content length required\"}", null);
-            return;
-        }
-        if (contentLength > MaxRequestBody)
-        {
-            SendApi(stream, 413, "{\"error\":\"body too large\"}", null);
-            return;
-        }
-        if (contentLength < 0) contentLength = 0;
+        int bodyAt = headers.BodyAt;
+        int contentLength = headers.ContentLength;
         int need = bodyAt + contentLength;
         DateTime bodyDead = DateTime.UtcNow.AddSeconds(10);
         if (got < need)
@@ -274,10 +195,16 @@ static class VireListen
                 return;
             }
         }
-        string path = bits[1];
-        int queryAt = path.IndexOf('?');
-        if (queryAt >= 0) path = path.Substring(0, queryAt);
-        string body = Encoding.UTF8.GetString(buffer, bodyAt, contentLength);
+        HttpWire.Result parsed = HttpWire.FinishBody(headers, buffer, got);
+        if (parsed.Status != 0)
+        {
+            SendApi(stream, parsed.Status, parsed.ErrorJson, null);
+            return;
+        }
+        string method = parsed.Method;
+        string path = parsed.Path;
+        string head = parsed.Head;
+        string body = parsed.Body;
         if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line, root))
             return;
         bool health = path == "/health" && (method == "GET" || method == "HEAD");
@@ -378,6 +305,14 @@ static class VireListen
         if (code == 503) return "Service Unavailable";
         if (code == 507) return "Insufficient Storage";
         return "OK";
+    }
+
+    static void SendParseFail(NetworkStream stream, int status, HttpWire.Result parsed)
+    {
+        if (status == 404)
+            SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
+        else
+            SendApi(stream, status, parsed != null && parsed.ErrorJson != null ? parsed.ErrorJson : "{\"error\":\"bad request\"}", null);
     }
 
     static void SendApi(NetworkStream stream, int code, string body, string extra)

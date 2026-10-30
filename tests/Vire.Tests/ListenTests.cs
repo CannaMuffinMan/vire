@@ -152,6 +152,46 @@ public class ListenTests : IDisposable
     }
 
     [Fact]
+    public void ListenerRejectsThroughHttpWire()
+    {
+        using (TcpClient emptyMethod = new TcpClient())
+        {
+            emptyMethod.Connect("127.0.0.1", host.Port);
+            byte[] raw = Encoding.ASCII.GetBytes(" / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+            emptyMethod.GetStream().Write(raw, 0, raw.Length);
+            Assert.Equal(400, ReadStatus(emptyMethod, TimeSpan.FromSeconds(5)));
+            Assert.Equal(400, HttpWire.ParseComplete(raw, raw.Length).Status);
+        }
+
+        using (TcpClient hugeLine = new TcpClient())
+        {
+            hugeLine.Connect("127.0.0.1", host.Port);
+            byte[] raw = Encoding.ASCII.GetBytes("GET /" + new string('a', HttpWire.MaxRequestLine + 8) + " HTTP/1.1\r\nHost: x\r\n\r\n");
+            hugeLine.GetStream().Write(raw, 0, raw.Length);
+            Assert.Equal(431, ReadStatus(hugeLine, TimeSpan.FromSeconds(5)));
+            Assert.Equal(431, HttpWire.ParseComplete(raw, raw.Length).Status);
+        }
+
+        using (TcpClient fat = new TcpClient())
+        {
+            fat.Connect("127.0.0.1", host.Port);
+            byte[] raw = Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nContent-Length: " + (HttpWire.MaxRequestBody + 1) + "\r\n\r\n");
+            fat.GetStream().Write(raw, 0, raw.Length);
+            Assert.Equal(413, ReadStatus(fat, TimeSpan.FromSeconds(5)));
+            Assert.Equal(413, HttpWire.ParseComplete(raw, raw.Length).Status);
+        }
+
+        using (TcpClient chunked = new TcpClient())
+        {
+            chunked.Connect("127.0.0.1", host.Port);
+            byte[] raw = Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n");
+            chunked.GetStream().Write(raw, 0, raw.Length);
+            Assert.Equal(501, ReadStatus(chunked, TimeSpan.FromSeconds(5)));
+            Assert.Equal(501, HttpWire.ParseComplete(raw, raw.Length).Status);
+        }
+    }
+
+    [Fact]
     public void TwoMegabyteBodyIs413()
     {
         using (TcpClient client = new TcpClient())
