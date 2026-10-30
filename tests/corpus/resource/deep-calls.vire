@@ -1,0 +1,6 @@
+define boom with n
+  return boom with (n + 1)
+end
+define main
+  boom with 1
+end

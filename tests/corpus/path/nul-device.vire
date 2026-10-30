@@ -1,0 +1,3 @@
+define main
+  write with "data/nul.txt", "x"
+end

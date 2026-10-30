@@ -1,0 +1,3 @@
+define main
+  fetch with "https://user:pass@example.com/"
+end

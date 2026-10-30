@@ -1,0 +1,23 @@
+{
+  "class": "shell-injection",
+  "kind": "source",
+  "exit": 1,
+  "stderr_contains": [
+    "program folder"
+  ],
+  "stderr_forbids": [
+    "internal error",
+    "at Vire.",
+    "CryptographicException",
+    "StackOverflow"
+  ],
+  "stdout_contains": [],
+  "stdout_forbids": [
+    "PWNED",
+    "OUTSIDE-SECRET",
+    "root:x:"
+  ],
+  "compile_reject": [
+    "taint"
+  ]
+}

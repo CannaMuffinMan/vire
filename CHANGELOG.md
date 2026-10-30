@@ -2,6 +2,8 @@
 
 ## Phase 1 (safe stdlib groundwork)
 
+- Attack corpus (runtime half): `tests/corpus/` (≥40 programs) with `*.expect.json`, dual-mode CI in `AttackCorpusTests`. Writes of `.js` outside `site/` are refused.
+
 Crypto and JSON pieces that do not wait on types or capabilities:
 
 - Builtins `random`, `token`, `hmac`, `samebytes`, `encrypt`, `decrypt` on both `Machine` and `CompiledMachine`, implemented once in `VireCrypto` with the .NET BCL (`RandomNumberGenerator`, `HMACSHA256`, `AesGcm`, `FixedTimeEquals`).

@@ -1,0 +1,3 @@
+define main
+  read with "' OR 1=1 -- /etc/passwd"
+end

@@ -1,0 +1,21 @@
+{
+  "class": "malformed-vc",
+  "kind": "vc",
+  "exit": 1,
+  "stderr_contains": [
+    "damaged"
+  ],
+  "stderr_forbids": [
+    "internal error",
+    "at Vire.",
+    "CryptographicException",
+    "StackOverflow"
+  ],
+  "stdout_contains": [],
+  "stdout_forbids": [
+    "PWNED",
+    "OUTSIDE-SECRET",
+    "root:x:"
+  ],
+  "compile_reject": []
+}

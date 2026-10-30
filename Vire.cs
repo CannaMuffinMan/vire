@@ -371,7 +371,7 @@ sealed class Machine
             string path = SafePath(args[0], line, col);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
-            VirePaths.RefuseProgram(path, line, col);
+            VirePaths.RefuseProgram(root, path, line, col);
             try
             {
                 string parent = Path.GetDirectoryName(path);
@@ -745,7 +745,7 @@ sealed class Machine
         if (name == "erase")
         {
             string path = SafePath(args[0], line, col);
-            VirePaths.RefuseProgram(path, line, col);
+            VirePaths.RefuseProgram(root, path, line, col);
             VireFiles.Erase(path);
             return true;
         }
@@ -753,7 +753,7 @@ sealed class Machine
         {
             string from = SafePath(args[0], line, col);
             string to = SafePath(args[1], line, col);
-            VirePaths.RefuseProgram(to, line, col);
+            VirePaths.RefuseProgram(root, to, line, col);
             try { VireFiles.Copy(from, to); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
@@ -762,7 +762,7 @@ sealed class Machine
         if (name == "append")
         {
             string path = SafePath(args[0], line, col);
-            VirePaths.RefuseProgram(path, line, col);
+            VirePaths.RefuseProgram(root, path, line, col);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
             try { VireFiles.AppendAllText(path, text); }

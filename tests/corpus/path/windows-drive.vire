@@ -1,0 +1,3 @@
+define main
+  read with "C:/Windows/win.ini"
+end

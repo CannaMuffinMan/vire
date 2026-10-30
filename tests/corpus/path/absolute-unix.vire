@@ -1,0 +1,3 @@
+define main
+  read with "/etc/passwd"
+end

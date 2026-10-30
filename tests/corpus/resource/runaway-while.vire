@@ -1,0 +1,5 @@
+define main
+  while 1
+  end
+  say "escaped"
+end

@@ -1,0 +1,3 @@
+define main
+  write with "data/xss.js", "alert(1)"
+end

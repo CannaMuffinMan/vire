@@ -161,17 +161,38 @@ static class VirePaths
 
     public static void RefuseProgram(string path, int line)
     {
-        RefuseProgram(path, line, 1);
+        RefuseProgram(null, path, line, 1);
     }
 
     public static void RefuseProgram(string path, int line, int column)
     {
+        RefuseProgram(null, path, line, column);
+    }
+
+    public static void RefuseProgram(string root, string path, int line, int column)
+    {
         string ext = NormalizedExtension(path);
+        if (ext == ".js")
+        {
+            if (JsWriteAllowed(root, path)) return;
+            throw new VireError("vire will not write a program file", line, column);
+        }
         for (int i = 0; i < BlockedWriteExt.Length; i++)
         {
             if (ext == BlockedWriteExt[i])
                 throw new VireError("vire will not write a program file", line, column);
         }
+    }
+
+    static bool JsWriteAllowed(string root, string path)
+    {
+        if (!string.IsNullOrEmpty(root) && !string.IsNullOrEmpty(path))
+        {
+            string site = Path.GetFullPath(Path.Combine(root, "site"));
+            return InFolder(site, path);
+        }
+        string slash = (path ?? "").Replace('\\', '/');
+        return slash.StartsWith("site/", StringComparison.OrdinalIgnoreCase);
     }
 
     public static void RefuseReparse(string path, string root, int line)

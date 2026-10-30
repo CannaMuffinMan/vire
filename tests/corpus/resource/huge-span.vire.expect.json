@@ -1,0 +1,21 @@
+{
+  "class": "resource-exhaustion",
+  "kind": "source",
+  "exit": 1,
+  "stderr_contains": [
+    "too large"
+  ],
+  "stderr_forbids": [
+    "internal error",
+    "at Vire.",
+    "CryptographicException",
+    "StackOverflow"
+  ],
+  "stdout_contains": [],
+  "stdout_forbids": [
+    "PWNED",
+    "OUTSIDE-SECRET",
+    "root:x:"
+  ],
+  "compile_reject": []
+}

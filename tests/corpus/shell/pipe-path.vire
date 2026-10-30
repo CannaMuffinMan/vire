@@ -1,0 +1,3 @@
+define main
+  read with "data/x|rm -rf /"
+end

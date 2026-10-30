@@ -61,6 +61,9 @@ public class PathSsrfTests
         Assert.Throws<VireError>(() => VirePaths.RefuseProgram("x.sh", 1));
         VirePaths.RefuseProgram("data/stage.vc", 1);
         VirePaths.RefuseProgram("site/app.js", 1);
+        Assert.Throws<VireError>(() => VirePaths.RefuseProgram("data/xss.js", 1));
+        Assert.Throws<VireError>(() => VirePaths.RefuseProgram("/tmp/prog", Path.Combine("/tmp/prog", "data", "xss.js"), 1, 1));
+        VirePaths.RefuseProgram("/tmp/prog", Path.Combine("/tmp/prog", "site", "app.js"), 1, 1);
     }
 
     [Fact]
