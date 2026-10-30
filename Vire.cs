@@ -1129,11 +1129,17 @@ sealed class Machine
                 client.ReceiveTimeout = 5000;
                 client.SendTimeout = 5000;
                 try { AnswerApi(client, line); }
-                catch (IOException) { }
+                catch (IOException)
+                {
+                    Console.Error.WriteLine("vire: internal error (IOException)");
+                }
                 catch (VireError)
                 {
                     try { Send(client.GetStream(), 500, "application/json", "{\"error\":\"route failed\"}"); }
-                    catch (Exception) { }
+                    catch (Exception sendError)
+                    {
+                        Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
+                    }
                 }
                 finally { client.Close(); }
             }
@@ -1256,7 +1262,10 @@ sealed class Machine
                 client.ReceiveTimeout = 2000;
                 client.SendTimeout = 2000;
                 try { Answer(client, site, key); }
-                catch (IOException) { }
+                catch (IOException)
+                {
+                    Console.Error.WriteLine("vire: internal error (IOException)");
+                }
                 finally { client.Close(); }
             }
         }
@@ -2662,8 +2671,19 @@ sealed class Program
         thread.IsBackground = true;
         thread.Start();
         thread.Join();
-        if (failure != null) throw failure;
-        return code;
+        if (failure == null) return code;
+        if (failure is HaltSignal halt) return halt.Code;
+        if (failure is VireError exc)
+        {
+            string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
+            Console.Error.WriteLine("vire: " + where + exc.Message);
+            return 1;
+        }
+        if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
+            Console.Error.WriteLine(failure.ToString());
+        else
+            Console.Error.WriteLine("vire: internal error (" + failure.GetType().Name + ")");
+        return 3;
     }
 
     static int ExecuteBody(string[] args)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Xunit;
@@ -60,6 +61,63 @@ public class CrashTests
             File.Delete(wide);
             File.Delete(tooWide);
         }
+
+        RunResult overflow = Run(root, Path.Combine(crash, "overflow.vire"), null);
+        Assert.Equal(0, overflow.Code);
+        Assert.Equal("4294967294\n", overflow.StdOut.Replace("\r\n", "\n"));
+
+        RunResult zero = Run(root, Path.Combine(crash, "zero-div.vire"), null);
+        Assert.Equal(1, zero.Code);
+        Assert.Contains("division by zero", zero.StdErr);
+
+        RunResult badJson = Run(root, Path.Combine(crash, "bad-json.vire"), null);
+        Assert.Equal(1, badJson.Code);
+        Assert.Contains("json", badJson.StdErr);
+
+        string huge = Path.Combine(crash, "huge-num.vire");
+        File.WriteAllText(huge, "define main\n  say " + new string('9', 400) + "\nend\n");
+        try
+        {
+            RunResult hugeRun = Run(root, huge, null);
+            Assert.Equal(1, hugeRun.Code);
+            Assert.Contains("too large", hugeRun.StdErr);
+        }
+        finally { File.Delete(huge); }
+    }
+
+    [Fact]
+    public void JsonAndShowRefuseAdversarialValuesInProcess()
+    {
+        List<object> cycle = new List<object>();
+        cycle.Add(cycle);
+        Assert.Contains("[...]", Machine.Show(cycle));
+        VireError loop = Assert.Throws<VireError>(() => Json.Write(cycle));
+        Assert.Contains("contains itself", loop.Message);
+
+        string escaped = Json.Write("a\b\f\n\r\t\"\\" + ((char)1).ToString() + "\uD800");
+        Assert.Contains("\\b", escaped);
+        Assert.Contains("\\f", escaped);
+        Assert.Contains("\\n", escaped);
+        Assert.Contains("\\r", escaped);
+        Assert.Contains("\\t", escaped);
+        Assert.Contains("\\u0001", escaped);
+        Assert.Contains("\\ud800", escaped);
+
+        VireError nan = Assert.Throws<VireError>(() => Json.Write(double.NaN));
+        Assert.Contains("json can't write that number", nan.Message);
+        Assert.Throws<VireError>(() => Json.Write(double.PositiveInfinity));
+
+        VireError deep = Assert.Throws<VireError>(() => Json.Read(new string('[', 300) + new string(']', 300), 1));
+        Assert.Contains("nested too deeply", deep.Message);
+
+        VireError huge = Assert.Throws<VireError>(() => Json.Read("1e400", 1));
+        Assert.Contains("bad number", huge.Message);
+
+        VireError esc = Assert.Throws<VireError>(() => Json.Read("\"\\uZZZZ\"", 1));
+        Assert.Contains("bad escape", esc.Message);
+
+        VireError extra = Assert.Throws<VireError>(() => Json.Read("true true", 1));
+        Assert.Contains("extra", extra.Message);
     }
 
     static RunResult Run(string root, string program, string budget)
