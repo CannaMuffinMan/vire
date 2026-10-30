@@ -277,18 +277,18 @@ Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.tx
 
 ## 12. Step by step: a local site
 
-Vire writes the browser files, then serves that one folder on this computer only. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire.
+Vire writes the browser files into `site/`. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire. The old `serve` builtin is gone; calling it errors with `serve was removed; use listen`.
 
 `vault.vire` is the one-shot local experiment:
 
-1. Run `vire.exe vault.vire`.
+1. Run `dotnet run -c Release -- vault.vire`.
 2. It lists `site/videos` with `files`, keeps names that end in `.mp4`, `.webm`, or `.ogv`, and writes `site/catalog.json`.
 3. It writes `site/index.html`, `site/vault.css`, and `site/vault.js`. The page has a player, a playlist, and a search box. The script loads the catalog and points the player at `videos/` plus the file name.
 4. It also writes a branching story (`site/story.html`, `site/story.json`) that remembers the last room in the browser, and a dashboard (`site/dash.html`, `site/data.json`) that loads its numbers with `fetch`.
-5. Run `vire.exe serve.vire` and open `http://127.0.0.1:8080/`.
-6. Press Ctrl+C to stop the server.
+5. Run `dotnet run -c Release -- serve.vire`. That file calls `listen`, which binds `127.0.0.1` on an OS-assigned port and serves GET and HEAD of `site/`. Or put any static server in front of `site/` behind a reverse proxy.
+6. Press Ctrl+C to stop the listener.
 
-Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. The server allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 512 MB and are read from disk in pieces, including a byte range for seeking. Other files stay at 1 MB. The listener is `127.0.0.1` only. A run prints a key. Open `http://127.0.0.1:8080/?key=` plus that key. The browser then sends the key as a cookie. A request without the key is refused, including a post to `/inbox`. `fetch` and `post` refuse localhost and private network addresses. `read`, `write`, `append`, `copy`, `erase`, `files`, and `folders` work only in `data` and `site`. A link or junction in the folder is refused. `..` is refused. The port must be from 1024 through 65535.
+Put real clips in `site/videos`, run `vault.vire` again, and the playlist matches the folder. `listen` allows `.html`, `.css`, `.js`, `.svg`, `.json`, `.txt`, `.mp4`, `.webm`, and `.ogv`. Video files may be up to 512 MB and are read from disk in pieces. A valid `Range` on video returns 206; an invalid range returns 416. Other files stay at 1 MB. There is no directory listing. A symlink, a `..` path, or a `.vire` source request returns 404. Responses include `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'self'`. The listener is `127.0.0.1` only. There is no access key in the URL, no cookie gate, and no `/inbox` write. `fetch` and `post` refuse localhost and private network addresses. `read`, `write`, `append`, `copy`, `erase`, `files`, and `folders` work only in `data` and `site`. A link or junction in the folder is refused. `..` is refused. The port must be from 1024 through 65535, or `0` so the OS assigns one.
 
 The window in section 11 stays inside Vire. The site path is for a browser.
 
@@ -305,8 +305,8 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 9. Catch a bad conversion with `try` and `miss`.
 10. Open a small desktop tool with `open`, `field`, `button`, and `show`, as `work.vire` does.
 11. Save a list of records as JSON, then build a page from those records.
-12. Serve that page on this computer with `serve`.
-13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open them through `serve`.
+12. Write that page into `site/`, then open it with `listen` (see `serve.vire`) or any static server behind a reverse proxy.
+13. Build a private media vault, a branching story, and a dashboard in one run with `vault.vire`, then open `site/` through `listen`.
 14. Run the small systems under `systems/`. `tests.vire` runs every `.vire` file in that folder, so a new file there is part of the suite. `optional/live.vire` reads a public block and a public page, and it is not part of that scan.
 
 ## 14. Security
@@ -327,7 +327,7 @@ A compiled program is a sealed `VIRE1` file, not readable source. A file that is
 - A call argument stops before `+`. Parenthesize an argument that itself uses `+`.
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
-- Prefer the window operations for an application. Use `serve` only when the result must be a browser page.
+- Prefer the window operations for an application. Write browser files into `site/` and open them with `listen` or a static server.
 - After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
 
 ## 15. Limits
