@@ -2106,7 +2106,60 @@ sealed class Json
 
     public static void Check(object value, object schema, int line)
     {
+        CheckSchema(schema, line, 0);
         CheckValue(value, schema, line, 0);
+    }
+
+    static void CheckSchema(object schema, int line, int depth)
+    {
+        if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
+        Dictionary<string, object> spec = schema as Dictionary<string, object>;
+        if (spec == null) throw new VireError("json schema must be a map", line);
+        string kind = null;
+        if (spec.ContainsKey("kind")) kind = spec["kind"] as string;
+        if (kind == null) throw new VireError("json schema needs a kind", line);
+        if (kind != "text" && kind != "number" && kind != "bool" && kind != "none" && kind != "list" && kind != "map")
+            throw new VireError("json schema has an unknown kind", line);
+        foreach (KeyValuePair<string, object> pair in spec)
+        {
+            string name = pair.Key;
+            if (name == "kind") continue;
+            if (name == "closed")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                if (!(pair.Value is bool)) throw new VireError("json schema closed must be a bool", line);
+                continue;
+            }
+            if (name == "keys")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                Dictionary<string, object> keys = pair.Value as Dictionary<string, object>;
+                if (keys == null) throw new VireError("json schema keys must be a map", line);
+                foreach (KeyValuePair<string, object> child in keys)
+                    CheckSchema(child.Value, line, depth + 1);
+                continue;
+            }
+            if (name == "need")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                List<object> need = pair.Value as List<object>;
+                if (need == null) throw new VireError("json schema need must be a list", line);
+                foreach (object item in need)
+                {
+                    if (!(item is string)) throw new VireError("json schema need must be text", line);
+                }
+                continue;
+            }
+            if (name == "items")
+            {
+                if (kind != "list") throw new VireError("json schema has an unknown field", line);
+                Dictionary<string, object> items = pair.Value as Dictionary<string, object>;
+                if (items == null) throw new VireError("json schema items must be a map", line);
+                CheckSchema(items, line, depth + 1);
+                continue;
+            }
+            throw new VireError("json schema has an unknown field", line);
+        }
     }
 
     static void CheckValue(object value, object schema, int line, int depth)
@@ -2216,6 +2269,7 @@ sealed class Json
             Skip(text, ref i);
             if (i >= text.Length || text[i] != ':') throw new VireError("json needs a colon", line);
             i++;
+            if (map.ContainsKey(key)) throw new VireError("json has a duplicate key", line);
             map[key] = ReadValue(text, ref i, line, depth);
             Skip(text, ref i);
             if (i < text.Length && text[i] == ',') { i++; continue; }

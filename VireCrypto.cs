@@ -31,11 +31,14 @@ static class VireCrypto
         {
             Need(args, 2, name, line, col);
             byte[] key = HexBytes(args[0], 1, MaxHmacKey, "hmac key must be hex", line, col);
-            string message = args[1] as string;
-            if (message == null) throw new VireError("hmac needs text", line, col);
-            if (message.Length > MaxPlain) throw new VireError("text is too large", line, col);
-            using (HMACSHA256 hmac = new HMACSHA256(key))
-                return ToHex(hmac.ComputeHash(Encoding.UTF8.GetBytes(message)));
+            return WithZeroedKey(key, k =>
+            {
+                string message = args[1] as string;
+                if (message == null) throw new VireError("hmac needs text", line, col);
+                if (message.Length > MaxPlain) throw new VireError("text is too large", line, col);
+                using (HMACSHA256 hmac = new HMACSHA256(k))
+                    return (object)ToHex(hmac.ComputeHash(Encoding.UTF8.GetBytes(message)));
+            });
         }
         if (name == "samebytes")
         {
@@ -56,23 +59,36 @@ static class VireCrypto
         {
             Need(args, 2, name, line, col);
             byte[] key = HexBytes(args[0], KeySize, KeySize, "encrypt needs a 32-byte hex key", line, col);
-            string plainText = args[1] as string;
-            if (plainText == null) throw new VireError("encrypt needs text", line, col);
-            byte[] plain = Encoding.UTF8.GetBytes(plainText);
-            if (plain.Length > MaxPlain) throw new VireError("text is too large", line, col);
-            byte[] nonce = RandomNumberGenerator.GetBytes(NonceSize);
-            byte[] packed = Seal(key, nonce, plain);
-            CryptographicOperations.ZeroMemory(plain);
-            return ToHex(packed);
+            return WithZeroedKey(key, k =>
+            {
+                string plainText = args[1] as string;
+                if (plainText == null) throw new VireError("encrypt needs text", line, col);
+                byte[] plain = Encoding.UTF8.GetBytes(plainText);
+                if (plain.Length > MaxPlain) throw new VireError("text is too large", line, col);
+                byte[] nonce = RandomNumberGenerator.GetBytes(NonceSize);
+                try
+                {
+                    byte[] packed = Seal(k, nonce, plain);
+                    return (object)ToHex(packed);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(plain);
+                    CryptographicOperations.ZeroMemory(nonce);
+                }
+            });
         }
         if (name == "decrypt")
         {
             Need(args, 2, name, line, col);
             byte[] key = HexBytes(args[0], KeySize, KeySize, "decrypt needs a 32-byte hex key", line, col);
-            byte[] packed = HexBytes(args[1], NonceSize + TagSize, NonceSize + TagSize + MaxPlain, "decrypt needs packed hex", line, col);
-            byte[] plain = Open(key, packed, line, col);
-            try { return Encoding.UTF8.GetString(plain); }
-            finally { CryptographicOperations.ZeroMemory(plain); }
+            return WithZeroedKey(key, k =>
+            {
+                byte[] packed = HexBytes(args[1], NonceSize + TagSize, NonceSize + TagSize + MaxPlain, "decrypt needs packed hex", line, col);
+                byte[] plain = Open(k, packed, line, col);
+                try { return (object)Encoding.UTF8.GetString(plain); }
+                finally { CryptographicOperations.ZeroMemory(plain); }
+            });
         }
         throw new VireError("there is no definition named " + name, line, col);
     }
@@ -155,6 +171,12 @@ static class VireCrypto
             bytes[i] = (byte)((hi << 4) | lo);
         }
         return bytes;
+    }
+
+    public static T WithZeroedKey<T>(byte[] key, Func<byte[], T> body)
+    {
+        try { return body(key); }
+        finally { CryptographicOperations.ZeroMemory(key); }
     }
 
     static byte[] HexBytes(object value, int min, int max, string message, int line, int col)

@@ -104,6 +104,116 @@ public class StdlibCryptoJsonTests
     }
 
     [Fact]
+    public void DecryptWrongKeyTruncatedPackingAndBadKeyLengthFailClosed()
+    {
+        string goodKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+        string otherKey = "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100";
+        byte[] key = VireCrypto.FromHex(goodKey, 1, 1);
+        byte[] packed = VireCrypto.Seal(key, RandomNumberGenerator.GetBytes(12), Encoding.UTF8.GetBytes("secret"));
+        string packedHex = VireCrypto.ToHex(packed);
+
+        DualMode.DualRun wrong = DualMode.RunSource(
+            "define main\n  decrypt with \"" + otherKey + "\", \"" + packedHex + "\"\nend\n",
+            null);
+        Assert.True(wrong.Matched, wrong.InterpErr + wrong.CompErr);
+        Assert.Equal(1, wrong.InterpCode);
+        Assert.Contains("could not decrypt that message", wrong.InterpErr);
+
+        for (int n = 1; n <= 16; n++)
+        {
+            byte[] cut = new byte[packed.Length - n];
+            Buffer.BlockCopy(packed, 0, cut, 0, cut.Length);
+            try
+            {
+                VireCrypto.Open(key, cut, 1, 1);
+                Assert.Fail("truncated packing must not decrypt");
+            }
+            catch (VireError err)
+            {
+                Assert.Contains("could not decrypt that message", err.Message);
+            }
+        }
+
+        DualMode.DualRun shortTag = DualMode.RunSource(
+            "define main\n  decrypt with \"" + goodKey + "\", \"" + packedHex.Substring(0, packedHex.Length - 2) + "\"\nend\n",
+            null);
+        Assert.True(shortTag.Matched, shortTag.InterpErr + shortTag.CompErr);
+        Assert.Equal(1, shortTag.InterpCode);
+        Assert.Contains("could not decrypt that message", shortTag.InterpErr);
+
+        DualMode.DualRun key31 = DualMode.RunSource(
+            "define main\n  encrypt with \"" + goodKey.Substring(0, 62) + "\", \"x\"\nend\n",
+            null);
+        Assert.True(key31.Matched, key31.InterpErr + key31.CompErr);
+        Assert.Equal(1, key31.InterpCode);
+        Assert.Contains("encrypt needs a 32-byte hex key", key31.InterpErr);
+
+        DualMode.DualRun key33 = DualMode.RunSource(
+            "define main\n  decrypt with \"" + goodKey + "00" + "\", \"" + packedHex + "\"\nend\n",
+            null);
+        Assert.True(key33.Matched, key33.InterpErr + key33.CompErr);
+        Assert.Equal(1, key33.InterpCode);
+        Assert.Contains("decrypt needs a 32-byte hex key", key33.InterpErr);
+    }
+
+    [Fact]
+    public void EncryptUsesFreshNonceEachTimeInBothModes()
+    {
+        string key = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+        HashSet<string> packed = new HashSet<string>();
+        HashSet<string> nonces = new HashSet<string>();
+        for (int i = 0; i < 8; i++)
+        {
+            object hex = VireCrypto.Builtin("encrypt", new List<object> { key, "hello vire" }, 1, 1);
+            string text = (string)hex;
+            Assert.True(packed.Add(text));
+            Assert.True(nonces.Add(text.Substring(0, 24)));
+        }
+
+        DualMode.DualRun both = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let key be \"" + key + "\"",
+            "  let a be encrypt with key, \"hello vire\"",
+            "  let b be encrypt with key, \"hello vire\"",
+            "  let c be encrypt with key, \"hello vire\"",
+            "  let d be encrypt with key, \"hello vire\"",
+            "  if a == b",
+            "    say \"dup\"",
+            "  else if a == c",
+            "    say \"dup\"",
+            "  else if a == d",
+            "    say \"dup\"",
+            "  else if b == c",
+            "    say \"dup\"",
+            "  else if b == d",
+            "    say \"dup\"",
+            "  else if c == d",
+            "    say \"dup\"",
+            "  else if (slice with a, 0, 24) == (slice with b, 0, 24)",
+            "    say \"nonce\"",
+            "  else if (slice with a, 0, 24) == (slice with c, 0, 24)",
+            "    say \"nonce\"",
+            "  else if (slice with a, 0, 24) == (slice with d, 0, 24)",
+            "    say \"nonce\"",
+            "  else if (slice with b, 0, 24) == (slice with c, 0, 24)",
+            "    say \"nonce\"",
+            "  else if (slice with b, 0, 24) == (slice with d, 0, 24)",
+            "    say \"nonce\"",
+            "  else if (slice with c, 0, 24) == (slice with d, 0, 24)",
+            "    say \"nonce\"",
+            "  else",
+            "    say \"fresh\"",
+            "  end",
+            "end",
+            ""
+        }), null);
+        Assert.True(both.Matched, both.InterpErr + both.CompErr + both.InterpOut + both.CompOut);
+        Assert.Equal(0, both.InterpCode);
+        Assert.Equal("fresh\n", DualMode.Norm(both.InterpOut));
+    }
+
+    [Fact]
     public void RandomAndTokenAreBoundedHexAndUrl()
     {
         DualMode.DualRun rnd = DualMode.RunSource("define main\n  say length with (random with 16)\nend\n", null);
@@ -176,6 +286,54 @@ public class StdlibCryptoJsonTests
         Assert.True(wrong.Matched, wrong.InterpErr);
         Assert.Equal(1, wrong.InterpCode);
         Assert.Contains("json has the wrong type", wrong.InterpErr);
+
+        DualMode.DualRun closedText = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let schema be {\"kind\": \"map\", \"closed\": \"true\"}",
+            "  parse with \"{}\", schema",
+            "end",
+            ""
+        }), null);
+        Assert.True(closedText.Matched, closedText.InterpErr + closedText.CompErr);
+        Assert.Equal(1, closedText.InterpCode);
+        Assert.Contains("json schema closed must be a bool", closedText.InterpErr);
+
+        DualMode.DualRun keysList = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let schema be {\"kind\": \"map\", \"keys\": []}",
+            "  parse with \"{}\", schema",
+            "end",
+            ""
+        }), null);
+        Assert.True(keysList.Matched, keysList.InterpErr + keysList.CompErr);
+        Assert.Equal(1, keysList.InterpCode);
+        Assert.Contains("json schema keys must be a map", keysList.InterpErr);
+
+        DualMode.DualRun itemsList = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let schema be {\"kind\": \"list\", \"items\": []}",
+            "  parse with \"[]\", schema",
+            "end",
+            ""
+        }), null);
+        Assert.True(itemsList.Matched, itemsList.InterpErr + itemsList.CompErr);
+        Assert.Equal(1, itemsList.InterpCode);
+        Assert.Contains("json schema items must be a map", itemsList.InterpErr);
+
+        DualMode.DualRun unknown = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let schema be {\"kind\": \"map\", \"requried\": [\"a\"]}",
+            "  parse with \"{}\", schema",
+            "end",
+            ""
+        }), null);
+        Assert.True(unknown.Matched, unknown.InterpErr + unknown.CompErr);
+        Assert.Equal(1, unknown.InterpCode);
+        Assert.Contains("json schema has an unknown field", unknown.InterpErr);
     }
 
     [Fact]
@@ -187,6 +345,69 @@ public class StdlibCryptoJsonTests
         Assert.True(deep.Matched, deep.InterpErr + deep.CompErr);
         Assert.Equal(1, deep.InterpCode);
         Assert.Contains("json is nested too deeply", deep.InterpErr);
+
+        DualMode.DualRun dup = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let q be \"\\\"\"",
+            "  parse with (join with [\"{\", q, \"a\", q, \":1,\", q, \"a\", q, \":2}\"], \"\")",
+            "end",
+            ""
+        }), null);
+        Assert.True(dup.Matched, dup.InterpErr + dup.CompErr);
+        Assert.Equal(1, dup.InterpCode);
+        Assert.Contains("json has a duplicate key", dup.InterpErr);
+
+        try
+        {
+            Json.Read("{\"a\":1,\"a\":2}", 1);
+            Assert.Fail("duplicate json keys must be refused");
+        }
+        catch (VireError err)
+        {
+            Assert.Contains("json has a duplicate key", err.Message);
+        }
+
+        try
+        {
+            Json.Read(new string('x', Json.MaxChars + 1), 1);
+            Assert.Fail("oversized json must be refused");
+        }
+        catch (VireError err)
+        {
+            Assert.Contains("json is too large", err.Message);
+        }
+
+        StringBuilder items = new StringBuilder();
+        items.Append('[');
+        for (int i = 0; i < Json.MaxItems + 2; i++)
+        {
+            if (i > 0) items.Append(',');
+            items.Append('0');
+        }
+        items.Append(']');
+        try
+        {
+            Json.Read(items.ToString(), 1);
+            Assert.Fail("oversized json list must be refused");
+        }
+        catch (VireError err)
+        {
+            Assert.Contains("json is too large", err.Message);
+        }
+
+        object nest = new Dictionary<string, object> { { "kind", "text" } };
+        for (int i = 0; i < Json.MaxDepth + 2; i++)
+            nest = new Dictionary<string, object> { { "kind", "list" }, { "items", nest } };
+        try
+        {
+            Json.Check(new List<object>(), nest, 1);
+            Assert.Fail("oversized schema depth must be refused");
+        }
+        catch (VireError err)
+        {
+            Assert.Contains("json is nested too deeply", err.Message);
+        }
 
         Random rng = new Random(20261030);
         int closed = 0;
@@ -222,5 +443,28 @@ public class StdlibCryptoJsonTests
             else body.Add((char)rng.Next(128));
         }
         return new string(body.ToArray());
+    }
+
+    [Fact]
+    public void CryptoKeyBuffersAreZeroedAfterUse()
+    {
+        byte[] key = new byte[] { 1, 2, 3, 4 };
+        int n = VireCrypto.WithZeroedKey(key, k =>
+        {
+            Assert.Equal(1, k[0]);
+            return k.Length;
+        });
+        Assert.Equal(4, n);
+        for (int i = 0; i < key.Length; i++) Assert.Equal(0, key[i]);
+
+        byte[] throwing = new byte[] { 9, 8, 7 };
+        try
+        {
+            VireCrypto.WithZeroedKey<int>(throwing, k => throw new VireError("boom", 1, 1));
+        }
+        catch (VireError)
+        {
+            for (int i = 0; i < throwing.Length; i++) Assert.Equal(0, throwing[i]);
+        }
     }
 }
