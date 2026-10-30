@@ -112,7 +112,7 @@ for item in [1, 2, 3]
 end
 ```
 
-`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 100,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped.
+`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 100,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000. Each `listen` request gets a fresh copy of that budget and a 5 second wall-clock deadline.
 
 ## 5. Definitions
 
@@ -311,13 +311,15 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 
 ## 14. Security
 
-A program cannot grant itself more steps. The cap is 1000000. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
+A program cannot grant itself more steps. The default cap is 1,000,000. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap. `listen` does not share leftover steps across requests: each request gets a fresh budget and a 5 second deadline checked inside `Step`.
 
-`listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token`. The compare does not stop at the first differing character. A token sitting in the body does not count. The body limit is 65536 bytes. A path that contains `..` is refused.
+`listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token` when a token is set. The compare does not stop at the first differing character. A token sitting in the body does not count. Headers must finish within 5 seconds (16 KB block, 8 KB request line). Bodies need `Content-Length`, at most 1 MB, and 10 seconds to arrive. Chunked encoding is refused. At most 64 requests run at once; extra connections get 503. Responses include `Content-Length`, `Connection: close`, and `X-Content-Type-Options: nosniff`. GET and HEAD of `site/` use the static rules in section 12. A path that contains `..` is refused.
 
-`fetch` and `post` allow `https` only, refuse redirects, and refuse localhost, private ranges, link-local, shared carrier space `100.64.0.0/10`, and IPv4 addresses hidden inside IPv6. `write`, `append`, and `copy` refuse executable, script, `.vire`, `.cs`, and `.sh` files, plus `..` and links.
+`fetch` and `post` allow `http` and `https` only, with no userinfo. Redirects are followed at most three times, and every hop is checked again. Localhost, private ranges, link-local, shared carrier space `100.64.0.0/10`, `198.18.0.0/15`, documentation prefixes, NAT64, 6to4, and IPv4 addresses hidden inside IPv6 are refused. The connect uses the address that was just checked. The body is capped at 1 MB while it streams.
 
-A compiled program is a sealed `VIRE1` file, not readable source. A file that is not a `VIRE1` seal is refused with `sealed program is damaged`. The runner checks a hash of the whole program before it runs, so a patched file stops with `sealed program was changed`. Set `VIRE_SEAL` to a long private value when you compile, and use that same value when you run. A copied file then stays shut on a machine that does not have the seal. A person who has your runner and your seal can still study the program. The seal stops casual reading and casual patches. It does not stop every attack.
+Paths use one `SafeName` gate (`SafePath`, `run`, `use`, `need`, writes, compiled file builtins). Refused: rooted paths, `..` segments, a segment ending in `.` or space, `:`, control characters, `<>"|?*`, Windows device names on every OS, and reparse points. Writes cannot create `.vire`, `.vc`, or executable/script extensions (`.js` in `site/` is still allowed). `run` and `use` stay out of `data/` and `site/`.
+
+A compiled program is a `VC2` file: magic `VIRE-VC2`, version 2, a random 12-byte nonce, AES-256-GCM ciphertext, and a 16-byte tag. A seal key is required: environment `VIRE_SEAL_KEY` (base64 of exactly 32 bytes) or `--seal-key-file` pointing at 32 raw bytes or that same base64, outside the program folder. Missing or invalid key: exit 2, message `vire: a seal key is required (set VIRE_SEAL_KEY or --seal-key-file)`. The key is never printed. Allowed output: `seal key fingerprint` plus the first 8 hex characters of SHA-256 of the key. `vire keygen --out <path>` writes a new key file with owner-only permissions. An old XOR `.vc` is refused with `this .vc uses the old seal; recompile it`. A person who has your runner and your seal key can still study the program. The seal stops casual reading and casual patches. It does not stop every attack.
 
 ## 15. Rules an agent should follow
 
@@ -330,6 +332,8 @@ A compiled program is a sealed `VIRE1` file, not readable source. A file that is
 - Prefer the window operations for an application. Write browser files into `site/` and open them with `listen` or a static server.
 - After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
 
-## 15. Limits
+## 16. Limits
 
 Vire is a general-purpose language for programs, files, packages, windows, and a local site. It does not ship a public package index, a phone store, or device-driver tooling. File and package access stays in the program folder so a sample cannot wander across the disk.
+
+Build commands use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`.
