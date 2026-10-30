@@ -2,13 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 #if WINDOWS
 using System.Windows.Forms;
 #endif
@@ -205,109 +203,7 @@ sealed class Machine
         string rawText = text as string;
         if (rawText == null || rawText.Trim().Length == 0)
             throw new VireError("a file path must be text", line);
-        if (Path.IsPathRooted(rawText) || rawText.Contains("..") || rawText.IndexOf(':') >= 0 || rawText.IndexOf('\0') >= 0)
-            throw new VireError("files stay inside the program folder", line);
-        string path = Path.GetFullPath(Path.Combine(root, rawText));
-        string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(path, root, StringComparison.OrdinalIgnoreCase))
-            throw new VireError("files stay inside the program folder", line);
-        string dataRoot = Path.GetFullPath(Path.Combine(root, "data"));
-        string siteRoot = Path.GetFullPath(Path.Combine(root, "site"));
-        if (!InFolder(dataRoot, path) && !InFolder(siteRoot, path))
-            throw new VireError("files stay in data or site", line);
-        RefuseReparse(path, line);
-        return path;
-    }
-
-    static bool InFolder(string folder, string path)
-    {
-        string full = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return string.Equals(path, folder, StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith(full, StringComparison.OrdinalIgnoreCase);
-    }
-
-    void RefuseReparse(string path, int line)
-    {
-        string cursor = path;
-        string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        while (!string.IsNullOrEmpty(cursor) &&
-            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(cursor, root, StringComparison.OrdinalIgnoreCase)))
-        {
-            if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                throw new VireError("files stay inside the program folder", line);
-            string parent = Path.GetDirectoryName(cursor);
-            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
-            cursor = parent;
-        }
-    }
-
-    static IPAddress DemandPublic(string url, int line)
-    {
-        Uri parsed;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
-            throw new VireError("that address is not allowed", line);
-        if (parsed.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-            throw new VireError("fetch stays off this machine and private networks", line);
-        IPAddress literal;
-        if (IPAddress.TryParse(parsed.IdnHost, out literal) && !IsPublicAddress(literal))
-            throw new VireError("fetch stays off this machine and private networks", line);
-        IPAddress[] addresses;
-        try { addresses = Dns.GetHostAddresses(parsed.Host); }
-        catch (Exception) { throw new VireError("could not check that address", line); }
-        if (addresses.Length == 0) throw new VireError("could not check that address", line);
-        IPAddress chosen = null;
-        foreach (IPAddress address in addresses)
-        {
-            if (!IsPublicAddress(address))
-                throw new VireError("fetch stays off this machine and private networks", line);
-            if (chosen == null) chosen = address;
-        }
-        if (chosen == null) throw new VireError("could not check that address", line);
-        if (parsed.Scheme != "https")
-            throw new VireError("fetch allows https only", line);
-        return chosen;
-    }
-
-    static bool IsPublicAddress(IPAddress address)
-    {
-        if (IPAddress.IsLoopback(address)) return false;
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            byte[] part = address.GetAddressBytes();
-            if (part[0] == 0 || part[0] == 10 || part[0] == 127) return false;
-            if (part[0] == 169 && part[1] == 254) return false;
-            if (part[0] == 172 && part[1] >= 16 && part[1] <= 31) return false;
-            if (part[0] == 192 && part[1] == 168) return false;
-            if (part[0] == 100 && part[1] >= 64 && part[1] <= 127) return false;
-            if (part[0] == 198 && (part[1] == 18 || part[1] == 19)) return false;
-            if (part[0] >= 224) return false;
-            return true;
-        }
-        if (address.IsIPv4MappedToIPv6) return IsPublicAddress(address.MapToIPv4());
-        byte[] bits = address.GetAddressBytes();
-        if (bits.Length != 16) return false;
-        if (Zeros(bits, 0, 12)) return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (Zeros(bits, 0, 8) && bits[8] == 0xff && bits[9] == 0xff && bits[10] == 0 && bits[11] == 0)
-            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (bits[0] == 0x20 && bits[1] == 0x02)
-            return IsPublicAddress(new IPAddress(new byte[] { bits[2], bits[3], bits[4], bits[5] }));
-        if (bits[0] == 0x00 && bits[1] == 0x64 && bits[2] == 0xff && bits[3] == 0x9b && Zeros(bits, 4, 8))
-            return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
-        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x00 && bits[3] == 0x00) return false;
-        if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x0d && bits[3] == 0xb8) return false;
-        if (bits[0] == 0xff) return false;
-        if (bits[0] == 0xfe && (bits[1] & 0xc0) == 0x80) return false;
-        if ((bits[0] & 0xfe) == 0xfc) return false;
-        return true;
-    }
-
-    static bool Zeros(byte[] bits, int at, int count)
-    {
-        for (int n = 0; n < count; n++) if (bits[at + n] != 0) return false;
-        return true;
+        return VirePaths.DataOrSite(root, rawText, line);
     }
 
     public object Call(string name, List<object> args, int line)
@@ -391,7 +287,7 @@ sealed class Machine
             string path = SafePath(args[0], line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
-            RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line);
             try
             {
                 string parent = Path.GetDirectoryName(path);
@@ -450,13 +346,7 @@ sealed class Machine
         if (name == "run")
         {
             string rel = args[0] as string;
-            if (rel == null || rel.Contains("..") || rel.IndexOf(':') >= 0 || rel.IndexOf('\0') >= 0 || Path.IsPathRooted(rel) || !rel.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-                throw new VireError("run needs a vire file in this folder", line);
-            string full = Path.GetFullPath(Path.Combine(root, rel));
-            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
-                throw new VireError("run stays inside the program folder", line);
-            RefuseReparse(full, line);
+            string full = VirePaths.ProgramFile(root, rel, line);
             budget.Runs++;
             StringWriter sink = new StringWriter();
             TextWriter previous = Console.Out;
@@ -577,14 +467,14 @@ sealed class Machine
         if (name == "sources")
         {
             string rel = args[0] as string;
-            if (rel == null || rel.Length == 0 || rel.Contains("..") || rel.Contains(":") || rel.Contains("/") || rel.Contains("\\") || Path.IsPathRooted(rel))
+            if (rel == null || rel.Length == 0 || rel.IndexOf('/') >= 0 || rel.IndexOf('\\') >= 0)
                 throw new VireError("sources needs one folder name inside this program", line);
-            string dir = Path.GetFullPath(Path.Combine(root, rel));
-            string rootFull = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!dir.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(dir))
+            VirePaths.CheckName(rel, line);
+            string dir = VirePaths.CombineUnder(root, rel, line);
+            if (!Directory.Exists(dir))
                 throw new VireError("sources needs one folder name inside this program", line);
-            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)
-                throw new VireError("sources stays inside the program folder", line);
+            if (VirePaths.UnderWritableZone(root, dir))
+                throw new VireError("sources stays out of data and site", line);
             List<object> found = new List<object>();
             foreach (string file in Directory.GetFiles(dir, "*.vire")) found.Add(Path.GetFileName(file));
             return found;
@@ -602,9 +492,9 @@ sealed class Machine
             string url = args[0] as string;
             if (url == null || !(url.StartsWith("https://") || url.StartsWith("http://")))
                 throw new VireError("fetch needs an http or https address", line);
-            try { return SendWeb(HttpMethod.Get, url, null, line); }
+            try { return VireNet.SendWeb(HttpMethod.Get, url, null, line); }
             catch (VireError) { throw; }
-            catch (Exception exc) { throw new VireError(exc.GetBaseException().Message, line); }
+            catch (Exception) { throw new VireError("could not fetch that address", line); }
         }
         if (name == "post")
         {
@@ -615,7 +505,7 @@ sealed class Machine
             {
                 string payload = Show(args[1]);
                 if (payload.Length > 1000000) throw new VireError("text is too large to send", line);
-                return SendWeb(HttpMethod.Post, url, payload, line);
+                return VireNet.SendWeb(HttpMethod.Post, url, payload, line);
             }
             catch (VireError) { throw; }
             catch (Exception) { throw new VireError("could not post to that address", line); }
@@ -772,7 +662,7 @@ sealed class Machine
         if (name == "erase")
         {
             string path = SafePath(args[0], line);
-            RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line);
             if (File.Exists(path)) File.Delete(path);
             return true;
         }
@@ -780,7 +670,7 @@ sealed class Machine
         {
             string from = SafePath(args[0], line);
             string to = SafePath(args[1], line);
-            RefuseProgram(to, line);
+            VirePaths.RefuseProgram(to, line);
             string parent = Path.GetDirectoryName(to);
             if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
             File.Copy(from, to, true);
@@ -789,7 +679,7 @@ sealed class Machine
         if (name == "append")
         {
             string path = SafePath(args[0], line);
-            RefuseProgram(path, line);
+            VirePaths.RefuseProgram(path, line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
             string parent = Path.GetDirectoryName(path);
@@ -1004,13 +894,6 @@ sealed class Machine
 #endif
     }
 
-    static void RefuseProgram(string path, int line)
-    {
-        string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi" || ext == ".vire" || ext == ".cs" || ext == ".sh")
-            throw new VireError("vire will not write a program file", line);
-    }
-
     List<Stroke> ActiveOps()
     {
 #if WINDOWS
@@ -1069,44 +952,6 @@ sealed class Machine
         }
     }
 
-    static string SendWeb(HttpMethod method, string url, string body, int line)
-    {
-        IPAddress pinned = DemandPublic(url, line);
-        SocketsHttpHandler handler = new SocketsHttpHandler();
-        handler.AllowAutoRedirect = false;
-        handler.ConnectCallback = (context, token) => ConnectPinned(pinned, context.DnsEndPoint.Port);
-        using (HttpClient client = new HttpClient(handler))
-        {
-            client.Timeout = TimeSpan.FromSeconds(8);
-            using (HttpRequestMessage message = new HttpRequestMessage(method, url))
-            {
-                if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
-                using (HttpResponseMessage response = client.SendAsync(message).Result)
-                {
-                    string text = response.Content.ReadAsStringAsync().Result;
-                    int code = (int)response.StatusCode;
-                    if (code < 200 || code >= 300) throw new VireError("the address returned " + code, line);
-                    if (text.Length > 1000000) throw new VireError("the response is too large", line);
-                    return text;
-                }
-            }
-        }
-    }
-
-    static ValueTask<Stream> ConnectPinned(IPAddress pinned, int port)
-    {
-        Socket socket = new Socket(pinned.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        try
-        {
-            socket.Connect(pinned, port);
-            return new ValueTask<Stream>(new NetworkStream(socket, true));
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
 
     void Listen(int port, int line)
     {
@@ -2548,16 +2393,14 @@ sealed class Program
         string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
-        RefuseReparsePath(full, folder);
+        VirePaths.RefuseReparse(full, folder, 1);
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
         Unit unit = new Parser(Lexer.Tokenize(File.ReadAllText(full))).Parse();
         foreach (string used in unit.Uses)
         {
-            if (Path.IsPathRooted(used) || used.Contains("..") || used.IndexOf(':') >= 0 || used.IndexOf('\0') >= 0 || !used.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
-                throw new VireError("use stays inside the program folder and only opens .vire files", 1);
-            string next = Path.GetFullPath(Path.Combine(folder, used));
+            string next = VirePaths.UseFile(folder, used, 1);
             Dictionary<string, Func> imported = Load(next, folder, seen);
             Merge(unit, imported);
         }
@@ -2565,35 +2408,12 @@ sealed class Program
         {
             if (!IsPackage(package))
                 throw new VireError("package names are plain words", 1);
-            string next = Path.Combine(folder, "deps", package, "lib.vire");
+            string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
             Merge(unit, Load(next, folder, seen));
         }
         return unit.Funcs;
         }
         finally { seen.Remove(full); }
-    }
-
-    static void RefuseReparsePath(string path, string folder)
-    {
-        string cursor = path;
-        string rootFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        while (!string.IsNullOrEmpty(cursor) &&
-            (cursor.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(cursor, folder, StringComparison.OrdinalIgnoreCase)))
-        {
-            try
-            {
-                if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                    (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                    throw new VireError("files stay inside the program folder", 1);
-            }
-            catch (VireError) { throw; }
-            catch (IOException) { throw new VireError("files stay inside the program folder", 1); }
-            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", 1); }
-            string parent = Path.GetDirectoryName(cursor);
-            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
-            cursor = parent;
-        }
     }
 
     public static int BudgetOf(string source)

@@ -489,22 +489,13 @@ sealed class CompiledMachine
     string Safe(object value)
     {
         string rel = value as string;
-        if (rel == null || rel.Length == 0 || rel.IndexOf('\0') >= 0 || rel.Contains("..") || rel.IndexOf(':') >= 0 || Path.IsPathRooted(rel))
+        if (rel == null || rel.Length == 0)
             throw new VireError("files stay inside the program folder", 1);
-        string leaf = rel.Replace('\\', '/');
-        int slash = leaf.IndexOf('/');
-        string first = slash < 0 ? leaf : leaf.Substring(0, slash);
-        if (!IsDataOrSite(first) && !(slash < 0 && RootIsDataOrSite()))
+        string full = VirePaths.CombineUnder(root, rel, 1);
+        if (!VirePaths.UnderWritableZone(root, full) && !RootIsDataOrSite())
             throw new VireError("files stay in data or site", 1);
-        string full;
-        try { full = Path.GetFullPath(Path.Combine(root, rel)); }
-        catch (ArgumentException) { throw new VireError("files stay inside the program folder", 1); }
-        catch (NotSupportedException) { throw new VireError("files stay inside the program folder", 1); }
-        string baseFull = Path.GetFullPath(root);
-        string prefix = baseFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            throw new VireError("files stay inside the program folder", 1);
-        RefuseReparse(full, baseFull, prefix);
+        if (RootIsDataOrSite() && !VirePaths.InFolder(root, full))
+            throw new VireError("files stay in data or site", 1);
         return full;
     }
 
@@ -512,42 +503,13 @@ sealed class CompiledMachine
     {
         string full = Path.GetFullPath(root);
         string name = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        return IsDataOrSite(name);
-    }
-
-    static bool IsDataOrSite(string name)
-    {
         return name.Equals("data", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("site", StringComparison.OrdinalIgnoreCase);
     }
 
-    static void RefuseReparse(string path, string baseFull, string prefix)
-    {
-        string cursor = path;
-        while (!string.IsNullOrEmpty(cursor) &&
-            (cursor.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(cursor, baseFull, StringComparison.OrdinalIgnoreCase)))
-        {
-            try
-            {
-                if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                    (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                    throw new VireError("files stay inside the program folder", 1);
-            }
-            catch (VireError) { throw; }
-            catch (IOException) { throw new VireError("files stay inside the program folder", 1); }
-            catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", 1); }
-            string parent = Path.GetDirectoryName(cursor);
-            if (string.IsNullOrEmpty(parent) || string.Equals(parent, cursor, StringComparison.OrdinalIgnoreCase)) break;
-            cursor = parent;
-        }
-    }
-
     static void RefuseProgram(string path)
     {
-        string ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext == ".exe" || ext == ".dll" || ext == ".bat" || ext == ".cmd" || ext == ".ps1" || ext == ".com" || ext == ".scr" || ext == ".vbs" || ext == ".msi" || ext == ".vire" || ext == ".cs" || ext == ".sh")
-            throw new VireError("vire will not write a program file", 1);
+        VirePaths.RefuseProgram(path, 1);
     }
 
     static string Show(object value)
