@@ -4,7 +4,7 @@ using System.Net.Sockets;
 
 static class PortGuard
 {
-    static readonly int[] Banned = { 7099, 8778, 7071, 7072, 17841 };
+    static readonly int[] Banned = { 7099, 8778, 7071, 7072, 7093, 17841, 17843 };
 
     public static int GetFreeLoopbackPort()
     {

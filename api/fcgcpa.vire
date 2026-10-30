@@ -1,39 +1,316 @@
-~ The web2 door. Apps mine on their own with Proof of Rot. This process does not mine.
+~ The web2 door. Apps mine on their own. This process does not mine.
+~ Open question (roadmap Q2): who may POST /block is Canna's call.
+~ Phase 0 does not authorize POST /block. Do not invent a key scheme here.
 
-define genesis
-  return {"index": 0, "previousHash": "0", "hash": "genesis", "miner": "forevercouchgang.blockchain", "por": none}
+define pad6 with n
+  let s be text with n
+  while (length with s) < 6
+    let s be "0" + s
+  end
+  return s
 end
 
-define tipHash with chain
-  let last be (length with chain) - 1
-  let tip be chain at last
-  return tip at "hash"
+define segmentPath with n
+  return "data/chain/" + (pad6 with n) + ".json"
 end
 
-define porOk with por
-  if por == none
+define makeProof with index, previous, text
+  let row be []
+  push with row, index
+  push with row, previous
+  push with row, text
+  return hash with (json with row)
+end
+
+define textOk with value
+  if (kind with value) != "text"
     return false
   end
-  if not (has with por, "action")
+  if (length with value) > 4096
     return false
   end
-  if not (has with por, "engagement")
+  let dumped be json with value
+  if (find with dumped, "\\u00") >= 0
     return false
   end
-  if not (has with por, "timestamp")
+  if (find with value, "\t") >= 0
     return false
   end
-  if not (has with por, "userId")
+  if (find with value, "\r") >= 0
     return false
   end
   return true
 end
 
-define loadChain
-  return parse with (read with "data/chain.json")
+define genesisBlock
+  let previous be "0"
+  let text be ""
+  let proof be makeProof with 0, previous, text
+  return {"index": 0, "previous": previous, "proof": proof, "text": text}
+end
+
+define verifyBlocks with blocks, startPrevious, startIndex
+  if (kind with blocks) != "list"
+    return false
+  end
+  let previous be startPrevious
+  let want be startIndex
+  let i be 0
+  while i < (length with blocks)
+    let block be blocks at i
+    if (kind with block) != "map"
+      return false
+    end
+    if not (has with block, "index")
+      return false
+    end
+    if not (has with block, "previous")
+      return false
+    end
+    if not (has with block, "proof")
+      return false
+    end
+    if not (has with block, "text")
+      return false
+    end
+    if not (textOk with (block at "text"))
+      return false
+    end
+    if (block at "index") != want
+      return false
+    end
+    if (block at "previous") != previous
+      return false
+    end
+    let proof be makeProof with (block at "index"), (block at "previous"), (block at "text")
+    if (block at "proof") != proof
+      return false
+    end
+    let previous be block at "proof"
+    let want be want + 1
+    let i be i + 1
+  end
+  return true
+end
+
+define verifyChain
+  if not (exists with "data/chain/head.json")
+    return false
+  end
+  try
+    let head be parse with (read with "data/chain/head.json")
+    let lastSeg be head at "segment"
+    let n be 1
+    let previous be "0"
+    let want be 0
+    let lastProof be "0"
+    let lastIndex be 0 - 1
+    while n <= lastSeg
+      let raw be read with (segmentPath with n)
+      if (length with raw) > 1000000
+        return false
+      end
+      let seg be parse with raw
+      if (seg at "link") != previous
+        return false
+      end
+      let blocks be seg at "blocks"
+      if not (verifyBlocks with blocks, previous, want)
+        return false
+      end
+      if (length with blocks) > 0
+        let last be blocks at ((length with blocks) - 1)
+        let previous be last at "proof"
+        let want be (last at "index") + 1
+        let lastProof be last at "proof"
+        let lastIndex be last at "index"
+      end
+      let n be n + 1
+    end
+    if (head at "index") != lastIndex
+      return false
+    end
+    if (head at "proof") != lastProof
+      return false
+    end
+    return true
+  miss problem
+    return false
+  end
+end
+
+define writeHead with segment, index, proof
+  write with "data/chain/head.json", json with {"segment": segment, "index": index, "proof": proof}
+end
+
+define writeGenesis
+  let block be genesisBlock
+  let blocks be []
+  push with blocks, block
+  write with (segmentPath with 1), json with {"link": "0", "blocks": blocks}
+  writeHead with 1, 0, (block at "proof")
+end
+
+define migrateOld
+  try
+    let old be parse with (read with "data/chain.json")
+    if (kind with old) != "list"
+      return false
+    end
+    if (length with old) < 1
+      return false
+    end
+    let mapped be []
+    let i be 0
+    while i < (length with old)
+      let src be old at i
+      let text be ""
+      if has with src, "text"
+        let text be src at "text"
+      end
+      let previous be "0"
+      if has with src, "previous"
+        let previous be src at "previous"
+      end
+      if has with src, "previousHash"
+        let previous be src at "previousHash"
+      end
+      let index be i
+      if has with src, "index"
+        let index be src at "index"
+      end
+      let block be {"index": index, "previous": previous, "text": text, "proof": makeProof with index, previous, text}
+      push with mapped, block
+      let i be i + 1
+    end
+    if not (verifyBlocks with mapped, "0", 0)
+      return false
+    end
+    write with (segmentPath with 1), json with {"link": "0", "blocks": mapped}
+    let last be mapped at ((length with mapped) - 1)
+    writeHead with 1, (last at "index"), (last at "proof")
+    erase with "data/chain.json"
+    return true
+  miss problem
+    return false
+  end
+end
+
+define bootChain
+  if exists with "data/chain/head.json"
+    return verifyChain
+  end
+  if exists with "data/chain.json"
+    return migrateOld
+  end
+  writeGenesis
+  return true
+end
+
+define loadBlocks
+  if not verifyChain
+    return none
+  end
+  let head be parse with (read with "data/chain/head.json")
+  let all be []
+  let n be 1
+  while n <= (head at "segment")
+    let seg be parse with (read with (segmentPath with n))
+    let blocks be seg at "blocks"
+    let i be 0
+    while i < (length with blocks)
+      push with all, (blocks at i)
+      let i be i + 1
+    end
+    let n be n + 1
+  end
+  return all
+end
+
+define clientField with block, first, second
+  if has with block, first
+    return block at first
+  end
+  if has with block, second
+    return block at second
+  end
+  return none
+end
+
+define appendBlock with body
+  if not verifyChain
+    return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
+  end
+  let block be none
+  try
+    let block be parse with body
+  miss problem
+    return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
+  end
+  if (kind with block) != "map"
+    return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
+  end
+  if not (has with block, "text")
+    return "{\"ok\":false,\"status\":400,\"error\":\"text is required\"}"
+  end
+  let text be block at "text"
+  if not (textOk with text)
+    return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
+  end
+  let head be parse with (read with "data/chain/head.json")
+  let index be (head at "index") + 1
+  let previous be head at "proof"
+  let proof be makeProof with index, previous, text
+  let givenPrev be clientField with block, "previous", "previousHash"
+  if givenPrev != none
+    if givenPrev != previous
+      return "{\"ok\":false,\"status\":400,\"error\":\"previous does not match\"}"
+    end
+  end
+  let givenProof be clientField with block, "proof", "hash"
+  if givenProof != none
+    if givenProof != proof
+      return "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
+    end
+  end
+  let stored be {"index": index, "previous": previous, "proof": proof, "text": text}
+  let segNo be head at "segment"
+  let raw be read with (segmentPath with segNo)
+  let seg be parse with raw
+  let extra be json with stored
+  if ((length with raw) + (length with extra) + 2) > 524288
+    if segNo >= 64
+      return "{\"ok\":false,\"status\":507,\"error\":\"chain full\"}"
+    end
+    let fresh be []
+    push with fresh, stored
+    let segNo be segNo + 1
+    write with (segmentPath with segNo), json with {"link": previous, "blocks": fresh}
+  else
+    let grown be []
+    let i be 0
+    while i < (length with (seg at "blocks"))
+      push with grown, ((seg at "blocks") at i)
+      let i be i + 1
+    end
+    push with grown, stored
+    write with (segmentPath with segNo), json with {"link": (seg at "link"), "blocks": grown}
+  end
+  writeHead with segNo, index, proof
+  return "{\"ok\":true,\"accepted\":true,\"index\":" + (text with index) + ",\"proof\":" + (json with proof) + "}"
 end
 
 define route with method, path, body
+  if path == "/chain"
+    if not (exists with "data/chain/head.json")
+      bootChain
+    end
+  end
+  if path == "/block"
+    if not (exists with "data/chain/head.json")
+      bootChain
+    end
+  end
   if path == "/health"
     return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
   end
@@ -41,30 +318,23 @@ define route with method, path, body
     return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\"}"
   end
   if path == "/info"
-    return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"forevercouchgang.blockchain\",\"chainId\":\"local-demo\",\"mining\":\"local-por\",\"miningNetwork\":false,\"payments\":false}"
+    return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"local\",\"chainId\":\"local-demo\",\"mining\":\"local\",\"miningNetwork\":false,\"payments\":false}"
   end
   if path == "/connect"
     return "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
   end
   if path == "/chain"
     if method == "GET"
-      return json with (loadChain)
+      let blocks be loadBlocks
+      if blocks == none
+        return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
+      end
+      return json with blocks
     end
   end
   if path == "/block"
     if method == "POST"
-      let chain be loadChain
-      let block be parse with body
-      let previous be block at "previousHash"
-      if not (previous == (tipHash with chain))
-        return "{\"ok\":false,\"status\":403,\"error\":\"block does not link to the tip\"}"
-      end
-      if not (porOk with (block at "por"))
-        return "{\"ok\":false,\"status\":403,\"error\":\"block needs a local Proof of Rot\"}"
-      end
-      push with chain, block
-      write with "data/chain.json", json with chain
-      return "{\"ok\":true,\"accepted\":true}"
+      return appendBlock with body
     end
   end
   if path == "/mine"
@@ -74,8 +344,10 @@ define route with method, path, body
 end
 
 define main
-  let chain be []
-  push with chain, genesis
-  write with "data/chain.json", json with chain
-  listen with 8080
+  let port be 8080
+  if (length with args) > 0
+    let port be number with (args at 0)
+  end
+  bootChain
+  listen with port
 end

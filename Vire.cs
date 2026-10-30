@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -114,6 +115,9 @@ sealed class Budget
     public int MaxWhilePasses = 1000000;
     public int Runs;
     public int MaxRuns = 8;
+    public int Output;
+    public int MaxOutput = 1000000;
+    public long DeadlineUtcTicks;
 
     public void ApplyStepLimit(int limit)
     {
@@ -121,13 +125,44 @@ sealed class Budget
         MaxSteps = limit;
         MaxWhilePasses = limit;
     }
+
+    public static Budget ForRequest(Budget parent)
+    {
+        Budget fresh = new Budget();
+        if (parent != null)
+        {
+            fresh.MaxSteps = parent.MaxSteps;
+            fresh.MaxCalls = parent.MaxCalls;
+            fresh.MaxWhilePasses = parent.MaxWhilePasses;
+            fresh.MaxRuns = parent.MaxRuns;
+            fresh.MaxOutput = parent.MaxOutput;
+        }
+        fresh.DeadlineUtcTicks = DateTime.UtcNow.AddSeconds(5).Ticks;
+        return fresh;
+    }
+
+    public bool DeadlinePassed()
+    {
+        return DeadlineUtcTicks != 0 && DateTime.UtcNow.Ticks > DeadlineUtcTicks;
+    }
+}
+
+static class ListenHooks
+{
+    internal static Exception RouteException;
+    internal static readonly object ChainRouteLock = new object();
+
+    internal static void Reset()
+    {
+        RouteException = null;
+    }
 }
 
 sealed class Machine
 {
     const int MaxItems = 100000;
     const int MaxText = 1000000;
-    Budget budget = new Budget();
+    internal Budget budget = new Budget();
     List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
     string root;
@@ -155,6 +190,7 @@ sealed class Machine
     int inkR, inkG, inkB;
     string watchName;
     int watchLine;
+    internal int ListenPort;
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
@@ -193,13 +229,19 @@ sealed class Machine
         else if (value is double) whole = (int)(double)value;
         else if (value is string && int.TryParse((string)value, out whole)) { }
         else throw new VireError("port must be a whole number", line);
-        if (whole < 1024 || whole > 65535) throw new VireError("port must be from 1024 to 65535", line);
-        if (whole == 7099 || whole == 8778) throw new VireError("that port is reserved", line);
+        if (whole != 0 && (whole < 1024 || whole > 65535)) throw new VireError("port must be from 1024 to 65535", line);
+        if (IsReservedListenPort(whole)) throw new VireError("that port is reserved", line);
         return whole;
+    }
+
+    static bool IsReservedListenPort(int port)
+    {
+        return port == 7099 || port == 8778 || port == 7071 || port == 7072 || port == 7093 || port == 17841 || port == 17843;
     }
 
     void Step(int line)
     {
+        if (budget.DeadlinePassed()) throw new VireError("request ran too long", line);
         budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
         if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
     }
@@ -299,7 +341,7 @@ sealed class Machine
                 string parent = Path.GetDirectoryName(path);
                 if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
                 if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, text);
-                else File.WriteAllText(path, text);
+                else VireFiles.WriteAllText(path, text);
             }
             catch (IOException) { throw new VireError("could not write that file", line); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
@@ -670,7 +712,7 @@ sealed class Machine
         {
             string path = SafePath(args[0], line);
             VirePaths.RefuseProgram(path, line);
-            if (File.Exists(path)) File.Delete(path);
+            VireFiles.Erase(path);
             return true;
         }
         if (name == "copy")
@@ -678,9 +720,9 @@ sealed class Machine
             string from = SafePath(args[0], line);
             string to = SafePath(args[1], line);
             VirePaths.RefuseProgram(to, line);
-            string parent = Path.GetDirectoryName(to);
-            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-            File.Copy(from, to, true);
+            try { VireFiles.Copy(from, to); }
+            catch (IOException) { throw new VireError("could not write that file", line); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
             return args[1];
         }
         if (name == "append")
@@ -689,9 +731,9 @@ sealed class Machine
             VirePaths.RefuseProgram(path, line);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line);
-            string parent = Path.GetDirectoryName(path);
-            if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-            File.AppendAllText(path, text, Encoding.UTF8);
+            try { VireFiles.AppendAllText(path, text); }
+            catch (IOException) { throw new VireError("could not write that file", line); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
             return text;
         }
         if (name == "round")
@@ -960,7 +1002,28 @@ sealed class Machine
     }
 
 
+    const int ListenSlotsMax = 64;
+    const int MaxHeaderBlock = 16384;
+    const int MaxRequestLine = 8192;
+    const int MaxRequestBody = 1000000;
+    static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
+
     void Listen(int port, int line)
+    {
+        using (CancellationTokenSource cts = new CancellationTokenSource())
+        {
+            ConsoleCancelEventHandler onCancel = delegate (object sender, ConsoleCancelEventArgs e)
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+            Console.CancelKeyPress += onCancel;
+            try { ListenCore(port, line, cts.Token); }
+            finally { Console.CancelKeyPress -= onCancel; }
+        }
+    }
+
+    internal void ListenCore(int port, int line, CancellationToken stop)
     {
         if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
         string envPort = Environment.GetEnvironmentVariable("PORT");
@@ -969,34 +1032,85 @@ sealed class Machine
         string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
         if (publish && (string.IsNullOrEmpty(token) || token.Length < 16))
             throw new VireError("a public listener needs FCG_API_TOKEN of at least 16 characters", line);
-        System.Net.IPAddress bind = publish ? System.Net.IPAddress.Any : System.Net.IPAddress.Loopback;
-        System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(bind, port);
-        listener.Start();
-        Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + port);
+        IPAddress bind = publish ? IPAddress.Any : IPAddress.Loopback;
+        TcpListener listener = BindListen(bind, port);
+        int actual = ((IPEndPoint)listener.LocalEndpoint).Port;
+        if (IsReservedListenPort(actual))
+        {
+            listener.Stop();
+            throw new VireError("that port is reserved", line);
+        }
+        ListenPort = actual;
+        Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + actual);
         try
         {
-            while (true)
+            while (!stop.IsCancellationRequested)
             {
-                System.Net.Sockets.TcpClient client = listener.AcceptTcpClient();
-                client.ReceiveTimeout = 5000;
-                client.SendTimeout = 5000;
-                try { AnswerApi(client, line); }
-                catch (IOException)
+                IAsyncResult pending = listener.BeginAcceptTcpClient(null, null);
+                WaitHandle[] wait = new WaitHandle[] { pending.AsyncWaitHandle, stop.WaitHandle };
+                int which = WaitHandle.WaitAny(wait);
+                if (which != 0)
                 {
-                    Console.Error.WriteLine("vire: internal error (IOException)");
+                    try { listener.EndAcceptTcpClient(pending).Close(); } catch (Exception) { }
+                    break;
                 }
-                catch (VireError)
+                TcpClient client;
+                try { client = listener.EndAcceptTcpClient(pending); }
+                catch (ObjectDisposedException) { break; }
+                catch (SocketException) { continue; }
+                if (!ListenSlots.Wait(0))
                 {
-                    try { Send(client.GetStream(), 500, "application/json", "{\"error\":\"route failed\"}"); }
-                    catch (Exception sendError)
+                    try { SendApi(client.GetStream(), 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n"); }
+                    catch (Exception) { }
+                    try { client.Close(); } catch (Exception) { }
+                    continue;
+                }
+                ThreadPool.QueueUserWorkItem(delegate (object state)
+                {
+                    TcpClient held = (TcpClient)state;
+                    try { AnswerApi(held, line, token, publish, stop); }
+                    catch (IOException)
                     {
-                        Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
+                        Console.Error.WriteLine("vire: internal error (IOException)");
                     }
-                }
-                finally { client.Close(); }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
+                    }
+                    finally
+                    {
+                        try { held.Close(); } catch (Exception) { }
+                        ListenSlots.Release();
+                    }
+                }, client);
             }
+            DateTime drain = DateTime.UtcNow.AddSeconds(5);
+            while (ListenSlots.CurrentCount < ListenSlotsMax && DateTime.UtcNow < drain)
+                Thread.Sleep(50);
         }
-        finally { listener.Stop(); }
+        finally
+        {
+            try { listener.Stop(); } catch (Exception) { }
+        }
+    }
+
+    static TcpListener BindListen(IPAddress bind, int port)
+    {
+        if (port != 0)
+        {
+            TcpListener once = new TcpListener(bind, port);
+            once.Start();
+            return once;
+        }
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            TcpListener listener = new TcpListener(bind, 0);
+            listener.Start();
+            int actual = ((IPEndPoint)listener.LocalEndpoint).Port;
+            if (!IsReservedListenPort(actual)) return listener;
+            listener.Stop();
+        }
+        throw new VireError("that port is reserved", 1);
     }
 
     static int HeaderEnd(byte[] buffer, int got)
@@ -1014,86 +1128,268 @@ sealed class Machine
             if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
             {
                 int value;
-                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return 65537;
+                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return -2;
                 return value;
             }
         }
         return -1;
     }
 
-    void AnswerApi(System.Net.Sockets.TcpClient client, int line)
+    static bool HasChunked(string head)
+    {
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
+                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+        return false;
+    }
+
+    static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
+    {
+        while (got < want)
+        {
+            int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
+            if (remain <= 0) return false;
+            stream.ReadTimeout = Math.Max(1, remain);
+            int n;
+            try { n = stream.Read(buffer, got, want - got); }
+            catch (IOException) { return false; }
+            if (n <= 0) return false;
+            got += n;
+        }
+        return true;
+    }
+
+    static bool ReadOnce(NetworkStream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
+    {
+        if (got >= maxGot) return false;
+        int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
+        if (remain <= 0) return false;
+        stream.ReadTimeout = Math.Max(1, remain);
+        int n;
+        try { n = stream.Read(buffer, got, maxGot - got); }
+        catch (IOException) { return false; }
+        if (n <= 0) return false;
+        got += n;
+        return true;
+    }
+
+    Machine ForkRequest()
+    {
+        Machine child = new Machine(funcs, root);
+        child.UseShared(Budget.ForRequest(budget));
+        child.UseArgs(programArgs);
+        return child;
+    }
+
+    void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop)
     {
         NetworkStream stream = client.GetStream();
-        byte[] buffer = new byte[65536 + 8192];
+        DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
+        byte[] buffer = new byte[MaxHeaderBlock + MaxRequestBody + 16];
         int got = 0;
         int headerEnd = -1;
-        while (got < buffer.Length && headerEnd < 0)
+        while (headerEnd < 0)
         {
-            int n = stream.Read(buffer, got, buffer.Length - got);
-            if (n <= 0) break;
-            got += n;
+            if (stop.IsCancellationRequested) return;
+            if (got >= MaxHeaderBlock)
+            {
+                SendApi(stream, 431, "{\"error\":\"headers too large\"}", null);
+                return;
+            }
+            int before = got;
+            if (!ReadOnce(stream, buffer, ref got, MaxHeaderBlock, headerDead))
+            {
+                if (HeaderEnd(buffer, got) >= 0) break;
+                SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
+                return;
+            }
+            if (got == before) { SendApi(stream, 408, "{\"error\":\"timeout\"}", null); return; }
             headerEnd = HeaderEnd(buffer, got);
         }
-        if (headerEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
-        string head = Encoding.UTF8.GetString(buffer, 0, headerEnd);
+        if (headerEnd < 0)
+        {
+            SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
+            return;
+        }
+        int lineEnd = -1;
+        for (int i = 0; i + 1 < headerEnd; i++)
+        {
+            if (buffer[i] == 13 && buffer[i + 1] == 10) { lineEnd = i; break; }
+        }
+        if (lineEnd < 0 || lineEnd > MaxRequestLine)
+        {
+            SendApi(stream, 431, "{\"error\":\"request line too large\"}", null);
+            return;
+        }
+        string head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
+        string requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
+        string[] bits = requestLine.Split(' ');
+        if (bits.Length < 2 || bits[1].IndexOf("..") >= 0)
+        {
+            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
+        }
+        if (HasChunked(head))
+        {
+            SendApi(stream, 501, "{\"error\":\"chunked encoding is not supported\"}", null);
+            return;
+        }
         int bodyAt = headerEnd + 4;
         int contentLength = ContentLengthOf(head);
-        if (contentLength > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-        if (contentLength >= 0)
+        if (contentLength == -2)
         {
-            int need = bodyAt + contentLength;
-            if (need > buffer.Length) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-            while (got < need)
-            {
-                int n = stream.Read(buffer, got, need - got);
-                if (n <= 0) break;
-                got += n;
-            }
-            if (got < need) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+            return;
         }
-        string request = Encoding.UTF8.GetString(buffer, 0, got);
-        int lineEnd = request.IndexOf("\r\n");
-        if (lineEnd < 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
-        string[] bits = request.Substring(0, lineEnd).Split(' ');
-        if (bits.Length < 2 || bits[1].IndexOf("..") >= 0) { Send(stream, 400, "application/json", "{\"error\":\"bad request\"}"); return; }
+        string method = bits[0];
+        bool expectsBody = method == "POST" || method == "PUT" || method == "PATCH";
+        if (expectsBody && contentLength < 0)
+        {
+            SendApi(stream, 411, "{\"error\":\"content length required\"}", null);
+            return;
+        }
+        if (contentLength > MaxRequestBody)
+        {
+            SendApi(stream, 413, "{\"error\":\"body too large\"}", null);
+            return;
+        }
+        if (contentLength < 0) contentLength = 0;
+        int need = bodyAt + contentLength;
+        DateTime bodyDead = DateTime.UtcNow.AddSeconds(10);
+        if (got < need)
+        {
+            if (!ReadTimed(stream, buffer, ref got, need, bodyDead))
+            {
+                SendApi(stream, got < need ? 408 : 400, "{\"error\":\"timeout\"}", null);
+                return;
+            }
+        }
         string path = bits[1];
         int queryAt = path.IndexOf('?');
         if (queryAt >= 0) path = path.Substring(0, queryAt);
-        string body = Encoding.UTF8.GetString(buffer, bodyAt, got - bodyAt);
-        if (body.Length > 65536) { Send(stream, 400, "application/json", "{\"error\":\"body too large\"}"); return; }
-        string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
-        bool health = path == "/health" && (bits[0] == "GET" || bits[0] == "HEAD");
-        if (!health && !Program.HeaderTokenMatches(head, token))
+        string body = Encoding.UTF8.GetString(buffer, bodyAt, contentLength);
+        bool health = path == "/health" && (method == "GET" || method == "HEAD");
+        bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
+        if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
         {
-            Send(stream, 401, "application/json", "{\"error\":\"unauthorized\"}");
+            SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
+            return;
+        }
+        if (!health && publish && !tokenOn)
+        {
+            SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
         List<object> call = new List<object>();
-        call.Add(bits[0]);
+        call.Add(method);
         call.Add(path);
         call.Add(body);
+        Machine worker = ForkRequest();
         object result;
-        try { result = Call("route", call, line); }
-        catch (VireError) { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); return; }
+        bool chain = path == "/block" || path == "/chain";
+        if (chain) Monitor.Enter(ListenHooks.ChainRouteLock);
+        try
+        {
+            if (ListenHooks.RouteException != null && path == "/boom")
+                throw ListenHooks.RouteException;
+            result = worker.Call("route", call, line);
+        }
+        catch (VireError err)
+        {
+            if (IsRequestBudget(err))
+                SendApi(stream, 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n");
+            else
+                SendApi(stream, 500, "{\"error\":\"route failed\"}", null);
+            return;
+        }
+        catch (HaltSignal)
+        {
+            SendApi(stream, 500, "{\"error\":\"route failed\"}", null);
+            return;
+        }
         catch (Exception ex)
         {
             if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
                 Console.Error.WriteLine(ex.ToString());
             else
                 Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
-            try { Send(stream, 500, "application/json", "{\"error\":\"route failed\"}"); }
+            try { SendApi(stream, 500, "{\"error\":\"route failed\"}", null); }
             catch (Exception sendError)
             {
                 Console.Error.WriteLine("vire: internal error (" + sendError.GetType().Name + ")");
             }
             return;
         }
+        finally
+        {
+            if (chain) Monitor.Exit(ListenHooks.ChainRouteLock);
+        }
         string text = result as string;
         if (text == null) text = Show(result);
-        int code = 200;
-        if (text != null && text.IndexOf("\"status\":404") >= 0) code = 404;
-        if (text != null && text.IndexOf("\"status\":403") >= 0) code = 403;
-        Send(stream, code, "application/json", text ?? "null");
+        if (text == null) text = "null";
+        if (text.Length > worker.budget.MaxOutput) text = "{\"error\":\"response too large\"}";
+        worker.budget.Output = text.Length;
+        int code = StatusOf(text, 200);
+        SendApi(stream, code, text, null);
+    }
+
+    static bool IsRequestBudget(VireError err)
+    {
+        string msg = err.Message;
+        return msg.IndexOf("request ran too long", StringComparison.Ordinal) >= 0
+            || msg.IndexOf("program ran too long", StringComparison.Ordinal) >= 0
+            || msg.IndexOf("while ran too long", StringComparison.Ordinal) >= 0;
+    }
+
+    static int StatusOf(string text, int fallback)
+    {
+        if (text == null) return fallback;
+        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400 };
+        for (int i = 0; i < codes.Length; i++)
+        {
+            string needle = "\"status\":" + codes[i];
+            if (text.IndexOf(needle, StringComparison.Ordinal) >= 0) return codes[i];
+        }
+        return fallback;
+    }
+
+    static string ReasonOf(int code)
+    {
+        if (code == 200) return "OK";
+        if (code == 206) return "Partial Content";
+        if (code == 400) return "Bad Request";
+        if (code == 401) return "Unauthorized";
+        if (code == 403) return "Forbidden";
+        if (code == 404) return "Not Found";
+        if (code == 408) return "Request Timeout";
+        if (code == 411) return "Length Required";
+        if (code == 413) return "Payload Too Large";
+        if (code == 431) return "Request Header Fields Too Large";
+        if (code == 500) return "Internal Server Error";
+        if (code == 501) return "Not Implemented";
+        if (code == 503) return "Service Unavailable";
+        if (code == 507) return "Insufficient Storage";
+        return "OK";
+    }
+
+    static void SendApi(NetworkStream stream, int code, string body, string extra)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(body ?? "");
+        string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
+            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Length: " + data.Length + "\r\n"
+            + "Connection: close\r\n"
+            + "X-Content-Type-Options: nosniff\r\n"
+            + "Cache-Control: no-store\r\n"
+            + (extra ?? "")
+            + "\r\n";
+        byte[] prefix = Encoding.ASCII.GetBytes(head);
+        stream.Write(prefix, 0, prefix.Length);
+        if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
     void Serve(int port, int line)
@@ -1315,6 +1611,7 @@ sealed class Machine
             {
                 while (Truth(Eval(stmt[1], env)))
                 {
+                    if (budget.DeadlinePassed()) throw new VireError("request ran too long", (int)stmt[3]);
                     budget.WhilePasses++;
                     if (budget.WhilePasses > budget.MaxWhilePasses) throw new VireError("while ran too long", (int)stmt[3]);
                     try { ExecBlock((List<object>)stmt[2], env); }
@@ -2133,10 +2430,10 @@ sealed class Json
 {
     public static string Write(object value)
     {
-        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0, new int[1]);
+        return WriteValue(value, new HashSet<object>(ReferenceEqualityComparer.Instance), 0);
     }
 
-    static string WriteValue(object value, HashSet<object> path, int nest, int[] used)
+    static string WriteValue(object value, HashSet<object> path, int nest)
     {
         if (nest > 256) throw new VireError("json is nested too deeply", 1);
         string text;
@@ -2161,7 +2458,7 @@ sealed class Json
                 for (int i = 0; i < list.Count; i++)
                 {
                     if (i > 0) body.Append(',');
-                    body.Append(WriteValue(list[i], path, nest + 1, used));
+                    body.Append(WriteValue(list[i], path, nest + 1));
                 }
                 body.Append(']');
                 text = body.ToString();
@@ -2181,9 +2478,9 @@ sealed class Json
                 {
                     if (!first) body.Append(',');
                     first = false;
-                    body.Append(WriteValue(pair.Key, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Key, path, nest + 1));
                     body.Append(':');
-                    body.Append(WriteValue(pair.Value, path, nest + 1, used));
+                    body.Append(WriteValue(pair.Value, path, nest + 1));
                 }
                 body.Append('}');
                 text = body.ToString();
@@ -2191,8 +2488,7 @@ sealed class Json
             finally { path.Remove(map); }
         }
         else text = WriteString(Machine.Show(value));
-        used[0] += text.Length;
-        if (used[0] > 1000000) throw new VireError("text is too large to write", 1);
+        if (text.Length > 1000000) throw new VireError("text is too large to write", 1);
         return text;
     }
 
@@ -2387,7 +2683,7 @@ sealed class Program
         machine.Run();
     }
 
-    static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
+    internal static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
     {
         string full = Path.GetFullPath(program);
         if (!full.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))

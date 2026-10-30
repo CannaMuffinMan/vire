@@ -75,6 +75,7 @@ sealed class CompiledMachine
 
     object[] Run(List<object> step, Dictionary<string, object> env)
     {
+        if (budget.DeadlinePassed()) throw new VireError("request ran too long", 1);
         budget.Steps++;
         if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", 1);
         string op = (string)step[0];
@@ -411,7 +412,7 @@ sealed class CompiledMachine
                 string parent = Path.GetDirectoryName(path);
                 if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
                 if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, payload);
-                else File.WriteAllText(path, payload);
+                else VireFiles.WriteAllText(path, payload);
             }
             catch (IOException) { throw new VireError("could not write that file", 1); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", 1); }
