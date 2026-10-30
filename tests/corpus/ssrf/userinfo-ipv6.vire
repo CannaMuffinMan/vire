@@ -1,0 +1,3 @@
+define main
+  fetch with "http://user@[::1]:9/"
+end

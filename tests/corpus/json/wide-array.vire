@@ -1,0 +1,16 @@
+define main
+  let n be 0
+  let bits be ["["]
+  while n < 500
+    push with bits, "1"
+    push with bits, ","
+    let n be n + 1
+  end
+  parse with ((join with bits, "") + "1]")
+  let huge be []
+  let i be 0
+  while i < 100001
+    push with huge, 1
+    let i be i + 1
+  end
+end

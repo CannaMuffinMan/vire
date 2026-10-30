@@ -1,0 +1,3 @@
+define main
+  read with "data/note.txt."
+end

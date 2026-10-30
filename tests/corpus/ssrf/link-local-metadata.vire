@@ -1,0 +1,3 @@
+define main
+  fetch with "http://169.254.169.254/"
+end

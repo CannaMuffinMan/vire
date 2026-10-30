@@ -1,0 +1,3 @@
+define main
+  read with "data/' UNION SELECT ../secret.txt"
+end

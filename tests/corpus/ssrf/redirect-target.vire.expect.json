@@ -1,0 +1,24 @@
+{
+  "class": "ssrf",
+  "kind": "source",
+  "exit": 1,
+  "stderr_contains": [
+    "private"
+  ],
+  "stderr_forbids": [
+    "internal error",
+    "at Vire.",
+    "CryptographicException",
+    "StackOverflow"
+  ],
+  "stdout_contains": [],
+  "stdout_forbids": [
+    "PWNED",
+    "OUTSIDE-SECRET",
+    "root:x:"
+  ],
+  "compile_reject": [
+    "capabilities"
+  ],
+  "notes": "Redirect hops are re-checked; a hop to this private target is refused the same way as a direct fetch."
+}

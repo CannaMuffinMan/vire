@@ -1,0 +1,3 @@
+define main
+  fetch with "http://localhost:9/"
+end

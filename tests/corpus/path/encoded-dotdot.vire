@@ -1,0 +1,3 @@
+define main
+  read with "data/..%2fsecret.txt"
+end

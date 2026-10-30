@@ -1,0 +1,3 @@
+define main
+  fetch with "javascript:alert(1)"
+end
