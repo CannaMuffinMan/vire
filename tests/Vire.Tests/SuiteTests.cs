@@ -27,6 +27,7 @@ public class SuiteTests
         programs.Add(Path.Combine(root, "tests.vire"));
         AddMains(programs, Path.Combine(root, "checks"));
         AddMains(programs, Path.Combine(root, "systems"));
+        // Dual-mode identity for this suite is ConformanceTests.SuiteProgramsMatchInBothModes.
         // Local programs declare success as a line that is exactly "pass"
         // or that ends with " pass" (for example "net pass").
         Assert.Contains(programs, path => path.EndsWith("tests.vire", StringComparison.OrdinalIgnoreCase));

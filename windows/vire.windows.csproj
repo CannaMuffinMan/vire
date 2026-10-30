@@ -13,7 +13,6 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\Vire.cs" />
-    <Compile Include="..\Compiled.cs" />
+    <Compile Include="../*.cs" />
   </ItemGroup>
 </Project>

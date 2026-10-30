@@ -17,18 +17,31 @@ sealed class CompiledProgram
         catch (UnauthorizedAccessException) { throw new VireError("could not read that file", 1); }
         string text = Encoding.UTF8.GetString(VireSeal.OpenBytes(packed));
         object tree = Json.Read(text, 1);
-        Dictionary<string, object> root = tree as Dictionary<string, object>;
-        if (root == null || !root.ContainsKey("funcs")) throw new VireError("compiled file has no funcs", 1);
-        Dictionary<string, object> funcs = new Dictionary<string, object>();
-        foreach (object item in (List<object>)root["funcs"])
-        {
-            Dictionary<string, object> func = (Dictionary<string, object>)item;
-            funcs[(string)func["name"]] = func;
-        }
+        Dictionary<string, object> funcs = LoadFuncs(tree);
         Budget budget = new Budget();
         budget.ApplyStepLimit(Program.BudgetOf(""));
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
         machine.Call("main", new List<object>(), 1, 1);
+    }
+
+    internal static Dictionary<string, object> LoadFuncs(object tree)
+    {
+        Dictionary<string, object> root = tree as Dictionary<string, object>;
+        if (root == null || !root.ContainsKey("funcs")) throw new VireError("compiled file has no funcs", 1);
+        List<object> items = root["funcs"] as List<object>;
+        if (items == null) throw new VireError("bad compiled operand type", 1, 1);
+        Dictionary<string, object> funcs = new Dictionary<string, object>();
+        foreach (object item in items)
+        {
+            Dictionary<string, object> func = item as Dictionary<string, object>;
+            if (func == null) throw new VireError("bad compiled operand type", 1, 1);
+            object rawName;
+            if (!func.TryGetValue("name", out rawName) || !(rawName is string))
+                throw new VireError("bad compiled operand type", 1, 1);
+            funcs[(string)rawName] = func;
+        }
+        CompiledCheck.Program(funcs);
+        return funcs;
     }
 }
 
@@ -80,7 +93,7 @@ sealed class CompiledMachine
 
     public object Call(string name, List<object> args, int line, int col)
     {
-        if (!funcs.ContainsKey(name)) return Builtin(name, args, line, col);
+        if (!funcs.ContainsKey(name)) return SafeBuiltin(name, args, line, col);
         Dictionary<string, object> func = (Dictionary<string, object>)funcs[name];
         List<object> names = (List<object>)func["params"];
         if (names.Count != args.Count) throw new VireError(name + " argument count", 1, 1);
@@ -90,9 +103,13 @@ sealed class CompiledMachine
         if (depth > 64) throw new VireError("definitions called too deeply", 1, 1);
         try
         {
-            foreach (object step in (List<object>)func["body"])
+            List<object> body = func["body"] as List<object>;
+            if (body == null) throw new VireError("bad compiled operand type", line, col);
+            foreach (object raw in body)
             {
-                object[] hit = Run((List<object>)step, env);
+                List<object> step = raw as List<object>;
+                if (step == null) throw new VireError("bad compiled operand type", line, col);
+                object[] hit = Run(step, env);
                 if (hit != null)
                 {
                     if (hit.Length > 1 && (string)hit[1] == "skip") throw new VireError("skip is only valid inside while or for", 1, 1);
@@ -107,10 +124,31 @@ sealed class CompiledMachine
 
     object[] Run(List<object> step, Dictionary<string, object> env)
     {
+        try
+        {
+            return RunCore(step, env);
+        }
+        catch (VireError) { throw; }
+        catch (HaltSignal) { throw; }
+        catch (InvalidCastException) { Fail("bad compiled operand type", step); return null; }
+        catch (NullReferenceException) { Fail("bad compiled operand type", step); return null; }
+        catch (IndexOutOfRangeException) { Fail("compiled stack underflow", step); return null; }
+        catch (ArgumentOutOfRangeException) { Fail("compiled stack underflow", step); return null; }
+    }
+
+    object[] RunCore(List<object> step, Dictionary<string, object> env)
+    {
+        if (step == null || step.Count < 1) Fail("compiled stack underflow", step);
         if (budget.DeadlinePassed()) Fail("request ran too long", step);
         budget.Steps++;
         if (budget.Steps > budget.MaxSteps) Fail("program ran too long and was stopped", step);
-        string op = (string)step[0];
+        string op = step[0] as string;
+        if (op == null) Fail("bad compiled opcode type", step);
+        if (op == "jump" || op == "goto")
+        {
+            if (step.Count < 2) Fail("compiled stack underflow", step);
+            Fail("compiled jump is out of range", step);
+        }
         if (op == "let") { env[(string)step[1]] = Eval((List<object>)step[2], env); return null; }
         if (op == "say") { Console.WriteLine(Show(Eval((List<object>)step[1], env))); return null; }
         if (op == "return") return new object[] { Eval((List<object>)step[1], env), "return" };
@@ -184,7 +222,7 @@ sealed class CompiledMachine
         return null;
     }
 
-    static bool IsWholeNum(object value)
+    internal static bool IsWholeNum(object value)
     {
         if (value is int) return true;
         if (value is double)
@@ -221,9 +259,12 @@ sealed class CompiledMachine
 
     object[] Block(List<object> steps, Dictionary<string, object> env)
     {
-        foreach (object step in steps)
+        if (steps == null) throw new VireError("bad compiled operand type", 1, 1);
+        foreach (object raw in steps)
         {
-            object[] hit = Run((List<object>)step, env);
+            List<object> step = raw as List<object>;
+            if (step == null) throw new VireError("bad compiled operand type", 1, 1);
+            object[] hit = Run(step, env);
             if (hit != null) return hit;
         }
         return null;
@@ -231,8 +272,14 @@ sealed class CompiledMachine
 
     List<object> Values(List<object> exprs, Dictionary<string, object> env)
     {
+        if (exprs == null) throw new VireError("bad compiled operand type", 1, 1);
         List<object> values = new List<object>();
-        foreach (object expr in exprs) values.Add(Eval((List<object>)expr, env));
+        foreach (object expr in exprs)
+        {
+            List<object> node = expr as List<object>;
+            if (node == null) throw new VireError("bad compiled operand type", 1, 1);
+            values.Add(Eval(node, env));
+        }
         return values;
     }
 
@@ -241,8 +288,10 @@ sealed class CompiledMachine
         exprDepth++;
         try
         {
+        if (expr == null || expr.Count < 1) Fail("compiled stack underflow", expr);
         if (exprDepth > 256) Fail("expression is too deep", expr);
-        string op = (string)expr[0];
+        string op = expr[0] as string;
+        if (op == null) Fail("bad compiled opcode type", expr);
         if (op == "num") return expr[1];
         if (op == "text") return expr[1];
         if (op == "bool") return expr[1];
@@ -253,7 +302,7 @@ sealed class CompiledMachine
             object found;
             if (env.TryGetValue(called, out found)) return found;
             if (called == "args" || called == "now" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
-                return Builtin(called, new List<object>(), AsLine(expr), AsCol(expr));
+                return SafeBuiltin(called, new List<object>(), AsLine(expr), AsCol(expr));
             if (funcs.ContainsKey(called))
             {
                 Dictionary<string, object> named = (Dictionary<string, object>)funcs[called];
@@ -337,7 +386,29 @@ sealed class CompiledMachine
         Fail("unknown compiled expression " + op, expr);
         return null;
         }
+        catch (VireError) { throw; }
+        catch (HaltSignal) { throw; }
+        catch (InvalidCastException) { Fail("bad compiled operand type", expr); return null; }
+        catch (NullReferenceException) { Fail("bad compiled operand type", expr); return null; }
+        catch (IndexOutOfRangeException) { Fail("compiled stack underflow", expr); return null; }
+        catch (ArgumentOutOfRangeException) { Fail("compiled stack underflow", expr); return null; }
         finally { exprDepth--; }
+    }
+
+    object SafeBuiltin(string name, List<object> args, int line, int col)
+    {
+        try
+        {
+            if (args == null) throw new VireError("compiled stack underflow", line, col);
+            return Builtin(name, args, line, col);
+        }
+        catch (VireError) { throw; }
+        catch (HaltSignal) { throw; }
+        catch (InvalidCastException) { throw new VireError("bad compiled operand type", line, col); }
+        catch (NullReferenceException) { throw new VireError("bad compiled operand type", line, col); }
+        catch (IndexOutOfRangeException) { throw new VireError("compiled stack underflow", line, col); }
+        catch (ArgumentOutOfRangeException) { throw new VireError("compiled stack underflow", line, col); }
+        catch (ArgumentException) { throw new VireError("bad compiled operand type", line, col); }
     }
 
     object At(object target, object index, List<object> expr)

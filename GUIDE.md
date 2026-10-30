@@ -336,4 +336,4 @@ A compiled program is a `VC2` file: magic `VIRE-VC2`, version 2, a random 12-byt
 
 Vire is a general-purpose language for programs, files, packages, windows, and a local site. It does not ship a public package index, a phone store, or device-driver tooling. File and package access stays in the program folder so a sample cannot wander across the disk.
 
-Build commands use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`.
+Build commands use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`. Phase 3A done-criteria and the proving tests are listed in `PHASE3A-DONE.md`.

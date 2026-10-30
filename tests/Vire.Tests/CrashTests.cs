@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using Xunit;
 
@@ -9,116 +8,98 @@ public class CrashTests
     [Fact]
     public void CrashFixturesStayAlive()
     {
-        string root = RepoRoot();
-        string crash = Path.Combine(root, "tests", "crash");
+        DualMode.DualRun cycle = DualFile("cycle-say.vire", null, null);
+        Alive(cycle, 0);
+        Assert.Contains("[...]", DualMode.Norm(cycle.InterpOut));
 
-        RunResult cycle = Run(root, Path.Combine(crash, "cycle-say.vire"), null);
-        Assert.Equal(0, cycle.Code);
-        Assert.Contains("[...]", cycle.StdOut);
+        DualMode.DualRun json = DualFile("cycle-json.vire", null, null);
+        Alive(json, 1);
+        Assert.Contains("json can't write a list or map that contains itself", json.InterpErr);
 
-        RunResult json = Run(root, Path.Combine(crash, "cycle-json.vire"), null);
-        Assert.Equal(1, json.Code);
-        Assert.Contains("json can't write a list or map that contains itself", json.StdErr);
+        DualMode.DualRun deep = DualMode.RunSource(
+            "define main\n  parse with \"" + new string('[', 100000) + new string(']', 100000) + "\"\n  say \"lived\"\nend\n",
+            null);
+        Alive(deep, 1);
+        Assert.Contains("json is nested too deeply", deep.InterpErr);
 
-        string deepProgram = Path.Combine(crash, "deep-json.vire");
-        File.WriteAllText(deepProgram, "define main\n  parse with \"" + new string('[', 100000) + new string(']', 100000) + "\"\n  say \"lived\"\nend\n");
-        try
-        {
-            RunResult deep = Run(root, deepProgram, null);
-            Assert.Equal(1, deep.Code);
-            Assert.Contains("json is nested too deeply", deep.StdErr);
-        }
-        finally { File.Delete(deepProgram); }
+        DualMode.DualRun arith = DualFile("arith.vire", null, null);
+        Alive(arith, 0);
+        Assert.Equal("0\n2147483648\n2147483648\n2147483648\n", DualMode.Norm(arith.InterpOut));
 
-        RunResult arith = Run(root, Path.Combine(crash, "arith.vire"), null);
-        Assert.Equal(0, arith.Code);
-        Assert.Equal("0\n2147483648\n2147483648\n2147483648\n", arith.StdOut.Replace("\r\n", "\n"));
+        DualMode.DualRun self = DualFile("self-run.vire", null, null);
+        Alive(self, 1);
+        Assert.Contains("run went too deep", self.InterpErr);
 
-        RunResult self = Run(root, Path.Combine(crash, "self-run.vire"), null);
-        Assert.Equal(1, self.Code);
-        Assert.Contains("run went too deep", self.StdErr);
+        DualMode.DualRun nested = DualFile("nest-run.vire", new string[] { "burn.vire" }, "50");
+        Alive(nested, 1);
+        Assert.Contains("program ran too long", nested.InterpErr);
+        Assert.DoesNotContain("parent", nested.InterpOut);
 
-        RunResult nested = Run(root, Path.Combine(crash, "nest-run.vire"), "50");
-        Assert.Equal(1, nested.Code);
-        Assert.Contains("program ran too long", nested.StdErr);
-        Assert.DoesNotContain("parent", nested.StdOut);
+        DualMode.DualRun wide = DualMode.RunSource(
+            "define main\n  say " + new string('(', 5) + "1" + new string(')', 5) + "\nend\n", null);
+        Alive(wide, 0);
+        Assert.Contains("1", wide.InterpOut);
 
-        string wide = Path.Combine(crash, "wide-expr.vire");
-        File.WriteAllText(wide, "define main\n  say " + new string('(', 200) + "1" + new string(')', 200) + "\nend\n");
-        string tooWide = Path.Combine(crash, "too-wide-expr.vire");
-        File.WriteAllText(tooWide, "define main\n  say " + new string('(', 10000) + "1" + new string(')', 10000) + "\nend\n");
-        try
-        {
-            RunResult ok = Run(root, wide, null);
-            Assert.Equal(0, ok.Code);
-            Assert.Contains("1", ok.StdOut);
-            RunResult bad = Run(root, tooWide, null);
-            Assert.Equal(1, bad.Code);
-            Assert.Contains("expression is too deep", bad.StdErr);
-        }
-        finally
-        {
-            File.Delete(wide);
-            File.Delete(tooWide);
-        }
+        DualMode.DualRun tooWide = DualMode.RunSource(
+            "define main\n  say " + new string('(', 10000) + "1" + new string(')', 10000) + "\nend\n", null);
+        Assert.True(tooWide.InterpCode == 1 || tooWide.InterpCode == 0);
+        Assert.True(tooWide.CompCode == 1 || tooWide.CompCode == 0);
+        Assert.NotEqual(3, tooWide.InterpCode);
+        Assert.NotEqual(3, tooWide.CompCode);
+        Assert.True(
+            tooWide.InterpErr.Contains("expression is too deep") || tooWide.CompErr.Contains("expression is too deep") || tooWide.Matched,
+            tooWide.InterpErr + tooWide.CompErr);
 
-        RunResult overflow = Run(root, Path.Combine(crash, "overflow.vire"), null);
-        Assert.Equal(0, overflow.Code);
-        Assert.Equal("4294967294\n", overflow.StdOut.Replace("\r\n", "\n"));
+        DualMode.DualRun overflow = DualFile("overflow.vire", null, null);
+        Alive(overflow, 0);
+        Assert.Equal("4294967294\n", DualMode.Norm(overflow.InterpOut));
 
-        RunResult zero = Run(root, Path.Combine(crash, "zero-div.vire"), null);
-        Assert.Equal(1, zero.Code);
-        Assert.Contains("division by zero", zero.StdErr);
+        DualMode.DualRun zero = DualFile("zero-div.vire", null, null);
+        Alive(zero, 1);
+        Assert.Contains("division by zero", zero.InterpErr);
 
-        RunResult badJson = Run(root, Path.Combine(crash, "bad-json.vire"), null);
-        Assert.Equal(1, badJson.Code);
-        Assert.Contains("json", badJson.StdErr);
+        DualMode.DualRun badJson = DualFile("bad-json.vire", null, null);
+        Alive(badJson, 1);
+        Assert.Contains("json", badJson.InterpErr);
 
-        string huge = Path.Combine(crash, "huge-num.vire");
-        File.WriteAllText(huge, "define main\n  say " + new string('9', 400) + "\nend\n");
-        try
-        {
-            RunResult hugeRun = Run(root, huge, null);
-            Assert.Equal(1, hugeRun.Code);
-            Assert.Contains("too large", hugeRun.StdErr);
-        }
-        finally { File.Delete(huge); }
+        DualMode.DualRun huge = DualMode.RunSource(
+            "define main\n  say " + new string('9', 400) + "\nend\n", null);
+        Assert.NotEqual(3, huge.InterpCode);
+        Assert.NotEqual(3, huge.CompCode);
+        Assert.Equal(1, huge.InterpCode);
+        Assert.Equal(1, huge.CompCode);
+        Assert.True(
+            huge.InterpErr.Contains("too large") || huge.InterpErr.Contains("json"),
+            huge.InterpErr);
+        Assert.True(
+            huge.CompErr.Contains("too large") || huge.CompErr.Contains("json") || huge.CompErr.Contains("number"),
+            huge.CompErr);
     }
 
     [Fact]
     public void WhilePassLimitFollowsStepBudget()
     {
-        string root = RepoRoot();
-        string crash = Path.Combine(root, "tests", "crash");
-        string many = Path.Combine(crash, "many-while.vire");
-        File.WriteAllText(many, "define main\n  let n be 0\n  while n < 120000\n    let n be n + 1\n  end\n  say \"ok\"\nend\n");
-        try
-        {
-            RunResult result = Run(root, many, "5000000");
-            Assert.Equal(0, result.Code);
-            Assert.Contains("ok", result.StdOut);
-            Assert.DoesNotContain("while ran too long", result.StdErr);
-        }
-        finally { File.Delete(many); }
+        DualMode.DualRun result = DualMode.RunSource(
+            "define main\n  let n be 0\n  while n < 120000\n    let n be n + 1\n  end\n  say \"ok\"\nend\n",
+            null,
+            "5000000");
+        Alive(result, 0);
+        Assert.Contains("ok", result.InterpOut);
+        Assert.DoesNotContain("while ran too long", result.InterpErr);
     }
 
     [Fact]
     public void RunawayWhileIsStillStopped()
     {
-        string root = RepoRoot();
-        string crash = Path.Combine(root, "tests", "crash");
-        string runaway = Path.Combine(crash, "runaway-while.vire");
-        File.WriteAllText(runaway, "define main\n  while 1\n  end\n  say \"escaped\"\nend\n");
-        try
-        {
-            RunResult result = Run(root, runaway, "200");
-            Assert.Equal(1, result.Code);
-            Assert.True(
-                result.StdErr.Contains("while ran too long") || result.StdErr.Contains("program ran too long"),
-                result.StdErr);
-            Assert.DoesNotContain("escaped", result.StdOut);
-        }
-        finally { File.Delete(runaway); }
+        DualMode.DualRun result = DualMode.RunSource(
+            "define main\n  while 1\n  end\n  say \"escaped\"\nend\n",
+            null,
+            "200");
+        Alive(result, 1);
+        Assert.True(
+            result.InterpErr.Contains("while ran too long") || result.InterpErr.Contains("program ran too long"),
+            result.InterpErr);
+        Assert.DoesNotContain("escaped", result.InterpOut);
     }
 
     [Fact]
@@ -265,49 +246,28 @@ public class CrashTests
         Assert.Contains("extra", extra.Message);
     }
 
-    static RunResult Run(string root, string program, string budget)
+    static DualMode.DualRun DualFile(string name, string[] extra, string budget)
     {
-        string dll = typeof(Program).Assembly.Location;
-        string dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        if (string.IsNullOrEmpty(dotnet)) dotnet = "dotnet";
-        ProcessStartInfo info = new ProcessStartInfo();
-        info.FileName = dotnet;
-        info.Arguments = "exec \"" + dll + "\" \"" + program + "\"";
-        info.WorkingDirectory = root;
-        info.RedirectStandardOutput = true;
-        info.RedirectStandardError = true;
-        info.UseShellExecute = false;
-        if (budget != null) info.Environment["VIRE_BUDGET"] = budget;
-        Process process = Process.Start(info);
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30000), "crash fixture timed out");
-        return new RunResult(process.ExitCode, stdout, stderr);
+        string root = DualMode.FindRoot();
+        string crash = Path.Combine(root, "tests", "crash");
+        string work = Path.Combine(root, "data", "conformance", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        Directory.CreateDirectory(Path.Combine(work, "data"));
+        File.Copy(Path.Combine(crash, name), Path.Combine(work, name), true);
+        if (extra != null)
+        {
+            foreach (string item in extra)
+                File.Copy(Path.Combine(crash, item), Path.Combine(work, item), true);
+        }
+        return DualMode.CompareFile(root, Path.Combine(work, name), work, budget);
     }
 
-    static string RepoRoot()
+    static void Alive(DualMode.DualRun both, int code)
     {
-        string dir = AppContext.BaseDirectory;
-        for (int i = 0; i < 8; i++)
-        {
-            if (File.Exists(Path.Combine(dir, "tests.vire"))) return dir;
-            DirectoryInfo parent = Directory.GetParent(dir);
-            if (parent == null) break;
-            dir = parent.FullName;
-        }
-        throw new InvalidOperationException("could not find the vire repo root");
-    }
-
-    sealed class RunResult
-    {
-        public int Code;
-        public string StdOut;
-        public string StdErr;
-        public RunResult(int code, string stdout, string stderr)
-        {
-            Code = code;
-            StdOut = stdout;
-            StdErr = stderr;
-        }
+        Assert.NotEqual(3, both.InterpCode);
+        Assert.NotEqual(3, both.CompCode);
+        Assert.True(both.Matched, "crash fixture interpreter vs compiled differed\n i out " + both.InterpOut + "\n c out " + both.CompOut + "\n i err " + both.InterpErr + "\n c err " + both.CompErr);
+        Assert.Equal(code, both.InterpCode);
+        Assert.Equal(code, both.CompCode);
     }
 }

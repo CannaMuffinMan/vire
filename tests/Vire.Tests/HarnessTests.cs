@@ -18,6 +18,9 @@ public class HarnessTests
         Assert.Contains("<TargetFramework>net10.0-windows</TargetFramework>", windows);
         Assert.Contains("WINDOWS", windows);
         Assert.Contains("UseWindowsForms", windows);
+        Assert.True(
+            windows.Contains("..\\*.cs") || windows.Contains("../*.cs") || windows.Contains("Include=\"..\\*.cs\"") || windows.Contains("VireListen.cs"),
+            "windows project must compile every runtime .cs file");
     }
 
     [Fact]
@@ -28,6 +31,9 @@ public class HarnessTests
         Assert.True(uses.Count >= 3, "expected pinned uses: lines");
         foreach (Match match in uses)
             Assert.Equal(40, match.Groups[1].Value.Length);
+        Assert.Contains("windows-gui", yml);
+        Assert.Contains("vire.windows.csproj", yml);
+        Assert.Contains("Vire.Windows.Tests", yml);
     }
 
     [Fact]
