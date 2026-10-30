@@ -8,7 +8,7 @@ public class SuiteTests
     [Fact]
     public void PortGuardRejectsReservedPortsAndBindsLoopback()
     {
-        int[] banned = { 7099, 8778, 7071, 7072, 17841 };
+        int[] banned = { 7099, 8778, 7071, 7072, 7093, 17841, 17843 };
         for (int i = 0; i < banned.Length; i++)
         {
             int port = banned[i];
