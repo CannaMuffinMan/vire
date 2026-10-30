@@ -31,6 +31,16 @@ public class HarnessTests
     }
 
     [Fact]
+    public void NativeSmokeKeepsVireStdoutOffTheExitCode()
+    {
+        string text = File.ReadAllText(Path.Combine(FindRoot(), "tools", "native-smoke.ps1"));
+        Assert.Contains("$code = Invoke-Vire", text);
+        Assert.Matches(
+            @"function Invoke-Vire[\s\S]*Write-Host[\s\S]*\$LASTEXITCODE",
+            text);
+    }
+
+    [Fact]
     public void GitTracksNoBinaries()
     {
         string root = FindRoot();
