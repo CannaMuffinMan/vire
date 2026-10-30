@@ -13,6 +13,35 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - name: interpreter Hello World
+        run: |
+          set -euo pipefail
+          VIRE=(dotnet exec bin/Release/net10.0/vire.dll)
+          printf 'Hello, World!\n' > want.txt
+          "${VIRE[@]}" examples/hello/hello.vire > got-interp.txt
+          test "$?" -eq 0
+          cmp -s got-interp.txt want.txt
+      - name: compiled Hello World
+        run: |
+          set -euo pipefail
+          VIRE=(dotnet exec bin/Release/net10.0/vire.dll)
+          export VIRE_SEAL_KEY="$(python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())')"
+          export VIRE_BUDGET=5000000
+          mkdir -p data
+          cp examples/hello/hello.vire data/hello.vire
+          "${VIRE[@]}" compiler.vire data/hello.vire data/hello.vc
+          printf 'Hello, World!\n' > want.txt
+          "${VIRE[@]}" run data/hello.vc > got-compiled.txt
+          test "$?" -eq 0
+          cmp -s got-compiled.txt want.txt
   test:
     runs-on: ubuntu-latest
     steps:
@@ -32,6 +61,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
       - run: docker build -t vire .
       - run: docker run --rm vire tests.vire
+      - name: docker Hello World
+        run: |
+          set -euo pipefail
+          printf 'Hello, World!\n' > want.txt
+          docker run --rm vire examples/hello/hello.vire > got-docker.txt
+          cmp -s got-docker.txt want.txt
   selfhost:
     runs-on: ubuntu-latest
     steps:
