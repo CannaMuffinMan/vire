@@ -515,6 +515,7 @@ sealed class CompiledMachine
 
     object Builtin(string name, List<object> args, int line, int col)
     {
+        if (VireCrypto.IsName(name)) return VireCrypto.Builtin(name, args, line, col);
         if (name == "args") return programArgs;
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "halt")
@@ -610,9 +611,13 @@ sealed class CompiledMachine
         }
         if (name == "parse")
         {
+            if (args.Count != 1 && args.Count != 2)
+                throw new VireError("parse takes 1 or 2 values, got " + args.Count, line, col);
             string raw = args[0] as string;
             if (raw == null) throw new VireError("parse needs text", line, col);
-            return Json.Read(raw, line);
+            object value = Json.Read(raw, line);
+            if (args.Count == 2) Json.Check(value, args[1], line);
+            return value;
         }
         if (name == "kind")
         {

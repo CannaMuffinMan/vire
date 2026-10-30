@@ -11,7 +11,7 @@ public class ConformanceTests
     public void GrammarProgramsMatchInBothModes()
     {
         string root = DualMode.FindRoot();
-        string[] names = { "else-if.vire", "for-skip.vire", "try-miss.vire", "map-decimal.vire", "use_main.vire", "span-sort-drop.vire", "files-folders.vire" };
+        string[] names = { "else-if.vire", "for-skip.vire", "try-miss.vire", "map-decimal.vire", "use_main.vire", "span-sort-drop.vire", "files-folders.vire", "stdlib-hmac.vire", "stdlib-schema.vire" };
         foreach (string name in names)
         {
             string source = Path.Combine(root, "tests", "conformance", name);

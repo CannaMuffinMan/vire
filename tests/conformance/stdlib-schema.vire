@@ -1,0 +1,5 @@
+define main
+  let schema be {"kind": "map", "closed": true, "need": ["title"], "keys": {"title": {"kind": "text"}, "done": {"kind": "bool"}}}
+  let value be parse with (json with {"title": "ok", "done": false}), schema
+  say value at "title"
+end
