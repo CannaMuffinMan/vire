@@ -999,9 +999,6 @@ sealed class Machine
 
 
     const int ListenSlotsMax = 64;
-    const int MaxHeaderBlock = 16384;
-    const int MaxRequestLine = 8192;
-    const int MaxRequestBody = 1000000;
     static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
 
     void Listen(int port, int line)
@@ -1111,36 +1108,7 @@ sealed class Machine
 
     static int HeaderEnd(byte[] buffer, int got)
     {
-        for (int i = 0; i + 3 < got; i++)
-            if (buffer[i] == 13 && buffer[i + 1] == 10 && buffer[i + 2] == 13 && buffer[i + 3] == 10) return i;
-        return -1;
-    }
-
-    static int ContentLengthOf(string head)
-    {
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-            {
-                int value;
-                if (!int.TryParse(lines[i].Substring(15).Trim(), out value) || value < 0) return -2;
-                return value;
-            }
-        }
-        return -1;
-    }
-
-    static bool HasChunked(string head)
-    {
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
-                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-        }
-        return false;
+        return HttpWire.HeaderEnd(buffer, got);
     }
 
     static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
@@ -1185,19 +1153,19 @@ sealed class Machine
     {
         NetworkStream stream = client.GetStream();
         DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
-        byte[] buffer = new byte[MaxHeaderBlock + MaxRequestBody + 16];
+        byte[] buffer = new byte[HttpWire.MaxHeaderBlock + HttpWire.MaxRequestBody + 16];
         int got = 0;
         int headerEnd = -1;
         while (headerEnd < 0)
         {
             if (stop.IsCancellationRequested) return;
-            if (got >= MaxHeaderBlock)
+            if (got >= HttpWire.MaxHeaderBlock)
             {
                 SendApi(stream, 431, "{\"error\":\"headers too large\"}", null);
                 return;
             }
             int before = got;
-            if (!ReadOnce(stream, buffer, ref got, MaxHeaderBlock, headerDead))
+            if (!ReadOnce(stream, buffer, ref got, HttpWire.MaxHeaderBlock, headerDead))
             {
                 if (HeaderEnd(buffer, got) >= 0) break;
                 SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
@@ -1211,57 +1179,17 @@ sealed class Machine
             SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
             return;
         }
-        int lineEnd = -1;
-        for (int i = 0; i + 1 < headerEnd; i++)
+        HttpWire.Result headers = HttpWire.ParseHeaders(buffer, got);
+        if (headers.Status != 0)
         {
-            if (buffer[i] == 13 && buffer[i + 1] == 10) { lineEnd = i; break; }
-        }
-        if (lineEnd < 0 || lineEnd > MaxRequestLine)
-        {
-            SendApi(stream, 431, "{\"error\":\"request line too large\"}", null);
-            return;
-        }
-        string head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
-        string requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
-        string[] bits = requestLine.Split(' ');
-        if (bits.Length < 2)
-        {
-            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
-            return;
-        }
-        if (bits[1].IndexOf("..") >= 0)
-        {
-            if (bits[0] == "GET" || bits[0] == "HEAD")
+            if (headers.Status == 404)
                 SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
             else
-                SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
+                SendApi(stream, headers.Status, headers.ErrorJson, null);
             return;
         }
-        if (HasChunked(head))
-        {
-            SendApi(stream, 501, "{\"error\":\"chunked encoding is not supported\"}", null);
-            return;
-        }
-        int bodyAt = headerEnd + 4;
-        int contentLength = ContentLengthOf(head);
-        if (contentLength == -2)
-        {
-            SendApi(stream, 400, "{\"error\":\"bad request\"}", null);
-            return;
-        }
-        string method = bits[0];
-        bool expectsBody = method == "POST" || method == "PUT" || method == "PATCH";
-        if (expectsBody && contentLength < 0)
-        {
-            SendApi(stream, 411, "{\"error\":\"content length required\"}", null);
-            return;
-        }
-        if (contentLength > MaxRequestBody)
-        {
-            SendApi(stream, 413, "{\"error\":\"body too large\"}", null);
-            return;
-        }
-        if (contentLength < 0) contentLength = 0;
+        int bodyAt = headers.BodyAt;
+        int contentLength = headers.ContentLength;
         int need = bodyAt + contentLength;
         DateTime bodyDead = DateTime.UtcNow.AddSeconds(10);
         if (got < need)
@@ -1272,10 +1200,16 @@ sealed class Machine
                 return;
             }
         }
-        string path = bits[1];
-        int queryAt = path.IndexOf('?');
-        if (queryAt >= 0) path = path.Substring(0, queryAt);
-        string body = Encoding.UTF8.GetString(buffer, bodyAt, contentLength);
+        HttpWire.Result parsed = HttpWire.FinishBody(headers, buffer, got);
+        if (parsed.Status != 0)
+        {
+            SendApi(stream, parsed.Status, parsed.ErrorJson, null);
+            return;
+        }
+        string method = parsed.Method;
+        string path = parsed.Path;
+        string head = parsed.Head;
+        string body = parsed.Body;
         if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line))
             return;
         bool health = path == "/health" && (method == "GET" || method == "HEAD");
@@ -2028,6 +1962,7 @@ sealed class Parser
     List<Token> tokens;
     int i;
     int nest;
+    int blockNest;
     static readonly HashSet<string> Stoppers = new HashSet<string>(new string[] { "end", "else", "miss", "eof" });
 
     public Parser(List<Token> tokens) { this.tokens = tokens; }
@@ -2108,11 +2043,17 @@ sealed class Parser
 
     List<object> Collect(bool stopOnElse, bool stopOnMiss)
     {
-        List<object> stmts = new List<object>();
-        while (!At("end") && !At("eof") && !(stopOnElse && At("else")) && !(stopOnMiss && At("miss")))
-            stmts.Add(Statement());
-        if (At("eof")) throw new VireError("block is missing end", Peek().Line);
-        return stmts;
+        blockNest++;
+        if (blockNest > 256) throw new VireError("block is nested too deeply", Peek().Line);
+        try
+        {
+            List<object> stmts = new List<object>();
+            while (!At("end") && !At("eof") && !(stopOnElse && At("else")) && !(stopOnMiss && At("miss")))
+                stmts.Add(Statement());
+            if (At("eof")) throw new VireError("block is missing end", Peek().Line);
+            return stmts;
+        }
+        finally { blockNest--; }
     }
 
     object Statement()
@@ -2562,6 +2503,8 @@ sealed class Json
 
     public static object Read(string text, int line)
     {
+        if (text == null) throw new VireError("json ended early", line);
+        if (text.Length > 1000000) throw new VireError("json is too large", line);
         int i = 0;
         object value = ReadValue(text, ref i, line);
         Skip(text, ref i);
@@ -2708,6 +2651,191 @@ sealed class Json
     static void Skip(string text, ref int i)
     {
         while (i < text.Length && (text[i] == ' ' || text[i] == '\n' || text[i] == '\r' || text[i] == '\t')) i++;
+    }
+}
+
+internal static class HttpWire
+{
+    public const int MaxHeaderBlock = 16384;
+    public const int MaxRequestLine = 8192;
+    public const int MaxRequestBody = 1000000;
+
+    public sealed class Result
+    {
+        public int Status;
+        public string ErrorJson;
+        public string Method;
+        public string Path;
+        public string Head;
+        public string Body;
+        public int BodyAt;
+        public int ContentLength;
+    }
+
+    public static int HeaderEnd(byte[] buffer, int got)
+    {
+        if (buffer == null || got < 4) return -1;
+        if (got > buffer.Length) got = buffer.Length;
+        for (int i = 0; i + 3 < got; i++)
+            if (buffer[i] == 13 && buffer[i + 1] == 10 && buffer[i + 2] == 13 && buffer[i + 3] == 10) return i;
+        return -1;
+    }
+
+    public static int ContentLengthOf(string head)
+    {
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+            {
+                int value;
+                if (!int.TryParse(lines[i].Substring(15).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) || value < 0) return -2;
+                return value;
+            }
+        }
+        return -1;
+    }
+
+    public static bool HasChunked(string head)
+    {
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
+                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+        return false;
+    }
+
+    public static Result ParseHeaders(byte[] buffer, int got)
+    {
+        Result result = new Result();
+        if (buffer == null)
+        {
+            Fail(result, 400, "bad request");
+            return result;
+        }
+        if (got < 0) got = 0;
+        if (got > buffer.Length) got = buffer.Length;
+        int headerEnd = HeaderEnd(buffer, got);
+        if (headerEnd < 0)
+        {
+            Fail(result, got >= MaxHeaderBlock ? 431 : 408, got >= MaxHeaderBlock ? "headers too large" : "timeout");
+            return result;
+        }
+        int lineEnd = -1;
+        for (int i = 0; i + 1 < headerEnd; i++)
+        {
+            if (buffer[i] == 13 && buffer[i + 1] == 10) { lineEnd = i; break; }
+        }
+        if (lineEnd < 0 || lineEnd > MaxRequestLine)
+        {
+            Fail(result, 431, "request line too large");
+            return result;
+        }
+        string head;
+        string requestLine;
+        try
+        {
+            head = Encoding.ASCII.GetString(buffer, 0, headerEnd);
+            requestLine = Encoding.ASCII.GetString(buffer, 0, lineEnd);
+        }
+        catch (DecoderFallbackException)
+        {
+            Fail(result, 400, "bad request");
+            return result;
+        }
+        string[] bits = requestLine.Split(' ');
+        if (bits.Length < 2 || bits[0].Length == 0 || bits[1].Length == 0)
+        {
+            Fail(result, 400, "bad request");
+            return result;
+        }
+        if (bits[1].IndexOf("..", StringComparison.Ordinal) >= 0)
+        {
+            if (bits[0] == "GET" || bits[0] == "HEAD")
+            {
+                result.Status = 404;
+                result.ErrorJson = "{\"error\":\"not found\"}";
+                return result;
+            }
+            Fail(result, 400, "bad request");
+            return result;
+        }
+        if (HasChunked(head))
+        {
+            Fail(result, 501, "chunked encoding is not supported");
+            return result;
+        }
+        int contentLength = ContentLengthOf(head);
+        if (contentLength == -2)
+        {
+            Fail(result, 400, "bad request");
+            return result;
+        }
+        string method = bits[0];
+        bool expectsBody = method == "POST" || method == "PUT" || method == "PATCH";
+        if (expectsBody && contentLength < 0)
+        {
+            Fail(result, 411, "content length required");
+            return result;
+        }
+        if (contentLength > MaxRequestBody)
+        {
+            Fail(result, 413, "body too large");
+            return result;
+        }
+        if (contentLength < 0) contentLength = 0;
+        result.Status = 0;
+        result.Method = method;
+        string path = bits[1];
+        int queryAt = path.IndexOf('?');
+        if (queryAt >= 0) path = path.Substring(0, queryAt);
+        result.Path = path;
+        result.Head = head;
+        result.BodyAt = headerEnd + 4;
+        result.ContentLength = contentLength;
+        return result;
+    }
+
+    public static Result FinishBody(Result headers, byte[] buffer, int got)
+    {
+        if (headers == null || headers.Status != 0) return headers;
+        Result result = headers;
+        int need = result.BodyAt + result.ContentLength;
+        if (need < result.BodyAt || need > buffer.Length)
+        {
+            Fail(result, 413, "body too large");
+            return result;
+        }
+        if (got < need)
+        {
+            Fail(result, 408, "timeout");
+            return result;
+        }
+        try { result.Body = Encoding.UTF8.GetString(buffer, result.BodyAt, result.ContentLength); }
+        catch (DecoderFallbackException)
+        {
+            Fail(result, 400, "bad request");
+        }
+        return result;
+    }
+
+    public static Result ParseComplete(byte[] buffer, int got)
+    {
+        Result headers = ParseHeaders(buffer, got);
+        if (headers.Status != 0) return headers;
+        return FinishBody(headers, buffer, got);
+    }
+
+    static void Fail(Result result, int status, string error)
+    {
+        result.Status = status;
+        result.ErrorJson = "{\"error\":\"" + error + "\"}";
+        result.Method = null;
+        result.Path = null;
+        result.Body = null;
     }
 }
 
