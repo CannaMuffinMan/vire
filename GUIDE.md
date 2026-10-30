@@ -311,7 +311,7 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 
 ## 14. Security
 
-A program cannot grant itself more steps. The cap is 1000000. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
+A program cannot grant itself more steps. The cap is 1000000. While-loop passes share that same cap. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5000000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap.
 
 `listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token`. The compare does not stop at the first differing character. A token sitting in the body does not count. The body limit is 65536 bytes. A path that contains `..` is refused.
 
