@@ -12,6 +12,7 @@ WORKDIR /work
 COPY checks ./checks/
 COPY systems ./systems/
 COPY tests.vire term.vire vault.vire count.vire ./
+COPY examples ./examples/
 RUN chown -R vire:vire /work
 USER vire
 ENTRYPOINT ["vire"]
