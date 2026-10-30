@@ -23,6 +23,13 @@ Open questions carried forward: who may `POST /block`; whether blocks should kee
 - `compiler.vire` parses `for`/`skip`, `else if`, `try`/`miss`, `use`/`need`, map literals, decimals, and emits line/column on the tree.
 - `CompiledMachine` executes those steps, fills in more builtins used by the suite, and reports the real line and column on errors.
 
+## Phase 3A residuals (cut 4)
+
+- One source nesting limit of 256 (parentheses, lists, maps, blocks, unary, operator chains) in the C# lexer/parser, `compiler.vire`, `.vc` loader, and both VMs. Overflow is `source is nested too deeply` with line and column, identical in interpreter and compiled mode.
+- Numeric literals longer than 100 digits are `that number is too large` with the same line and column in both modes.
+- `fail with message, line, column` reports a `VireError` at that location so the compiler can match interpreter diagnostics.
+- Hosting `compiler.vire` / `compiler.vc` raises call depth to 8192 so a 256-deep parse cannot hit the user-program cap of 64.
+
 ## Phase 3A close-out (cut 3)
 
 - Full suite (`tests.vire`, `checks/`, `systems/`, grammar programs) must match raw stdout/stderr in both modes. Error tests assert line and column. Crash fixtures dual-run and must not exit 3.

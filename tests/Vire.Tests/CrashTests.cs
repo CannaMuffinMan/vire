@@ -42,13 +42,10 @@ public class CrashTests
 
         DualMode.DualRun tooWide = DualMode.RunSource(
             "define main\n  say " + new string('(', 10000) + "1" + new string(')', 10000) + "\nend\n", null);
-        Assert.True(tooWide.InterpCode == 1 || tooWide.InterpCode == 0);
-        Assert.True(tooWide.CompCode == 1 || tooWide.CompCode == 0);
-        Assert.NotEqual(3, tooWide.InterpCode);
-        Assert.NotEqual(3, tooWide.CompCode);
-        Assert.True(
-            tooWide.InterpErr.Contains("expression is too deep") || tooWide.CompErr.Contains("expression is too deep") || tooWide.Matched,
-            tooWide.InterpErr + tooWide.CompErr);
+        Assert.True(tooWide.Matched, tooWide.InterpErr + tooWide.CompErr);
+        Assert.Equal(1, tooWide.InterpCode);
+        Assert.Contains("source is nested too deeply", tooWide.InterpErr);
+        Assert.Equal(DualMode.Norm(tooWide.InterpErr), DualMode.Norm(tooWide.CompErr));
 
         DualMode.DualRun overflow = DualFile("overflow.vire", null, null);
         Alive(overflow, 0);
@@ -64,16 +61,11 @@ public class CrashTests
 
         DualMode.DualRun huge = DualMode.RunSource(
             "define main\n  say " + new string('9', 400) + "\nend\n", null);
-        Assert.NotEqual(3, huge.InterpCode);
-        Assert.NotEqual(3, huge.CompCode);
+        Assert.True(huge.Matched, huge.InterpErr + " vs " + huge.CompErr);
         Assert.Equal(1, huge.InterpCode);
-        Assert.Equal(1, huge.CompCode);
-        Assert.True(
-            huge.InterpErr.Contains("too large") || huge.InterpErr.Contains("json"),
-            huge.InterpErr);
-        Assert.True(
-            huge.CompErr.Contains("too large") || huge.CompErr.Contains("json") || huge.CompErr.Contains("number"),
-            huge.CompErr);
+        Assert.Contains("that number is too large", huge.InterpErr);
+        Assert.Contains("line 2 col 7", DualMode.Norm(huge.InterpErr));
+        Assert.Equal(DualMode.Norm(huge.InterpErr), DualMode.Norm(huge.CompErr));
     }
 
     [Fact]
@@ -233,7 +225,7 @@ public class CrashTests
         Assert.Contains("json can't write that number", nan.Message);
         Assert.Throws<VireError>(() => Json.Write(double.PositiveInfinity));
 
-        VireError deep = Assert.Throws<VireError>(() => Json.Read(new string('[', 300) + new string(']', 300), 1));
+        VireError deep = Assert.Throws<VireError>(() => Json.Read(new string('[', 3000) + new string(']', 3000), 1));
         Assert.Contains("nested too deeply", deep.Message);
 
         VireError huge = Assert.Throws<VireError>(() => Json.Read("1e400", 1));

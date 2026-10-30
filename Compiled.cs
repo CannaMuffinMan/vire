@@ -20,6 +20,7 @@ sealed class CompiledProgram
         Dictionary<string, object> funcs = LoadFuncs(tree);
         Budget budget = new Budget();
         budget.ApplyStepLimit(Program.BudgetOf(""));
+        if (VireLimits.IsCompilerHost(file)) budget.MaxCalls = VireLimits.CompilerCalls;
         CompiledMachine machine = new CompiledMachine(funcs, folder, args, budget);
         machine.Call("main", new List<object>(), 1, 1);
     }
@@ -52,7 +53,6 @@ sealed class CompiledMachine
     List<object> programArgs;
     Budget budget;
     int depth;
-    int exprDepth;
     string title;
     List<Stroke> termOps = new List<Stroke>();
     bool termSheet;
@@ -206,7 +206,7 @@ sealed class CompiledMachine
         }
         if (op == "call")
         {
-            Call((string)step[1], Values((List<object>)step[2], env), AsLine(step), AsCol(step));
+            Call((string)step[1], Values((List<object>)step[2], env, 0), AsLine(step), AsCol(step));
             return null;
         }
         if (op == "put")
@@ -270,7 +270,7 @@ sealed class CompiledMachine
         return null;
     }
 
-    List<object> Values(List<object> exprs, Dictionary<string, object> env)
+    List<object> Values(List<object> exprs, Dictionary<string, object> env, int depth)
     {
         if (exprs == null) throw new VireError("bad compiled operand type", 1, 1);
         List<object> values = new List<object>();
@@ -278,18 +278,23 @@ sealed class CompiledMachine
         {
             List<object> node = expr as List<object>;
             if (node == null) throw new VireError("bad compiled operand type", 1, 1);
-            values.Add(Eval(node, env));
+            values.Add(Eval(node, env, depth));
         }
         return values;
     }
 
     object Eval(List<object> expr, Dictionary<string, object> env)
     {
-        exprDepth++;
+        return Eval(expr, env, 0);
+    }
+
+    object Eval(List<object> expr, Dictionary<string, object> env, int depth)
+    {
         try
         {
         if (expr == null || expr.Count < 1) Fail("compiled stack underflow", expr);
-        if (exprDepth > 256) Fail("expression is too deep", expr);
+        depth++;
+        if (depth > VireLimits.SourceNest) Fail("expression is too deep", expr);
         string op = expr[0] as string;
         if (op == null) Fail("bad compiled opcode type", expr);
         if (op == "num") return expr[1];
@@ -311,13 +316,13 @@ sealed class CompiledMachine
             }
             Fail(called + " has no value", expr);
         }
-        if (op == "list") return Values((List<object>)expr[1], env);
-        if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env), AsLine(expr), AsCol(expr));
-        if (op == "at") return At(Eval((List<object>)expr[1], env), Eval((List<object>)expr[2], env), expr);
-        if (op == "not") return !Truth(Eval((List<object>)expr[1], env));
+        if (op == "list") return Values((List<object>)expr[1], env, depth);
+        if (op == "call") return Call((string)expr[1], Values((List<object>)expr[2], env, depth), AsLine(expr), AsCol(expr));
+        if (op == "at") return At(Eval((List<object>)expr[1], env, depth), Eval((List<object>)expr[2], env, depth), expr);
+        if (op == "not") return !Truth(Eval((List<object>)expr[1], env, depth));
         if (op == "neg")
         {
-            object value = Eval((List<object>)expr[1], env);
+            object value = Eval((List<object>)expr[1], env, depth);
             if (value is int)
             {
                 int whole = (int)value;
@@ -328,13 +333,13 @@ sealed class CompiledMachine
         }
         if (op == "and")
         {
-            if (!Truth(Eval((List<object>)expr[1], env))) return false;
-            return Truth(Eval((List<object>)expr[2], env));
+            if (!Truth(Eval((List<object>)expr[1], env, depth))) return false;
+            return Truth(Eval((List<object>)expr[2], env, depth));
         }
         if (op == "or")
         {
-            if (Truth(Eval((List<object>)expr[1], env))) return true;
-            return Truth(Eval((List<object>)expr[2], env));
+            if (Truth(Eval((List<object>)expr[1], env, depth))) return true;
+            return Truth(Eval((List<object>)expr[2], env, depth));
         }
         if (op == "map")
         {
@@ -343,12 +348,12 @@ sealed class CompiledMachine
             foreach (object pair in (List<object>)expr[1])
             {
                 List<object> item = (List<object>)pair;
-                map[KeyOf(Eval((List<object>)item[0], env), expr)] = Eval((List<object>)item[1], env);
+                map[KeyOf(Eval((List<object>)item[0], env, depth), expr)] = Eval((List<object>)item[1], env, depth);
             }
             return map;
         }
-        object left = Eval((List<object>)expr[1], env);
-        object right = Eval((List<object>)expr[2], env);
+        object left = Eval((List<object>)expr[1], env, depth);
+        object right = Eval((List<object>)expr[2], env, depth);
         if (op == "+")
         {
             if (left is string || right is string) return Show(left) + Show(right);
@@ -392,7 +397,6 @@ sealed class CompiledMachine
         catch (NullReferenceException) { Fail("bad compiled operand type", expr); return null; }
         catch (IndexOutOfRangeException) { Fail("compiled stack underflow", expr); return null; }
         catch (ArgumentOutOfRangeException) { Fail("compiled stack underflow", expr); return null; }
-        finally { exprDepth--; }
     }
 
     object SafeBuiltin(string name, List<object> args, int line, int col)
@@ -524,6 +528,14 @@ sealed class CompiledMachine
             else if (args.Count > 0 && args[0] is double) code = (int)(double)args[0];
             throw new HaltSignal(code);
         }
+        if (name == "fail")
+        {
+            if (args.Count != 3) throw new VireError("fail takes 3 values, got " + args.Count, line, col);
+            string msg = args[0] as string;
+            if (msg == null || !(args[1] is int) || !(args[2] is int))
+                throw new VireError("fail needs text and two whole numbers", line, col);
+            throw new VireError(msg, (int)args[1], (int)args[2]);
+        }
         if (name == "length")
         {
             if (args[0] is string) return ((string)args[0]).Length;
@@ -548,9 +560,13 @@ sealed class CompiledMachine
             if (raw == null) throw new VireError("number needs text or a number", line, col);
             int whole;
             double real;
-            if (raw.IndexOf('.') < 0 && int.TryParse(raw, out whole)) return whole;
-            if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out real))
+            if (raw.Length > VireLimits.MaxLiteralDigits) throw new VireError(VireLimits.NumberError, line, col);
+            if (raw.IndexOf('.') < 0 && int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out whole))
+                return whole;
+            if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out real)
+                && !double.IsInfinity(real) && !double.IsNaN(real))
                 return real;
+            if (raw.Length > 0 && char.IsDigit(raw[0])) throw new VireError(VireLimits.NumberError, line, col);
             throw new VireError("that text is not a number", line, col);
         }
         if (name == "slice")

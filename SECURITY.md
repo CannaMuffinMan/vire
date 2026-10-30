@@ -14,12 +14,12 @@ The supported line is the current Phase 0 runner: .NET 10, this repository's `vi
 
 These are the current strengths, not a claim that the process cannot be abused:
 
-- Interpreter caps: 1,000,000 steps by default (the starter may set `VIRE_BUDGET` up to 5,000,000), 100,000 `while` passes, 64 call depth, 1,000,000 character text, 100,000 list items, 8 nested `run`s.
+- Interpreter caps: 1,000,000 steps by default (the starter may set `VIRE_BUDGET` up to 5,000,000), 100,000 `while` passes, 64 call depth (8192 only while hosting `compiler.vire` / `compiler.vc` so it can parse 256-deep user source), 256 source nest, 100-digit numeric literals, 1,000,000 character text, 100,000 list items, 8 nested `run`s.
 - `listen` gives each request a fresh budget and a 5 second wall-clock deadline. Header block 16 KB, request line 8 KB, body 1 MB with `Content-Length` required. At most 64 in-flight connections. Binds `127.0.0.1` by default.
 - Paths go through one `SafeName` gate. Rooted paths, `..`, NTFS ADS, device names, trailing dots/spaces, and reparse points are refused. `run` / `use` stay out of `data/` and `site/`. Program and script extensions cannot be written.
 - `fetch` and `post` use `http`/`https` only, no userinfo, no automatic redirects (each hop is re-checked), connect to a resolved public address, and cap the body while streaming.
 - `.vc` files are AES-256-GCM `VC2` seals. A key is required (`VIRE_SEAL_KEY` or `--seal-key-file`). The key is never printed; only an 8-hex fingerprint of SHA-256 of the key may be shown. Old XOR seals are refused. After unsealing, the loader rejects unknown opcodes, bad operand types, out-of-range jumps, and missing operands (`compiled stack underflow`) as `VireError` instead of letting CLR exceptions take the process.
-- JSON read/write is depth-capped. `say` of a cyclic list or map does not hang the process. `Main` turns unexpected exceptions into exit 3 without a stack trace unless `VIRE_DEBUG=1`.
+- JSON read/write is depth-capped (2048). `say` of a cyclic list or map does not hang the process. `Main` turns unexpected exceptions into exit 3 without a stack trace unless `VIRE_DEBUG=1`.
 - Static `listen` GET of `site/` is allowlisted, GET-only, no directory listing, no symlinks, no `.vire` sources.
 
 ## Non-guarantees
