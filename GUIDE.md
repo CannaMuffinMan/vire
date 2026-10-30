@@ -76,7 +76,7 @@ Text escapes: `\"` `\\` `\n` `\t`.
 
 Arithmetic: `+ - * / %`. `/` is ordinary division, so `5 / 2` is `2.5`. Comparisons: `== != < > <= >=`. Logic: `and`, `or`, `not`. Parentheses group expressions: `(1 + 2) * 3`.
 
-`+`, `-`, and `*` on whole numbers that do not fit in a whole result become decimals instead of wrapping. The remainder when dividing by `-1` is `0`, including the smallest whole number. Remainder or division by zero is an error. `abs` of the smallest whole number is a decimal, not a negative whole number.
+`+`, `-`, and `*` on whole numbers that do not fit in a whole result become decimals instead of wrapping. The remainder when dividing by `-1` is `0`, including the smallest whole number. Remainder or division by zero is an error. `abs` of the smallest whole number is a decimal, not a negative whole number. Parsed expressions may nest 256 levels. Compiled evaluation uses the same 256 cap, measured per evaluation (not as a lifetime total).
 
 `+` joins text, and also joins two lists. A call argument stops before `+`, so this prints `Vire</p>`:
 

@@ -140,7 +140,7 @@ sealed class CompiledMachine
         exprDepth++;
         try
         {
-        if (exprDepth > 64) throw new VireError("expression is too deep", 1);
+        if (exprDepth > 256) throw new VireError("expression is too deep", 1);
         string op = (string)expr[0];
         if (op == "num") return expr[1];
         if (op == "text") return expr[1];
