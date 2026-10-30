@@ -1,3 +1,4 @@
+# Digests from MCR manifest lists for the 10.0 tags (linux/amd64 included).
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS build
 WORKDIR /src
 COPY Vire.cs Compiled.cs vire.csproj ./

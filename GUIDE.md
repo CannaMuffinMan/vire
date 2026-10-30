@@ -2,7 +2,7 @@
 
 This is the manual for Vire. A person or a coding agent can follow it from a blank folder to a working program.
 
-Vire is one language. Source files use the extension `.vire`. The runner is `vire.exe`. Definitions, data, packages, and windows are all written in Vire.
+Vire is one language. Source files use the extension `.vire`. The runner is built with `dotnet build` (or a published `vire` / `vire.exe` from CI artifacts). Definitions, data, packages, and windows are all written in Vire.
 
 ## 1. What a program is
 
@@ -19,18 +19,20 @@ define main
 end
 ```
 
-Run it from the folder that contains `vire.exe`:
+Run it from the program folder:
 
 ```text
-vire.exe count.vire
+dotnet run -c Release -- count.vire
 ```
+
+Or use a published runner from GitHub Actions artifacts: `vire count.vire` (Linux) or `vire.exe count.vire` (Windows).
 
 If `main` is missing, Vire stops before running anything.
 
 ## 2. Step by step: first program
 
-1. Install nothing beyond Windows. The built `vire.exe` is the runner.
-2. Create `hello.vire` in the same folder as `vire.exe`.
+1. Install the .NET 10 SDK, or download a published runner from GitHub Actions artifacts.
+2. Create `hello.vire` in the folder you will run from.
 3. Put this in the file:
 
 ```vire
@@ -40,7 +42,7 @@ end
 ```
 
 4. Open a terminal in that folder.
-5. Run `vire.exe hello.vire`.
+5. Run `dotnet run -c Release -- hello.vire` (or `vire.exe hello.vire` if you published).
 6. The terminal prints `hello from vire`.
 
 To rebuild the runner from source (.NET 10 SDK):
@@ -319,14 +321,14 @@ A compiled program is a sealed `VIRE1` file, not readable source. A file that is
 
 ## 15. Rules an agent should follow
 
-- Put every program in the folder with `vire.exe`, or pass a path to a `.vire` file. The file's folder is the sandbox root.
-- Start every runnable file with definitions, and include `define main` in the file you pass to `vire.exe`. Packages must not require their own `main`.
+- Put every program in the folder you run from, or pass a path to a `.vire` file. The file's folder is the sandbox root.
+- Start every runnable file with definitions, and include `define main` in the file you pass to the runner. Packages must not require their own `main`.
 - Call definitions as `name with arg`. A bare name with no parameters, and the words `now` and `show`, run with no `with`.
 - A call argument stops before `+`. Parenthesize an argument that itself uses `+`.
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
 - Prefer the window operations for an application. Use `serve` only when the result must be a browser page.
-- After changing `Vire.cs`, rebuild `vire.exe` with the `csc` command in section 2 before running samples.
+- After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
 
 ## 15. Limits
 
