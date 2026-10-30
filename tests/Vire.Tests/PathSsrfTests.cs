@@ -228,7 +228,8 @@ public class PathSsrfTests
             using (NetworkStream stream = client.GetStream())
             {
                 byte[] buf = new byte[1024];
-                stream.Read(buf, 0, buf.Length);
+                int got = stream.Read(buf, 0, buf.Length);
+                if (got < 1) return;
                 int port = ((IPEndPoint)listener.LocalEndpoint).Port;
                 string body = "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:" + port + "/secret\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
                 byte[] bytes = Encoding.ASCII.GetBytes(body);

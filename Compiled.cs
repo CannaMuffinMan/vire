@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 
 sealed class CompiledProgram
@@ -10,11 +9,11 @@ sealed class CompiledProgram
     {
         if (!file.EndsWith(".vc", StringComparison.OrdinalIgnoreCase))
             throw new VireError("compiled programs use a .vc file", 1);
-        string packed;
-        try { packed = File.ReadAllText(file); }
+        byte[] packed;
+        try { packed = File.ReadAllBytes(file); }
         catch (IOException) { throw new VireError("could not read that file", 1); }
         catch (UnauthorizedAccessException) { throw new VireError("could not read that file", 1); }
-        string text = VireSeal.Open(packed);
+        string text = Encoding.UTF8.GetString(VireSeal.OpenBytes(packed));
         object tree = Json.Read(text, 1);
         Dictionary<string, object> root = tree as Dictionary<string, object>;
         if (root == null || !root.ContainsKey("funcs")) throw new VireError("compiled file has no funcs", 1);
@@ -411,7 +410,8 @@ sealed class CompiledMachine
             {
                 string parent = Path.GetDirectoryName(path);
                 if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-                File.WriteAllText(path, payload);
+                if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, payload);
+                else File.WriteAllText(path, payload);
             }
             catch (IOException) { throw new VireError("could not write that file", 1); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", 1); }
@@ -515,79 +515,5 @@ sealed class CompiledMachine
     static string Show(object value)
     {
         return Machine.Show(value);
-    }
-}
-
-static class VireSeal
-{
-    public static string HashText(string text)
-    {
-        using (SHA256 sha = SHA256.Create())
-        {
-            byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(text ?? ""));
-            StringBuilder hex = new StringBuilder();
-            foreach (byte piece in bytes) hex.Append(piece.ToString("x2"));
-            return hex.ToString();
-        }
-    }
-
-    public static string Seal(string text)
-    {
-        byte[] plain = Encoding.UTF8.GetBytes(text ?? "");
-        byte[] mask = Mask();
-        byte[] hidden = new byte[plain.Length];
-        for (int i = 0; i < plain.Length; i++) hidden[i] = (byte)(plain[i] ^ mask[i % mask.Length]);
-        return "VIRE1\n" + HashText(text ?? "") + "\n" + ToHex(hidden) + "\n";
-    }
-
-    public static string Open(string packed)
-    {
-        if (string.IsNullOrEmpty(packed) || !packed.TrimStart().StartsWith("VIRE1\n"))
-            throw new VireError("sealed program is damaged", 1);
-        string[] lines = packed.TrimStart().Split(new char[] { '\n' }, 3);
-        if (lines.Length < 3) throw new VireError("sealed program is damaged", 1);
-        byte[] hidden = FromHex(lines[2].Trim());
-        byte[] mask = Mask();
-        byte[] plain = new byte[hidden.Length];
-        for (int i = 0; i < hidden.Length; i++) plain[i] = (byte)(hidden[i] ^ mask[i % mask.Length]);
-        string text = Encoding.UTF8.GetString(plain);
-        if (!SameHex(lines[1].Trim(), HashText(text))) throw new VireError("sealed program was changed", 1);
-        return text;
-    }
-
-    static bool SameHex(string left, string right)
-    {
-        int diff = left.Length ^ right.Length;
-        int count = left.Length < right.Length ? left.Length : right.Length;
-        for (int i = 0; i < count; i++) diff |= left[i] ^ right[i];
-        return diff == 0;
-    }
-
-    static byte[] Mask()
-    {
-        string secret = Environment.GetEnvironmentVariable("VIRE_SEAL");
-        if (string.IsNullOrEmpty(secret)) secret = "vire-public-seal";
-        using (SHA256 sha = SHA256.Create())
-            return sha.ComputeHash(Encoding.UTF8.GetBytes("vire-seal-v1\n" + secret));
-    }
-
-    static string ToHex(byte[] bytes)
-    {
-        StringBuilder hex = new StringBuilder(bytes.Length * 2);
-        foreach (byte piece in bytes) hex.Append(piece.ToString("x2"));
-        return hex.ToString();
-    }
-
-    static byte[] FromHex(string hex)
-    {
-        if ((hex.Length % 2) != 0) throw new VireError("sealed program is damaged", 1);
-        byte[] bytes = new byte[hex.Length / 2];
-        try
-        {
-            for (int i = 0; i < bytes.Length; i++)
-                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        catch (FormatException) { throw new VireError("sealed program is damaged", 1); }
-        return bytes;
     }
 }

@@ -292,7 +292,8 @@ sealed class Machine
             {
                 string parent = Path.GetDirectoryName(path);
                 if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
-                File.WriteAllText(path, text);
+                if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, text);
+                else File.WriteAllText(path, text);
             }
             catch (IOException) { throw new VireError("could not write that file", line); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line); }
@@ -2494,16 +2495,24 @@ sealed class Program
         if (failure == null) return code;
         if (failure is HaltSignal halt) return halt.Code;
         if (failure is VireError exc)
-        {
-            string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
-            Console.Error.WriteLine("vire: " + where + exc.Message);
-            return 1;
-        }
+            return WriteVireError(exc);
         if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
             Console.Error.WriteLine(failure.ToString());
         else
             Console.Error.WriteLine("vire: internal error (" + failure.GetType().Name + ")");
         return 3;
+    }
+
+    static int WriteVireError(VireError exc)
+    {
+        if (VireSeal.MissingKeyExit(exc.Message))
+        {
+            Console.Error.WriteLine("vire: " + exc.Message);
+            return 2;
+        }
+        string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
+        Console.Error.WriteLine("vire: " + where + exc.Message);
+        return 1;
     }
 
     static int ExecuteBody(string[] args)
@@ -2512,30 +2521,63 @@ sealed class Program
         {
             Console.Error.WriteLine("usage: vire program.vire [args...]");
             Console.Error.WriteLine("       vire run file.vc [args...]");
+            Console.Error.WriteLine("       vire keygen --out <path>");
             return 2;
         }
         try
         {
-            if (args[0] == "run")
+            string keyFile;
+            string[] rest = StripKeyFile(args, out keyFile);
+            if (rest.Length >= 1 && rest[0] == "keygen")
             {
-                if (args.Length < 2) throw new VireError("usage: vire run file.vc", 1);
-                string compiled = Path.GetFullPath(args[1]);
+                string outPath = null;
+                for (int i = 1; i < rest.Length; i++)
+                {
+                    if (rest[i] == "--out" && i + 1 < rest.Length) { outPath = rest[i + 1]; i++; continue; }
+                    if (outPath == null) outPath = rest[i];
+                }
+                return VireSeal.Keygen(outPath);
+            }
+            string programFolder = null;
+            if (rest.Length >= 2 && rest[0] == "run")
+                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[1]));
+            else if (rest.Length >= 1)
+                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[0]));
+            VireSeal.ClearKey();
+            if (!string.IsNullOrEmpty(keyFile)) VireSeal.LoadFromFile(keyFile, programFolder);
+            else VireSeal.LoadFromEnvironment();
+            if (rest.Length < 1)
+            {
+                Console.Error.WriteLine("usage: vire program.vire [args...]");
+                return 2;
+            }
+            if (rest[0] == "payload-sha256")
+            {
+                if (rest.Length < 2) throw new VireError("usage: vire payload-sha256 file.vc", 1);
+                byte[] packed = File.ReadAllBytes(Path.GetFullPath(rest[1]));
+                Console.WriteLine(VireSeal.PayloadSha256(packed));
+                return 0;
+            }
+            if (rest[0] == "run")
+            {
+                if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);
+                string compiled = Path.GetFullPath(rest[1]);
                 string compiledFolder = Path.GetDirectoryName(compiled);
                 List<object> compiledArgs = new List<object>();
-                for (int i = 2; i < args.Length; i++) compiledArgs.Add(args[i]);
+                for (int i = 2; i < rest.Length; i++) compiledArgs.Add(rest[i]);
                 CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
                 return 0;
             }
-            string program = Path.GetFullPath(args[0]);
+            string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
             int budget = BudgetOf(File.ReadAllText(program));
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseBudget(budget);
-            List<object> rest = new List<object>();
-            for (int i = 1; i < args.Length; i++) rest.Add(args[i]);
-            machine.UseArgs(rest);
+            List<object> extra = new List<object>();
+            for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
+            machine.UseArgs(extra);
             machine.Run();
             return 0;
         }
@@ -2545,9 +2587,7 @@ sealed class Program
         }
         catch (VireError exc)
         {
-            string where = exc.Line > 0 ? "line " + exc.Line + ": " : "";
-            Console.Error.WriteLine("vire: " + where + exc.Message);
-            return 1;
+            return WriteVireError(exc);
         }
         catch (Exception ex)
         {
@@ -2557,5 +2597,23 @@ sealed class Program
                 Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
             return 3;
         }
+    }
+
+    static string[] StripKeyFile(string[] args, out string keyFile)
+    {
+        keyFile = null;
+        List<string> rest = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--seal-key-file")
+            {
+                if (i + 1 >= args.Length) throw new VireError("usage: --seal-key-file <path>", 1);
+                keyFile = args[i + 1];
+                i++;
+                continue;
+            }
+            rest.Add(args[i]);
+        }
+        return rest.ToArray();
     }
 }
