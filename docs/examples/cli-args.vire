@@ -1,0 +1,5 @@
+define main
+  let a be args
+  say length with a
+  say a at 0
+end

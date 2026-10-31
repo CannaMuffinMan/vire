@@ -1,0 +1,27 @@
+define main
+  say length with "ada"
+  say lower with "ViRe"
+  say upper with "vi"
+  say find with "vire", "re"
+  say join with ["a", "b"], "-"
+  say split with "a,b", ","
+  say replace with "aa", "a", "b"
+  say begins with "vire", "vi"
+  say ends with "vire", "re"
+  say slice with "vire", 1, 3
+  say slice with [1, 2, 3, 4], 1, 3
+  say escape with "<x>"
+  say sort with [3, 1, 2]
+  let xs be [1, 2]
+  say drop with xs
+  say xs
+  say abs with -4
+  say min with 3, 1
+  say max with 3, 1
+  say round with 2.5
+  say span with 1, 3
+  say kind with none
+  say kind with true
+  say text with 9
+  say number with "8"
+end
