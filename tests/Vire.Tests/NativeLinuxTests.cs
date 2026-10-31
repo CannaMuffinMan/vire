@@ -111,6 +111,10 @@ public class NativeLinuxTests
         string[] pairs = new string[40];
         for (int i = 0; i < pairs.Length; i++) pairs[i] = "a b";
         RunArgv(root, srcText, pairs, 1, "args is too large", "err");
+        RunArgv(root, srcText, new string[] { "hello world" }, 0, "1\nhello world", null);
+        string sized = "define main\n  say (length with args)\n  if (length with args) > 0\n    say (length with (args at 0))\n  end\nend\n";
+        RunArgv(root, sized, new string[] { "" }, 0, "1\n0", null);
+        RunArgvFill(root, sized);
     }
 
     [Fact]
@@ -314,6 +318,49 @@ public class NativeLinuxTests
             }
             else
                 Assert.Equal(want, DualMode.Norm(run.Out).Trim());
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    static void RunArgvFill(string root, string srcText)
+    {
+        string work = Path.Combine(root, "data", "native-linux-argvfill-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string src = Path.Combine(work, "args.vire");
+            File.WriteAllText(src, srcText);
+            string hexPath = Path.Combine(work, "out.hex");
+            DualMode.Proc compile = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(root, src), Rel(root, hexPath), "linux" }, root);
+            Assert.True(compile.Code == 0, "argv fill compile\n" + compile.Out + compile.Err);
+            string exe = WriteElf(work, hexPath);
+            string path = Path.GetFullPath(exe);
+            int room = 4095 - path.Length - 1;
+            Assert.True(room > 8, "command-line room");
+            ProcOut ok = RunExe(exe, work, new string[] { new string('a', room) });
+            Assert.Equal(0, ok.Code);
+            Assert.Equal("1\n" + room, DualMode.Norm(ok.Out).Trim());
+            Assert.Equal("", DualMode.Norm(ok.Err).Trim());
+            ProcOut over = RunExe(exe, work, new string[] { new string('a', room + 1) });
+            Assert.Equal(1, over.Code);
+            Assert.Contains("args is too large", DualMode.Norm(over.Err));
+            string spaced = Path.Combine(work, "dir with space");
+            Directory.CreateDirectory(spaced);
+            string moved = Path.Combine(spaced, "prog");
+            File.Copy(exe, moved);
+            Process chmod = Process.Start(new ProcessStartInfo
+            {
+                FileName = "chmod",
+                Arguments = "+x \"" + moved + "\"",
+                UseShellExecute = false
+            });
+            chmod.WaitForExit();
+            ProcOut viaSpace = RunExe(moved, spaced, Array.Empty<string>());
+            Assert.Equal(0, viaSpace.Code);
+            Assert.Equal("0", DualMode.Norm(viaSpace.Out).Trim());
         }
         finally
         {
