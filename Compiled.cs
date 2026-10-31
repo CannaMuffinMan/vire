@@ -110,7 +110,8 @@ sealed class CompiledMachine
         if (!funcs.ContainsKey(name)) return Builtin(name, args, line, col);
         Dictionary<string, object> func = (Dictionary<string, object>)funcs[name];
         List<object> names = (List<object>)func["params"];
-        if (names.Count != args.Count) throw new VireError(name + " argument count", 1, 1);
+        if (names.Count != args.Count)
+            throw new VireError(name + " takes " + names.Count + " values, got " + args.Count, line, col);
         Dictionary<string, object> env = new Dictionary<string, object>();
         for (int i = 0; i < names.Count; i++) env[(string)names[i]] = args[i];
         depth++;
@@ -136,7 +137,8 @@ sealed class CompiledMachine
     {
         if (budget.DeadlinePassed()) Fail("request ran too long", step);
         budget.Steps++;
-        if (budget.Steps > budget.MaxSteps) Fail("program ran too long and was stopped", step);
+        if (budget.Steps > budget.MaxSteps)
+            throw new VireError("program ran too long and was stopped", 0);
         string op = (string)step[0];
         if (op == "let") { env[(string)step[1]] = Eval((List<object>)step[2], env); return null; }
         if (op == "say") { Console.WriteLine(Show(Eval((List<object>)step[1], env))); return null; }
@@ -471,6 +473,8 @@ sealed class CompiledMachine
 
     object Builtin(string name, List<object> args, int line, int col)
     {
+        int need = Machine.BuiltinNeed(name);
+        if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "args") return programArgs;
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "halt")

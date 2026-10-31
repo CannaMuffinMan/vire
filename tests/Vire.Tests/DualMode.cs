@@ -90,6 +90,11 @@ static class DualMode
 
     public static Proc RunVire(string root, string[] args, string cwd)
     {
+        return RunVire(root, args, cwd, "5000000");
+    }
+
+    public static Proc RunVire(string root, string[] args, string cwd, string budget)
+    {
         string dll = typeof(Program).Assembly.Location;
         string dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
         if (string.IsNullOrEmpty(dotnet)) dotnet = "dotnet";
@@ -105,7 +110,7 @@ static class DualMode
         info.RedirectStandardError = true;
         info.UseShellExecute = false;
         info.Environment["VIRE_SEAL_KEY"] = TestKeyB64();
-        info.Environment["VIRE_BUDGET"] = "5000000";
+        info.Environment["VIRE_BUDGET"] = budget;
         Process process = Process.Start(info);
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();
