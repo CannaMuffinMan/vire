@@ -12,4 +12,6 @@ Deterministic seeded fuzz runs inside ordinary `dotnet test` (`FuzzTests`, 400 i
 | `.vc` loader decrypted then `Json.Read` + unchecked casts. Sealed JSON that was not a funcs table threw `InvalidCastException` (exit 3) instead of a Vire error. | Internal error / could look like a crash | `CompiledProgram.LoadFuncs` validates shape; JSON errors become `compiled file is damaged` | `FuzzRegressionTests.SealedGarbageJsonDoesNotRunAndDoesNotCrash` |
 | `Json.Read` had a depth cap but no input size cap. | Unbounded allocation on a huge string | Refuse inputs longer than 1,000,000 characters | `FuzzRegressionTests.JsonOverSizeLimitIsRefused` |
 
+Lockfile parser (`VireLock.Parse`): seeded fuzz in `FuzzTests.LockfileParserSeededFuzzNeverCrashes` plus `FuzzRegressionTests.HostileLockfilesAreVireErrorsNotCrashes`. Corpus: `tests/fuzz/corpus/lock-*.txt`.
+
 Listen request parsing is now `HttpWire` (header block 16 KB, request line 8 KB, body 1 MB, no chunked). Fuzz covers truncated, oversized, and malformed request lines/headers/bodies. AES-256-GCM still fail-closes on truncate/flip/forge (`SealTests` plus `FuzzTests.SealLoaderSeededFuzzRejectsAndFailsClosed`).

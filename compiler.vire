@@ -136,6 +136,9 @@ define joinRel with dir, rel
   if dir == ""
     return rel
   end
+  if dir == "."
+    return rel
+  end
   return dir + "/" + rel
 end
 
@@ -151,6 +154,9 @@ define isPackage with name
       let ok be true
     end
     if isDigit with ch
+      let ok be true
+    end
+    if ch == "_"
       let ok be true
     end
     if not ok
@@ -940,6 +946,8 @@ define compileUnit with path, seen, state
       end
       let rel be spelling with inner
       bump with inner
+      let root be state at "root"
+      pkgguard with "use", root, rel
       let next be joinRel with folder, rel
       let extra be compileUnit with next, seen, state
       let funcs be mergeFuncs with funcs, extra, state
@@ -961,7 +969,13 @@ define compileUnit with path, seen, state
           put true into state at "bad"
           stop
         end
-        let next be joinRel with folder, (joinRel with "deps", (joinRel with pkg, "lib.vire"))
+        let root be state at "root"
+        pkgguard with "need", root, pkg
+        let packaged be joinRel with root, (joinRel with "packages", (joinRel with pkg, "lib.vire"))
+        let next be joinRel with root, (joinRel with "deps", (joinRel with pkg, "lib.vire"))
+        if exists with packaged
+          let next be packaged
+        end
         let extra be compileUnit with next, seen, state
         let funcs be mergeFuncs with funcs, extra, state
       end
@@ -1002,7 +1016,8 @@ end
 
 define main
   let files be args
-  let state be {"bad": false}
+  let root be dirOf with (files at 0)
+  let state be {"bad": false, "root": root}
   let seen be {}
   let funcs be compileUnit with (files at 0), seen, state
   if state at "bad"

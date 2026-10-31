@@ -1,0 +1,5 @@
+vire.lock 1
+pkg ../escape 0 packages/x aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+pkg CON 0 packages/CON bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+not a line
+pkg ui 0 /abs cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc

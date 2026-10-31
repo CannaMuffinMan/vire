@@ -15,5 +15,11 @@
   <ItemGroup>
     <Compile Include="..\Vire.cs" />
     <Compile Include="..\Compiled.cs" />
+    <Compile Include="..\VirePaths.cs" />
+    <Compile Include="..\VireSeal.cs" />
+    <Compile Include="..\VireNet.cs" />
+    <Compile Include="..\VireFiles.cs" />
+    <Compile Include="..\VireListen.cs" />
+    <Compile Include="..\VireLock.cs" />
   </ItemGroup>
 </Project>

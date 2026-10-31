@@ -212,7 +212,7 @@ sealed class Machine
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "pkgguard"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -310,7 +310,7 @@ sealed class Machine
         int need = 1;
         if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
-        if (name == "ink" || name == "dot" || name == "replace") need = 3;
+        if (name == "ink" || name == "dot" || name == "replace" || name == "pkgguard") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
@@ -409,6 +409,8 @@ sealed class Machine
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
         if (name == "kind") return KindOf(args[0]);
+        if (name == "pkgguard")
+            return VireLock.BuiltinGuard(args, line, col);
         if (name == "hash")
         {
             string raw = args[0] as string;
@@ -2462,6 +2464,7 @@ sealed class Program
         Unit unit = new Parser(Lexer.Tokenize(File.ReadAllText(full))).Parse();
         foreach (string used in unit.Uses)
         {
+            VireLock.GuardUse(folder, used, 1);
             string next = VirePaths.UseFile(folder, used, 1);
             Dictionary<string, Func> imported = Load(next, folder, seen);
             Merge(unit, imported);
@@ -2470,7 +2473,8 @@ sealed class Program
         {
             if (!IsPackage(package))
                 throw new VireError("package names are plain words", 1);
-            string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
+            VireLock.GuardNeed(folder, package, 1);
+            string next = VirePaths.UseFile(folder, PackageFile(folder, package), 1);
             Merge(unit, Load(next, folder, seen));
         }
         return unit.Funcs;
@@ -2517,9 +2521,17 @@ sealed class Program
         return diff == 0;
     }
 
+    static string PackageFile(string folder, string package)
+    {
+        string packaged = Path.Combine(folder, "packages", package, "lib.vire");
+        if (File.Exists(packaged)) return "packages/" + package + "/lib.vire";
+        return "deps/" + package + "/lib.vire";
+    }
+
     static bool IsPackage(string name)
     {
-        if (name.Length == 0) return false;
+        if (name.Length == 0 || name.Length > VireLock.MaxNameChars) return false;
+        if (VirePaths.IsDeviceName(name)) return false;
         foreach (char ch in name)
             if (!char.IsLetterOrDigit(ch) && ch != '_') return false;
         return true;
@@ -2588,6 +2600,8 @@ sealed class Program
         {
             Console.Error.WriteLine("usage: vire program.vire [args...]");
             Console.Error.WriteLine("       vire run file.vc [args...]");
+            Console.Error.WriteLine("       vire pkg lock");
+            Console.Error.WriteLine("       vire pkg verify");
             Console.Error.WriteLine("       vire keygen --out <path>");
             return 2;
         }
@@ -2595,6 +2609,18 @@ sealed class Program
         {
             string keyFile;
             string[] rest = StripKeyFile(args, out keyFile);
+            if (rest.Length >= 1 && rest[0] == "pkg")
+            {
+                if (rest.Length < 2 || (rest[1] != "lock" && rest[1] != "verify"))
+                {
+                    Console.Error.WriteLine("usage: vire pkg lock");
+                    Console.Error.WriteLine("       vire pkg verify");
+                    return 2;
+                }
+                string cwd = Directory.GetCurrentDirectory();
+                if (rest[1] == "lock") return VireLock.LockProject(cwd);
+                return VireLock.VerifyProject(cwd);
+            }
             if (rest.Length >= 1 && rest[0] == "keygen")
             {
                 string outPath = null;
@@ -2639,6 +2665,8 @@ sealed class Program
                 if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);
                 string compiled = Path.GetFullPath(rest[1]);
                 string compiledFolder = Path.GetDirectoryName(compiled);
+                if (File.Exists(Path.Combine(compiledFolder, VireLock.FileName)))
+                    VireLock.VerifyOrThrow(compiledFolder);
                 List<object> compiledArgs = new List<object>();
                 for (int i = 2; i < rest.Length; i++) compiledArgs.Add(rest[i]);
                 CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
