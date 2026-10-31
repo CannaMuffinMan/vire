@@ -21,6 +21,12 @@ define codeOf with ch
   if ch == "\t"
     return 9
   end
+  if ch == ""
+    return 11
+  end
+  if ch == ""
+    return 12
+  end
   if (find with (alphabet), ch) < 0
     return -1
   end

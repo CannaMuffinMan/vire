@@ -1,0 +1,4 @@
+~ native-ok: 1
+define main
+  say number with "10000000000000000000e-19"
+end

@@ -1,0 +1,4 @@
+~ native-ok: 0
+define main
+  say number with "0e-1000001"
+end

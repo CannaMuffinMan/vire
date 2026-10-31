@@ -457,7 +457,7 @@ define emitMore with image, fixes, labels
   emitList with image, [76, 139, 2, 77, 133, 192, 15, 132]
   emitRel with image, fixes, "number_nan"
   emitList with image, [76, 141, 74, 8, 76, 141, 82, 8, 77, 1, 194, 69, 48, 219]
-  emitList with image, [72, 49, 192, 72, 199, 69, 248, 0, 0, 0, 0, 72, 199, 69, 240, 0, 0, 0, 0, 72, 199, 69, 232, 0, 0, 0, 0, 72, 199, 69, 224, 0, 0, 0, 0]
+  emitList with image, [72, 49, 192, 72, 199, 69, 248, 0, 0, 0, 0, 72, 199, 69, 240, 0, 0, 0, 0, 72, 199, 69, 232, 0, 0, 0, 0, 72, 199, 69, 224, 0, 0, 0, 0, 72, 199, 69, 200, 0, 0, 0, 0]
   pin with labels, "number_lws", image
   emitList with image, [77, 57, 209, 15, 131]
   emitRel with image, fixes, "number_nan"
@@ -468,6 +468,10 @@ define emitMore with image, fixes, labels
   emitList with image, [128, 249, 10, 15, 132]
   emitRel with image, fixes, "number_lws_eat"
   emitList with image, [128, 249, 13, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitList with image, [128, 249, 11, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitList with image, [128, 249, 12, 15, 132]
   emitRel with image, fixes, "number_lws_eat"
   emitJmpTo with image, fixes, "number_sign"
   pin with labels, "number_lws_eat", image
@@ -493,7 +497,7 @@ define emitMore with image, fixes, labels
   emitJcc with image, fixes, 129, "number_int_mul_ok"
   emitList with image, [76, 137, 192, 128, 249, 48, 15, 133]
   emitRel with image, fixes, "number_int_ovf"
-  emitList with image, [72, 133, 192, 15, 132]
+  emitList with image, [72, 255, 69, 200, 233]
   emitRel with image, fixes, "number_int_skip"
   pin with labels, "number_int_ovf", image
   emitList with image, [72, 199, 69, 232, 1, 0, 0, 0, 233]
@@ -595,6 +599,10 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "number_tws_eat"
   emitList with image, [128, 249, 13, 15, 132]
   emitRel with image, fixes, "number_tws_eat"
+  emitList with image, [128, 249, 11, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
+  emitList with image, [128, 249, 12, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
   emitJmpTo with image, fixes, "number_nan"
   pin with labels, "number_tws_eat", image
   emitList with image, [73, 255, 193, 233]
@@ -602,9 +610,11 @@ define emitMore with image, fixes, labels
   pin with labels, "number_finish", image
   emitList with image, [72, 131, 125, 240, 0, 15, 132]
   emitRel with image, fixes, "number_nan"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "number_out"
   emitList with image, [72, 131, 125, 232, 0, 15, 133]
   emitRel with image, fixes, "num_ovf"
-  emitList with image, [76, 139, 69, 224, 76, 43, 69, 248, 77, 133, 192, 15, 132]
+  emitList with image, [76, 139, 69, 224, 76, 43, 69, 248, 76, 3, 69, 200, 77, 133, 192, 15, 132]
   emitRel with image, fixes, "number_out"
   emitList with image, [77, 133, 192, 15, 136]
   emitRel with image, fixes, "number_div"
