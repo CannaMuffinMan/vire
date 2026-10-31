@@ -467,7 +467,7 @@ define emitMore with image, fixes, labels
   emitList with image, [73, 255, 193, 77, 57, 209, 15, 131]
   emitRel with image, fixes, "number_nan"
   pin with labels, "number_digits", image
-  emitList with image, [72, 49, 192]
+  emitList with image, [72, 49, 192, 77, 49, 192]
   pin with labels, "number_loop", image
   emitList with image, [77, 57, 209, 15, 131]
   emitRel with image, fixes, "number_done"
@@ -475,14 +475,24 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "number_nan"
   emitList with image, [128, 249, 57, 15, 135]
   emitRel with image, fixes, "number_nan"
-  emitList with image, [72, 107, 192, 10, 128, 233, 48, 72, 15, 182, 201, 72, 1, 200, 73, 255, 193, 233]
+  emitList with image, [72, 107, 192, 10]
+  emitJcc with image, fixes, 129, "number_mul_ok"
+  emitList with image, [65, 184, 1, 0, 0, 0]
+  pin with labels, "number_mul_ok", image
+  emitList with image, [128, 233, 48, 72, 15, 182, 201, 72, 1, 200]
+  emitJcc with image, fixes, 129, "number_add_ok"
+  emitList with image, [65, 184, 1, 0, 0, 0]
+  pin with labels, "number_add_ok", image
+  emitList with image, [73, 255, 193, 233]
   emitRel with image, fixes, "number_loop"
   pin with labels, "number_done", image
   emitList with image, [69, 132, 219, 15, 132]
   emitRel with image, fixes, "number_out"
   emitList with image, [72, 247, 216]
   pin with labels, "number_out", image
-  emitList with image, [72, 137, 194]
+  emitList with image, [72, 137, 194, 77, 133, 192]
+  emitJcc with image, fixes, 133, "num_ovf"
+  emitFit32 with image, fixes, "num_ovf"
   pin with labels, "number_push", image
   emitPushTag with image, 1
   emitEpi with image

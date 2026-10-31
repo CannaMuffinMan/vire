@@ -38,7 +38,7 @@ public class NativeSafetyTests
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
         string[] files = Directory.GetFiles(dir, "*.vire");
-        Assert.True(files.Length >= 16, "expected native safety fixtures");
+        Assert.True(files.Length >= 28, "expected native safety fixtures");
         foreach (string path in files)
         {
             string text = File.ReadAllText(path);
@@ -107,6 +107,46 @@ public class NativeSafetyTests
         Assert.Contains("Get-ChildItem", smoke);
         Assert.Contains("~ native-error:", smoke);
         Assert.DoesNotContain("KNOWN FAIL Phase 3B", smoke);
+    }
+
+    [Fact]
+    public void NumberWithTextMatchesInterpreterAndCompiled()
+    {
+        string root = DualMode.FindRoot();
+        string dir = Path.Combine(root, "tests", "native");
+        string[] names = {
+            "num-max.vire", "num-ovf-pos.vire", "num-ovf-neg.vire", "num-min.vire",
+            "num-i64-max.vire", "num-i64-min.vire", "num-past-i64.vire", "num-huge.vire",
+            "num-junk-lead.vire", "num-junk-trail.vire", "num-junk-ovf-trail.vire", "num-empty.vire"
+        };
+        Assert.Equal(12, names.Length);
+        foreach (string name in names)
+        {
+            string path = Path.Combine(dir, name);
+            string text = File.ReadAllText(path);
+            DualMode.DualRun both = DualMode.RunSource(text, null);
+            Assert.True(both.Matched, name + " interpreter vs compiled differed\n stdout i=" + both.InterpOut + " c=" + both.CompOut + "\n stderr i=" + both.InterpErr + " c=" + both.CompErr);
+            if (text.Contains("~ native-ok:") || text.Contains("~ native-interp-ok"))
+            {
+                Assert.Equal(0, both.InterpCode);
+                Assert.DoesNotContain("internal error", DualMode.Norm(both.InterpErr));
+                Assert.DoesNotContain("internal error", DualMode.Norm(both.CompErr));
+                continue;
+            }
+            Assert.Equal(1, both.InterpCode);
+            string want = WantOf(text);
+            Assert.False(string.IsNullOrEmpty(want), name);
+            Assert.Contains(want, DualMode.Norm(both.InterpErr) + DualMode.Norm(both.InterpOut));
+            Assert.Contains(want, DualMode.Norm(both.CompErr) + DualMode.Norm(both.CompOut));
+        }
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        int start = rt.IndexOf("pin with labels, \"rt_number\"", StringComparison.Ordinal);
+        int stop = rt.IndexOf("pin with labels, \"rt_length\"", StringComparison.Ordinal);
+        Assert.True(start >= 0 && stop > start, "rt_number block");
+        string body = rt.Substring(start, stop - start);
+        Assert.Contains("emitFit32", body);
+        Assert.Contains("num_ovf", body);
+        Assert.DoesNotContain("emitJcc with image, fixes, 128, \"num_ovf\"", body);
     }
 
     [Fact]
