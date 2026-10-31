@@ -33,3 +33,9 @@ Open questions carried forward: who may `POST /block`; whether blocks should kee
 - Dual-mode conformance harness: each suite program runs in the interpreter and as compiled `.vc`; stdout must match, and stderr matches after normalizing columns.
 - `compiler.vire` parses `for`/`skip`, `else if`, `try`/`miss`, `use`/`need`, map literals, decimals, and emits line/column on the tree.
 - `CompiledMachine` executes those steps, fills in more builtins used by the suite, and reports the real line and column on errors.
+
+## Phase 3A close-out (cut 3)
+
+- Full suite (`tests.vire`, `checks/`, `systems/`, grammar programs) must match raw stdout/stderr in both modes. Error tests assert line and column. Crash fixtures dual-run and must not exit 3.
+- Loader/VM rejects junk `.vc` steps (bad opcode, bad operand type, out-of-range jump, stack underflow). Seeded fuzz `20261030` in `dotnet test`.
+- `PHASE3A-DONE.md` maps each done-criterion to a test or CI job. `windows-gui` covers WinForms `Form` construction on `windows-latest`.

@@ -192,6 +192,7 @@ sealed class Machine
     int nextLeft = 16;
 #if WINDOWS
     Form form;
+    internal Form WindowForm { get { return form; } }
     Dictionary<string, TextBox> boxes = new Dictionary<string, TextBox>();
     SheetBox sheet;
 #endif

@@ -84,7 +84,7 @@ public class ConformanceTests
             }
             string work = CopyWork(root, program, extra);
             DualMode.DualRun both = DualMode.CompareFile(root, Path.Combine(work, Path.GetFileName(program)), work);
-            if (both.Matched) matched++;
+            if (both.Matched && both.InterpCode == 0 && DualMode.Norm(both.InterpOut).Length > 0) matched++;
             else
             {
                 report.AppendLine(program);
@@ -95,7 +95,7 @@ public class ConformanceTests
                 report.AppendLine(" stderr c: " + both.CompErr);
             }
         }
-        Assert.True(programs.Count > 0);
+        Assert.True(programs.Count >= 8, "expected tests.vire plus checks/ and systems/ mains, got " + programs.Count);
         Assert.True(matched == programs.Count, "conformance mismatches (" + matched + "/" + programs.Count + "):\n" + report);
     }
 
