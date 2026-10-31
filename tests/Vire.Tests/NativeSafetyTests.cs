@@ -18,6 +18,8 @@ public class NativeSafetyTests
         Assert.Contains("call_depth", rt);
         Assert.Contains("definitions called too deeply", rt);
         Assert.Contains("ran out of memory", rt);
+        Assert.Contains("that number overflowed", rt);
+        Assert.Contains("emitFit32", rt);
         Assert.Contains("1048576", rt);
         Assert.Contains("index is outside the value", rt);
         Assert.Contains("an index must be a whole number", rt);
@@ -35,7 +37,7 @@ public class NativeSafetyTests
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
         string[] files = Directory.GetFiles(dir, "*.vire");
-        Assert.True(files.Length >= 10, "expected native safety fixtures");
+        Assert.True(files.Length >= 16, "expected native safety fixtures");
         foreach (string path in files)
         {
             string text = File.ReadAllText(path);
@@ -84,6 +86,8 @@ public class NativeSafetyTests
             Assert.Contains(AsciiHex("an index must be a whole number"), hex);
             Assert.Contains(AsciiHex("slice needs text or a list"), hex);
             Assert.Contains(AsciiHex("ran out of memory"), hex);
+            Assert.Contains(AsciiHex("that number overflowed"), hex);
+            Assert.Contains(AsciiHex("division by zero"), hex);
         }
         finally
         {

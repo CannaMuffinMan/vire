@@ -1,0 +1,5 @@
+~ native-error: that number overflowed
+~ native-interp-ok
+define main
+  say (0 - 2147483647 - 1) - 1
+end

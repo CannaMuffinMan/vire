@@ -53,6 +53,13 @@ define emitPushTag with image, tag
   return true
 end
 
+~ After a 64-bit add/sub/mul/neg/div in rdx, fail unless the result fits a signed 32-bit whole number. Native has no decimal widen.
+define emitFit32 with image, fixes, fail
+  emitList with image, [72, 137, 209, 72, 99, 194, 72, 57, 193]
+  emitJcc with image, fixes, 133, fail
+  return true
+end
+
 define emitMore with image, fixes, labels
   pin with labels, "rt_alloc", image
   emitPro with image
@@ -319,6 +326,7 @@ define emitMore with image, fixes, labels
   emitList with image, [73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "add_notint"
   emitList with image, [76, 1, 202]
+  emitFit32 with image, fixes, "num_ovf"
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "add_notint", image
@@ -356,6 +364,7 @@ define emitMore with image, fixes, labels
   emitList with image, [73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "sub_bad"
   emitList with image, [76, 41, 202]
+  emitFit32 with image, fixes, "num_ovf"
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "sub_bad", image
@@ -369,6 +378,7 @@ define emitMore with image, fixes, labels
   emitList with image, [73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "mul_bad"
   emitList with image, [73, 15, 175, 209]
+  emitFit32 with image, fixes, "num_ovf"
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "mul_bad", image
@@ -384,6 +394,7 @@ define emitMore with image, fixes, labels
   emitList with image, [77, 133, 201, 15, 132]
   emitRel with image, fixes, "div_zero"
   emitList with image, [72, 137, 208, 72, 153, 73, 247, 249, 72, 137, 194]
+  emitFit32 with image, fixes, "num_ovf"
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "div_bad", image
@@ -414,10 +425,13 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "neg_bad"
   emitList with image, [72, 247, 218]
+  emitFit32 with image, fixes, "num_ovf"
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "neg_bad", image
   emitFail with image, fixes, "msg_minus"
+  pin with labels, "num_ovf", image
+  emitFail with image, fixes, "msg_ovf"
 
   pin with labels, "rt_text", image
   emitPro with image
@@ -1213,6 +1227,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_mod", "% needs two numbers"
   parkMsg with image, labels, "msg_zero", "division by zero"
   parkMsg with image, labels, "msg_minus", "minus applies to numbers"
+  parkMsg with image, labels, "msg_ovf", "that number overflowed"
   parkMsg with image, labels, "msg_oom", "ran out of memory"
   parkMsg with image, labels, "msg_biglist", "list is too large"
   parkMsg with image, labels, "msg_push", "push needs a list"
