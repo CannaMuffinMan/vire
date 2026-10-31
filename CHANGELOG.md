@@ -8,6 +8,7 @@ Crypto and JSON pieces that do not wait on types or capabilities:
 - AES-256-GCM encrypt always generates a 12-byte nonce; decrypt fails closed on tampers. HMAC known-answer tests follow RFC 4231. GCM known-answer tests follow the all-zero NIST vectors.
 - `parse` accepts an optional schema map (`kind`, `need`, `keys`, `closed`) with explicit depth and size limits. Seeded fuzz covers the parser and GCM decrypt.
 - Duplicate JSON object keys are rejected (`json has a duplicate key`). The same `Json.Read` path loads compiled `.vc` files, so a `.vc` with duplicate keys in its JSON tree is refused rather than last-wins.
+- Recursive schemas are refused. Schema `need` lists are deduped and length-capped. Value checks charge the step budget (and the listen deadline) once per value node and once per `need` entry.
 - Ed25519 is documented as left: no standalone type in the .NET 10 BCL, no hand-rolled substitute.
 
 ## Phase 0

@@ -164,13 +164,26 @@ static class VireCrypto
     {
         if (text == null || (text.Length & 1) != 0) throw new VireError("hex text is damaged", line, col);
         byte[] bytes = new byte[text.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            int hi = Nibble(text[i * 2], line, col);
-            int lo = Nibble(text[i * 2 + 1], line, col);
-            bytes[i] = (byte)((hi << 4) | lo);
-        }
+        DecodeHex(text, bytes, line, col);
         return bytes;
+    }
+
+    public static void DecodeHex(string text, byte[] bytes, int line, int col)
+    {
+        try
+        {
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                int hi = Nibble(text[i * 2], line, col);
+                int lo = Nibble(text[i * 2 + 1], line, col);
+                bytes[i] = (byte)((hi << 4) | lo);
+            }
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            throw;
+        }
     }
 
     public static T WithZeroedKey<T>(byte[] key, Func<byte[], T> body)

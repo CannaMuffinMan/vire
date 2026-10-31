@@ -29,6 +29,11 @@ static class DualMode
 
     public static DualRun RunSource(string sourceText, string[] extraFiles)
     {
+        return RunSource(sourceText, extraFiles, "5000000");
+    }
+
+    public static DualRun RunSource(string sourceText, string[] extraFiles, string budget)
+    {
         string root = FindRoot();
         string work = Path.Combine(root, "data", "conformance", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
@@ -49,7 +54,7 @@ static class DualMode
                     File.WriteAllText(full, body);
                 }
             }
-            return CompareFile(root, dest, work);
+            return CompareFile(root, dest, work, budget);
         }
         finally
         {
@@ -59,19 +64,24 @@ static class DualMode
 
     public static DualRun CompareFile(string root, string source, string work)
     {
+        return CompareFile(root, source, work, "5000000");
+    }
+
+    public static DualRun CompareFile(string root, string source, string work, string budget)
+    {
         try
         {
         string destName = Path.GetFileName(source);
-        Proc interp = RunVire(root, new string[] { destName }, work);
+        Proc interp = RunVire(root, new string[] { destName }, work, budget);
         string relDir = Path.Combine("data", "conformance", Path.GetFileName(work));
         string relSrc = Path.Combine(relDir, destName).Replace('\\', '/');
         string relVc = Path.Combine(relDir, Path.ChangeExtension(destName, ".vc")).Replace('\\', '/');
-        Proc compile = RunVire(root, new string[] { "compiler.vire", relSrc, relVc }, root);
+        Proc compile = RunVire(root, new string[] { "compiler.vire", relSrc, relVc }, root, "5000000");
         if (compile.Code != 0)
         {
             return new DualRun(false, interp.Code, compile.Code, interp.Out, compile.Out, interp.Err, compile.Err);
         }
-        Proc compiled = RunVire(root, new string[] { "run", relVc }, root);
+        Proc compiled = RunVire(root, new string[] { "run", relVc }, root, budget);
         bool matched = interp.Code == compiled.Code
             && Norm(interp.Out) == Norm(compiled.Out)
             && Norm(interp.Err) == Norm(compiled.Err);
@@ -90,6 +100,11 @@ static class DualMode
 
     public static Proc RunVire(string root, string[] args, string cwd)
     {
+        return RunVire(root, args, cwd, "5000000");
+    }
+
+    public static Proc RunVire(string root, string[] args, string cwd, string budget)
+    {
         string dll = typeof(Program).Assembly.Location;
         string dotnet = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
         if (string.IsNullOrEmpty(dotnet)) dotnet = "dotnet";
@@ -105,7 +120,7 @@ static class DualMode
         info.RedirectStandardError = true;
         info.UseShellExecute = false;
         info.Environment["VIRE_SEAL_KEY"] = TestKeyB64();
-        info.Environment["VIRE_BUDGET"] = "5000000";
+        info.Environment["VIRE_BUDGET"] = budget;
         Process process = Process.Start(info);
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();

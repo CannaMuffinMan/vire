@@ -2119,7 +2119,7 @@ sealed class Json
         HashSet<object> walking = new HashSet<object>(ReferenceEqualityComparer.Instance);
         HashSet<object> done = new HashSet<object>(ReferenceEqualityComparer.Instance);
         CheckSchema(schema, line, 0, walking, done, budget);
-        CheckValue(value, schema, line, 0);
+        CheckValue(value, schema, line, 0, budget);
     }
 
     static void CheckSchema(object schema, int line, int depth, HashSet<object> walking, HashSet<object> done, Budget budget)
@@ -2161,10 +2161,16 @@ sealed class Json
                 if (kind != "map") throw new VireError("json schema has an unknown field", line);
                 List<object> need = pair.Value as List<object>;
                 if (need == null) throw new VireError("json schema need must be a list", line);
+                if (need.Count > MaxItems) throw new VireError("json is too large", line);
+                List<object> unique = new List<object>();
+                HashSet<string> seen = new HashSet<string>();
                 foreach (object item in need)
                 {
-                    if (!(item is string)) throw new VireError("json schema need must be text", line);
+                    string needName = item as string;
+                    if (needName == null) throw new VireError("json schema need must be text", line);
+                    if (seen.Add(needName)) unique.Add(needName);
                 }
+                spec["need"] = unique;
                 continue;
             }
             if (name == "items")
@@ -2181,8 +2187,9 @@ sealed class Json
         done.Add(spec);
     }
 
-    static void CheckValue(object value, object schema, int line, int depth)
+    static void CheckValue(object value, object schema, int line, int depth, Budget budget)
     {
+        if (budget != null) budget.Charge(line);
         if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
         Dictionary<string, object> spec = schema as Dictionary<string, object>;
         if (spec == null) throw new VireError("json schema must be a map", line);
@@ -2216,7 +2223,7 @@ sealed class Json
             if (spec.ContainsKey("items"))
             {
                 for (int i = 0; i < list.Count; i++)
-                    CheckValue(list[i], spec["items"], line, depth + 1);
+                    CheckValue(list[i], spec["items"], line, depth + 1, budget);
             }
             return;
         }
@@ -2233,6 +2240,7 @@ sealed class Json
                 if (need == null) throw new VireError("json schema need must be a list", line);
                 foreach (object item in need)
                 {
+                    if (budget != null) budget.Charge(line);
                     string name = item as string;
                     if (name == null) throw new VireError("json schema need must be text", line);
                     if (!map.ContainsKey(name)) throw new VireError("json is missing a required key", line);
@@ -2247,7 +2255,7 @@ sealed class Json
                         if (closed) throw new VireError("json has an extra key", line);
                         continue;
                     }
-                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1);
+                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1, budget);
                 }
             }
             else if (closed && map.Count > 0)

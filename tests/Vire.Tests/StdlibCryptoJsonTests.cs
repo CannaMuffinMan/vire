@@ -510,4 +510,64 @@ public class StdlibCryptoJsonTests
         Assert.Contains("json schema has a cycle", cycle.InterpErr);
         Assert.DoesNotContain("lived", DualMode.Norm(cycle.InterpOut));
     }
+
+    [Fact]
+    public void LargeValueAgainstBigNeedListHitsBudgetFastInBothModes()
+    {
+        StringBuilder row = new StringBuilder();
+        row.Append('{');
+        for (int k = 1; k <= 500; k++)
+        {
+            if (k > 1) row.Append(',');
+            row.Append('"').Append(k).Append("\":1");
+        }
+        row.Append('}');
+        StringBuilder json = new StringBuilder();
+        json.Append('[');
+        for (int i = 0; i < 40; i++)
+        {
+            if (i > 0) json.Append(',');
+            json.Append(row);
+        }
+        json.Append(']');
+        System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        DualMode.DualRun both = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let want be []",
+            "  let i be 1",
+            "  while i <= 500",
+            "    push with want, (text with i)",
+            "    let i be i + 1",
+            "  end",
+            "  let schema be {\"kind\": \"list\", \"items\": {\"kind\": \"map\", \"closed\": false, \"need\": want}}",
+            "  parse with \"" + json.ToString().Replace("\"", "\\\"") + "\", schema",
+            "  say \"lived\"",
+            "end",
+            ""
+        }), null, "12000");
+        Assert.True(clock.ElapsedMilliseconds < 5000, "big need list must fail closed quickly, took " + clock.ElapsedMilliseconds);
+        Assert.True(both.Matched, both.InterpErr + both.CompErr);
+        Assert.Equal(1, both.InterpCode);
+        Assert.True(
+            both.InterpErr.Contains("program ran too long") || both.InterpErr.Contains("request ran too long"),
+            both.InterpErr);
+        Assert.DoesNotContain("lived", DualMode.Norm(both.InterpOut));
+    }
+
+    [Fact]
+    public void BadHexCharacterZerosThePartialKeyBuffer()
+    {
+        byte[] buf = new byte[] { 0xaa, 0xbb, 0xcc };
+        try
+        {
+            VireCrypto.DecodeHex("00zz00", buf, 1, 1);
+            Assert.Fail("damaged hex must throw");
+        }
+        catch (VireError err)
+        {
+            Assert.Contains("hex text is damaged", err.Message);
+            for (int i = 0; i < buf.Length; i++) Assert.Equal(0, buf[i]);
+        }
+    }
 }
