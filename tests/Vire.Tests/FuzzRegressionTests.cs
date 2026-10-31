@@ -60,6 +60,19 @@ public class FuzzRegressionTests
     }
 
     [Fact]
+    public void HostileLockfilesAreVireErrorsNotCrashes()
+    {
+        int pid = Environment.ProcessId;
+        Assert.Throws<VireError>(() => VireLock.ParseText("vire.lock 1\n" + new string('#', VireLock.MaxLineChars + 1) + "\n"));
+        Assert.Throws<VireError>(() => VireLock.ParseText("vire.lock 2\n"));
+        Assert.Throws<VireError>(() => VireLock.ParseText("vire.lock 1\npkg ui 0 packages/ui/" + new string('a', 300) + " " + new string('0', 64) + "\n"));
+        StringBuilder lines = new StringBuilder("vire.lock 1\n");
+        for (int i = 0; i < VireLock.MaxLockLines; i++) lines.Append("# x\n");
+        Assert.Throws<VireError>(() => VireLock.ParseText(lines.ToString()));
+        Assert.Equal(pid, Environment.ProcessId);
+    }
+
+    [Fact]
     public void UnsealedForgedMagicIsRefused()
     {
         WithKey(() =>

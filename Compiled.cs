@@ -529,6 +529,7 @@ sealed class CompiledMachine
         if (name == "json") return Json.Write(args[0]);
         if (name == "seal") return VireSeal.Seal(args[0] as string ?? Show(args[0]));
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
+        if (name == "pkgguard") return VireLock.BuiltinGuard(args, line, col);
         if (name == "read")
         {
             try

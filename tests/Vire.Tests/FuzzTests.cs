@@ -83,6 +83,27 @@ public class FuzzTests
     }
 
     [Fact]
+    public void LockfileParserSeededFuzzNeverCrashes()
+    {
+        int pid = Environment.ProcessId;
+        FuzzRng rng = new FuzzRng(Seed ^ 29);
+        string[] corpus = LoadCorpus("lock-*.txt");
+        int iters = Iters();
+        for (int n = 0; n < iters; n++)
+        {
+            string text = NextText(rng, corpus);
+            try { VireLock.ParseText(text); }
+            catch (VireError) { }
+            byte[] raw = Encoding.UTF8.GetBytes(text);
+            if (rng.Next(4) == 0 && raw.Length > 0) raw[rng.Next(raw.Length)] = 0;
+            try { VireLock.Parse(raw); }
+            catch (VireError) { }
+            Assert.Equal(pid, Environment.ProcessId);
+        }
+        Assert.Throws<VireError>(() => VireLock.Parse(new byte[VireLock.MaxLockBytes + 8]));
+    }
+
+    [Fact]
     public void ListenRequestParseSeededFuzzNeverCrashes()
     {
         int pid = Environment.ProcessId;

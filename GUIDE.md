@@ -237,6 +237,10 @@ end
 
 `use "math.vire"` loads another file in the program folder. `use` only opens `.vire` files, refuses `..`, and refuses a loop of files. At most 32 files are loaded.
 
+`need "ui"` loads `packages/ui/lib.vire` if that file exists, otherwise `deps/ui/lib.vire`. Package `use`/`need` is fail-closed: a `vire.lock` must be present in the program folder, the name must be listed, and the SHA-256 of that folder must match. Local `use` of ordinary `.vire` files does not require a lockfile. There is no network fetch. `vire pkg lock` writes the lockfile from `packages/` and `deps/`; `vire pkg verify` re-hashes and compares. The same checks run when compiling to `.vc` and when `vire run` sees a `vire.lock` next to the compiled file.
+
+The lockfile is line-based UTF-8 with LF endings. First line: `vire.lock 1`. Package lines: `pkg <name> <version> <packages/name-or-deps/name> <64 lowercase hex>`. `#` comments and blank lines are allowed. Hash input is raw file bytes (no newline rewriting): for each file under the package folder, in ordinal path order using `/`, UTF-8 relative path, a newline, an 8-byte big-endian length, then the file bytes. Caps: lockfile 256 KiB / 512 lines / 64 packages; 4096 files and 8 MiB hashed per package. Paths cannot leave the project folder.
+
 ## 11. Step by step: a window
 
 `work.vire` is the sample application. It does not use another programming language.
@@ -301,7 +305,7 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 5. Walk a list of scores, `skip` the blanks, and add the rest.
 6. Clean text with `split`, `lower`, `join`, and `sort`.
 7. Save a note with `write` and load it with `read`.
-8. Share helpers through `need` and `deps/<name>/lib.vire`.
+8. Share helpers through `need` and a vendored package under `packages/<name>/` (or the older `deps/<name>/`) listed in `vire.lock`.
 9. Catch a bad conversion with `try` and `miss`.
 10. Open a small desktop tool with `open`, `field`, `button`, and `show`, as `work.vire` does.
 11. Save a list of records as JSON, then build a page from those records.

@@ -1,5 +1,12 @@
 # Changelog
 
+## Phase 1 (packages, lockfile cut)
+
+- `vire.lock` lists vendored packages (`packages/` and `deps/`) with name, version, relative path, and SHA-256 of raw file bytes in sorted path order.
+- `vire pkg lock` and `vire pkg verify` stay inside the project folder. No network.
+- `need` and `use` of a vendored package fail closed in the interpreter and in compiled `.vc` mode when the lockfile is missing, malformed, or the hash mismatches. Local `use` of non-package `.vire` files does not require a lockfile.
+- Seeded fuzz and regression tests cover the lockfile parser. Caps bound lock size, package count, and bytes hashed.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.
