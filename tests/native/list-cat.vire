@@ -1,0 +1,4 @@
+~ native-ok: [1, 2, 3, 4]
+define main
+  say [1, 2] + [3, 4]
+end

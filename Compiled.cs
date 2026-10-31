@@ -332,8 +332,11 @@ sealed class CompiledMachine
             if (left is string || right is string) return Show(left) + Show(right);
             if (left is List<object> && right is List<object>)
             {
-                List<object> joined = new List<object>((List<object>)left);
-                joined.AddRange((List<object>)right);
+                List<object> a = (List<object>)left;
+                List<object> b = (List<object>)right;
+                if ((long)a.Count + b.Count > MaxItems) Fail("list is too large", expr);
+                List<object> joined = new List<object>(a);
+                joined.AddRange(b);
                 return joined;
             }
             return Add(left, right);

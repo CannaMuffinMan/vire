@@ -1,0 +1,11 @@
+~ native-error: ran out of memory
+~ native-interp-ok
+define main
+  let n be 0
+  let xs be []
+  while n < 50000
+    push with xs, [1, 2, 3, 4]
+    let n be n + 1
+  end
+  say "lived"
+end

@@ -1340,11 +1340,7 @@ sealed class Machine
         {
             if (left is string || right is string) return Show(left) + Show(right);
             if (left is List<object> && right is List<object>)
-            {
-                List<object> joined = new List<object>((List<object>)left);
-                joined.AddRange((List<object>)right);
-                return joined;
-            }
+                return JoinLists((List<object>)left, (List<object>)right, line, col);
             if (IsNum(left) && IsNum(right)) return Add(left, right);
             throw new VireError("plus needs numbers, text, or lists", line, col);
         }
@@ -1380,6 +1376,14 @@ sealed class Machine
         if (left == null || right == null) return left == null && right == null;
         if (IsNum(left) && IsNum(right)) return ToDouble(left) == ToDouble(right);
         return left.Equals(right);
+    }
+
+    static List<object> JoinLists(List<object> left, List<object> right, int line, int col)
+    {
+        if ((long)left.Count + right.Count > MaxItems) throw new VireError("list is too large", line, col);
+        List<object> joined = new List<object>(left);
+        joined.AddRange(right);
+        return joined;
     }
 
     static object Widen(long value)
@@ -2664,6 +2668,10 @@ sealed class Program
         catch (VireError exc)
         {
             return WriteVireError(exc);
+        }
+        catch (OutOfMemoryException)
+        {
+            return WriteVireError(new VireError("ran out of memory", 1));
         }
         catch (Exception ex)
         {
