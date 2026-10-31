@@ -184,7 +184,11 @@ static class VireCrypto
         string text = value as string;
         if (text == null) throw new VireError(message, line, col);
         byte[] bytes = FromHex(text, line, col);
-        if (bytes.Length < min || bytes.Length > max) throw new VireError(message, line, col);
+        if (bytes.Length < min || bytes.Length > max)
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            throw new VireError(message, line, col);
+        }
         return bytes;
     }
 

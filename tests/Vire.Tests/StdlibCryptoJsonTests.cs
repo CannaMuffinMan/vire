@@ -461,10 +461,53 @@ public class StdlibCryptoJsonTests
         try
         {
             VireCrypto.WithZeroedKey<int>(throwing, k => throw new VireError("boom", 1, 1));
+            Assert.Fail("key use must throw");
         }
         catch (VireError)
         {
             for (int i = 0; i < throwing.Length; i++) Assert.Equal(0, throwing[i]);
         }
+    }
+
+    [Fact]
+    public void SharedSchemaDagAndCyclicSchemaFinishFastInBothModes()
+    {
+        System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        DualMode.DualRun dag = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let s be {\"kind\": \"map\", \"closed\": false}",
+            "  let i be 1",
+            "  while i <= 64",
+            "    let s be {\"kind\": \"map\", \"closed\": false, \"keys\": {\"a\": s, \"b\": s}}",
+            "    let i be i + 1",
+            "  end",
+            "  parse with \"{}\", s",
+            "  say \"ok\"",
+            "end",
+            ""
+        }), null);
+        Assert.True(clock.ElapsedMilliseconds < 5000, "shared schema dag must finish fast, took " + clock.ElapsedMilliseconds);
+        Assert.True(dag.Matched, dag.InterpErr + dag.CompErr + dag.InterpOut + dag.CompOut);
+        Assert.Equal(0, dag.InterpCode);
+        Assert.Equal("ok\n", DualMode.Norm(dag.InterpOut));
+
+        clock.Restart();
+        DualMode.DualRun cycle = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let keys be {}",
+            "  let s be {\"kind\": \"map\", \"closed\": false, \"keys\": keys}",
+            "  put s into keys at \"a\"",
+            "  parse with \"{}\", s",
+            "  say \"lived\"",
+            "end",
+            ""
+        }), null);
+        Assert.True(clock.ElapsedMilliseconds < 5000, "cyclic schema must finish fast, took " + clock.ElapsedMilliseconds);
+        Assert.True(cycle.Matched, cycle.InterpErr + cycle.CompErr);
+        Assert.Equal(1, cycle.InterpCode);
+        Assert.Contains("json schema has a cycle", cycle.InterpErr);
+        Assert.DoesNotContain("lived", DualMode.Norm(cycle.InterpOut));
     }
 }

@@ -159,6 +159,13 @@ sealed class Budget
     {
         return DeadlineUtcTicks != 0 && DateTime.UtcNow.Ticks > DeadlineUtcTicks;
     }
+
+    public void Charge(int line)
+    {
+        if (DeadlinePassed()) throw new VireError("request ran too long", line);
+        Steps = Interlocked.Increment(ref Steps);
+        if (Steps > MaxSteps) throw new VireError("program ran too long and was stopped", line);
+    }
 }
 
 static class ListenHooks
@@ -256,9 +263,7 @@ sealed class Machine
 
     void Step(int line)
     {
-        if (budget.DeadlinePassed()) throw new VireError("request ran too long", line);
-        budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
-        if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        budget.Charge(line);
     }
 
     string SafePath(object text, int line)
@@ -566,7 +571,7 @@ sealed class Machine
             string raw = args[0] as string;
             if (raw == null) throw new VireError("parse needs text", line, col);
             object value = Json.Read(raw, line);
-            if (args.Count == 2) Json.Check(value, args[1], line);
+            if (args.Count == 2) Json.Check(value, args[1], line, budget);
             return value;
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -2106,15 +2111,27 @@ sealed class Json
 
     public static void Check(object value, object schema, int line)
     {
-        CheckSchema(schema, line, 0);
+        Check(value, schema, line, null);
+    }
+
+    public static void Check(object value, object schema, int line, Budget budget)
+    {
+        HashSet<object> walking = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        HashSet<object> done = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        CheckSchema(schema, line, 0, walking, done, budget);
         CheckValue(value, schema, line, 0);
     }
 
-    static void CheckSchema(object schema, int line, int depth)
+    static void CheckSchema(object schema, int line, int depth, HashSet<object> walking, HashSet<object> done, Budget budget)
     {
+        if (budget != null) budget.Charge(line);
         if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
         Dictionary<string, object> spec = schema as Dictionary<string, object>;
         if (spec == null) throw new VireError("json schema must be a map", line);
+        if (done.Contains(spec)) return;
+        if (walking.Contains(spec)) throw new VireError("json schema has a cycle", line);
+        if (walking.Count + done.Count >= MaxItems) throw new VireError("json is too large", line);
+        walking.Add(spec);
         string kind = null;
         if (spec.ContainsKey("kind")) kind = spec["kind"] as string;
         if (kind == null) throw new VireError("json schema needs a kind", line);
@@ -2136,7 +2153,7 @@ sealed class Json
                 Dictionary<string, object> keys = pair.Value as Dictionary<string, object>;
                 if (keys == null) throw new VireError("json schema keys must be a map", line);
                 foreach (KeyValuePair<string, object> child in keys)
-                    CheckSchema(child.Value, line, depth + 1);
+                    CheckSchema(child.Value, line, depth + 1, walking, done, budget);
                 continue;
             }
             if (name == "need")
@@ -2155,11 +2172,13 @@ sealed class Json
                 if (kind != "list") throw new VireError("json schema has an unknown field", line);
                 Dictionary<string, object> items = pair.Value as Dictionary<string, object>;
                 if (items == null) throw new VireError("json schema items must be a map", line);
-                CheckSchema(items, line, depth + 1);
+                CheckSchema(items, line, depth + 1, walking, done, budget);
                 continue;
             }
             throw new VireError("json schema has an unknown field", line);
         }
+        walking.Remove(spec);
+        done.Add(spec);
     }
 
     static void CheckValue(object value, object schema, int line, int depth)
