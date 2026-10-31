@@ -1,0 +1,4 @@
+~ native-error: index is outside the value
+define main
+  say [1] at 5
+end

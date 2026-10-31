@@ -1,0 +1,18 @@
+~ native-error: definitions called too deeply
+define ping with n
+  if n <= 0
+    return 0
+  end
+  return pong with (n - 1)
+end
+
+define pong with n
+  if n <= 0
+    return 0
+  end
+  return ping with (n - 1)
+end
+
+define main
+  say ping with 100
+end

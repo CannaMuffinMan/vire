@@ -1,0 +1,4 @@
+~ native-error: an index must be a whole number
+define main
+  say [1] at true
+end

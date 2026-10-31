@@ -1,0 +1,11 @@
+~ native-ok: 0
+define boom with n
+  if n <= 0
+    return 0
+  end
+  return boom with (n - 1)
+end
+
+define main
+  say boom with 10
+end

@@ -1,0 +1,6 @@
+~ native-error: index is outside the value
+define main
+  let xs be [1]
+  put 9 into xs at 4
+  say xs
+end

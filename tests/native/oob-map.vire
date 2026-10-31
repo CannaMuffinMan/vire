@@ -1,0 +1,5 @@
+~ native-error: map has no key
+define main
+  let m be {"a": 1}
+  say m at "z"
+end
