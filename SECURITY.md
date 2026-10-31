@@ -14,7 +14,9 @@ The supported line is the current Phase 0 runner: .NET 10, this repository's `vi
 
 These are the current strengths, not a claim that the process cannot be abused:
 
-- Interpreter caps: 1,000,000 steps by default (the starter may set `VIRE_BUDGET` up to 5,000,000), 100,000 `while` passes, 64 call depth, 1,000,000 character text, 100,000 list items, 8 nested `run`s.
+- Interpreter caps: 1,000,000 steps by default (the starter may set `VIRE_BUDGET` up to 5,000,000), 100,000 `while` passes, 64 call depth, 1,000,000 character text (including text `+`), 100,000 list items (push, list literals, and list `+`), 8 nested `run`s. Host `OutOfMemoryException` is reported as `ran out of memory` with exit 1, not an internal error.
+- Whole `+`, `-`, `*`, `/`, and unary minus that do not fit in a 32-bit whole number become decimals in the interpreter and the `.vc` machine. They never wrap. The native Windows build has no decimal widen, so the same overflow is `that number overflowed` with exit 1.
+- Native bump-heap: 1 MiB `VirtualAlloc` arena. `rt_alloc` (and file-read bumps) must not write past it; exhaustion is `ran out of memory` with exit 1.
 - `listen` gives each request a fresh budget and a 5 second wall-clock deadline. Header block 16 KB, request line 8 KB, body 1 MB with `Content-Length` required. At most 64 in-flight connections. Binds `127.0.0.1` by default.
 - Paths go through one `SafeName` gate. Rooted paths, `..`, NTFS ADS, device names, trailing dots/spaces, and reparse points are refused. `run` / `use` stay out of `data/` and `site/`. Program and script extensions cannot be written.
 - `fetch` and `post` use `http`/`https` only, no userinfo, no automatic redirects (each hop is re-checked), connect to a resolved public address, and cap the body while streaming.

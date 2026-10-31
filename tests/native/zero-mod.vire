@@ -1,0 +1,4 @@
+~ native-error: division by zero
+define main
+  say 1 % 0
+end

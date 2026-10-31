@@ -1338,13 +1338,9 @@ sealed class Machine
         if (op == "!=") return !ValuesMatch(left, right);
         if (op == "+")
         {
-            if (left is string || right is string) return Show(left) + Show(right);
+            if (left is string || right is string) return JoinText(Show(left), Show(right), line, col);
             if (left is List<object> && right is List<object>)
-            {
-                List<object> joined = new List<object>((List<object>)left);
-                joined.AddRange((List<object>)right);
-                return joined;
-            }
+                return JoinLists((List<object>)left, (List<object>)right, line, col);
             if (IsNum(left) && IsNum(right)) return Add(left, right);
             throw new VireError("plus needs numbers, text, or lists", line, col);
         }
@@ -1380,6 +1376,20 @@ sealed class Machine
         if (left == null || right == null) return left == null && right == null;
         if (IsNum(left) && IsNum(right)) return ToDouble(left) == ToDouble(right);
         return left.Equals(right);
+    }
+
+    static List<object> JoinLists(List<object> left, List<object> right, int line, int col)
+    {
+        if ((long)left.Count + right.Count > MaxItems) throw new VireError("list is too large", line, col);
+        List<object> joined = new List<object>(left);
+        joined.AddRange(right);
+        return joined;
+    }
+
+    static string JoinText(string left, string right, int line, int col)
+    {
+        if ((long)left.Length + right.Length > MaxText) throw new VireError("text is too large to write", line, col);
+        return left + right;
     }
 
     static object Widen(long value)
@@ -2664,6 +2674,10 @@ sealed class Program
         catch (VireError exc)
         {
             return WriteVireError(exc);
+        }
+        catch (OutOfMemoryException)
+        {
+            return WriteVireError(new VireError("ran out of memory", 1));
         }
         catch (Exception ex)
         {

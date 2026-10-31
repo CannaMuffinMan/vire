@@ -17,6 +17,11 @@ public class NativeSafetyTests
         Assert.Contains("rt_leave", rt);
         Assert.Contains("call_depth", rt);
         Assert.Contains("definitions called too deeply", rt);
+        Assert.Contains("ran out of memory", rt);
+        Assert.Contains("that number overflowed", rt);
+        Assert.Contains("list is too large", rt);
+        Assert.Contains("emitFit32", rt);
+        Assert.Contains("1048576", rt);
         Assert.Contains("index is outside the value", rt);
         Assert.Contains("an index must be a whole number", rt);
         Assert.Contains("[101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]", rt);
@@ -33,7 +38,7 @@ public class NativeSafetyTests
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
         string[] files = Directory.GetFiles(dir, "*.vire");
-        Assert.True(files.Length >= 10, "expected native safety fixtures");
+        Assert.True(files.Length >= 16, "expected native safety fixtures");
         foreach (string path in files)
         {
             string text = File.ReadAllText(path);
@@ -41,7 +46,15 @@ public class NativeSafetyTests
             if (text.Contains("~ native-ok:"))
             {
                 Assert.Equal(0, run.Code);
-                Assert.Contains("0", DualMode.Norm(run.Out));
+                string ok = WantOk(text);
+                Assert.False(string.IsNullOrEmpty(ok), path);
+                Assert.Contains(ok, DualMode.Norm(run.Out));
+                continue;
+            }
+            if (text.Contains("~ native-interp-ok"))
+            {
+                Assert.Equal(0, run.Code);
+                Assert.DoesNotContain("internal error", DualMode.Norm(run.Err));
                 continue;
             }
             Assert.Equal(1, run.Code);
@@ -73,6 +86,11 @@ public class NativeSafetyTests
             Assert.Contains(AsciiHex("definitions called too deeply"), hex);
             Assert.Contains(AsciiHex("an index must be a whole number"), hex);
             Assert.Contains(AsciiHex("slice needs text or a list"), hex);
+            Assert.Contains(AsciiHex("ran out of memory"), hex);
+            Assert.Contains(AsciiHex("that number overflowed"), hex);
+            Assert.Contains(AsciiHex("division by zero"), hex);
+            Assert.Contains(AsciiHex("list is too large"), hex);
+            Assert.Contains(AsciiHex("text is too large to write"), hex);
         }
         finally
         {
@@ -89,6 +107,44 @@ public class NativeSafetyTests
         Assert.Contains("Get-ChildItem", smoke);
         Assert.Contains("~ native-error:", smoke);
         Assert.DoesNotContain("KNOWN FAIL Phase 3B", smoke);
+    }
+
+    [Fact]
+    public void ListCatAndTextCatShareInterpreterCaps()
+    {
+        string root = DualMode.FindRoot();
+        DualMode.DualRun lists = DualMode.RunSource(
+            "define main\n  let a be span with 0, 50001\n  let b be span with 0, 50001\n  say a + b\nend\n",
+            null);
+        Assert.True(lists.Matched, "interp=" + lists.InterpErr + " compiled=" + lists.CompErr);
+        Assert.Equal(1, lists.InterpCode);
+        Assert.Contains("list is too large", DualMode.Norm(lists.InterpErr));
+        Assert.Contains("list is too large", DualMode.Norm(lists.CompErr));
+        DualMode.DualRun texts = DualMode.RunSource(
+            "define main\n  let a be \"\"\n  let n be 0\n  while n < 20\n    let a be a + a + \"x\"\n    let n be n + 1\n  end\n  say a + a\nend\n",
+            null);
+        Assert.True(texts.Matched, "interp=" + texts.InterpErr + " compiled=" + texts.CompErr);
+        Assert.Equal(1, texts.InterpCode);
+        Assert.Contains("text is too large to write", DualMode.Norm(texts.InterpErr));
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        int cat = rt.IndexOf("rt_list_cat", StringComparison.Ordinal);
+        int cap = rt.IndexOf("100000", cat, StringComparison.Ordinal);
+        int alloc = rt.IndexOf("rt_alloc", cat, StringComparison.Ordinal);
+        Assert.True(cap > cat && cap < alloc, "rt_list_cat must check 100000 before rt_alloc");
+        int tcat = rt.IndexOf("rt_text_cat", StringComparison.Ordinal);
+        int tcap = rt.IndexOf("1000000", tcat, StringComparison.Ordinal);
+        int talloc = rt.IndexOf("rt_alloc", tcat, StringComparison.Ordinal);
+        Assert.True(tcap > tcat && tcap < talloc, "rt_text_cat must check 1000000 before rt_alloc");
+    }
+
+    static string WantOk(string text)
+    {
+        const string mark = "~ native-ok: ";
+        int at = text.IndexOf(mark, StringComparison.Ordinal);
+        if (at < 0) return "";
+        int end = text.IndexOf('\n', at);
+        if (end < 0) end = text.Length;
+        return text.Substring(at + mark.Length, end - (at + mark.Length)).Trim();
     }
 
     static string WantOf(string text)
