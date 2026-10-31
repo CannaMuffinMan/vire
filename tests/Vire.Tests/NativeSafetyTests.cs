@@ -19,6 +19,7 @@ public class NativeSafetyTests
         Assert.Contains("definitions called too deeply", rt);
         Assert.Contains("ran out of memory", rt);
         Assert.Contains("that number overflowed", rt);
+        Assert.Contains("list is too large", rt);
         Assert.Contains("emitFit32", rt);
         Assert.Contains("1048576", rt);
         Assert.Contains("index is outside the value", rt);
@@ -88,6 +89,8 @@ public class NativeSafetyTests
             Assert.Contains(AsciiHex("ran out of memory"), hex);
             Assert.Contains(AsciiHex("that number overflowed"), hex);
             Assert.Contains(AsciiHex("division by zero"), hex);
+            Assert.Contains(AsciiHex("list is too large"), hex);
+            Assert.Contains(AsciiHex("text is too large to write"), hex);
         }
         finally
         {
@@ -104,6 +107,34 @@ public class NativeSafetyTests
         Assert.Contains("Get-ChildItem", smoke);
         Assert.Contains("~ native-error:", smoke);
         Assert.DoesNotContain("KNOWN FAIL Phase 3B", smoke);
+    }
+
+    [Fact]
+    public void ListCatAndTextCatShareInterpreterCaps()
+    {
+        string root = DualMode.FindRoot();
+        DualMode.DualRun lists = DualMode.RunSource(
+            "define main\n  let a be span with 0, 50001\n  let b be span with 0, 50001\n  say a + b\nend\n",
+            null);
+        Assert.True(lists.Matched, "interp=" + lists.InterpErr + " compiled=" + lists.CompErr);
+        Assert.Equal(1, lists.InterpCode);
+        Assert.Contains("list is too large", DualMode.Norm(lists.InterpErr));
+        Assert.Contains("list is too large", DualMode.Norm(lists.CompErr));
+        DualMode.DualRun texts = DualMode.RunSource(
+            "define main\n  let a be \"\"\n  let n be 0\n  while n < 20\n    let a be a + a + \"x\"\n    let n be n + 1\n  end\n  say a + a\nend\n",
+            null);
+        Assert.True(texts.Matched, "interp=" + texts.InterpErr + " compiled=" + texts.CompErr);
+        Assert.Equal(1, texts.InterpCode);
+        Assert.Contains("text is too large to write", DualMode.Norm(texts.InterpErr));
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        int cat = rt.IndexOf("rt_list_cat", StringComparison.Ordinal);
+        int cap = rt.IndexOf("100000", cat, StringComparison.Ordinal);
+        int alloc = rt.IndexOf("rt_alloc", cat, StringComparison.Ordinal);
+        Assert.True(cap > cat && cap < alloc, "rt_list_cat must check 100000 before rt_alloc");
+        int tcat = rt.IndexOf("rt_text_cat", StringComparison.Ordinal);
+        int tcap = rt.IndexOf("1000000", tcat, StringComparison.Ordinal);
+        int talloc = rt.IndexOf("rt_alloc", tcat, StringComparison.Ordinal);
+        Assert.True(tcap > tcat && tcap < talloc, "rt_text_cat must check 1000000 before rt_alloc");
     }
 
     static string WantOk(string text)

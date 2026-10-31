@@ -1,0 +1,9 @@
+define main
+  let a be ""
+  let n be 0
+  while n < 20
+    let a be a + a + "x"
+    let n be n + 1
+  end
+  say a + a
+end

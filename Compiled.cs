@@ -329,11 +329,20 @@ sealed class CompiledMachine
         object right = Eval((List<object>)expr[2], env);
         if (op == "+")
         {
-            if (left is string || right is string) return Show(left) + Show(right);
+            if (left is string || right is string)
+            {
+                string a = Show(left);
+                string b = Show(right);
+                if ((long)a.Length + b.Length > MaxText) Fail("text is too large to write", expr);
+                return a + b;
+            }
             if (left is List<object> && right is List<object>)
             {
-                List<object> joined = new List<object>((List<object>)left);
-                joined.AddRange((List<object>)right);
+                List<object> a = (List<object>)left;
+                List<object> b = (List<object>)right;
+                if ((long)a.Count + b.Count > MaxItems) Fail("list is too large", expr);
+                List<object> joined = new List<object>(a);
+                joined.AddRange(b);
                 return joined;
             }
             return Add(left, right);

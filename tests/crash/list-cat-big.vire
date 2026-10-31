@@ -1,0 +1,5 @@
+define main
+  let a be span with 0, 50001
+  let b be span with 0, 50001
+  say a + b
+end

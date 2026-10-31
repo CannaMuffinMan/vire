@@ -123,6 +123,14 @@ public class CrashTests
         Assert.Equal(0, overflow.Code);
         Assert.Equal("4294967294\n", overflow.StdOut.Replace("\r\n", "\n"));
 
+        RunResult cat = Run(root, Path.Combine(crash, "list-cat-big.vire"), null);
+        Assert.Equal(1, cat.Code);
+        Assert.Contains("list is too large", cat.StdErr);
+
+        RunResult textCat = Run(root, Path.Combine(crash, "text-cat-big.vire"), null);
+        Assert.Equal(1, textCat.Code);
+        Assert.Contains("text is too large to write", textCat.StdErr);
+
         RunResult zero = Run(root, Path.Combine(crash, "zero-div.vire"), null);
         Assert.Equal(1, zero.Code);
         Assert.Contains("division by zero", zero.StdErr);

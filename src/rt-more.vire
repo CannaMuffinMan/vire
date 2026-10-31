@@ -309,7 +309,12 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_list_cat", image
   emitPro with image
-  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 3, 2, 72, 137, 69, 232, 72, 139, 200, 72, 193, 225, 4, 72, 131, 193, 16]
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 3, 2]
+  emitJcc with image, fixes, 130, "list_cat_big"
+  emitList with image, [72, 61]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 135, "list_cat_big"
+  emitList with image, [72, 137, 69, 232, 72, 139, 200, 72, 193, 225, 4, 72, 131, 193, 16]
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 224, 72, 139, 85, 232, 72, 137, 16, 72, 137, 80, 8, 72, 141, 72, 16, 76, 139, 77, 248, 73, 141, 81, 16, 76, 137, 208, 77, 139, 1, 73, 193, 224, 4]
   emitCallTo with image, fixes, "rt_memcpy"
@@ -317,6 +322,8 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 85, 224]
   emitEpi with image
+  pin with labels, "list_cat_big", image
+  emitFail with image, fixes, "msg_biglist"
 
   pin with labels, "rt_add", image
   emitPro with image
