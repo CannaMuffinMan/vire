@@ -1,0 +1,234 @@
+~ Linux x64 ELF image builder. Same IAT shim names as the PE path, filled
+~ with raw syscall stubs (write, exit_group, mmap, open, read, close, fstat).
+
+define poke64 with buf, pos, n
+  poke32 with buf, pos, n
+  let high be floorDiv with n, 4294967296
+  if n < 0
+    let high be 0
+  end
+  poke32 with buf, (pos + 4), high
+  return buf
+end
+
+define elfBase
+  return 4194304
+end
+
+define elfHead
+  return 120
+end
+
+define elfVa with off
+  return (elfBase) + (elfHead) + off
+end
+
+define emitLinuxShims with image, fixes, labels
+  pin with labels, "sys_GetStdHandle", image
+  emitList with image, [129, 249]
+  emitU32 with image, 4294967285
+  emitJcc with image, fixes, 132, "gs_out"
+  emitList with image, [129, 249]
+  emitU32 with image, 4294967284
+  emitJcc with image, fixes, 132, "gs_err"
+  emitList with image, [49, 192, 195]
+  pin with labels, "gs_out", image
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitList with image, [195]
+  pin with labels, "gs_err", image
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [195]
+
+  pin with labels, "sys_ExitProcess", image
+  emitList with image, [137, 207, 184]
+  emitU32 with image, 231
+  emitList with image, [15, 5]
+
+  pin with labels, "sys_VirtualAlloc", image
+  emitList with image, [87, 86, 49, 255, 72, 137, 214, 186]
+  emitU32 with image, 3
+  emitList with image, [65, 186]
+  emitU32 with image, 34
+  emitList with image, [73, 199, 192]
+  emitU32 with image, 4294967295
+  emitList with image, [69, 49, 201, 184]
+  emitU32 with image, 9
+  emitList with image, [15, 5, 94, 95, 72, 61]
+  emitU32 with image, 4294963200
+  emitJcc with image, fixes, 131, "va_fail"
+  emitList with image, [195]
+  pin with labels, "va_fail", image
+  emitList with image, [49, 192, 195]
+
+  pin with labels, "sys_WriteFile", image
+  emitList with image, [87, 86, 72, 137, 207, 72, 137, 214, 68, 137, 194, 184]
+  emitU32 with image, 1
+  emitList with image, [15, 5, 94, 95, 77, 133, 201]
+  emitJcc with image, fixes, 132, "wf_nostore"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 136, "wf_fail"
+  emitList with image, [65, 137, 1]
+  pin with labels, "wf_nostore", image
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 136, "wf_fail"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitList with image, [195]
+  pin with labels, "wf_fail", image
+  emitList with image, [49, 192, 195]
+
+  pin with labels, "sys_ReadFile", image
+  emitList with image, [87, 86, 72, 137, 207, 72, 137, 214, 68, 137, 194, 49, 192, 15, 5, 94, 95, 77, 133, 201]
+  emitJcc with image, fixes, 132, "rf_nostore"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 136, "rf_fail"
+  emitList with image, [65, 137, 1]
+  pin with labels, "rf_nostore", image
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 136, "rf_fail"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitList with image, [195]
+  pin with labels, "rf_fail", image
+  emitList with image, [49, 192, 195]
+
+  pin with labels, "sys_CloseHandle", image
+  emitList with image, [87, 137, 207, 184]
+  emitU32 with image, 3
+  emitList with image, [15, 5, 95, 72, 133, 192]
+  emitJcc with image, fixes, 133, "ch_fail"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitList with image, [195]
+  pin with labels, "ch_fail", image
+  emitList with image, [49, 192, 195]
+
+  pin with labels, "sys_CreateFileA", image
+  emitList with image, [87, 86, 72, 137, 207, 139, 68, 36, 56, 131, 248, 2]
+  emitJcc with image, fixes, 132, "cf_create"
+  emitList with image, [49, 246, 184]
+  emitU32 with image, 2
+  emitList with image, [15, 5, 233]
+  emitRel with image, fixes, "cf_done"
+  pin with labels, "cf_create", image
+  emitList with image, [190]
+  emitU32 with image, 577
+  emitList with image, [186]
+  emitU32 with image, 420
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [15, 5]
+  pin with labels, "cf_done", image
+  emitList with image, [94, 95, 195]
+
+  pin with labels, "sys_GetFileSize", image
+  emitList with image, [87, 86, 72, 129, 236]
+  emitU32 with image, 144
+  emitList with image, [72, 137, 207, 72, 137, 230, 184]
+  emitU32 with image, 5
+  emitList with image, [15, 5, 72, 133, 192]
+  emitJcc with image, fixes, 133, "sz_fail"
+  emitList with image, [139, 68, 36, 48, 72, 129, 196]
+  emitU32 with image, 144
+  emitList with image, [94, 95, 195]
+  pin with labels, "sz_fail", image
+  emitList with image, [72, 129, 196]
+  emitU32 with image, 144
+  emitList with image, [94, 95, 184]
+  emitU32 with image, 4294967295
+  emitList with image, [195]
+
+  pin with labels, "sys_GetCommandLineA", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "cmdline_buf"
+  emitList with image, [195]
+
+  pin with labels, "elf_start", image
+  emitList with image, [72, 139, 12, 36, 72, 141, 116, 36, 8, 72, 141, 61]
+  emitRel with image, fixes, "cmdline_buf"
+  emitList with image, [76, 141, 13]
+  emitRel with image, fixes, "cmdline_end"
+  emitList with image, [77, 141, 73, 255, 77, 49, 192]
+  pin with labels, "arg_loop", image
+  emitList with image, [73, 57, 200]
+  emitJcc with image, fixes, 141, "arg_done"
+  emitList with image, [77, 133, 192]
+  emitJcc with image, fixes, 132, "arg_nospace"
+  emitList with image, [76, 57, 207]
+  emitJcc with image, fixes, 131, "arg_done"
+  emitList with image, [198, 7, 32, 72, 255, 199]
+  pin with labels, "arg_nospace", image
+  emitList with image, [74, 139, 4, 198]
+  pin with labels, "arg_copy", image
+  emitList with image, [76, 57, 207]
+  emitJcc with image, fixes, 131, "arg_done"
+  emitList with image, [138, 24, 132, 219]
+  emitJcc with image, fixes, 132, "arg_copied"
+  emitList with image, [136, 31, 72, 255, 199, 72, 255, 192, 233]
+  emitRel with image, fixes, "arg_copy"
+  pin with labels, "arg_copied", image
+  emitList with image, [73, 255, 192, 233]
+  emitRel with image, fixes, "arg_loop"
+  pin with labels, "arg_done", image
+  emitList with image, [198, 7, 0, 72, 131, 228, 240, 72, 131, 236, 8, 233]
+  emitRel with image, fixes, "code"
+
+  pin with labels, "stack_limit", image
+  emitU64 with image, 0
+  pin with labels, "cmdline_buf", image
+  let i be 0
+  while i < 4096
+    emitU8 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "cmdline_end", image
+  emitU8 with image, 0
+  return image
+end
+
+define finishElf with image, labels, fixes, iats
+  patchRel with image, labels, fixes
+  let names be ["sys_GetStdHandle", "sys_WriteFile", "sys_ExitProcess", "sys_VirtualAlloc", "sys_CreateFileA", "sys_ReadFile", "sys_GetFileSize", "sys_CloseHandle", "sys_GetCommandLineA"]
+  let i be 0
+  while i < (length with iats)
+    poke64 with image, (labels at (iats at i)), (elfVa with (labels at (names at i)))
+    let i be i + 1
+  end
+  return image
+end
+
+define buildElf with image, entry
+  let total be (elfHead) + (length with image)
+  let head be zeros with (elfHead)
+  put 127 into head at 0
+  put 69 into head at 1
+  put 76 into head at 2
+  put 70 into head at 3
+  put 2 into head at 4
+  put 1 into head at 5
+  put 1 into head at 6
+  poke16 with head, 16, 2
+  poke16 with head, 18, 62
+  poke32 with head, 20, 1
+  poke64 with head, 24, (elfVa with entry)
+  poke64 with head, 32, 64
+  poke16 with head, 52, 64
+  poke16 with head, 54, 56
+  poke16 with head, 56, 1
+  poke32 with head, 64, 1
+  poke32 with head, 68, 7
+  poke64 with head, 80, (elfBase)
+  poke64 with head, 88, (elfBase)
+  poke64 with head, 96, total
+  poke64 with head, 104, total
+  poke64 with head, 112, 4096
+  let i be 0
+  let n be length with image
+  while i < n
+    push with head, (image at i)
+    let i be i + 1
+  end
+  return head
+end
