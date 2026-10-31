@@ -112,7 +112,7 @@ for item in [1, 2, 3]
 end
 ```
 
-`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 100,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000. Each `listen` request gets a fresh copy of that budget and a 5 second wall-clock deadline.
+`skip` goes to the next pass of `while` or `for`. `stop` leaves the loop. Both are valid only inside a loop. A `while` that would run more than 1,000,000 passes is stopped. A program that performs more than 1,000,000 steps is stopped. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000. Each `listen` request gets a fresh copy of that budget and a 5 second wall-clock deadline.
 
 ## 5. Definitions
 
@@ -311,7 +311,7 @@ The window in section 11 stays inside Vire. The site path is for a browser.
 
 ## 14. Security
 
-A program cannot grant itself more steps. The default cap is 1,000,000. While-loop passes share that same cap. The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap. `listen` does not share leftover steps across requests: each request gets a fresh budget and a 5 second deadline checked inside `Step`.
+A program cannot grant itself more steps. The default cap is 1,000,000 steps and 1,000,000 while-loop passes (the runner default, not 100,000). The person who starts Vire may set `VIRE_BUDGET` from 1 to 5,000,000; that value raises both the step limit and the while-pass limit. A line such as `~ budget` in a source file does not raise the cap. `vire run` uses that same cap. `listen` does not share leftover steps across requests: each request gets a fresh budget and a 5 second deadline checked inside `Step`. When the step cap is hit, both interpreter and compiled mode print `vire: program ran too long and was stopped` with no line or column.
 
 `listen` binds `127.0.0.1` only. It binds all interfaces solely when `VIRE_BIND` is `public` and `FCG_API_TOKEN` is at least 16 characters. The token is never printed. Every path except `GET /health` needs header `X-FCG-Token` when a token is set. The compare does not stop at the first differing character. A token sitting in the body does not count. Headers must finish within 5 seconds (16 KB block, 8 KB request line). Bodies need `Content-Length`, at most 1 MB, and 10 seconds to arrive. Chunked encoding is refused. At most 64 requests run at once; extra connections get 503. Responses include `Content-Length`, `Connection: close`, and `X-Content-Type-Options: nosniff`. GET and HEAD of `site/` use the static rules in section 12. A path that contains `..` is refused.
 

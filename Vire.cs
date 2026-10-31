@@ -206,7 +206,7 @@ sealed class Machine
     int watchLine;
     internal int ListenPort;
 
-    static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
+    internal static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
         "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
@@ -214,6 +214,19 @@ sealed class Machine
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
     });
+
+    internal static int BuiltinNeed(string name)
+    {
+        int need = 1;
+        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
+        if (name == "ink" || name == "dot" || name == "replace") need = 3;
+        if (name == "stroke" || name == "fill") need = 4;
+        if (name == "mark") need = 5;
+        if (name == "serve" || name == "escape") need = 1;
+        if (name == "slice") need = 3;
+        return need;
+    }
 
     public Machine(Dictionary<string, Func> funcs, string root)
     {
@@ -307,14 +320,7 @@ sealed class Machine
     object Builtin(string name, List<object> args, int line, int col)
     {
         Step(line);
-        int need = 1;
-        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
-        if (name == "ink" || name == "dot" || name == "replace") need = 3;
-        if (name == "stroke" || name == "fill") need = 4;
-        if (name == "mark") need = 5;
-        if (name == "serve" || name == "escape") need = 1;
-        if (name == "slice") need = 3;
+        int need = BuiltinNeed(name);
         if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "length")
         {
