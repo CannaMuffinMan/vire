@@ -1,6 +1,7 @@
-~ Compile let, if, calls, and read into a native Windows executable.
+~ Compile let, if, calls, and read into a native Windows PE or Linux ELF executable.
 
 use "src/pe.vire"
+use "src/elf.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -1132,9 +1133,15 @@ end
 define main
   let files be args
   if (length with files) < 2
-    say "usage: compile-native source.vire out.hex"
+    say "usage: compile-native source.vire out.hex [linux]"
     say "compile failed"
     halt with 1
+  end
+  let linux be false
+  if (length with files) >= 3
+    if (files at 2) == "linux"
+      let linux be true
+    end
   end
   let scanned be tokenize with (read with (files at 0))
   if scanned at "bad"
@@ -1162,7 +1169,12 @@ define main
     say "compile failed"
     halt with 1
   end
-  let opened be openImage
+  let opened be openSlots
+  if linux
+    let hostLabels be opened at "labels"
+    put true into hostLabels at "linux_host"
+  end
+  emitRuntime with (opened at "image"), (opened at "fixes"), (opened at "labels")
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
   while i < (length with funcs)
@@ -1177,6 +1189,14 @@ define main
   parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")
   parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
   parkRuntime with (gen at "image"), (gen at "labels")
+  if linux
+    emitLinuxShims with (gen at "image"), (gen at "fixes"), (gen at "labels")
+    finishElf with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")
+    let exe be buildElf with (gen at "image"), ((gen at "labels") at "elf_start")
+    write with (files at 1), (hexOf with exe)
+    say "compiled"
+    return none
+  end
   finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc")
   write with (files at 1), (hexOf with exe)

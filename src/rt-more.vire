@@ -1033,7 +1033,14 @@ define emitMore with image, fixes, labels
   ~ margin: SizeOfStackCommit starts at one page, so StackLimit+16KiB sits
   ~ above rsp and falsely trips every program.
   pin with labels, "rt_enter", image
-  emitList with image, [101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]
+  if has with labels, "linux_host"
+    emitList with image, [72, 139, 5]
+    emitRel with image, fixes, "stack_limit"
+    emitList with image, [72, 57, 196, 144, 144]
+  end
+  if not (has with labels, "linux_host")
+    emitList with image, [101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]
+  end
   emitJcc with image, fixes, 130, "enter_fail"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "call_depth"

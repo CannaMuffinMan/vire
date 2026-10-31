@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 3B (native ELF x64, cut 1)
+
+- `compile-native source.vire out.hex linux` writes a static x86-64 ELF (no libc, no dynamic loader). The same runtime still talks through the IAT names; Linux fills those slots with syscall stubs (`write`, `exit_group`, `mmap`, `open`/`read`/`close`/`fstat`).
+- Linux keeps the native safety checks: bounds, 64-call depth plus an `rsp` stack limit, 1 MiB arena, overflow errors, clean exit 1 with the interpreter's message text.
+- CI job `native-linux` (ubuntu, Actions pinned by SHA) builds hello, every `tests/native` fixture, and the safety programs and checks them against interpreter mode (overflow/heap keep the native error, same as Windows).
+
 ## Phase 3B (native safety, continued)
 
 - Native `rt_alloc` stops at the 1 MiB arena (`ran out of memory`, exit 1). File reads bump through `rt_alloc`. Interpreter host OOM uses the same message.

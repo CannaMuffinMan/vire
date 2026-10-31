@@ -32,7 +32,15 @@ define emitRuntime with image, fixes, labels
   emitU32 with image, 65536
   emitList with image, [73, 137, 196, 73, 129, 196]
   emitU32 with image, 327680
-  emitList with image, [77, 137, 238, 232]
+  emitList with image, [77, 137, 238]
+  if has with labels, "linux_host"
+    emitList with image, [72, 137, 224, 72, 45]
+    emitU32 with image, 7340032
+    emitList with image, [72, 141, 13]
+    emitRel with image, fixes, "stack_limit"
+    emitList with image, [72, 137, 1]
+  end
+  emitList with image, [232]
   emitRel with image, fixes, "rt_args_init"
   emitList with image, [232]
   emitRel with image, fixes, "fn_main"

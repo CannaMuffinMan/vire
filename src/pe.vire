@@ -89,7 +89,7 @@ define alignTo with buf, n
   return buf
 end
 
-define openImage
+define openSlots
   let image be []
   let labels be {}
   let fixes be []
@@ -130,8 +130,13 @@ define openImage
     let i be i + 1
   end
   alignTo with image, 16
-  emitRuntime with image, fixes, labels
   return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats}
+end
+
+define openImage
+  let opened be openSlots
+  emitRuntime with (opened at "image"), (opened at "fixes"), (opened at "labels")
+  return opened
 end
 
 define parkPool with image, labels, pool
