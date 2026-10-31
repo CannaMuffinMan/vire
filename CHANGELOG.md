@@ -4,6 +4,7 @@
 
 - Native `rt_alloc` stops at the 1 MiB arena (`ran out of memory`, exit 1). File reads bump through `rt_alloc`. Interpreter host OOM uses the same message.
 - Native `+` `-` `*` `/` and unary minus refuse silent wrap: the result must fit a 32-bit whole number or `that number overflowed`. Interpreter still widens to decimal.
+- Native `number with` text that does not fit a 32-bit whole number uses the same overflow path (`that number overflowed`) instead of wrapping. Digit overflow during the parse also fails that way. Interpreter and `.vc` still widen to decimal when `int` parse cannot.
 - `rt_list_cat` and interpreter/`.vc` list `+` share the 100,000-item cap and `list is too large`. Text `+` shares the 1,000,000-character cap and `text is too large to write`.
 
 ## Phase 0
