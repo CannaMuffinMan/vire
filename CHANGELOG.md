@@ -5,6 +5,8 @@
 - Native `rt_alloc` stops at the 1 MiB arena (`ran out of memory`, exit 1). File reads bump through `rt_alloc`. Interpreter host OOM uses the same message.
 - Native `+` `-` `*` `/` and unary minus refuse silent wrap: the result must fit a 32-bit whole number or `that number overflowed`. Interpreter still widens to decimal.
 - Native `number with` text that does not fit a 32-bit whole number uses the same overflow path (`that number overflowed`) instead of wrapping. Digit overflow during the parse also fails that way. Trailing junk still reports `that text is not a number` even when the digit prefix overflows. Interpreter and `.vc` still widen to decimal when `int` parse cannot.
+- Native `number with` accepts the same whitespace, `+`/`-`, decimal, and exponent text as the interpreter when the value is a 32-bit whole number. A real that is not a whole number, or that does not fit, is `that number overflowed`. A lone `+` or `-` is `that text is not a number`. Vertical tab and form feed count as whitespace. A zero with a huge exponent stays 0. Extra integer zeros that do not fit a 64-bit significand fold into the exponent.
+- `compile-native` refuses a source literal that does not fit a signed 32-bit whole number (`that number overflowed`) instead of truncating it in `emitU32`. `-2147483648` still compiles.
 - `rt_list_cat` and interpreter/`.vc` list `+` share the 100,000-item cap and `list is too large`. Text `+` shares the 1,000,000-character cap and `text is too large to write`.
 
 ## Phase 0

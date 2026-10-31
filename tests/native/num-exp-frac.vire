@@ -1,0 +1,4 @@
+~ native-ok: 15
+define main
+  say number with "1.5e1"
+end

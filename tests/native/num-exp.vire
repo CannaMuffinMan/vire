@@ -1,0 +1,4 @@
+~ native-ok: 100
+define main
+  say number with "1e2"
+end

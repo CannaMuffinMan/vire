@@ -28,11 +28,14 @@ function Invoke-Vire {
 function Get-NativeWant {
     param([string]$Path)
     foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line.StartsWith("~ native-compile-error: ")) {
+            return @{ Code = 1; Text = $line.Substring("~ native-compile-error: ".Length).Trim(); Exact = $false; CompileFail = $true }
+        }
         if ($line.StartsWith("~ native-error: ")) {
-            return @{ Code = 1; Text = $line.Substring("~ native-error: ".Length).Trim(); Exact = $false }
+            return @{ Code = 1; Text = $line.Substring("~ native-error: ".Length).Trim(); Exact = $false; CompileFail = $false }
         }
         if ($line.StartsWith("~ native-ok: ")) {
-            return @{ Code = 0; Text = $line.Substring("~ native-ok: ".Length).Trim(); Exact = $true }
+            return @{ Code = 0; Text = $line.Substring("~ native-ok: ".Length).Trim(); Exact = $true; CompileFail = $false }
         }
     }
     return $null
@@ -44,7 +47,7 @@ $programs = @(
 foreach ($path in Get-ChildItem -LiteralPath (Join-Path $Root "tests/native") -Filter "*.vire") {
     $meta = Get-NativeWant $path.FullName
     if ($null -eq $meta) { throw "missing native comment in $($path.Name)" }
-    $programs += @{ Name = [IO.Path]::GetFileNameWithoutExtension($path.Name); Src = ("tests/native/" + $path.Name); Want = $meta.Text; Code = $meta.Code; Exact = $meta.Exact }
+    $programs += @{ Name = [IO.Path]::GetFileNameWithoutExtension($path.Name); Src = ("tests/native/" + $path.Name); Want = $meta.Text; Code = $meta.Code; Exact = $meta.Exact; CompileFail = $meta.CompileFail }
 }
 
 $failed = $false
@@ -54,6 +57,15 @@ foreach ($program in $programs) {
     $srcRel = "data/native-smoke/" + $program.Name + ".vire"
     $hexRel = "data/native-smoke/" + $program.Name + ".hex"
     $code = Invoke-Vire compile-native.vire $srcRel $hexRel
+    if ($program.CompileFail) {
+        if ($code -ne 0) {
+            Write-Output "PASS $($program.Name) compile-error"
+            continue
+        }
+        Write-Output "FAIL compile $($program.Name) expected compile error $($program.Want) exit=$code"
+        $failed = $true
+        continue
+    }
     if ($code -ne 0) {
         Write-Output "FAIL compile $($program.Name) exit=$code"
         $failed = $true
