@@ -10,7 +10,9 @@ public class NativeSafetyTests
     {
         string root = DualMode.FindRoot();
         string rt = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        string rtCore = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
         string compiler = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
+        Assert.Contains("72, 131, 228, 240", rtCore);
         Assert.Contains("rt_enter", rt);
         Assert.Contains("rt_leave", rt);
         Assert.Contains("call_depth", rt);

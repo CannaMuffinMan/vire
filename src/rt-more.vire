@@ -579,8 +579,10 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "index_out"
   emitList with image, [195]
   pin with labels, "index_bad", image
+  emitPro with image
   emitFail with image, fixes, "msg_index"
   pin with labels, "index_out", image
+  emitPro with image
   emitFail with image, fixes, "msg_outside"
 
   pin with labels, "rt_at", image
@@ -850,6 +852,7 @@ define emitMore with image, fixes, labels
   emitJcc with image, fixes, 135, "enter_fail"
   emitList with image, [195]
   pin with labels, "enter_fail", image
+  emitPro with image
   emitFail with image, fixes, "msg_deep"
 
   pin with labels, "rt_leave", image
