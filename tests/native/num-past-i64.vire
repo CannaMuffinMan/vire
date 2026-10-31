@@ -1,0 +1,5 @@
+~ native-error: that number overflowed
+~ native-interp-ok
+define main
+  say number with "9223372036854775808"
+end

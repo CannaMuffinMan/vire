@@ -1,0 +1,4 @@
+~ native-error: that text is not a number
+define main
+  say number with "12x"
+end
