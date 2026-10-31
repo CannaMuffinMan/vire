@@ -616,7 +616,7 @@ sealed class CompiledMachine
             string raw = args[0] as string;
             if (raw == null) throw new VireError("parse needs text", line, col);
             object value = Json.Read(raw, line);
-            if (args.Count == 2) Json.Check(value, args[1], line);
+            if (args.Count == 2) Json.Check(value, args[1], line, budget);
             return value;
         }
         if (name == "kind")

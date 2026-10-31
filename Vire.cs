@@ -159,6 +159,13 @@ sealed class Budget
     {
         return DeadlineUtcTicks != 0 && DateTime.UtcNow.Ticks > DeadlineUtcTicks;
     }
+
+    public void Charge(int line)
+    {
+        if (DeadlinePassed()) throw new VireError("request ran too long", line);
+        Steps = Interlocked.Increment(ref Steps);
+        if (Steps > MaxSteps) throw new VireError("program ran too long and was stopped", line);
+    }
 }
 
 static class ListenHooks
@@ -257,9 +264,7 @@ sealed class Machine
 
     void Step(int line)
     {
-        if (budget.DeadlinePassed()) throw new VireError("request ran too long", line);
-        budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
-        if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        budget.Charge(line);
     }
 
     string SafePath(object text, int line)
@@ -567,7 +572,7 @@ sealed class Machine
             string raw = args[0] as string;
             if (raw == null) throw new VireError("parse needs text", line, col);
             object value = Json.Read(raw, line);
-            if (args.Count == 2) Json.Check(value, args[1], line);
+            if (args.Count == 2) Json.Check(value, args[1], line, budget);
             return value;
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -2093,6 +2098,7 @@ sealed class Json
     public const int MaxChars = 1000000;
     public const int MaxDepth = 256;
     public const int MaxItems = 100000;
+    public const int MaxNeedName = 1024;
 
     public static object Read(string text, int line)
     {
@@ -2107,11 +2113,88 @@ sealed class Json
 
     public static void Check(object value, object schema, int line)
     {
-        CheckValue(value, schema, line, 0);
+        Check(value, schema, line, null);
     }
 
-    static void CheckValue(object value, object schema, int line, int depth)
+    public static void Check(object value, object schema, int line, Budget budget)
     {
+        HashSet<object> walking = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        HashSet<object> done = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        Dictionary<object, List<object>> needLists = new Dictionary<object, List<object>>(ReferenceEqualityComparer.Instance);
+        CheckSchema(schema, line, 0, walking, done, budget, needLists);
+        CheckValue(value, schema, line, 0, budget, needLists);
+    }
+
+    static void CheckSchema(object schema, int line, int depth, HashSet<object> walking, HashSet<object> done, Budget budget, Dictionary<object, List<object>> needLists)
+    {
+        if (budget != null) budget.Charge(line);
+        if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
+        Dictionary<string, object> spec = schema as Dictionary<string, object>;
+        if (spec == null) throw new VireError("json schema must be a map", line);
+        if (done.Contains(spec)) return;
+        if (walking.Contains(spec)) throw new VireError("json schema has a cycle", line);
+        if (walking.Count + done.Count >= MaxItems) throw new VireError("json is too large", line);
+        walking.Add(spec);
+        string kind = null;
+        if (spec.ContainsKey("kind")) kind = spec["kind"] as string;
+        if (kind == null) throw new VireError("json schema needs a kind", line);
+        if (kind != "text" && kind != "number" && kind != "bool" && kind != "none" && kind != "list" && kind != "map")
+            throw new VireError("json schema has an unknown kind", line);
+        foreach (KeyValuePair<string, object> pair in spec)
+        {
+            string name = pair.Key;
+            if (name == "kind") continue;
+            if (name == "closed")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                if (!(pair.Value is bool)) throw new VireError("json schema closed must be a bool", line);
+                continue;
+            }
+            if (name == "keys")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                Dictionary<string, object> keys = pair.Value as Dictionary<string, object>;
+                if (keys == null) throw new VireError("json schema keys must be a map", line);
+                foreach (KeyValuePair<string, object> child in keys)
+                    CheckSchema(child.Value, line, depth + 1, walking, done, budget, needLists);
+                continue;
+            }
+            if (name == "need")
+            {
+                if (kind != "map") throw new VireError("json schema has an unknown field", line);
+                List<object> need = pair.Value as List<object>;
+                if (need == null) throw new VireError("json schema need must be a list", line);
+                if (need.Count > MaxItems) throw new VireError("json is too large", line);
+                List<object> unique = new List<object>();
+                HashSet<string> seen = new HashSet<string>();
+                foreach (object item in need)
+                {
+                    if (budget != null) budget.Charge(line);
+                    string needName = item as string;
+                    if (needName == null) throw new VireError("json schema need must be text", line);
+                    if (needName.Length > MaxNeedName) throw new VireError("json schema need name is too long", line);
+                    if (seen.Add(needName)) unique.Add(needName);
+                }
+                needLists[spec] = unique;
+                continue;
+            }
+            if (name == "items")
+            {
+                if (kind != "list") throw new VireError("json schema has an unknown field", line);
+                Dictionary<string, object> items = pair.Value as Dictionary<string, object>;
+                if (items == null) throw new VireError("json schema items must be a map", line);
+                CheckSchema(items, line, depth + 1, walking, done, budget, needLists);
+                continue;
+            }
+            throw new VireError("json schema has an unknown field", line);
+        }
+        walking.Remove(spec);
+        done.Add(spec);
+    }
+
+    static void CheckValue(object value, object schema, int line, int depth, Budget budget, Dictionary<object, List<object>> needLists)
+    {
+        if (budget != null) budget.Charge(line);
         if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
         Dictionary<string, object> spec = schema as Dictionary<string, object>;
         if (spec == null) throw new VireError("json schema must be a map", line);
@@ -2145,7 +2228,7 @@ sealed class Json
             if (spec.ContainsKey("items"))
             {
                 for (int i = 0; i < list.Count; i++)
-                    CheckValue(list[i], spec["items"], line, depth + 1);
+                    CheckValue(list[i], spec["items"], line, depth + 1, budget, needLists);
             }
             return;
         }
@@ -2156,12 +2239,14 @@ sealed class Json
             bool closed = spec.ContainsKey("closed") && TrueOf(spec["closed"]);
             Dictionary<string, object> keys = null;
             if (spec.ContainsKey("keys")) keys = spec["keys"] as Dictionary<string, object>;
-            if (spec.ContainsKey("need"))
+            List<object> need = null;
+            if (needLists != null) needLists.TryGetValue(spec, out need);
+            if (need == null && spec.ContainsKey("need")) need = spec["need"] as List<object>;
+            if (need != null)
             {
-                List<object> need = spec["need"] as List<object>;
-                if (need == null) throw new VireError("json schema need must be a list", line);
                 foreach (object item in need)
                 {
+                    if (budget != null) budget.Charge(line);
                     string name = item as string;
                     if (name == null) throw new VireError("json schema need must be text", line);
                     if (!map.ContainsKey(name)) throw new VireError("json is missing a required key", line);
@@ -2176,7 +2261,7 @@ sealed class Json
                         if (closed) throw new VireError("json has an extra key", line);
                         continue;
                     }
-                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1);
+                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1, budget, needLists);
                 }
             }
             else if (closed && map.Count > 0)
@@ -2217,6 +2302,7 @@ sealed class Json
             Skip(text, ref i);
             if (i >= text.Length || text[i] != ':') throw new VireError("json needs a colon", line);
             i++;
+            if (map.ContainsKey(key)) throw new VireError("json has a duplicate key", line);
             map[key] = ReadValue(text, ref i, line, depth);
             Skip(text, ref i);
             if (i < text.Length && text[i] == ',') { i++; continue; }
