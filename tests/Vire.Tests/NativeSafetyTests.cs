@@ -38,7 +38,7 @@ public class NativeSafetyTests
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
         string[] files = Directory.GetFiles(dir, "*.vire");
-        Assert.True(files.Length >= 27, "expected native safety fixtures");
+        Assert.True(files.Length >= 28, "expected native safety fixtures");
         foreach (string path in files)
         {
             string text = File.ReadAllText(path);
@@ -117,9 +117,9 @@ public class NativeSafetyTests
         string[] names = {
             "num-max.vire", "num-ovf-pos.vire", "num-ovf-neg.vire", "num-min.vire",
             "num-i64-max.vire", "num-i64-min.vire", "num-past-i64.vire", "num-huge.vire",
-            "num-junk-lead.vire", "num-junk-trail.vire", "num-empty.vire"
+            "num-junk-lead.vire", "num-junk-trail.vire", "num-junk-ovf-trail.vire", "num-empty.vire"
         };
-        Assert.Equal(11, names.Length);
+        Assert.Equal(12, names.Length);
         foreach (string name in names)
         {
             string path = Path.Combine(dir, name);
@@ -146,6 +146,7 @@ public class NativeSafetyTests
         string body = rt.Substring(start, stop - start);
         Assert.Contains("emitFit32", body);
         Assert.Contains("num_ovf", body);
+        Assert.DoesNotContain("emitJcc with image, fixes, 128, \"num_ovf\"", body);
     }
 
     [Fact]
