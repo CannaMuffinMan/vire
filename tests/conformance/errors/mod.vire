@@ -1,0 +1,4 @@
+~ expect line 3 col 9
+define main
+  say 1 % 0
+end

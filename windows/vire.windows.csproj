@@ -13,13 +13,6 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\Vire.cs" />
-    <Compile Include="..\Compiled.cs" />
-    <Compile Include="..\VireCrypto.cs" />
-    <Compile Include="..\VireSeal.cs" />
-    <Compile Include="..\VirePaths.cs" />
-    <Compile Include="..\VireFiles.cs" />
-    <Compile Include="..\VireListen.cs" />
-    <Compile Include="..\VireNet.cs" />
+    <Compile Include="../*.cs" />
   </ItemGroup>
 </Project>
