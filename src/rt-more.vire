@@ -56,8 +56,17 @@ end
 define emitMore with image, fixes, labels
   pin with labels, "rt_alloc", image
   emitPro with image
-  emitList with image, [72, 131, 193, 7, 72, 131, 225, 248, 76, 137, 224, 73, 1, 204]
+  ~ bump r12; refuse wrap or anything past the 1 MiB VirtualAlloc arena at r15.
+  emitList with image, [72, 131, 193, 7, 72, 131, 225, 248, 76, 137, 224, 73, 141, 20, 12, 76, 57, 226]
+  emitJcc with image, fixes, 130, "alloc_oom"
+  emitList with image, [77, 141, 135]
+  emitU32 with image, 1048576
+  emitList with image, [76, 57, 194]
+  emitJcc with image, fixes, 135, "alloc_oom"
+  emitList with image, [73, 137, 212]
   emitEpi with image
+  pin with labels, "alloc_oom", image
+  emitFail with image, fixes, "msg_oom"
 
   pin with labels, "rt_memcpy", image
   emitList with image, [77, 133, 192, 15, 132]
@@ -95,7 +104,9 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_buf_ensure", image
   emitPro with image
-  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 1, 208, 76, 139, 65, 8, 76, 57, 192, 15, 134]
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 1, 208]
+  emitJcc with image, fixes, 130, "alloc_oom"
+  emitList with image, [76, 139, 65, 8, 76, 57, 192, 15, 134]
   emitRel with image, fixes, "ensure_ok"
   emitList with image, [76, 139, 69, 240, 73, 209, 224, 76, 57, 192, 15, 131]
   emitRel with image, fixes, "ensure_cap"
@@ -1202,6 +1213,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_mod", "% needs two numbers"
   parkMsg with image, labels, "msg_zero", "division by zero"
   parkMsg with image, labels, "msg_minus", "minus applies to numbers"
+  parkMsg with image, labels, "msg_oom", "ran out of memory"
   parkMsg with image, labels, "msg_biglist", "list is too large"
   parkMsg with image, labels, "msg_push", "push needs a list"
   parkMsg with image, labels, "msg_length", "length needs text, a list, or a map"

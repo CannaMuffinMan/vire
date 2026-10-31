@@ -17,6 +17,8 @@ public class NativeSafetyTests
         Assert.Contains("rt_leave", rt);
         Assert.Contains("call_depth", rt);
         Assert.Contains("definitions called too deeply", rt);
+        Assert.Contains("ran out of memory", rt);
+        Assert.Contains("1048576", rt);
         Assert.Contains("index is outside the value", rt);
         Assert.Contains("an index must be a whole number", rt);
         Assert.Contains("[101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]", rt);
@@ -41,7 +43,15 @@ public class NativeSafetyTests
             if (text.Contains("~ native-ok:"))
             {
                 Assert.Equal(0, run.Code);
-                Assert.Contains("0", DualMode.Norm(run.Out));
+                string ok = WantOk(text);
+                Assert.False(string.IsNullOrEmpty(ok), path);
+                Assert.Contains(ok, DualMode.Norm(run.Out));
+                continue;
+            }
+            if (text.Contains("~ native-interp-ok"))
+            {
+                Assert.Equal(0, run.Code);
+                Assert.DoesNotContain("internal error", DualMode.Norm(run.Err));
                 continue;
             }
             Assert.Equal(1, run.Code);
@@ -73,6 +83,7 @@ public class NativeSafetyTests
             Assert.Contains(AsciiHex("definitions called too deeply"), hex);
             Assert.Contains(AsciiHex("an index must be a whole number"), hex);
             Assert.Contains(AsciiHex("slice needs text or a list"), hex);
+            Assert.Contains(AsciiHex("ran out of memory"), hex);
         }
         finally
         {
@@ -89,6 +100,16 @@ public class NativeSafetyTests
         Assert.Contains("Get-ChildItem", smoke);
         Assert.Contains("~ native-error:", smoke);
         Assert.DoesNotContain("KNOWN FAIL Phase 3B", smoke);
+    }
+
+    static string WantOk(string text)
+    {
+        const string mark = "~ native-ok: ";
+        int at = text.IndexOf(mark, StringComparison.Ordinal);
+        if (at < 0) return "";
+        int end = text.IndexOf('\n', at);
+        if (end < 0) end = text.Length;
+        return text.Substring(at + mark.Length, end - (at + mark.Length)).Trim();
     }
 
     static string WantOf(string text)

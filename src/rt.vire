@@ -399,7 +399,9 @@ define emitRuntime with image, fixes, labels
   emitU32 with image, 1000000
   emitList with image, [15, 135]
   emitRel with image, fixes, "read_close_big"
-  emitList with image, [137, 69, 240, 77, 137, 226, 137, 193, 72, 131, 193, 24, 73, 1, 204, 73, 131, 196, 7, 73, 131, 228, 248, 139, 69, 240, 73, 137, 2, 73, 141, 82, 8, 76, 137, 85, 224, 72, 139, 77, 248, 68, 139, 69, 240, 76, 141, 77, 232, 72, 199, 68, 36, 32]
+  emitList with image, [137, 69, 240, 137, 193, 72, 131, 193, 24]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [73, 137, 194, 139, 69, 240, 73, 137, 2, 73, 141, 82, 8, 76, 137, 85, 224, 72, 139, 77, 248, 68, 139, 69, 240, 76, 141, 77, 232, 72, 199, 68, 36, 32]
   emitU32 with image, 0
   emitList with image, [255, 21]
   emitRel with image, fixes, "iat_rf"

@@ -2665,6 +2665,10 @@ sealed class Program
         {
             return WriteVireError(exc);
         }
+        catch (OutOfMemoryException)
+        {
+            return WriteVireError(new VireError("ran out of memory", 1));
+        }
         catch (Exception ex)
         {
             if (Environment.GetEnvironmentVariable("VIRE_DEBUG") == "1")
