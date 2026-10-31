@@ -1,0 +1,4 @@
+~ native-ok: 2147483647
+define main
+  say 2147483647
+end

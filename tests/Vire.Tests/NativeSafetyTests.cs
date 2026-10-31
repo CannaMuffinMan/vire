@@ -38,7 +38,7 @@ public class NativeSafetyTests
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
         string[] files = Directory.GetFiles(dir, "*.vire");
-        Assert.True(files.Length >= 28, "expected native safety fixtures");
+        Assert.True(files.Length >= 40, "expected native safety fixtures");
         foreach (string path in files)
         {
             string text = File.ReadAllText(path);
@@ -106,23 +106,23 @@ public class NativeSafetyTests
         Assert.Contains("tests/native", smoke);
         Assert.Contains("Get-ChildItem", smoke);
         Assert.Contains("~ native-error:", smoke);
+        Assert.Contains("~ native-compile-error:", smoke);
         Assert.DoesNotContain("KNOWN FAIL Phase 3B", smoke);
     }
 
     [Fact]
-    public void NumberWithTextMatchesInterpreterAndCompiled()
+    public void NumberParseMatchesInterpreterCompiledAndNativeCompile()
     {
         string root = DualMode.FindRoot();
         string dir = Path.Combine(root, "tests", "native");
-        string[] names = {
-            "num-max.vire", "num-ovf-pos.vire", "num-ovf-neg.vire", "num-min.vire",
-            "num-i64-max.vire", "num-i64-min.vire", "num-past-i64.vire", "num-huge.vire",
-            "num-junk-lead.vire", "num-junk-trail.vire", "num-junk-ovf-trail.vire", "num-empty.vire"
-        };
-        Assert.Equal(12, names.Length);
-        foreach (string name in names)
+        string[] files = Directory.GetFiles(dir, "*.vire");
+        int seen = 0;
+        foreach (string path in files)
         {
-            string path = Path.Combine(dir, name);
+            string name = Path.GetFileName(path);
+            if (!name.StartsWith("num-", StringComparison.Ordinal) && !name.StartsWith("lit-", StringComparison.Ordinal))
+                continue;
+            seen++;
             string text = File.ReadAllText(path);
             DualMode.DualRun both = DualMode.RunSource(text, null);
             Assert.True(both.Matched, name + " interpreter vs compiled differed\n stdout i=" + both.InterpOut + " c=" + both.CompOut + "\n stderr i=" + both.InterpErr + " c=" + both.CompErr);
@@ -131,14 +131,51 @@ public class NativeSafetyTests
                 Assert.Equal(0, both.InterpCode);
                 Assert.DoesNotContain("internal error", DualMode.Norm(both.InterpErr));
                 Assert.DoesNotContain("internal error", DualMode.Norm(both.CompErr));
-                continue;
+                if (text.Contains("~ native-ok:"))
+                {
+                    string ok = WantOk(text);
+                    Assert.Contains(ok, DualMode.Norm(both.InterpOut));
+                    Assert.Contains(ok, DualMode.Norm(both.CompOut));
+                }
             }
-            Assert.Equal(1, both.InterpCode);
-            string want = WantOf(text);
-            Assert.False(string.IsNullOrEmpty(want), name);
-            Assert.Contains(want, DualMode.Norm(both.InterpErr) + DualMode.Norm(both.InterpOut));
-            Assert.Contains(want, DualMode.Norm(both.CompErr) + DualMode.Norm(both.CompOut));
+            else
+            {
+                Assert.Equal(1, both.InterpCode);
+                string want = WantOf(text);
+                Assert.False(string.IsNullOrEmpty(want), name);
+                Assert.Contains(want, DualMode.Norm(both.InterpErr) + DualMode.Norm(both.InterpOut));
+                Assert.Contains(want, DualMode.Norm(both.CompErr) + DualMode.Norm(both.CompOut));
+            }
+
+            string work = Path.Combine(root, "data", "native-num-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(work);
+            try
+            {
+                string src = Path.Combine(work, name);
+                File.WriteAllText(src, text);
+                string srcRel = Rel(root, src);
+                string hexRel = Rel(root, Path.Combine(work, Path.ChangeExtension(name, ".hex")));
+                DualMode.Proc native = DualMode.RunVire(root, new string[] { "compile-native.vire", srcRel, hexRel }, root);
+                string nativeText = DualMode.Norm(native.Out) + DualMode.Norm(native.Err);
+                if (text.Contains("~ native-compile-error:"))
+                {
+                    Assert.NotEqual(0, native.Code);
+                    string compileWant = WantCompile(text);
+                    Assert.False(string.IsNullOrEmpty(compileWant), name);
+                    Assert.Contains(compileWant, nativeText);
+                    Assert.DoesNotContain("internal error", nativeText);
+                }
+                else
+                {
+                    Assert.True(native.Code == 0, name + " compile-native failed\n" + nativeText);
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(work, true); } catch (IOException) { }
+            }
         }
+        Assert.True(seen >= 25, "expected number fixtures, got " + seen);
         string rt = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
         int start = rt.IndexOf("pin with labels, \"rt_number\"", StringComparison.Ordinal);
         int stop = rt.IndexOf("pin with labels, \"rt_length\"", StringComparison.Ordinal);
@@ -146,6 +183,8 @@ public class NativeSafetyTests
         string body = rt.Substring(start, stop - start);
         Assert.Contains("emitFit32", body);
         Assert.Contains("num_ovf", body);
+        Assert.Contains("number_lws", body);
+        Assert.Contains("number_exp", body);
         Assert.DoesNotContain("emitJcc with image, fixes, 128, \"num_ovf\"", body);
     }
 
@@ -190,6 +229,16 @@ public class NativeSafetyTests
     static string WantOf(string text)
     {
         const string mark = "~ native-error: ";
+        int at = text.IndexOf(mark, StringComparison.Ordinal);
+        if (at < 0) return "";
+        int end = text.IndexOf('\n', at);
+        if (end < 0) end = text.Length;
+        return text.Substring(at + mark.Length, end - (at + mark.Length)).Trim();
+    }
+
+    static string WantCompile(string text)
+    {
+        const string mark = "~ native-compile-error: ";
         int at = text.IndexOf(mark, StringComparison.Ordinal);
         if (at < 0) return "";
         int end = text.IndexOf('\n', at);

@@ -1,0 +1,4 @@
+~ native-ok: 12
+define main
+  say number with " 12 "
+end
