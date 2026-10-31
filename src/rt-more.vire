@@ -579,8 +579,10 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "index_out"
   emitList with image, [195]
   pin with labels, "index_bad", image
+  emitPro with image
   emitFail with image, fixes, "msg_index"
   pin with labels, "index_out", image
+  emitPro with image
   emitFail with image, fixes, "msg_outside"
 
   pin with labels, "rt_at", image
@@ -836,6 +838,27 @@ define emitMore with image, fixes, labels
   emitEpi with image
   pin with labels, "tick_fail", image
   emitFail with image, fixes, "msg_while"
+
+  ~ Recursion depth (interpreter MaxCalls = 64) plus a Windows stack-limit
+  ~ guard. gs:[0x10] is StackLimit (lowest committed address). Do not add a
+  ~ margin: SizeOfStackCommit starts at one page, so StackLimit+16KiB sits
+  ~ above rsp and falsely trips every program.
+  pin with labels, "rt_enter", image
+  emitList with image, [101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]
+  emitJcc with image, fixes, 130, "enter_fail"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "call_depth"
+  emitList with image, [72, 139, 1, 72, 255, 192, 72, 137, 1, 72, 131, 248, 64]
+  emitJcc with image, fixes, 135, "enter_fail"
+  emitList with image, [195]
+  pin with labels, "enter_fail", image
+  emitPro with image
+  emitFail with image, fixes, "msg_deep"
+
+  pin with labels, "rt_leave", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "call_depth"
+  emitList with image, [72, 255, 9, 195]
 
   pin with labels, "rt_halt", image
   emitPro with image
@@ -1193,6 +1216,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_textput", "text cannot be changed in place"
   parkMsg with image, labels, "msg_halt", "halt needs a whole number"
   parkMsg with image, labels, "msg_while", "while ran too long"
+  parkMsg with image, labels, "msg_deep", "definitions called too deeply"
   parkMsg with image, labels, "msg_nowrite", "vire will not write a program file"
   parkMsg with image, labels, "msg_write", "could not write that file"
   parkMsg with image, labels, "msg_bigtxt", "text is too large to write"
@@ -1211,6 +1235,8 @@ define parkMore with image, labels
   parkMsg with image, labels, "ext_cs", ".cs"
   parkMsg with image, labels, "ext_sh", ".sh"
   pin with labels, "args_ptr", image
+  emitU64 with image, 0
+  pin with labels, "call_depth", image
   emitU64 with image, 0
   return true
 end

@@ -303,7 +303,9 @@ define emitRuntime with image, fixes, labels
   emitRel with image, fixes, "iat_wf"
   emitList with image, [201, 195]
   pin with labels, "rt_fail", image
-  emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  ~ and rsp, -16 so leaf helpers (rt_index, rt_enter) can call rt_fail
+  ~ without a 16-byte-aligned frame; ExitProcess AVs on a misaligned stack.
+  emitList with image, [85, 72, 137, 229, 72, 131, 228, 240, 72, 131, 236, 96, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
   emitRel with image, fixes, "written"
   emitList with image, [72, 199, 68, 36, 32]
   emitU32 with image, 0

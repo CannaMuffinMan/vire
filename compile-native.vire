@@ -1027,6 +1027,7 @@ define emitStmt with gen, funcs, func, stmt
   if k == "return"
     emitExpr with gen, funcs, func, (stmt at 1)
     emitCall with gen, "rt_return"
+    emitCall with gen, "rt_leave"
     emitOp with gen, [72, 131, 196, 40, 195]
     return true
   end
@@ -1092,6 +1093,7 @@ end
 define emitFunc with gen, funcs, func
   pinHere with gen, ("fn_" + (func at "name"))
   emitOp with gen, [72, 131, 236, 40]
+  emitCall with gen, "rt_enter"
   emitU8 with (gen at "image"), 185
   emitU32 with (gen at "image"), (func at "nparams")
   emitU8 with (gen at "image"), 186
@@ -1100,6 +1102,7 @@ define emitFunc with gen, funcs, func
   emitBlock with gen, funcs, func, (func at "body")
   emitCall with gen, "rt_push_none"
   emitCall with gen, "rt_return"
+  emitCall with gen, "rt_leave"
   emitOp with gen, [72, 131, 196, 40, 195]
   return true
 end

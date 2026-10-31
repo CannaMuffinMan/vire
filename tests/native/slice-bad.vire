@@ -1,0 +1,4 @@
+~ native-error: slice needs text or a list
+define main
+  say slice with 3, 0, 1
+end

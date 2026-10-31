@@ -194,7 +194,7 @@ define buildExe with image, entry, imp
   poke16 with head, 220, 3
   poke16 with head, 222, 352
   poke32 with head, 224, 1048576
-  poke32 with head, 232, 4096
+  poke32 with head, 232, 262144
   poke32 with head, 240, 1048576
   poke32 with head, 248, 4096
   poke32 with head, 260, 16

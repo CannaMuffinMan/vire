@@ -1,7 +1,6 @@
-# Native compiler smoke on Windows. Compiles each known native sample with
-# compile-native.vire, turns the hex into an .exe, and compares stdout to the
-# interpreter. A crash after printing (index error) is recorded as a known
-# Phase 3B failure and still runs.
+# Native compiler smoke on Windows. Compiles hello plus every tests/native
+# fixture, turns the hex into an .exe, and checks the process exits cleanly
+# with the interpreter's error text (never a crash).
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -26,12 +25,29 @@ function Invoke-Vire {
     return [int]$code
 }
 
+function Get-NativeWant {
+    param([string]$Path)
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line.StartsWith("~ native-error: ")) {
+            return @{ Code = 1; Text = $line.Substring("~ native-error: ".Length).Trim(); Exact = $false }
+        }
+        if ($line.StartsWith("~ native-ok: ")) {
+            return @{ Code = 0; Text = $line.Substring("~ native-ok: ".Length).Trim(); Exact = $true }
+        }
+    }
+    return $null
+}
+
 $programs = @(
-    @{ Name = "hello"; Src = "samples/hello.vire"; Want = "hello from vire" }
+    @{ Name = "hello"; Src = "samples/hello.vire"; Want = "hello from vire"; Code = 0; Exact = $true }
 )
+foreach ($path in Get-ChildItem -LiteralPath (Join-Path $Root "tests/native") -Filter "*.vire") {
+    $meta = Get-NativeWant $path.FullName
+    if ($null -eq $meta) { throw "missing native comment in $($path.Name)" }
+    $programs += @{ Name = [IO.Path]::GetFileNameWithoutExtension($path.Name); Src = ("tests/native/" + $path.Name); Want = $meta.Text; Code = $meta.Code; Exact = $meta.Exact }
+}
 
 $failed = $false
-$phase3b = $false
 foreach ($program in $programs) {
     $srcCopy = Join-Path $Work ($program.Name + ".vire")
     Copy-Item $program.Src $srcCopy
@@ -53,21 +69,23 @@ foreach ($program in $programs) {
     [System.IO.File]::WriteAllBytes($exePath, $bytes)
     $got = & $exePath 2>&1 | Out-String
     $exit = $LASTEXITCODE
+    if ($null -eq $exit) { $exit = 0 }
     $got = $got.Trim()
-    if ($got -eq $program.Want -and $exit -eq 0) {
+    $ok = $false
+    if ($program.Exact) {
+        if ($got -eq $program.Want -and $exit -eq $program.Code) { $ok = $true }
+    }
+    else {
+        if ($got.Contains($program.Want) -and $exit -eq $program.Code) { $ok = $true }
+    }
+    if ($ok) {
         Write-Output "PASS $($program.Name)"
         continue
     }
-    if ($got.Contains($program.Want) -and $exit -ne 0) {
-        Write-Output "KNOWN FAIL Phase 3B $($program.Name): printed then exited $exit"
-        $phase3b = $true
-        continue
-    }
-    Write-Output "FAIL run $($program.Name) exit=$exit got=$got"
+    Write-Output "FAIL run $($program.Name) exit=$exit wantExit=$($program.Code) got=$got"
     $failed = $true
 }
 
 if ($failed) { exit 1 }
-if ($phase3b) { Write-Output "native smoke finished with known Phase 3B failure" }
-else { Write-Output "native smoke ok" }
+Write-Output "native smoke ok"
 exit 0
