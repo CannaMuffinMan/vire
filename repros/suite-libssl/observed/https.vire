@@ -1,0 +1,3 @@
+define main
+  say fetch with "https://example.com/"
+end

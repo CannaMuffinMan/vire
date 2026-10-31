@@ -1,0 +1,4 @@
+define main
+  say hash with "abc"
+  say hash with ""
+end
