@@ -92,23 +92,25 @@ PY
     return
   fi
   set +e
-  local got
-  got="$("$bin" 2>&1)"
+  local got_out got_err
+  got_out="$("$bin" 2>"$Work/$name.err")"
   local exitc=$?
+  got_err="$(cat "$Work/$name.err")"
   set -e
-  got="$(printf '%s' "$got" | tr -d '\r')"
+  got_out="$(printf '%s' "$got_out" | tr -d '\r')"
+  got_err="$(printf '%s' "$got_err" | tr -d '\r')"
   if [[ "$kind" == "ok" ]]; then
-    if [[ "$got" == "$want_text" && "$exitc" -eq "$want_code" ]]; then
+    if [[ "$got_out" == "$want_text" && -z "$got_err" && "$exitc" -eq "$want_code" ]]; then
       echo "PASS $name"
       return
     fi
   else
-    if [[ "$got" == *"$want_text"* && "$exitc" -eq "$want_code" ]]; then
+    if [[ "$got_err" == *"$want_text"* && "$got_out" != *"$want_text"* && "$exitc" -eq "$want_code" ]]; then
       echo "PASS $name"
       return
     fi
   fi
-  echo "FAIL run $name exit=$exitc wantExit=$want_code got=$got"
+  echo "FAIL run $name exit=$exitc wantExit=$want_code stdout=$got_out stderr=$got_err"
   failed=1
 }
 

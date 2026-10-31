@@ -311,9 +311,11 @@ define emitRuntime with image, fixes, labels
   emitRel with image, fixes, "iat_wf"
   emitList with image, [201, 195]
   pin with labels, "rt_fail", image
-  ~ and rsp, -16 so leaf helpers (rt_index, rt_enter) can call rt_fail
-  ~ without a 16-byte-aligned frame; ExitProcess AVs on a misaligned stack.
-  emitList with image, [85, 72, 137, 229, 72, 131, 228, 240, 72, 131, 236, 96, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  emitList with image, [85, 72, 137, 229, 72, 131, 228, 240, 72, 131, 236, 96, 72, 137, 76, 36, 40, 185]
+  emitU32 with image, 4294967284
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "iat_gs"
+  emitList with image, [72, 137, 195, 72, 139, 76, 36, 40, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
   emitRel with image, fixes, "written"
   emitList with image, [72, 199, 68, 36, 32]
   emitU32 with image, 0
@@ -456,7 +458,7 @@ define emitRuntime with image, fixes, labels
   return image
 end
 
-define parkRuntime with image, labels
+define parkRodata with image, labels
   pin with labels, "nlchar", image
   emitList with image, [10]
   pin with labels, "lit_true", image
@@ -493,8 +495,24 @@ define parkRuntime with image, labels
   emitU64 with image, 17
   emitList with image, [102, 105, 108, 101, 32, 105, 115, 32, 116, 111, 111, 32, 108, 97, 114, 103, 101]
   emitU8 with image, 0
+  parkMore with image, labels
+  return image
+end
+
+define parkCells with image, labels
   pin with labels, "written", image
   emitU64 with image, 0
-  parkMore with image, labels
+  pin with labels, "args_ptr", image
+  emitU64 with image, 0
+  pin with labels, "call_depth", image
+  emitU64 with image, 0
+  pin with labels, "args_ovf", image
+  emitU64 with image, 0
+  return image
+end
+
+define parkRuntime with image, labels
+  parkRodata with image, labels
+  parkCells with image, labels
   return image
 end

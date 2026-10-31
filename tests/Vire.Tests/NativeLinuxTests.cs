@@ -59,6 +59,66 @@ public class NativeLinuxTests
     }
 
     [Fact]
+    public void ElfProgramHeadersRejectWritableExecuteAndRequireNxStack()
+    {
+        if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+            return;
+        string root = DualMode.FindRoot();
+        string work = Path.Combine(root, "data", "native-linux-phdr-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string src = Path.Combine(work, "hello.vire");
+            File.WriteAllText(src, "define main\n  say \"hello from vire\"\nend\n");
+            DualMode.Proc compile = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(root, src), Rel(root, Path.Combine(work, "hello.hex")), "linux" }, root);
+            Assert.Equal(0, compile.Code);
+            byte[] elf = HexBytes(File.ReadAllText(Path.Combine(work, "hello.hex")));
+            AssertWx(elf);
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void NativeLinuxSafetyErrorsGoToStderrNotStdout()
+    {
+        if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+            return;
+        string root = DualMode.FindRoot();
+        CheckStreams(root, Path.Combine(root, "tests", "native", "oob-list.vire"), 1, "index is outside the value", false);
+        CheckStreams(root, Path.Combine(root, "tests", "native", "deep-rec.vire"), 1, "definitions called too deeply", false);
+        CheckStreams(root, Path.Combine(root, "samples", "hello.vire"), 0, "hello from vire", true);
+    }
+
+    [Fact]
+    public void NativeLinuxArgvUsesCommandLineShimBounded()
+    {
+        if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+            return;
+        string root = DualMode.FindRoot();
+        string srcText = "define main\n  say (length with args)\n  if (length with args) > 0\n    say (args at 0)\n  end\nend\n";
+        RunArgv(root, srcText, new string[] { }, 0, "0", null);
+        RunArgv(root, srcText, new string[] { "hello" }, 0, "1\nhello", null);
+        string[] many = new string[80];
+        for (int i = 0; i < many.Length; i++) many[i] = "x";
+        RunArgv(root, srcText, many, 1, "args is too large", "err");
+        RunArgv(root, srcText, new string[] { new string('a', 5000) }, 1, "args is too large", "err");
+        string[] xs = new string[80];
+        for (int i = 0; i < xs.Length; i++) xs[i] = "x";
+        string joined = string.Join(" ", xs);
+        RunArgv(root, srcText, new string[] { joined }, 0, "1\n" + joined, null);
+        string[] pairs = new string[40];
+        for (int i = 0; i < pairs.Length; i++) pairs[i] = "a b";
+        RunArgv(root, srcText, pairs, 0, "40\na b", null);
+        RunArgv(root, srcText, new string[] { "hello world" }, 0, "1\nhello world", null);
+        string sized = "define main\n  say (length with args)\n  if (length with args) > 0\n    say (length with (args at 0))\n  end\nend\n";
+        RunArgv(root, sized, new string[] { "" }, 0, "1\n0", null);
+        RunArgvFill(root, sized);
+    }
+
+    [Fact]
     public void NativeLinuxElfMatchesInterpreterForHelloAndSafety()
     {
         if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
@@ -147,22 +207,22 @@ public class NativeLinuxTests
             string stdout = run.StandardOutput.ReadToEnd();
             string stderr = run.StandardError.ReadToEnd();
             Assert.True(run.WaitForExit(30000), Path.GetFileName(srcPath) + " timed out");
-            string combined = DualMode.Norm(stdout) + DualMode.Norm(stderr);
             Assert.Equal(wantCode, run.ExitCode);
             if (exact)
             {
                 Assert.Equal(wantText.Trim(), DualMode.Norm(stdout).Trim());
+                Assert.Equal("", DualMode.Norm(stderr).Trim());
                 Assert.Equal(wantCode, interp.Code);
                 Assert.Equal(wantText.Trim(), DualMode.Norm(interp.Out).Trim());
             }
             else
             {
-                Assert.Contains(wantText, combined);
+                Assert.Contains(wantText, DualMode.Norm(stderr));
+                Assert.DoesNotContain(wantText, DualMode.Norm(stdout));
                 if (!interpMayDiffer)
                 {
                     Assert.Equal(wantCode, interp.Code);
-                    string interpText = DualMode.Norm(interp.Err) + DualMode.Norm(interp.Out);
-                    Assert.Contains(wantText, interpText);
+                    Assert.Contains(wantText, DualMode.Norm(interp.Err));
                 }
             }
         }
@@ -200,6 +260,197 @@ public class NativeLinuxTests
         int end = text.IndexOf('\n', at);
         if (end < 0) end = text.Length;
         return text.Substring(at + mark.Length, end - (at + mark.Length)).Trim();
+    }
+
+    static void CheckStreams(string root, string srcPath, int wantCode, string wantText, bool onStdout)
+    {
+        DualMode.Proc interp = DualMode.RunVire(root, new string[] { Rel(root, srcPath) }, root);
+        string work = Path.Combine(root, "data", "native-linux-stream-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string copy = Path.Combine(work, Path.GetFileName(srcPath));
+            File.Copy(srcPath, copy);
+            string hexPath = Path.Combine(work, "out.hex");
+            DualMode.Proc compile = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(root, copy), Rel(root, hexPath), "linux" }, root);
+            Assert.True(compile.Code == 0, Path.GetFileName(srcPath) + " compile\n" + compile.Out + compile.Err);
+            string exe = WriteElf(work, hexPath);
+            ProcOut run = RunExe(exe, work, Array.Empty<string>());
+            Assert.Equal(wantCode, run.Code);
+            if (onStdout)
+            {
+                Assert.Equal(wantText.Trim(), DualMode.Norm(run.Out).Trim());
+                Assert.Equal("", DualMode.Norm(run.Err).Trim());
+                Assert.Equal(wantCode, interp.Code);
+                Assert.Equal(wantText.Trim(), DualMode.Norm(interp.Out).Trim());
+            }
+            else
+            {
+                Assert.Contains(wantText, DualMode.Norm(run.Err));
+                Assert.DoesNotContain(wantText, DualMode.Norm(run.Out));
+                Assert.Equal(wantCode, interp.Code);
+                Assert.Contains(wantText, DualMode.Norm(interp.Err));
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    static void RunArgv(string root, string srcText, string[] extra, int wantCode, string want, string sink)
+    {
+        string work = Path.Combine(root, "data", "native-linux-argv-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string src = Path.Combine(work, "args.vire");
+            File.WriteAllText(src, srcText);
+            string hexPath = Path.Combine(work, "out.hex");
+            DualMode.Proc compile = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(root, src), Rel(root, hexPath), "linux" }, root);
+            Assert.True(compile.Code == 0, "argv compile\n" + compile.Out + compile.Err);
+            string exe = WriteElf(work, hexPath);
+            ProcOut run = RunExe(exe, work, extra);
+            Assert.Equal(wantCode, run.Code);
+            if (sink == "err")
+            {
+                Assert.Contains(want, DualMode.Norm(run.Err));
+                Assert.DoesNotContain(want, DualMode.Norm(run.Out));
+            }
+            else
+                Assert.Equal(want, DualMode.Norm(run.Out).Trim());
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    static void RunArgvFill(string root, string srcText)
+    {
+        string work = Path.Combine(root, "data", "native-linux-argvfill-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string src = Path.Combine(work, "args.vire");
+            File.WriteAllText(src, srcText);
+            string hexPath = Path.Combine(work, "out.hex");
+            DualMode.Proc compile = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(root, src), Rel(root, hexPath), "linux" }, root);
+            Assert.True(compile.Code == 0, "argv fill compile\n" + compile.Out + compile.Err);
+            string exe = WriteElf(work, hexPath);
+            string path = Path.GetFullPath(exe);
+            int room = 4095 - path.Length - 1;
+            Assert.True(room > 8, "command-line room");
+            ProcOut ok = RunExe(exe, work, new string[] { new string('a', room) });
+            Assert.Equal(0, ok.Code);
+            Assert.Equal("1\n" + room, DualMode.Norm(ok.Out).Trim());
+            Assert.Equal("", DualMode.Norm(ok.Err).Trim());
+            ProcOut over = RunExe(exe, work, new string[] { new string('a', room + 1) });
+            Assert.Equal(1, over.Code);
+            Assert.Contains("args is too large", DualMode.Norm(over.Err));
+            string spaced = Path.Combine(work, "dir with space");
+            Directory.CreateDirectory(spaced);
+            string moved = Path.Combine(spaced, "prog");
+            File.Copy(exe, moved);
+            Process chmod = Process.Start(new ProcessStartInfo
+            {
+                FileName = "chmod",
+                Arguments = "+x \"" + moved + "\"",
+                UseShellExecute = false
+            });
+            chmod.WaitForExit();
+            ProcOut viaSpace = RunExe(moved, spaced, Array.Empty<string>());
+            Assert.Equal(0, viaSpace.Code);
+            Assert.Equal("0", DualMode.Norm(viaSpace.Out).Trim());
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    static string WriteElf(string work, string hexPath)
+    {
+        byte[] bytes = HexBytes(File.ReadAllText(hexPath));
+        string exe = Path.Combine(work, "prog");
+        File.WriteAllBytes(exe, bytes);
+        Process chmod = Process.Start(new ProcessStartInfo
+        {
+            FileName = "chmod",
+            Arguments = "+x \"" + exe + "\"",
+            UseShellExecute = false
+        });
+        chmod.WaitForExit();
+        return exe;
+    }
+
+    static ProcOut RunExe(string exe, string work, string[] extra)
+    {
+        ProcessStartInfo info = new ProcessStartInfo
+        {
+            FileName = exe,
+            WorkingDirectory = work,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (string arg in extra)
+            info.ArgumentList.Add(arg);
+        Process run = Process.Start(info);
+        string stdout = run.StandardOutput.ReadToEnd();
+        string stderr = run.StandardError.ReadToEnd();
+        Assert.True(run.WaitForExit(30000), "native argv timed out");
+        return new ProcOut(run.ExitCode, stdout, stderr);
+    }
+
+    static void AssertWx(byte[] elf)
+    {
+        Assert.True(elf.Length >= 64, "elf header");
+        Assert.Equal(0x7f, elf[0]);
+        Assert.Equal((byte)'E', elf[1]);
+        ushort phentsize = BitConverter.ToUInt16(elf, 54);
+        ushort phnum = BitConverter.ToUInt16(elf, 56);
+        long phoff = BitConverter.ToInt64(elf, 32);
+        Assert.Equal(56, phentsize);
+        Assert.True(phnum >= 2, "expected load and gnu stack headers");
+        bool sawStack = false;
+        for (int i = 0; i < phnum; i++)
+        {
+            int at = (int)phoff + i * phentsize;
+            uint type = BitConverter.ToUInt32(elf, at);
+            uint flags = BitConverter.ToUInt32(elf, at + 4);
+            bool write = (flags & 2) != 0;
+            bool exec = (flags & 1) != 0;
+            Assert.False(write && exec, "PT " + type + " is writable and executable");
+            if (type == 0x6474e551)
+            {
+                sawStack = true;
+                Assert.False(exec, "PT_GNU_STACK is executable");
+            }
+        }
+        Assert.True(sawStack, "missing PT_GNU_STACK");
+    }
+
+    static byte[] HexBytes(string hex)
+    {
+        hex = hex.Trim();
+        byte[] bytes = new byte[hex.Length / 2];
+        for (int i = 0; i < bytes.Length; i++)
+            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        return bytes;
+    }
+
+    readonly struct ProcOut
+    {
+        public ProcOut(int code, string stdout, string stderr)
+        {
+            Code = code;
+            Out = stdout;
+            Err = stderr;
+        }
+        public int Code { get; }
+        public string Out { get; }
+        public string Err { get; }
     }
 
     static string Rel(string root, string path)
