@@ -1272,6 +1272,12 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_args_init", image
   emitPro with image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "args_ovf"
+  emitList with image, [72, 131, 56, 0]
+  emitJcc with image, fixes, 132, "args_init_ok"
+  emitFail with image, fixes, "msg_args"
+  pin with labels, "args_init_ok", image
   emitCallTo with image, fixes, "rt_list_new"
   emitList with image, [255, 21]
   emitRel with image, fixes, "iat_cl"
@@ -1361,7 +1367,7 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_take_arg", image
   emitPro with image
-  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 77, 248, 72, 139, 85, 240, 72, 141, 68, 17, 16, 72, 137, 193]
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 141, 74, 16]
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 232, 72, 139, 85, 240, 72, 137, 16, 72, 141, 72, 8, 72, 139, 85, 248, 76, 139, 69, 240]
   emitCallTo with image, fixes, "rt_memcpy"
@@ -1420,6 +1426,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_bigtxt", "text is too large to write"
   parkMsg with image, labels, "msg_number", "number needs text or a number"
   parkMsg with image, labels, "msg_nan", "that text is not a number"
+  parkMsg with image, labels, "msg_args", "args is too large"
   parkMsg with image, labels, "ext_exe", ".exe"
   parkMsg with image, labels, "ext_dll", ".dll"
   parkMsg with image, labels, "ext_bat", ".bat"
@@ -1432,9 +1439,5 @@ define parkMore with image, labels
   parkMsg with image, labels, "ext_vire", ".vire"
   parkMsg with image, labels, "ext_cs", ".cs"
   parkMsg with image, labels, "ext_sh", ".sh"
-  pin with labels, "args_ptr", image
-  emitU64 with image, 0
-  pin with labels, "call_depth", image
-  emitU64 with image, 0
   return true
 end

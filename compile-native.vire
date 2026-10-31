@@ -1173,6 +1173,9 @@ define main
   if linux
     let hostLabels be opened at "labels"
     put true into hostLabels at "linux_host"
+    alignTo with (opened at "image"), 4096
+    pin with hostLabels, "seg_rx", (opened at "image")
+    emitLinuxShims with (opened at "image"), (opened at "fixes"), hostLabels
   end
   emitRuntime with (opened at "image"), (opened at "fixes"), (opened at "labels")
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
@@ -1186,17 +1189,26 @@ define main
     say "compile failed"
     halt with 1
   end
-  parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")
-  parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
-  parkRuntime with (gen at "image"), (gen at "labels")
   if linux
-    emitLinuxShims with (gen at "image"), (gen at "fixes"), (gen at "labels")
+    alignTo with (gen at "image"), 4096
+    pin with (gen at "labels"), "seg_ro", (gen at "image")
+  end
+  parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")
+  if linux
+    parkRodata with (gen at "image"), (gen at "labels")
+    alignTo with (gen at "image"), 4096
+    pin with (gen at "labels"), "seg_rw", (gen at "image")
+    parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
+    parkCells with (gen at "image"), (gen at "labels")
+    emitLinuxData with (gen at "image"), (gen at "labels")
     finishElf with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")
-    let exe be buildElf with (gen at "image"), ((gen at "labels") at "elf_start")
+    let exe be buildElf with (gen at "image"), ((gen at "labels") at "elf_start"), (gen at "labels")
     write with (files at 1), (hexOf with exe)
     say "compiled"
     return none
   end
+  parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
+  parkRuntime with (gen at "image"), (gen at "labels")
   finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc")
   write with (files at 1), (hexOf with exe)

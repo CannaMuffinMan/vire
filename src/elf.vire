@@ -16,7 +16,7 @@ define elfBase
 end
 
 define elfHead
-  return 120
+  return 4096
 end
 
 define elfVa with off
@@ -150,20 +150,21 @@ define emitLinuxShims with image, fixes, labels
   emitRel with image, fixes, "cmdline_buf"
   emitList with image, [76, 141, 13]
   emitRel with image, fixes, "cmdline_end"
-  emitList with image, [77, 141, 73, 255, 77, 49, 192]
+  emitList with image, [77, 141, 73, 255, 77, 49, 192, 72, 131, 249, 64]
+  emitJcc with image, fixes, 135, "arg_ovf"
   pin with labels, "arg_loop", image
   emitList with image, [73, 57, 200]
   emitJcc with image, fixes, 141, "arg_done"
   emitList with image, [77, 133, 192]
   emitJcc with image, fixes, 132, "arg_nospace"
   emitList with image, [76, 57, 207]
-  emitJcc with image, fixes, 131, "arg_done"
+  emitJcc with image, fixes, 131, "arg_ovf"
   emitList with image, [198, 7, 32, 72, 255, 199]
   pin with labels, "arg_nospace", image
   emitList with image, [74, 139, 4, 198]
   pin with labels, "arg_copy", image
   emitList with image, [76, 57, 207]
-  emitJcc with image, fixes, 131, "arg_done"
+  emitJcc with image, fixes, 131, "arg_ovf"
   emitList with image, [138, 24, 132, 219]
   emitJcc with image, fixes, 132, "arg_copied"
   emitList with image, [136, 31, 72, 255, 199, 72, 255, 192, 233]
@@ -171,10 +172,18 @@ define emitLinuxShims with image, fixes, labels
   pin with labels, "arg_copied", image
   emitList with image, [73, 255, 192, 233]
   emitRel with image, fixes, "arg_loop"
+  pin with labels, "arg_ovf", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "args_ovf"
+  emitList with image, [72, 199, 0]
+  emitU32 with image, 1
   pin with labels, "arg_done", image
   emitList with image, [198, 7, 0, 72, 131, 228, 240, 72, 131, 236, 8, 233]
   emitRel with image, fixes, "code"
+  return image
+end
 
+define emitLinuxData with image, labels
   pin with labels, "stack_limit", image
   emitU64 with image, 0
   pin with labels, "cmdline_buf", image
@@ -188,6 +197,18 @@ define emitLinuxShims with image, fixes, labels
   return image
 end
 
+define emitPhdr with head, pos, type, flags, off, va, sz, align
+  poke32 with head, pos, type
+  poke32 with head, (pos + 4), flags
+  poke64 with head, (pos + 8), off
+  poke64 with head, (pos + 16), va
+  poke64 with head, (pos + 24), va
+  poke64 with head, (pos + 32), sz
+  poke64 with head, (pos + 40), sz
+  poke64 with head, (pos + 48), align
+  return pos + 56
+end
+
 define finishElf with image, labels, fixes, iats
   patchRel with image, labels, fixes
   let names be ["sys_GetStdHandle", "sys_WriteFile", "sys_ExitProcess", "sys_VirtualAlloc", "sys_CreateFileA", "sys_ReadFile", "sys_GetFileSize", "sys_CloseHandle", "sys_GetCommandLineA"]
@@ -199,7 +220,7 @@ define finishElf with image, labels, fixes, iats
   return image
 end
 
-define buildElf with image, entry
+define buildElf with image, entry, labels
   let total be (elfHead) + (length with image)
   let head be zeros with (elfHead)
   put 127 into head at 0
@@ -216,16 +237,19 @@ define buildElf with image, entry
   poke64 with head, 32, 64
   poke16 with head, 52, 64
   poke16 with head, 54, 56
-  poke16 with head, 56, 1
-  poke32 with head, 64, 1
-  poke32 with head, 68, 7
-  poke64 with head, 80, (elfBase)
-  poke64 with head, 88, (elfBase)
-  poke64 with head, 96, total
-  poke64 with head, 104, total
-  poke64 with head, 112, 4096
-  let i be 0
+  poke16 with head, 56, 6
+  let rx be labels at "seg_rx"
+  let ro be labels at "seg_ro"
+  let rw be labels at "seg_rw"
   let n be length with image
+  let pos be 64
+  let pos be emitPhdr with head, pos, 1, 4, 0, (elfBase), (elfHead), 4096
+  let pos be emitPhdr with head, pos, 1, 6, (elfHead), (elfVa with 0), rx, 4096
+  let pos be emitPhdr with head, pos, 1, 5, ((elfHead) + rx), (elfVa with rx), (ro - rx), 4096
+  let pos be emitPhdr with head, pos, 1, 4, ((elfHead) + ro), (elfVa with ro), (rw - ro), 4096
+  let pos be emitPhdr with head, pos, 1, 6, ((elfHead) + rw), (elfVa with rw), (n - rw), 4096
+  let pos be emitPhdr with head, pos, 1685382481, 6, 0, 0, 0, 16
+  let i be 0
   while i < n
     push with head, (image at i)
     let i be i + 1
