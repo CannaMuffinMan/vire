@@ -147,6 +147,28 @@ public class BuiltinParityTests
         }
     }
 
+    [Fact]
+    public void SealNeedsTextInBothModes()
+    {
+        DualMode.DualRun both = DualMode.RunSource(
+            "define main\n  say seal with 12\nend\n", null);
+        Assert.True(both.Matched, both.InterpErr + " | " + both.CompErr);
+        Assert.Equal(1, both.InterpCode);
+        Assert.Contains("seal needs text", both.InterpErr);
+        Assert.Contains("seal needs text", both.CompErr);
+    }
+
+    [Fact]
+    public void HaltNeedsAWholeNumberInBothModes()
+    {
+        DualMode.DualRun both = DualMode.RunSource(
+            "define main\n  halt with \"no\"\nend\n", null);
+        Assert.True(both.Matched, both.InterpErr + " | " + both.CompErr);
+        Assert.Equal(1, both.InterpCode);
+        Assert.Contains("halt needs a whole number", both.InterpErr);
+        Assert.Contains("halt needs a whole number", both.CompErr);
+    }
+
     static Machine Load(string source)
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-bp-" + Guid.NewGuid().ToString("N"));

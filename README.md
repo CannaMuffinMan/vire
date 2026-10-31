@@ -2,7 +2,7 @@
 
 Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 10 SDK, can run them. A Windows desktop build can also open a window. Binaries are not stored in git. GitHub Actions uploads single-file builds as workflow artifacts.
 
-The manual is [GUIDE.md](GUIDE.md).
+The manual is [GUIDE.md](GUIDE.md). Language, standard library, CLI, and security reference: [docs/](docs/).
 
 ## Run with Docker
 

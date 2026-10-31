@@ -1,0 +1,3 @@
+define main
+  say hash with "vire"
+end

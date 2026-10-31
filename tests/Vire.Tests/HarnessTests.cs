@@ -43,6 +43,8 @@ public class HarnessTests
         Assert.Contains("dotnet-version: 10.0.x", yml);
         Assert.Contains("bash tools/check-tracked-binaries.sh", yml);
         Assert.Contains("bash tools/selfhost-check.sh", yml);
+        Assert.Contains("bash tools/check-docs-examples.sh", yml);
+        Assert.Contains("docs-examples:", yml);
     }
 
     [Fact]

@@ -1,0 +1,56 @@
+~ statements, expressions, lists, maps, try/miss
+define twice with n
+  return n * 2
+end
+
+define silent
+end
+
+define main
+  let n be 1
+  while n <= 3
+    say n
+    let n be n + 1
+  end
+  for item in [10, 20, 30]
+    if item == 20
+      skip
+    end
+    if item == 30
+      stop
+    end
+    say item
+  end
+  for item in [1, 2, 3]
+    if item == 2
+      skip
+    end
+    say item
+  end
+  if 2 < 1
+    say "no"
+  else if 2 == 2
+    say "yes"
+  else
+    say "nope"
+  end
+  say twice with 21
+  say silent
+  let nums be [9, 2]
+  push with nums, 4
+  put 1 into nums at 0
+  say nums
+  let person be {"name": "ada", "year": 1815}
+  say person at "name"
+  say has with person, "year"
+  try
+    say number with "nope"
+  miss problem
+    say problem
+  end
+  say (1 + 2) * 3
+  say 5 / 2
+  say not false and true
+  say "Vire" + "!"
+  say [1] + [2, 3]
+end

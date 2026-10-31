@@ -475,10 +475,9 @@ sealed class CompiledMachine
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "halt")
         {
-            int code = 1;
-            if (args.Count > 0 && args[0] is int) code = (int)args[0];
-            else if (args.Count > 0 && args[0] is double) code = (int)(double)args[0];
-            throw new HaltSignal(code);
+            if (args.Count != 1) throw new VireError("halt takes 1 values, got " + args.Count, line, col);
+            if (!(args[0] is int)) throw new VireError("halt needs a whole number", line, col);
+            throw new HaltSignal((int)args[0]);
         }
         if (name == "length")
         {
@@ -527,7 +526,12 @@ sealed class CompiledMachine
             return raw.IndexOf(needle);
         }
         if (name == "json") return Json.Write(args[0]);
-        if (name == "seal") return VireSeal.Seal(args[0] as string ?? Show(args[0]));
+        if (name == "seal")
+        {
+            string sealedText = args[0] as string;
+            if (sealedText == null) throw new VireError("seal needs text", line, col);
+            return VireSeal.Seal(sealedText);
+        }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {

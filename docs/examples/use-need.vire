@@ -1,0 +1,7 @@
+use "helpers/add.vire"
+need "demo"
+
+define main
+  say add with 2, 3
+  say tag with "ok"
+end

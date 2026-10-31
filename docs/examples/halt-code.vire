@@ -1,0 +1,5 @@
+define main
+  say "bye"
+  halt with 7
+  say "no"
+end

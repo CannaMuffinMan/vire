@@ -1,0 +1,15 @@
+define main
+  write with "data/note.txt", "hello"
+  append with "data/note.txt", "!"
+  say read with "data/note.txt"
+  say exists with "data/note.txt"
+  copy with "data/note.txt", "data/copy.txt"
+  say read with "data/copy.txt"
+  let row be {"ok": true, "n": 2}
+  write with "data/row.json", json with row
+  let loaded be parse with read with "data/row.json"
+  say loaded at "ok"
+  say loaded at "n"
+  erase with "data/copy.txt"
+  say exists with "data/copy.txt"
+end
