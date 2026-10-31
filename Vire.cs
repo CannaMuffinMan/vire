@@ -2097,6 +2097,7 @@ sealed class Json
     public const int MaxChars = 1000000;
     public const int MaxDepth = 256;
     public const int MaxItems = 100000;
+    public const int MaxNeedName = 1024;
 
     public static object Read(string text, int line)
     {
@@ -2118,11 +2119,12 @@ sealed class Json
     {
         HashSet<object> walking = new HashSet<object>(ReferenceEqualityComparer.Instance);
         HashSet<object> done = new HashSet<object>(ReferenceEqualityComparer.Instance);
-        CheckSchema(schema, line, 0, walking, done, budget);
-        CheckValue(value, schema, line, 0, budget);
+        Dictionary<object, List<object>> needLists = new Dictionary<object, List<object>>(ReferenceEqualityComparer.Instance);
+        CheckSchema(schema, line, 0, walking, done, budget, needLists);
+        CheckValue(value, schema, line, 0, budget, needLists);
     }
 
-    static void CheckSchema(object schema, int line, int depth, HashSet<object> walking, HashSet<object> done, Budget budget)
+    static void CheckSchema(object schema, int line, int depth, HashSet<object> walking, HashSet<object> done, Budget budget, Dictionary<object, List<object>> needLists)
     {
         if (budget != null) budget.Charge(line);
         if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
@@ -2153,7 +2155,7 @@ sealed class Json
                 Dictionary<string, object> keys = pair.Value as Dictionary<string, object>;
                 if (keys == null) throw new VireError("json schema keys must be a map", line);
                 foreach (KeyValuePair<string, object> child in keys)
-                    CheckSchema(child.Value, line, depth + 1, walking, done, budget);
+                    CheckSchema(child.Value, line, depth + 1, walking, done, budget, needLists);
                 continue;
             }
             if (name == "need")
@@ -2166,11 +2168,13 @@ sealed class Json
                 HashSet<string> seen = new HashSet<string>();
                 foreach (object item in need)
                 {
+                    if (budget != null) budget.Charge(line);
                     string needName = item as string;
                     if (needName == null) throw new VireError("json schema need must be text", line);
+                    if (needName.Length > MaxNeedName) throw new VireError("json schema need name is too long", line);
                     if (seen.Add(needName)) unique.Add(needName);
                 }
-                spec["need"] = unique;
+                needLists[spec] = unique;
                 continue;
             }
             if (name == "items")
@@ -2178,7 +2182,7 @@ sealed class Json
                 if (kind != "list") throw new VireError("json schema has an unknown field", line);
                 Dictionary<string, object> items = pair.Value as Dictionary<string, object>;
                 if (items == null) throw new VireError("json schema items must be a map", line);
-                CheckSchema(items, line, depth + 1, walking, done, budget);
+                CheckSchema(items, line, depth + 1, walking, done, budget, needLists);
                 continue;
             }
             throw new VireError("json schema has an unknown field", line);
@@ -2187,7 +2191,7 @@ sealed class Json
         done.Add(spec);
     }
 
-    static void CheckValue(object value, object schema, int line, int depth, Budget budget)
+    static void CheckValue(object value, object schema, int line, int depth, Budget budget, Dictionary<object, List<object>> needLists)
     {
         if (budget != null) budget.Charge(line);
         if (depth > MaxDepth) throw new VireError("json is nested too deeply", line);
@@ -2223,7 +2227,7 @@ sealed class Json
             if (spec.ContainsKey("items"))
             {
                 for (int i = 0; i < list.Count; i++)
-                    CheckValue(list[i], spec["items"], line, depth + 1, budget);
+                    CheckValue(list[i], spec["items"], line, depth + 1, budget, needLists);
             }
             return;
         }
@@ -2234,10 +2238,11 @@ sealed class Json
             bool closed = spec.ContainsKey("closed") && TrueOf(spec["closed"]);
             Dictionary<string, object> keys = null;
             if (spec.ContainsKey("keys")) keys = spec["keys"] as Dictionary<string, object>;
-            if (spec.ContainsKey("need"))
+            List<object> need = null;
+            if (needLists != null) needLists.TryGetValue(spec, out need);
+            if (need == null && spec.ContainsKey("need")) need = spec["need"] as List<object>;
+            if (need != null)
             {
-                List<object> need = spec["need"] as List<object>;
-                if (need == null) throw new VireError("json schema need must be a list", line);
                 foreach (object item in need)
                 {
                     if (budget != null) budget.Charge(line);
@@ -2255,7 +2260,7 @@ sealed class Json
                         if (closed) throw new VireError("json has an extra key", line);
                         continue;
                     }
-                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1, budget);
+                    CheckValue(pair.Value, keys[pair.Key], line, depth + 1, budget, needLists);
                 }
             }
             else if (closed && map.Count > 0)

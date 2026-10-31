@@ -570,4 +570,90 @@ public class StdlibCryptoJsonTests
             for (int i = 0; i < buf.Length; i++) Assert.Equal(0, buf[i]);
         }
     }
+
+    [Fact]
+    public void LongNeedNamesFailClosedQuicklyInBothModes()
+    {
+        System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        DualMode.DualRun both = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let n be \"\"",
+            "  let i be 1",
+            "  while i <= 1025",
+            "    let n be n + \"a\"",
+            "    let i be i + 1",
+            "  end",
+            "  let want be []",
+            "  let j be 1",
+            "  while j <= 200",
+            "    push with want, n",
+            "    let j be j + 1",
+            "  end",
+            "  parse with \"{}\", {\"kind\": \"map\", \"closed\": false, \"need\": want}",
+            "  say \"lived\"",
+            "end",
+            ""
+        }), null);
+        Assert.True(clock.ElapsedMilliseconds < 5000, "long need names must fail closed quickly, took " + clock.ElapsedMilliseconds);
+        Assert.True(both.Matched, both.InterpErr + both.CompErr);
+        Assert.Equal(1, both.InterpCode);
+        Assert.Contains("json schema need name is too long", both.InterpErr);
+        Assert.DoesNotContain("lived", DualMode.Norm(both.InterpOut));
+
+        string huge = new string('b', 2000);
+        List<object> need = new List<object>();
+        for (int i = 0; i < 20000; i++) need.Add(huge);
+        Dictionary<string, object> schema = new Dictionary<string, object>
+        {
+            { "kind", "map" },
+            { "closed", false },
+            { "need", need }
+        };
+        Budget budget = new Budget();
+        budget.ApplyStepLimit(1000000);
+        clock.Restart();
+        try
+        {
+            Json.Check(new Dictionary<string, object>(), schema, 1, budget);
+            Assert.Fail("oversized need names must be refused");
+        }
+        catch (VireError err)
+        {
+            Assert.True(clock.ElapsedMilliseconds < 5000, "hashed long need names must fail quickly, took " + clock.ElapsedMilliseconds);
+            Assert.Contains("json schema need name is too long", err.Message);
+        }
+    }
+
+    [Fact]
+    public void ParseDoesNotRewriteCallerNeedListInBothModes()
+    {
+        DualMode.DualRun both = DualMode.RunSource(string.Join("\n", new string[]
+        {
+            "define main",
+            "  let schema be {\"kind\": \"map\", \"closed\": false, \"need\": [\"a\", \"a\", \"b\"]}",
+            "  parse with (json with {\"a\": 1, \"b\": 2}), schema",
+            "  say length with (schema at \"need\")",
+            "end",
+            ""
+        }), null);
+        Assert.True(both.Matched, both.InterpErr + both.CompErr + both.InterpOut);
+        Assert.Equal(0, both.InterpCode);
+        Assert.Equal("3\n", DualMode.Norm(both.InterpOut));
+
+        List<object> need = new List<object> { "a", "a", "b" };
+        Dictionary<string, object> schema = new Dictionary<string, object>
+        {
+            { "kind", "map" },
+            { "closed", false },
+            { "need", need }
+        };
+        Dictionary<string, object> value = new Dictionary<string, object> { { "a", 1 }, { "b", 2 } };
+        Json.Check(value, schema, 1);
+        Assert.Same(need, schema["need"]);
+        Assert.Equal(3, need.Count);
+        Assert.Equal("a", (string)need[0]);
+        Assert.Equal("a", (string)need[1]);
+        Assert.Equal("b", (string)need[2]);
+    }
 }
