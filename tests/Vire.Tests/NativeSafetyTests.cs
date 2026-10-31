@@ -91,6 +91,8 @@ public class NativeSafetyTests
             Assert.Contains(AsciiHex("division by zero"), hex);
             Assert.Contains(AsciiHex("list is too large"), hex);
             Assert.Contains(AsciiHex("text is too large to write"), hex);
+            Assert.Contains("48894c2428b9f4ffffff", hex);
+            Assert.DoesNotContain("48890c24b9f4ffffff", hex);
         }
         finally
         {

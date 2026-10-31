@@ -105,6 +105,12 @@ public class NativeLinuxTests
         for (int i = 0; i < many.Length; i++) many[i] = "x";
         RunArgv(root, srcText, many, 1, "args is too large", "err");
         RunArgv(root, srcText, new string[] { new string('a', 5000) }, 1, "args is too large", "err");
+        string[] xs = new string[80];
+        for (int i = 0; i < xs.Length; i++) xs[i] = "x";
+        RunArgv(root, srcText, new string[] { string.Join(" ", xs) }, 1, "args is too large", "err");
+        string[] pairs = new string[40];
+        for (int i = 0; i < pairs.Length; i++) pairs[i] = "a b";
+        RunArgv(root, srcText, pairs, 1, "args is too large", "err");
     }
 
     [Fact]
