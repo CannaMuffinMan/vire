@@ -161,15 +161,42 @@ define emitLinuxShims with image, fixes, labels
   emitJcc with image, fixes, 131, "arg_ovf"
   emitList with image, [198, 7, 32, 72, 255, 199]
   pin with labels, "arg_nospace", image
-  emitList with image, [74, 139, 4, 198]
-  pin with labels, "arg_copy", image
+  emitList with image, [74, 139, 4, 198, 77, 49, 210, 72, 137, 194]
+  pin with labels, "arg_scan", image
+  emitList with image, [138, 26, 132, 219]
+  emitJcc with image, fixes, 132, "arg_scan_end"
+  emitList with image, [128, 251, 32]
+  emitJcc with image, fixes, 132, "arg_needq"
+  emitList with image, [128, 251, 9]
+  emitJcc with image, fixes, 132, "arg_needq"
+  emitList with image, [128, 251, 34]
+  emitJcc with image, fixes, 132, "arg_ovf"
+  emitList with image, [72, 255, 194, 233]
+  emitRel with image, fixes, "arg_scan"
+  pin with labels, "arg_scan_end", image
+  emitList with image, [72, 57, 194]
+  emitJcc with image, fixes, 133, "arg_copy"
+  pin with labels, "arg_needq", image
   emitList with image, [76, 57, 207]
   emitJcc with image, fixes, 131, "arg_ovf"
+  emitList with image, [198, 7, 34, 72, 255, 199, 65, 186]
+  emitU32 with image, 1
+  pin with labels, "arg_copy", image
   emitList with image, [138, 24, 132, 219]
   emitJcc with image, fixes, 132, "arg_copied"
+  emitList with image, [76, 57, 207]
+  emitJcc with image, fixes, 131, "arg_ovf"
+  emitList with image, [128, 251, 34]
+  emitJcc with image, fixes, 132, "arg_ovf"
   emitList with image, [136, 31, 72, 255, 199, 72, 255, 192, 233]
   emitRel with image, fixes, "arg_copy"
   pin with labels, "arg_copied", image
+  emitList with image, [77, 133, 210]
+  emitJcc with image, fixes, 132, "arg_next"
+  emitList with image, [76, 57, 207]
+  emitJcc with image, fixes, 131, "arg_ovf"
+  emitList with image, [198, 7, 34, 72, 255, 199]
+  pin with labels, "arg_next", image
   emitList with image, [73, 255, 192, 233]
   emitRel with image, fixes, "arg_loop"
   pin with labels, "arg_ovf", image
