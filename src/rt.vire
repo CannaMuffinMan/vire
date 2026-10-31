@@ -311,11 +311,11 @@ define emitRuntime with image, fixes, labels
   emitRel with image, fixes, "iat_wf"
   emitList with image, [201, 195]
   pin with labels, "rt_fail", image
-  emitList with image, [85, 72, 137, 229, 72, 131, 228, 240, 72, 131, 236, 96, 72, 137, 12, 36, 185]
+  emitList with image, [85, 72, 137, 229, 72, 131, 228, 240, 72, 131, 236, 96, 72, 137, 76, 36, 40, 185]
   emitU32 with image, 4294967284
   emitList with image, [255, 21]
   emitRel with image, fixes, "iat_gs"
-  emitList with image, [72, 137, 195, 72, 139, 12, 36, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  emitList with image, [72, 137, 195, 72, 139, 76, 36, 40, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
   emitRel with image, fixes, "written"
   emitList with image, [72, 199, 68, 36, 32]
   emitU32 with image, 0
