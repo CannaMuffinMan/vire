@@ -17,7 +17,8 @@ public class NativeSafetyTests
         Assert.Contains("definitions called too deeply", rt);
         Assert.Contains("index is outside the value", rt);
         Assert.Contains("an index must be a whole number", rt);
-        Assert.Contains("[101, 72, 139, 4, 37, 16, 0, 0, 0", rt);
+        Assert.Contains("[101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]", rt);
+        Assert.DoesNotContain("16384", rt);
         Assert.Contains("emitCall with gen, \"rt_enter\"", compiler);
         Assert.Contains("emitCall with gen, \"rt_leave\"", compiler);
         Assert.Contains("emitCall with gen, \"rt_at\"", compiler);

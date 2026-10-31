@@ -838,12 +838,12 @@ define emitMore with image, fixes, labels
   emitFail with image, fixes, "msg_while"
 
   ~ Recursion depth (interpreter MaxCalls = 64) plus a Windows stack-limit
-  ~ guard. Stay 16 KiB above gs:[0x10] so rt_fail can still run.
+  ~ guard. gs:[0x10] is StackLimit (lowest committed address). Do not add a
+  ~ margin: SizeOfStackCommit starts at one page, so StackLimit+16KiB sits
+  ~ above rsp and falsely trips every program.
   pin with labels, "rt_enter", image
-  emitList with image, [101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 5]
-  emitU32 with image, 16384
-  emitList with image, [72, 57, 196]
-  emitJcc with image, fixes, 134, "enter_fail"
+  emitList with image, [101, 72, 139, 4, 37, 16, 0, 0, 0, 72, 57, 196]
+  emitJcc with image, fixes, 130, "enter_fail"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "call_depth"
   emitList with image, [72, 139, 1, 72, 255, 192, 72, 137, 1, 72, 131, 248, 64]
