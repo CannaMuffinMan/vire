@@ -778,15 +778,30 @@ define jumpLoop with gen, word, edge
   return true
 end
 
+define emitPushInt with gen, n
+  if n > 2147483647
+    put true into gen at "bad"
+    put "that number overflowed" into gen at "why"
+    return true
+  end
+  if n < -2147483648
+    put true into gen at "bad"
+    put "that number overflowed" into gen at "why"
+    return true
+  end
+  emitOp with gen, [72, 199, 193]
+  emitU32 with (gen at "image"), n
+  emitCall with gen, "rt_push_int"
+  return true
+end
+
 define emitExpr with gen, funcs, func, expr
   if gen at "bad"
     return true
   end
   let k be expr at 0
   if k == "num"
-    emitOp with gen, [72, 199, 193]
-    emitU32 with (gen at "image"), (expr at 1)
-    emitCall with gen, "rt_push_int"
+    emitPushInt with gen, (expr at 1)
     return true
   end
   if k == "text"
@@ -941,7 +956,14 @@ define emitExpr with gen, funcs, func, expr
     return true
   end
   if k == "neg"
-    emitExpr with gen, funcs, func, (expr at 1)
+    let inner be expr at 1
+    if (inner at 0) == "num"
+      if (inner at 1) == 2147483648
+        emitPushInt with gen, -2147483648
+        return true
+      end
+    end
+    emitExpr with gen, funcs, func, inner
     emitCall with gen, "rt_neg"
     return true
   end

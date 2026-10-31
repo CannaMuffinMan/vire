@@ -456,42 +456,179 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "number_bad"
   emitList with image, [76, 139, 2, 77, 133, 192, 15, 132]
   emitRel with image, fixes, "number_nan"
-  emitList with image, [76, 141, 74, 8, 76, 141, 82, 8, 77, 1, 194, 69, 48, 219, 65, 128, 57, 45, 15, 133]
-  emitRel with image, fixes, "number_plus"
-  emitList with image, [65, 179, 1, 73, 255, 193, 77, 57, 209, 15, 131]
+  emitList with image, [76, 141, 74, 8, 76, 141, 82, 8, 77, 1, 194, 69, 48, 219]
+  emitList with image, [72, 49, 192, 72, 199, 69, 248, 0, 0, 0, 0, 72, 199, 69, 240, 0, 0, 0, 0, 72, 199, 69, 232, 0, 0, 0, 0, 72, 199, 69, 224, 0, 0, 0, 0]
+  pin with labels, "number_lws", image
+  emitList with image, [77, 57, 209, 15, 131]
   emitRel with image, fixes, "number_nan"
-  emitJmpTo with image, fixes, "number_digits"
+  emitList with image, [65, 15, 182, 9, 128, 249, 32, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitList with image, [128, 249, 9, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitList with image, [128, 249, 10, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitList with image, [128, 249, 13, 15, 132]
+  emitRel with image, fixes, "number_lws_eat"
+  emitJmpTo with image, fixes, "number_sign"
+  pin with labels, "number_lws_eat", image
+  emitList with image, [73, 255, 193, 233]
+  emitRel with image, fixes, "number_lws"
+  pin with labels, "number_sign", image
+  emitList with image, [65, 128, 57, 45, 15, 133]
+  emitRel with image, fixes, "number_plus"
+  emitList with image, [65, 179, 1, 73, 255, 193, 233]
+  emitRel with image, fixes, "number_int"
   pin with labels, "number_plus", image
   emitList with image, [65, 128, 57, 43, 15, 133]
-  emitRel with image, fixes, "number_digits"
-  emitList with image, [73, 255, 193, 77, 57, 209, 15, 131]
-  emitRel with image, fixes, "number_nan"
-  pin with labels, "number_digits", image
-  emitList with image, [72, 49, 192, 77, 49, 192]
-  pin with labels, "number_loop", image
+  emitRel with image, fixes, "number_int"
+  emitList with image, [73, 255, 193]
+  pin with labels, "number_int", image
   emitList with image, [77, 57, 209, 15, 131]
-  emitRel with image, fixes, "number_done"
-  emitList with image, [65, 138, 9, 128, 249, 48, 15, 130]
-  emitRel with image, fixes, "number_nan"
+  emitRel with image, fixes, "number_after_int"
+  emitList with image, [65, 15, 182, 9, 128, 249, 48, 15, 130]
+  emitRel with image, fixes, "number_after_int"
   emitList with image, [128, 249, 57, 15, 135]
-  emitRel with image, fixes, "number_nan"
-  emitList with image, [72, 107, 192, 10]
-  emitJcc with image, fixes, 129, "number_mul_ok"
-  emitList with image, [65, 184, 1, 0, 0, 0]
-  pin with labels, "number_mul_ok", image
+  emitRel with image, fixes, "number_after_int"
+  emitList with image, [72, 199, 69, 240, 1, 0, 0, 0, 73, 137, 192, 72, 107, 192, 10]
+  emitJcc with image, fixes, 129, "number_int_mul_ok"
+  emitList with image, [76, 137, 192, 128, 249, 48, 15, 133]
+  emitRel with image, fixes, "number_int_ovf"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "number_int_skip"
+  pin with labels, "number_int_ovf", image
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0, 233]
+  emitRel with image, fixes, "number_int_skip"
+  pin with labels, "number_int_mul_ok", image
   emitList with image, [128, 233, 48, 72, 15, 182, 201, 72, 1, 200]
-  emitJcc with image, fixes, 129, "number_add_ok"
-  emitList with image, [65, 184, 1, 0, 0, 0]
-  pin with labels, "number_add_ok", image
+  emitJcc with image, fixes, 129, "number_int_skip"
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0]
+  pin with labels, "number_int_skip", image
   emitList with image, [73, 255, 193, 233]
-  emitRel with image, fixes, "number_loop"
-  pin with labels, "number_done", image
-  emitList with image, [69, 132, 219, 15, 132]
+  emitRel with image, fixes, "number_int"
+  pin with labels, "number_after_int", image
+  emitList with image, [77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_exp_or_end"
+  emitList with image, [65, 128, 57, 46, 15, 133]
+  emitRel with image, fixes, "number_exp_or_end"
+  emitList with image, [73, 255, 193]
+  pin with labels, "number_frac", image
+  emitList with image, [77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_exp_or_end"
+  emitList with image, [65, 15, 182, 9, 128, 249, 48, 15, 130]
+  emitRel with image, fixes, "number_exp_or_end"
+  emitList with image, [128, 249, 57, 15, 135]
+  emitRel with image, fixes, "number_exp_or_end"
+  emitList with image, [72, 199, 69, 240, 1, 0, 0, 0, 73, 137, 192, 72, 107, 192, 10]
+  emitJcc with image, fixes, 129, "number_frac_mul_ok"
+  emitList with image, [76, 137, 192, 128, 249, 48, 15, 133]
+  emitRel with image, fixes, "number_frac_ovf"
+  emitJmpTo with image, fixes, "number_frac_skip"
+  pin with labels, "number_frac_ovf", image
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0, 233]
+  emitRel with image, fixes, "number_frac_skip"
+  pin with labels, "number_frac_mul_ok", image
+  emitList with image, [128, 233, 48, 72, 15, 182, 201, 72, 1, 200]
+  emitJcc with image, fixes, 129, "number_frac_count"
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0]
+  pin with labels, "number_frac_count", image
+  emitList with image, [72, 255, 69, 248]
+  pin with labels, "number_frac_skip", image
+  emitList with image, [73, 255, 193, 233]
+  emitRel with image, fixes, "number_frac"
+  pin with labels, "number_exp_or_end", image
+  emitList with image, [77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_tws"
+  emitList with image, [65, 128, 57, 101, 15, 132]
+  emitRel with image, fixes, "number_exp"
+  emitList with image, [65, 128, 57, 69, 15, 132]
+  emitRel with image, fixes, "number_exp"
+  emitJmpTo with image, fixes, "number_tws"
+  pin with labels, "number_exp", image
+  emitList with image, [73, 255, 193, 72, 199, 69, 216, 0, 0, 0, 0, 72, 199, 69, 208, 0, 0, 0, 0, 77, 49, 192, 77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_nan"
+  emitList with image, [65, 128, 57, 45, 15, 133]
+  emitRel with image, fixes, "number_exp_plus"
+  emitList with image, [72, 199, 69, 216, 1, 0, 0, 0, 73, 255, 193, 233]
+  emitRel with image, fixes, "number_exp_digits"
+  pin with labels, "number_exp_plus", image
+  emitList with image, [65, 128, 57, 43, 15, 133]
+  emitRel with image, fixes, "number_exp_digits"
+  emitList with image, [73, 255, 193]
+  pin with labels, "number_exp_digits", image
+  emitList with image, [77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_exp_done"
+  emitList with image, [65, 15, 182, 9, 128, 249, 48, 15, 130]
+  emitRel with image, fixes, "number_exp_done"
+  emitList with image, [128, 249, 57, 15, 135]
+  emitRel with image, fixes, "number_exp_done"
+  emitList with image, [72, 199, 69, 208, 1, 0, 0, 0, 77, 107, 192, 10]
+  emitJcc with image, fixes, 129, "number_exp_mul_ok"
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0, 233]
+  emitRel with image, fixes, "number_exp_eat"
+  pin with labels, "number_exp_mul_ok", image
+  emitList with image, [128, 233, 48, 72, 15, 182, 201, 73, 1, 200]
+  emitJcc with image, fixes, 129, "number_exp_bound"
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0]
+  pin with labels, "number_exp_bound", image
+  emitList with image, [73, 129, 248, 64, 66, 15, 0]
+  emitJcc with image, fixes, 134, "number_exp_eat"
+  emitList with image, [72, 199, 69, 232, 1, 0, 0, 0]
+  pin with labels, "number_exp_eat", image
+  emitList with image, [73, 255, 193, 233]
+  emitRel with image, fixes, "number_exp_digits"
+  pin with labels, "number_exp_done", image
+  emitList with image, [72, 131, 125, 208, 0, 15, 132]
+  emitRel with image, fixes, "number_nan"
+  emitList with image, [72, 131, 125, 216, 0, 15, 132]
+  emitRel with image, fixes, "number_exp_store"
+  emitList with image, [73, 247, 216]
+  pin with labels, "number_exp_store", image
+  emitList with image, [76, 137, 69, 224]
+  pin with labels, "number_tws", image
+  emitList with image, [77, 57, 209, 15, 131]
+  emitRel with image, fixes, "number_finish"
+  emitList with image, [65, 15, 182, 9, 128, 249, 32, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
+  emitList with image, [128, 249, 9, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
+  emitList with image, [128, 249, 10, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
+  emitList with image, [128, 249, 13, 15, 132]
+  emitRel with image, fixes, "number_tws_eat"
+  emitJmpTo with image, fixes, "number_nan"
+  pin with labels, "number_tws_eat", image
+  emitList with image, [73, 255, 193, 233]
+  emitRel with image, fixes, "number_tws"
+  pin with labels, "number_finish", image
+  emitList with image, [72, 131, 125, 240, 0, 15, 132]
+  emitRel with image, fixes, "number_nan"
+  emitList with image, [72, 131, 125, 232, 0, 15, 133]
+  emitRel with image, fixes, "num_ovf"
+  emitList with image, [76, 139, 69, 224, 77, 43, 69, 248, 77, 133, 192, 15, 132]
   emitRel with image, fixes, "number_out"
-  emitList with image, [72, 247, 216]
-  pin with labels, "number_out", image
-  emitList with image, [72, 137, 194, 77, 133, 192]
+  emitList with image, [77, 133, 192, 15, 136]
+  emitRel with image, fixes, "number_div"
+  pin with labels, "number_mul10", image
+  emitList with image, [72, 107, 192, 10]
+  emitJcc with image, fixes, 129, "number_mul10_ok"
+  emitJmpTo with image, fixes, "num_ovf"
+  pin with labels, "number_mul10_ok", image
+  emitList with image, [73, 255, 200, 77, 133, 192, 15, 133]
+  emitRel with image, fixes, "number_mul10"
+  emitJmpTo with image, fixes, "number_out"
+  pin with labels, "number_div", image
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "number_out"
+  emitList with image, [72, 49, 210, 72, 185, 10, 0, 0, 0, 0, 0, 0, 0, 72, 247, 241, 72, 133, 210]
   emitJcc with image, fixes, 133, "num_ovf"
+  emitList with image, [73, 255, 192, 77, 133, 192, 15, 133]
+  emitRel with image, fixes, "number_div"
+  pin with labels, "number_out", image
+  emitList with image, [69, 132, 219, 15, 132]
+  emitRel with image, fixes, "number_fit"
+  emitList with image, [72, 247, 216]
+  pin with labels, "number_fit", image
+  emitList with image, [72, 137, 194]
   emitFit32 with image, fixes, "num_ovf"
   pin with labels, "number_push", image
   emitPushTag with image, 1
