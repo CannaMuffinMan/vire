@@ -185,6 +185,8 @@ public class NativeSafetyTests
         Assert.Contains("num_ovf", body);
         Assert.Contains("number_lws", body);
         Assert.Contains("number_exp", body);
+        Assert.Contains("76, 43, 69, 248", body);
+        Assert.DoesNotContain("77, 43, 69, 248", body);
         Assert.DoesNotContain("emitJcc with image, fixes, 128, \"num_ovf\"", body);
     }
 

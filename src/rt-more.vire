@@ -604,7 +604,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "number_nan"
   emitList with image, [72, 131, 125, 232, 0, 15, 133]
   emitRel with image, fixes, "num_ovf"
-  emitList with image, [76, 139, 69, 224, 77, 43, 69, 248, 77, 133, 192, 15, 132]
+  emitList with image, [76, 139, 69, 224, 76, 43, 69, 248, 77, 133, 192, 15, 132]
   emitRel with image, fixes, "number_out"
   emitList with image, [77, 133, 192, 15, 136]
   emitRel with image, fixes, "number_div"
