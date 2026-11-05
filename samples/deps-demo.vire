@@ -1,0 +1,10 @@
+need "textkit"
+need "listkit"
+
+define main
+  let joined be words with ["alpha", "", "beta"]
+  let clean be trim with "  hi  "
+  let n be count_of with [1, 2, 1, 2, 1], 1
+  let tail be last with ["x", "y"]
+  say (joined + " " + clean + " " + (text with n) + " " + tail)
+end

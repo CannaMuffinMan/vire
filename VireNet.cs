@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 static class VireNet
@@ -52,6 +53,9 @@ static class VireNet
             return IsPublicAddress(new IPAddress(new byte[] { bits[2], bits[3], bits[4], bits[5] }));
         if (bits[0] == 0x00 && bits[1] == 0x64 && bits[2] == 0xff && bits[3] == 0x9b && Zeros(bits, 4, 8))
             return IsPublicAddress(new IPAddress(new byte[] { bits[12], bits[13], bits[14], bits[15] }));
+        // RFC 8215 local-use NAT64. The embedded IPv4 is not a global destination.
+        if (bits[0] == 0x00 && bits[1] == 0x64 && bits[2] == 0xff && bits[3] == 0x9b && bits[4] == 0x00 && bits[5] == 0x01)
+            return false;
         if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x00 && bits[3] == 0x00) return false;
         if (bits[0] == 0x20 && bits[1] == 0x01 && bits[2] == 0x0d && bits[3] == 0xb8) return false;
         if (bits[0] == 0xff) return false;
@@ -70,6 +74,7 @@ static class VireNet
         if (part[0] == 192 && part[1] == 168) return false;
         if (part[0] == 100 && part[1] >= 64 && part[1] <= 127) return false;
         if (part[0] == 198 && (part[1] == 18 || part[1] == 19)) return false;
+        if (part[0] == 192 && part[1] == 88 && part[2] == 99) return false;
         if (part[0] == 192 && part[1] == 0 && part[2] == 0) return false;
         if (part[0] == 192 && part[1] == 0 && part[2] == 2) return false;
         if (part[0] == 198 && part[1] == 51 && part[2] == 100) return false;
@@ -171,29 +176,31 @@ static class VireNet
     {
         SocketsHttpHandler handler = new SocketsHttpHandler();
         handler.AllowAutoRedirect = false;
+        handler.UseProxy = false;
         IPAddress pin = pinned;
-        handler.ConnectCallback = (context, token) => ConnectPinned(pin, context.DnsEndPoint.Port);
+        handler.ConnectCallback = (context, token) => ConnectPinned(pin, context.DnsEndPoint.Port, token);
         using (HttpClient client = new HttpClient(handler))
+        using (CancellationTokenSource cancel = new CancellationTokenSource(TimeSpan.FromSeconds(8)))
         {
-            client.Timeout = TimeSpan.FromSeconds(8);
+            client.Timeout = Timeout.InfiniteTimeSpan;
             using (HttpRequestMessage message = new HttpRequestMessage(method, url))
             {
                 if (body != null) message.Content = new StringContent(body, Encoding.UTF8, "text/plain");
                 HttpResponseMessage response;
-                try { response = client.SendAsync(message).GetAwaiter().GetResult(); }
+                try { response = client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancel.Token).GetAwaiter().GetResult(); }
                 catch (VireError) { throw; }
                 catch (Exception) { throw new VireError("could not reach that address", line, column); }
                 using (response)
                 {
                     code = (int)response.StatusCode;
                     location = response.Headers.Location == null ? null : response.Headers.Location.ToString();
-                    return ReadLimited(response, line, column);
+                    return ReadLimited(response, line, column, cancel.Token);
                 }
             }
         }
     }
 
-    static string ReadLimited(HttpResponseMessage response, int line, int column)
+    static string ReadLimited(HttpResponseMessage response, int line, int column, CancellationToken cancel)
     {
         using (Stream stream = response.Content.ReadAsStream())
         {
@@ -202,7 +209,10 @@ static class VireNet
             int total = 0;
             while (true)
             {
-                int n = stream.Read(chunk, 0, chunk.Length);
+                int n;
+                try { n = stream.ReadAsync(chunk, 0, chunk.Length, cancel).GetAwaiter().GetResult(); }
+                catch (VireError) { throw; }
+                catch (Exception) { throw new VireError("could not reach that address", line, column); }
                 if (n <= 0) break;
                 total += n;
                 if (total > MaxResponse) throw new VireError("the response is too large", line, column);
@@ -212,13 +222,13 @@ static class VireNet
         }
     }
 
-    static ValueTask<Stream> ConnectPinned(IPAddress pinned, int port)
+    static async ValueTask<Stream> ConnectPinned(IPAddress pinned, int port, CancellationToken cancel)
     {
         Socket socket = new Socket(pinned.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
         {
-            socket.Connect(pinned, port);
-            return new ValueTask<Stream>(new NetworkStream(socket, true));
+            await socket.ConnectAsync(pinned, port, cancel).ConfigureAwait(false);
+            return new NetworkStream(socket, true);
         }
         catch (Exception)
         {

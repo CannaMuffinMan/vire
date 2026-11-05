@@ -1,0 +1,39 @@
+define as_whole with n
+  if not ((kind with n) == "number")
+    return number with "needs a whole number"
+  end
+  let rounded be round with n
+  if not (n == rounded)
+    return number with "needs a whole number"
+  end
+  return rounded
+end
+
+define whole_min with a, b
+  let left be as_whole with a
+  let right be as_whole with b
+  if left < right
+    return left
+  end
+  return right
+end
+
+define whole_max with a, b
+  let left be as_whole with a
+  let right be as_whole with b
+  if left > right
+    return left
+  end
+  return right
+end
+
+define sum_of with items
+  if not ((kind with items) == "list")
+    return number with "sum needs a list"
+  end
+  let total be 0
+  for item in items
+    let total be total + (as_whole with item)
+  end
+  return total
+end

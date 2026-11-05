@@ -31,13 +31,25 @@ static class VireListen
     {
         string envPort = Environment.GetEnvironmentVariable("PORT");
         if (!string.IsNullOrWhiteSpace(envPort)) port = Machine.RequirePort(envPort.Trim(), line);
-        bool publish = string.Equals(Environment.GetEnvironmentVariable("VIRE_BIND"), "public", StringComparison.Ordinal);
-        string token = Environment.GetEnvironmentVariable("FCG_API_TOKEN");
+        string bindMode = ListenHooks.OverrideEnv ? ListenHooks.BindMode : Environment.GetEnvironmentVariable("VIRE_BIND");
+        string token = ListenHooks.OverrideEnv ? ListenHooks.Token : Environment.GetEnvironmentVariable("FCG_API_TOKEN");
+        bool publish = string.Equals(bindMode, "public", StringComparison.Ordinal);
         if (publish && (string.IsNullOrEmpty(token) || token.Length < 16))
             throw new VireError("a public listener needs FCG_API_TOKEN of at least 16 characters", line);
-        IPAddress bind = publish ? IPAddress.Any : IPAddress.Loopback;
+        IPAddress bind = publish ? IPAddress.Any : IPAddress.Parse("127.0.0.1");
         TcpListener listener = BindListen(bind, port);
-        int actual = ((IPEndPoint)listener.LocalEndpoint).Port;
+        IPEndPoint bound = (IPEndPoint)listener.LocalEndpoint;
+        if (!publish && (!IPAddress.IsLoopback(bound.Address) || bound.AddressFamily != AddressFamily.InterNetwork))
+        {
+            listener.Stop();
+            throw new VireError("listener must bind 127.0.0.1", line);
+        }
+        if (publish && !bound.Address.Equals(IPAddress.Any))
+        {
+            listener.Stop();
+            throw new VireError("listener bind failed", line);
+        }
+        int actual = bound.Port;
         if (Machine.IsReservedListenPort(actual))
         {
             listener.Stop();
@@ -185,7 +197,13 @@ static class VireListen
         }
         int bodyAt = headers.BodyAt;
         int contentLength = headers.ContentLength;
-        int need = bodyAt + contentLength;
+        long need64 = (long)bodyAt + contentLength;
+        if (contentLength < 0 || need64 > int.MaxValue || need64 > buffer.Length)
+        {
+            SendApi(stream, 413, "{\"error\":\"body too large\"}", null);
+            return;
+        }
+        int need = (int)need64;
         DateTime bodyDead = DateTime.UtcNow.AddSeconds(10);
         if (got < need)
         {
@@ -205,8 +223,6 @@ static class VireListen
         string path = parsed.Path;
         string head = parsed.Head;
         string body = parsed.Body;
-        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line, root))
-            return;
         bool health = path == "/health" && (method == "GET" || method == "HEAD");
         bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
         if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
@@ -219,6 +235,8 @@ static class VireListen
             SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
+        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line, root))
+            return;
         object result;
         int maxOutput;
         bool chain = path == "/block" || path == "/chain";
@@ -318,13 +336,20 @@ static class VireListen
     static void SendApi(NetworkStream stream, int code, string body, string extra)
     {
         byte[] data = Encoding.UTF8.GetBytes(body ?? "");
+        string extraSafe = HeaderField(extra);
+        if (extra != null && extraSafe == null)
+        {
+            extraSafe = "";
+            code = 500;
+            data = Encoding.UTF8.GetBytes("{\"error\":\"route failed\"}");
+        }
         string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
             + "Content-Type: application/json; charset=utf-8\r\n"
             + "Content-Length: " + data.Length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"
             + "Cache-Control: no-store\r\n"
-            + (extra ?? "")
+            + extraSafe
             + "\r\n";
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
@@ -343,14 +368,16 @@ static class VireListen
         }
         string type;
         long limit;
-        if (!SiteType(rel, out type, out limit))
+        if (!SiteType(rel, out type, out limit)) return false;
+        string full;
+        try { full = VirePaths.DataOrSite(root, "site/" + rel, line); }
+        catch (VireError)
         {
             SendSiteEmpty(stream, 404, "text/plain", "not found");
             return true;
         }
-        string full;
-        try { full = VirePaths.DataOrSite(root, "site/" + rel, line); }
-        catch (VireError)
+        string siteRoot = Path.GetFullPath(Path.Combine(root, "site"));
+        if (!VirePaths.InFolder(siteRoot, full))
         {
             SendSiteEmpty(stream, 404, "text/plain", "not found");
             return true;
@@ -388,9 +415,9 @@ static class VireListen
                 return true;
             }
         }
-        if (method == "HEAD") count = 0;
+        long writeCount = method == "HEAD" ? 0 : count;
         using (FileStream file = File.OpenRead(full))
-            SendSiteFile(stream, partial ? 206 : 200, type, file, start, count, partial, length, video);
+            SendSiteFile(stream, partial ? 206 : 200, type, file, start, count, writeCount, partial, length, video);
         return true;
     }
 
@@ -402,6 +429,8 @@ static class VireListen
         try { decoded = Uri.UnescapeDataString(url); }
         catch (UriFormatException) { return false; }
         if (decoded.IndexOf('\0') >= 0) return false;
+        if (decoded.IndexOf('\\') >= 0) return false;
+        if (decoded.IndexOf("..", StringComparison.Ordinal) >= 0) return false;
         if (decoded.IndexOf("://", StringComparison.Ordinal) >= 0) return false;
         while (decoded.StartsWith("/", StringComparison.Ordinal)) decoded = decoded.Substring(1);
         if (decoded.Length == 0) decoded = "index.html";
@@ -492,17 +521,17 @@ static class VireListen
         stream.Write(prefix, 0, prefix.Length);
     }
 
-    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, bool partial, long total, bool video)
+    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, long writeCount, bool partial, long total, bool video)
     {
         string extra = "";
         if (partial) extra += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";
         string head = SiteHead(code, type, count, extra, video);
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
-        if (count <= 0) return;
+        if (writeCount <= 0) return;
         file.Seek(start, SeekOrigin.Begin);
         byte[] buf = new byte[65536];
-        long left = count;
+        long left = writeCount;
         while (left > 0)
         {
             int n = file.Read(buf, 0, (int)Math.Min(buf.Length, left));
@@ -512,16 +541,45 @@ static class VireListen
         }
     }
 
+    static string HeaderField(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        for (int i = 0; i < value.Length; i++)
+        {
+            char ch = value[i];
+            if (ch == '\0') return null;
+            if (ch == '\r' || ch == '\n')
+            {
+                if (ch == '\n') return null;
+                if (i + 1 >= value.Length || value[i + 1] != '\n') return null;
+                i++;
+                if (i + 1 < value.Length && (value[i + 1] == ' ' || value[i + 1] == '\t')) return null;
+            }
+        }
+        if (value.IndexOf("\r\n\r\n", StringComparison.Ordinal) >= 0) return null;
+        return value;
+    }
+
     static string SiteHead(int code, string type, long length, string extra, bool acceptRanges)
     {
+        string typeSafe = HeaderField(type);
+        string extraSafe = HeaderField(extra);
+        if (typeSafe == null || extra != null && extraSafe == null || typeSafe.IndexOf('\r') >= 0 || typeSafe.IndexOf('\n') >= 0)
+        {
+            typeSafe = "text/plain; charset=utf-8";
+            extraSafe = "";
+            code = 500;
+            length = 0;
+        }
+        if (extraSafe == null) extraSafe = "";
         return "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
-            + "Content-Type: " + type + "\r\n"
+            + "Content-Type: " + typeSafe + "\r\n"
             + "Content-Length: " + length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"
             + "Content-Security-Policy: default-src 'self'\r\n"
             + (acceptRanges ? "Accept-Ranges: bytes\r\n" : "")
-            + (extra ?? "")
+            + extraSafe
             + "\r\n";
     }
 }

@@ -83,6 +83,7 @@ sealed class CompiledMachine
     int nextTop = 16;
     int nextLeft = 16;
     internal int ListenPort;
+    VireThreadTable threads = new VireThreadTable();
     const int MaxItems = 100000;
     const int MaxText = 1000000;
 
@@ -132,14 +133,46 @@ sealed class CompiledMachine
         finally { depth--; }
     }
 
+    int StartThread(List<object> args, int line, int col)
+    {
+        if (args.Count < 1 || args.Count > 2)
+            throw new VireError("start takes a definition name and at most one value", line, col);
+        string name = args[0] as string;
+        if (name == null || !funcs.ContainsKey(name))
+            throw new VireError("there is no definition named " + Show(args[0]), line, col);
+        List<object> names = (List<object>)((Dictionary<string, object>)funcs[name])["params"];
+        int given = args.Count - 1;
+        if (names.Count != given)
+            throw new VireError(name + " takes " + names.Count + " values, got " + given, line, col);
+        object arg = given == 1 ? VireThreads.Copy(args[1]) : null;
+        int steps = budget.MaxSteps;
+        List<object> argsCopy = new List<object>();
+        foreach (object item in programArgs) argsCopy.Add(VireThreads.Copy(item));
+        return VireThreads.Start(threads, Thread.CurrentThread.ManagedThreadId, delegate (VireJob job)
+        {
+            Budget childBudget = new Budget();
+            childBudget.ApplyStepLimit(steps);
+            CompiledMachine child = new CompiledMachine(funcs, root, argsCopy, childBudget);
+            List<object> callArgs = new List<object>();
+            if (given == 1) callArgs.Add(arg);
+            object value = child.Call(name, callArgs, line, col);
+            lock (job.Gate) job.Result = VireThreads.Copy(value);
+        }, line);
+    }
+
     object[] Run(List<object> step, Dictionary<string, object> env)
     {
         if (budget.DeadlinePassed()) Fail("request ran too long", step);
-        budget.Steps++;
-        if (budget.Steps > budget.MaxSteps) Fail("program ran too long and was stopped", step);
+        budget.Pending++;
+        if (budget.Pending >= Budget.StepBatch)
+        {
+            budget.Pending -= Budget.StepBatch;
+            budget.Steps++;
+            if (budget.Steps > budget.MaxSteps) Fail("program ran too long and was stopped", step);
+        }
         string op = (string)step[0];
         if (op == "let") { env[(string)step[1]] = Eval((List<object>)step[2], env); return null; }
-        if (op == "say") { Console.WriteLine(Show(Eval((List<object>)step[1], env))); return null; }
+        if (op == "say") { VireThreads.Say(Show(Eval((List<object>)step[1], env))); return null; }
         if (op == "return") return new object[] { Eval((List<object>)step[1], env), "return" };
         if (op == "stop") return new object[] { null, "stop" };
         if (op == "skip") return new object[] { null, "skip" };
@@ -279,7 +312,7 @@ sealed class CompiledMachine
             string called = (string)expr[1];
             object found;
             if (env.TryGetValue(called, out found)) return found;
-            if (called == "args" || called == "now" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
+            if (called == "args" || called == "now" || called == "ticks" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
                 return Builtin(called, new List<object>(), AsLine(expr), AsCol(expr));
             if (funcs.ContainsKey(called))
             {
@@ -403,18 +436,10 @@ sealed class CompiledMachine
         throw new VireError("put needs a list or a map", line, col);
     }
 
-    static int AsWhole(object value)
+    static int AsWhole(object value, int line)
     {
-        if (value is int) return (int)value;
-        if (value is double)
-        {
-            double real = (double)value;
-            if (double.IsNaN(real) || double.IsInfinity(real) || real != Math.Floor(real))
-                throw new VireError("slice bounds must be whole numbers", 1);
-            if (real < int.MinValue || real > int.MaxValue) throw new VireError("slice bounds must be whole numbers", 1);
-            return (int)real;
-        }
-        throw new VireError("slice bounds must be whole numbers", 1);
+        if (value is bool || !(value is int)) throw new VireError("slice bounds must be whole numbers", line);
+        return (int)value;
     }
 
     static string SliceText(string value, int start, int end)
@@ -471,8 +496,21 @@ sealed class CompiledMachine
 
     object Builtin(string name, List<object> args, int line, int col)
     {
+        if (name == "start") return StartThread(args, line, col);
+        if (name == "wait")
+        {
+            if (args.Count != 1) throw new VireError("wait takes 1 values, got " + args.Count, line, col);
+            VireThreads.Wait(threads, args[0], line, col);
+            return 0;
+        }
+        if (name == "result")
+        {
+            if (args.Count != 1) throw new VireError("result takes 1 values, got " + args.Count, line, col);
+            return VireThreads.Result(threads, args[0], line, col);
+        }
         if (name == "args") return programArgs;
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        if (name == "ticks") return Machine.ClockTicks();
         if (name == "halt")
         {
             int code = 1;
@@ -511,8 +549,8 @@ sealed class CompiledMachine
         }
         if (name == "slice")
         {
-            int start = AsWhole(args[1]);
-            int end = AsWhole(args[2]);
+            int start = AsWhole(args[1], line);
+            int end = AsWhole(args[2], line);
             string text = args[0] as string;
             if (text != null) return SliceText(text, start, end);
             List<object> list = args[0] as List<object>;
@@ -528,6 +566,11 @@ sealed class CompiledMachine
         }
         if (name == "json") return Json.Write(args[0]);
         if (name == "seal") return VireSeal.Seal(args[0] as string ?? Show(args[0]));
+        if (name == "idiv")
+        {
+            if (args.Count != 2) throw new VireError("idiv takes 2 values, got " + args.Count, line, col);
+            return Program.WholeDiv(args[0], args[1], line, col);
+        }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {
@@ -890,6 +933,12 @@ sealed class CompiledMachine
             if (raw == null) throw new VireError(name + " needs text", line, col);
             return name == "lower" ? raw.ToLowerInvariant() : raw.ToUpperInvariant();
         }
+        if (name == "build")
+        {
+            if (args.Count != 2) throw new VireError("build takes 2 values, got " + args.Count, line, col);
+            return VireBuild.Compile(root, args[0], args[1], line, col);
+        }
+        if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "listen")
         {
             if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
@@ -964,6 +1013,12 @@ sealed class CompiledMachine
         if (name == "show")
         {
             if (title == null) throw new VireError("open a window before show", line, col);
+            if (Program.HeadlessDesktop())
+            {
+                Console.WriteLine(title);
+                foreach (string row in termLines) Console.WriteLine(row);
+                return 0;
+            }
             TermShow();
             return 0;
         }
@@ -1091,19 +1146,9 @@ sealed class CompiledMachine
         if (rel == null || rel.Length == 0)
             throw new VireError("files stay inside the program folder", line, col);
         string full = VirePaths.CombineUnder(root, rel, line, col);
-        if (!VirePaths.UnderWritableZone(root, full) && !RootIsDataOrSite())
-            throw new VireError("files stay in data or site", line, col);
-        if (RootIsDataOrSite() && !VirePaths.InFolder(root, full))
+        if (!VirePaths.UnderWritableZone(root, full))
             throw new VireError("files stay in data or site", line, col);
         return full;
-    }
-
-    bool RootIsDataOrSite()
-    {
-        string full = Path.GetFullPath(root);
-        string name = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        return name.Equals("data", StringComparison.OrdinalIgnoreCase) ||
-            name.Equals("site", StringComparison.OrdinalIgnoreCase);
     }
 
     static string Show(object value)

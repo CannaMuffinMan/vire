@@ -1,0 +1,29 @@
+define trim with raw
+  let n be length with raw
+  let start be 0
+  while start < n
+    if not ((raw at start) == " ")
+      stop
+    end
+    let start be start + 1
+  end
+  let finish be n
+  while finish > start
+    let prev be finish - 1
+    if not ((raw at prev) == " ")
+      stop
+    end
+    let finish be prev
+  end
+  return slice with raw, start, finish
+end
+
+define words with parts
+  let kept be []
+  for item in parts
+    if not (item == "")
+      push with kept, item
+    end
+  end
+  return join with kept, " "
+end

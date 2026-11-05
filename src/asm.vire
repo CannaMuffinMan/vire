@@ -16,35 +16,7 @@ define whole with n
 end
 
 define floorDiv with n, d
-  let q be 0
-  let rest be n
-  let acc be d
-  let bit be 1
-  let accs be []
-  let bits be []
-  while acc <= rest
-    push with accs, acc
-    push with bits, bit
-    if acc > 9007199254740992 - acc
-      stop
-    end
-    let next be acc + acc
-    if next <= acc
-      stop
-    end
-    let acc be next
-    let bit be bit + bit
-  end
-  let i be (length with accs) - 1
-  while i >= 0
-    let piece be accs at i
-    if piece <= rest
-      let rest be rest - piece
-      let q be q + (bits at i)
-    end
-    let i be i - 1
-  end
-  return whole with q
+  return idiv with n, d
 end
 
 define emitU8 with buf, n
@@ -52,44 +24,59 @@ define emitU8 with buf, n
   if x < 0
     let x be x + 256
   end
-  while x >= 256
-    let x be x - 256
+  if x >= 256
+    let x be x - ((floorDiv with x, 256) * 256)
   end
-  push with buf, (whole with x)
+  if x < 0
+    let x be 0
+  end
+  let buf be push with buf, x
   return buf
 end
 
 define emitU32 with buf, n
   let x be n
+  if x >= 0
+    if x < 256
+      let buf be push with buf, x
+      let buf be push with buf, 0
+      let buf be push with buf, 0
+      let buf be push with buf, 0
+      return buf
+    end
+  end
   if x < 0
-    let x be x + 4294967296
+    let x be x + 2147483647
+    let x be x + 2147483647
+    let x be x + 2
   end
   let i be 0
   while i < 4
-    let byte be x - ((floorDiv with x, 256) * 256)
+    let q be floorDiv with x, 256
+    let byte be x - (q * 256)
     if byte < 0
       let byte be 0
     end
-    push with buf, byte
-    let x be floorDiv with x, 256
+    let buf be push with buf, byte
+    let x be q
     let i be i + 1
   end
   return buf
 end
 
 define emitU64 with buf, n
-  emitU32 with buf, n
-  let high be floorDiv with n, 4294967296
-  if n < 0
-    let high be 0
+  let buf be emitU32 with buf, n
+  let high be 0
+  if n >= 4294967296
+    let high be floorDiv with n, 4294967296
   end
-  emitU32 with buf, high
+  let buf be emitU32 with buf, high
   return buf
 end
 
 define emitRel with buf, fixes, name
   let pos be length with buf
-  emitU32 with buf, 0
+  let buf be emitU32 with buf, 0
   push with fixes, {"at": pos, "to": name}
   return buf
 end
@@ -109,7 +96,9 @@ define patchRel with buf, labels, fixes
     let rel be dest - (pos + 4)
     let x be rel
     if x < 0
-      let x be x + 4294967296
+      let x be x + 2147483647
+      let x be x + 2147483647
+      let x be x + 2
     end
     let b0 be 0
     let k be 0
@@ -125,27 +114,37 @@ define patchRel with buf, labels, fixes
   return buf
 end
 
-define hexByte with n
-  let digits be "0123456789abcdef"
-  let x be n
-  while x >= 256
-    let x be x - 256
+define hexPairs
+  return ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "1a", "1b", "1c", "1d", "1e", "1f", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "3a", "3b", "3c", "3d", "3e", "3f", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "4a", "4b", "4c", "4d", "4e", "4f", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "5a", "5b", "5c", "5d", "5e", "5f", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b", "7c", "7d", "7e", "7f", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "8a", "8b", "8c", "8d", "8e", "8f", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "9a", "9b", "9c", "9d", "9e", "9f", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "aa", "ab", "ac", "ad", "ae", "af", "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "ba", "bb", "bc", "bd", "be", "bf", "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "ca", "cb", "cc", "cd", "ce", "cf", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "da", "db", "dc", "dd", "de", "df", "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef", "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff"]
+end
+
+define hexIndex with n
+  let raw be text with n
+  let dot be find with raw, "."
+  if dot >= 0
+    let raw be slice with raw, 0, dot
   end
+  if raw == "" or raw == "-"
+    return 0
+  end
+  let x be number with raw
   if x < 0
-    let x be 0
+    return 0
   end
-  let hi be floorDiv with x, 16
-  let lo be whole with (x - (hi * 16))
-  return (digits at hi) + (digits at lo)
+  if x >= 256
+    let x be x - ((floorDiv with x, 256) * 256)
+  end
+  return x
 end
 
 define hexOf with buf
-  let out be ""
+  let pairs be hexPairs
+  let parts be []
   let i be 0
   let n be length with buf
   while i < n
-    let out be out + (hexByte with (buf at i))
+    push with parts, (pairs at (hexIndex with (buf at i)))
     let i be i + 1
   end
-  return out
+  return join with parts, ""
 end

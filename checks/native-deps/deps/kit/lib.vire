@@ -1,0 +1,3 @@
+define kitWord
+  return "from need"
+end

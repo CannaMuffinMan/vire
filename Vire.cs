@@ -123,6 +123,10 @@ sealed class Budget
 {
     public int Steps;
     public int MaxSteps = 1000000;
+    // Source statements and compiled ops are charged in batches. Builtins are not.
+    // While passes stay 1:1 so an empty loop still stops at the step cap.
+    public const int StepBatch = 64;
+    public int Pending;
     public int Calls;
     public int MaxCalls = 64;
     public int WhilePasses;
@@ -161,25 +165,186 @@ sealed class Budget
     }
 }
 
+// Memory rule: start copies its argument onto the worker. The worker has its own
+// environment and its own step budget (same cap, not a higher one). Only the thread
+// that called start may wait, and only that thread may read result, and only after
+// wait. Lists and maps are not shared with the worker. File, network, and ask/stdin
+// builtins stay process-global; two threads using the same path or stdin can race.
+sealed class VireJob
+{
+    public int Id;
+    public int OwnerId;
+    public object Result;
+    public Exception Error;
+    public bool Finished;
+    public bool Joined;
+    public readonly object Gate = new object();
+}
+
+sealed class VireThreadTable
+{
+    public readonly object Gate = new object();
+    public readonly Dictionary<int, VireJob> Jobs = new Dictionary<int, VireJob>();
+    public int Next = 1;
+}
+
+static class VireThreads
+{
+    public const int MaxLive = 8;
+    static int live;
+    public static readonly object SayLock = new object();
+
+    public static void Say(string text)
+    {
+        lock (SayLock) Console.WriteLine(text);
+    }
+
+    public static object Copy(object value)
+    {
+        return Copy(value, 0);
+    }
+
+    static object Copy(object value, int depth)
+    {
+        if (value == null || value is string || value is int || value is double || value is bool) return value;
+        if (depth > 64) throw new VireError("that value cannot cross a thread", 1);
+        List<object> list = value as List<object>;
+        if (list != null)
+        {
+            if (list.Count > 100000) throw new VireError("list is too large", 1);
+            List<object> next = new List<object>();
+            foreach (object item in list) next.Add(Copy(item, depth + 1));
+            return next;
+        }
+        Dictionary<string, object> map = value as Dictionary<string, object>;
+        if (map != null)
+        {
+            if (map.Count > 100000) throw new VireError("map is too large", 1);
+            Dictionary<string, object> next = new Dictionary<string, object>();
+            foreach (KeyValuePair<string, object> pair in map) next[pair.Key] = Copy(pair.Value, depth + 1);
+            return next;
+        }
+        throw new VireError("that value cannot cross a thread", 1);
+    }
+
+    public static int Start(VireThreadTable table, int ownerId, Action<VireJob> body, int line)
+    {
+        if (Interlocked.Increment(ref live) > MaxLive)
+        {
+            Interlocked.Decrement(ref live);
+            throw new VireError("too many threads", line);
+        }
+        VireJob job = new VireJob();
+        job.OwnerId = ownerId;
+        lock (table.Gate)
+        {
+            job.Id = table.Next++;
+            table.Jobs[job.Id] = job;
+        }
+        Thread thread = new Thread(delegate ()
+        {
+            try { body(job); }
+            catch (Exception ex)
+            {
+                lock (job.Gate) job.Error = ex;
+            }
+            finally
+            {
+                lock (job.Gate)
+                {
+                    job.Finished = true;
+                    Monitor.PulseAll(job.Gate);
+                }
+                Interlocked.Decrement(ref live);
+            }
+        });
+        thread.IsBackground = true;
+        try { thread.Start(); }
+        catch (Exception)
+        {
+            lock (table.Gate) table.Jobs.Remove(job.Id);
+            Interlocked.Decrement(ref live);
+            throw new VireError("could not start a thread", line);
+        }
+        return job.Id;
+    }
+
+    public static void Wait(VireThreadTable table, object handle, int line, int col)
+    {
+        VireJob job = Find(table, handle, line, col);
+        if (Thread.CurrentThread.ManagedThreadId != job.OwnerId)
+            throw new VireError("only the thread that started it can wait", line, col);
+        lock (job.Gate)
+        {
+            if (job.Joined) throw new VireError("that thread was already joined", line, col);
+            while (!job.Finished) Monitor.Wait(job.Gate);
+            job.Joined = true;
+            if (job.Error is HaltSignal) throw job.Error;
+            if (job.Error is VireError) throw job.Error;
+            if (job.Error != null) throw new VireError("thread failed", line, col);
+        }
+    }
+
+    public static object Result(VireThreadTable table, object handle, int line, int col)
+    {
+        VireJob job = Find(table, handle, line, col);
+        if (Thread.CurrentThread.ManagedThreadId != job.OwnerId)
+            throw new VireError("only the thread that started it can read the result", line, col);
+        lock (job.Gate)
+        {
+            if (!job.Joined) throw new VireError("join before reading the thread", line, col);
+            if (job.Error is HaltSignal) throw job.Error;
+            if (job.Error is VireError) throw job.Error;
+            if (job.Error != null) throw new VireError("thread failed", line, col);
+            return job.Result;
+        }
+    }
+
+    static VireJob Find(VireThreadTable table, object handle, int line, int col)
+    {
+        if (!(handle is int)) throw new VireError("a thread handle must be a whole number", line, col);
+        VireJob job;
+        lock (table.Gate)
+        {
+            if (!table.Jobs.TryGetValue((int)handle, out job))
+                throw new VireError("there is no thread by that number", line, col);
+        }
+        return job;
+    }
+}
+
 static class ListenHooks
 {
     internal static Exception RouteException;
     internal static readonly object ChainRouteLock = new object();
+    internal static bool OverrideEnv;
+    internal static string BindMode;
+    internal static string Token;
 
     internal static void Reset()
     {
         RouteException = null;
+        OverrideEnv = false;
+        BindMode = null;
+        Token = null;
     }
 }
 
 sealed class Machine
 {
     const int MaxItems = 100000;
+    int itemCap = 100000;
     const int MaxText = 1000000;
     internal Budget budget = new Budget();
     List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
     string root;
+    string sourceFile;
+    bool traceChecked;
+    bool traceOn;
+    bool traceStopped;
+    int traceLines;
+    string tracePath;
     int depth;
     int nextTop = 16;
     int nextLeft = 16;
@@ -205,14 +370,16 @@ sealed class Machine
     string watchName;
     int watchLine;
     internal int ListenPort;
+    VireThreadTable threads = new VireThreadTable();
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
-        "files", "json", "parse", "now", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
+        "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt"
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv",
+        "start", "wait", "result"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -221,7 +388,18 @@ sealed class Machine
         this.root = Path.GetFullPath(root);
     }
 
-    public void Run() { Call("main", new List<object>(), 1); }
+    public void Run()
+    {
+        VireDebug.Reset(root);
+        Call("main", new List<object>(), 1);
+    }
+
+    public void UseSource(string path) { sourceFile = path; }
+
+    public void UseCompilerLimits()
+    {
+        itemCap = 1000000;
+    }
 
     public void UseBudget(int limit)
     {
@@ -256,8 +434,10 @@ sealed class Machine
     void Step(int line)
     {
         if (budget.DeadlinePassed()) throw new VireError("request ran too long", line);
-        budget.Steps = System.Threading.Interlocked.Increment(ref budget.Steps);
-        if (budget.Steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        int pending = System.Threading.Interlocked.Increment(ref budget.Pending);
+        if (pending % Budget.StepBatch != 0) return;
+        int steps = System.Threading.Interlocked.Increment(ref budget.Steps);
+        if (steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
     }
 
     string SafePath(object text, int line)
@@ -286,6 +466,10 @@ sealed class Machine
         Func func = funcs[name];
         if (args.Count != func.Params.Count)
             throw new VireError(name + " takes " + func.Params.Count + " values, got " + args.Count, line, col);
+        NoteCall(name, line);
+        string inspected = InspectArgs(args);
+        VireInspect.Record(root, name, line, inspected);
+        VireDebug.Break(root, name, line, inspected);
         budget.Calls++;
         try
         {
@@ -299,17 +483,117 @@ sealed class Machine
         finally { budget.Calls--; }
     }
 
+    int StartThread(List<object> args, int line, int col)
+    {
+        string name = args[0] as string;
+        if (name == null || Builtins.Contains(name) || !funcs.ContainsKey(name))
+            throw new VireError("there is no definition named " + Show(args[0]), line, col);
+        Func func = funcs[name];
+        int given = args.Count - 1;
+        if (func.Params.Count != given)
+            throw new VireError(name + " takes " + func.Params.Count + " values, got " + given, line, col);
+        object arg = given == 1 ? VireThreads.Copy(args[1]) : null;
+        int steps = budget.MaxSteps;
+        int cap = itemCap;
+        List<object> argsCopy = new List<object>();
+        foreach (object item in programArgs) argsCopy.Add(VireThreads.Copy(item));
+        return VireThreads.Start(threads, Thread.CurrentThread.ManagedThreadId, delegate (VireJob job)
+        {
+            Machine child = new Machine(funcs, root);
+            child.itemCap = cap;
+            child.UseBudget(steps);
+            child.UseArgs(argsCopy);
+            child.UseSource(sourceFile);
+            List<object> callArgs = new List<object>();
+            if (given == 1) callArgs.Add(arg);
+            object value = child.Call(name, callArgs, line, col);
+            lock (job.Gate) job.Result = VireThreads.Copy(value);
+        }, line);
+    }
+
+    static string InspectArgs(List<object> args)
+    {
+        if (args == null || args.Count == 0) return "";
+        string text = "";
+        for (int i = 0; i < args.Count && text.Length < 160; i++)
+        {
+            if (i > 0) text += " ";
+            if (args[i] is int) text += ((int)args[i]).ToString();
+            else if (args[i] is string)
+            {
+                string s = (string)args[i];
+                if (s.IndexOf('\n') >= 0 || s.IndexOf('\r') >= 0) continue;
+                if (s.Length > 40) s = s.Substring(0, 40);
+                text += s;
+            }
+        }
+        return text;
+    }
+
+    void NoteCall(string name, int line)
+    {
+        if (traceStopped) return;
+        if (!traceChecked)
+        {
+            traceChecked = true;
+            if (Environment.GetEnvironmentVariable("VIRE_TRACE") != "1") return;
+            try
+            {
+                tracePath = VirePaths.DataOrSite(root, "data/trace.txt", 1);
+                string dir = Path.GetDirectoryName(tracePath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                VirePaths.RefuseFileReparse(tracePath, root, 1, 1);
+                if (!VirePaths.UnderWritableZone(root, Path.GetFullPath(tracePath))) return;
+                traceOn = true;
+            }
+            catch (VireError) { return; }
+            catch (IOException) { return; }
+            catch (UnauthorizedAccessException) { return; }
+        }
+        if (!traceOn) return;
+        if (traceLines >= 1000)
+        {
+            traceStopped = true;
+            return;
+        }
+        try
+        {
+            string text = "call " + name + " line " + line + "\n";
+            if (traceLines == 0) File.WriteAllText(tracePath, text);
+            else File.AppendAllText(tracePath, text);
+            traceLines++;
+        }
+        catch (IOException) { traceStopped = true; }
+        catch (UnauthorizedAccessException) { traceStopped = true; }
+    }
+
     object Builtin(string name, List<object> args, int line)
     {
         return Builtin(name, args, line, 1);
     }
 
+    // TickCount64 can exceed int. Saturate so ticks stays a positive whole number and does not wrap backwards.
+    internal static int ClockTicks()
+    {
+        long raw = Environment.TickCount64;
+        if (raw < 1) return 1;
+        if (raw > int.MaxValue) return int.MaxValue;
+        return (int)raw;
+    }
+
     object Builtin(string name, List<object> args, int line, int col)
     {
-        Step(line);
         int need = 1;
-        if (name == "now" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post") need = 2;
+        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
+        if (name == "wait" || name == "result") need = 1;
+        if (name == "start")
+        {
+            if (args.Count < 1 || args.Count > 2)
+                throw new VireError("start takes a definition name and at most one value", line, col);
+            need = args.Count;
+        }
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv") need = 2;
+        if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
@@ -327,7 +611,7 @@ sealed class Machine
         {
             List<object> list = args[0] as List<object>;
             if (list == null) throw new VireError("push needs a list", line, col);
-            if (list.Count >= MaxItems) throw new VireError("list is too large", line, col);
+            if (list.Count >= itemCap) throw new VireError("list is too large", line, col);
             list.Add(args[1]);
             return list;
         }
@@ -409,6 +693,12 @@ sealed class Machine
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
         if (name == "kind") return KindOf(args[0]);
+        if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
+        if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
+        if (name == "idiv") return Program.WholeDiv(args[0], args[1], line, col);
+        if (name == "start") return StartThread(args, line, col);
+        if (name == "wait") { VireThreads.Wait(threads, args[0], line, col); return 0; }
+        if (name == "result") return VireThreads.Result(threads, args[0], line, col);
         if (name == "hash")
         {
             string raw = args[0] as string;
@@ -561,6 +851,7 @@ sealed class Machine
             return Json.Read(raw, line);
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        if (name == "ticks") return ClockTicks();
         if (name == "fetch")
         {
             string url = args[0] as string;
@@ -694,6 +985,11 @@ sealed class Machine
         if (name == "show")
         {
             if (title == null) throw new VireError("open a window before show", line, col);
+            if (Program.HeadlessDesktop())
+            {
+                HeadlessShow();
+                return 0;
+            }
             if (desk) TermShow();
 #if WINDOWS
             else Application.Run(form);
@@ -807,6 +1103,7 @@ sealed class Machine
         termActions = new List<string>();
         termOps = new List<Stroke>();
         termSheet = false;
+        if (Program.HeadlessDesktop()) desk = true;
         if (desk) return;
 #if WINDOWS
         form = new Form();
@@ -995,6 +1292,12 @@ sealed class Machine
         return list;
     }
 
+    void HeadlessShow()
+    {
+        Console.WriteLine(title);
+        foreach (string row in termLines) Console.WriteLine(row);
+    }
+
     void TermShow()
     {
         while (true)
@@ -1113,6 +1416,7 @@ sealed class Machine
 
     void ExecStmt(object[] stmt, Env env)
     {
+        VireDebug.Gate(root, sourceFile, NodeLine(stmt), env);
         Step(0);
         string kind = (string)stmt[0];
         if (kind == "let")
@@ -1128,7 +1432,7 @@ sealed class Machine
         }
         if (kind == "say")
         {
-            Console.WriteLine(Show(Eval(stmt[1], env)));
+            VireThreads.Say(Show(Eval(stmt[1], env)));
             return;
         }
         if (kind == "return") throw new ReturnSignal(Eval(stmt[1], env));
@@ -1248,7 +1552,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "ticks"))
                 return Builtin(name, new List<object>(), line, col);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), line, col);
@@ -2268,31 +2572,94 @@ internal static class HttpWire
         return -1;
     }
 
+    public static bool HeaderBytesUnsafe(byte[] buffer, int headerEnd)
+    {
+        if (buffer == null || headerEnd < 0) return true;
+        if (headerEnd > buffer.Length) headerEnd = buffer.Length;
+        for (int i = 0; i < headerEnd; i++)
+        {
+            byte b = buffer[i];
+            if (b == 0) return true;
+            if (b == (byte)'\n')
+            {
+                if (i == 0 || buffer[i - 1] != (byte)'\r') return true;
+            }
+            else if (b == (byte)'\r')
+            {
+                if (i + 1 >= headerEnd || buffer[i + 1] != (byte)'\n') return true;
+            }
+            else if (b < 32 && b != (byte)'\t') return true;
+        }
+        return false;
+    }
+
     public static int ContentLengthOf(string head)
     {
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-        for (int i = 1; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-            {
-                int value;
-                if (!int.TryParse(lines[i].Substring(15).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) || value < 0) return -2;
-                return value;
-            }
-        }
-        return -1;
+        int found = -1;
+        int shape = ScanHeaders(head, ref found);
+        if (shape == -4) return -2;
+        if (shape < 0) return shape;
+        return found;
     }
 
     public static bool HasChunked(string head)
     {
+        int ignored = -1;
+        return ScanHeaders(head, ref ignored) == -4;
+    }
+
+    static int ScanHeaders(string head, ref int contentLength)
+    {
+        contentLength = -1;
+        if (head == null) return -2;
         string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        bool sawLength = false;
         for (int i = 1; i < lines.Length; i++)
         {
-            if (lines[i].StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) &&
-                lines[i].IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
+            string line = lines[i];
+            if (line.Length == 0) continue;
+            if (line[0] == ' ' || line[0] == '\t') return -2;
+            int colon = line.IndexOf(':');
+            if (colon <= 0) return -2;
+            string name = line.Substring(0, colon).Trim(' ', '\t');
+            if (name.Length == 0 || name.IndexOf(' ') >= 0 || name.IndexOf('\t') >= 0) return -2;
+            string value = line.Substring(colon + 1);
+            if (string.Equals(name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+                return -4;
+            if (string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase))
+            {
+                int parsed;
+                int kind = DigitsOnlyLength(value, out parsed);
+                if (kind < 0) return kind;
+                if (sawLength) return -2;
+                sawLength = true;
+                contentLength = parsed;
+            }
         }
-        return false;
+        return 0;
+    }
+
+    static int DigitsOnlyLength(string raw, out int value)
+    {
+        value = 0;
+        if (raw == null) return -2;
+        int i = 0;
+        while (i < raw.Length && (raw[i] == ' ' || raw[i] == '\t')) i++;
+        int end = raw.Length;
+        while (end > i && (raw[end - 1] == ' ' || raw[end - 1] == '\t')) end--;
+        if (end <= i) return -2;
+        if (raw[i] == '0' && end - i > 1) return -2;
+        long acc = 0;
+        for (int p = i; p < end; p++)
+        {
+            char ch = raw[p];
+            if (ch < '0' || ch > '9') return -2;
+            acc = acc * 10 + (ch - '0');
+            if (acc > int.MaxValue) return -2;
+        }
+        if (acc > MaxRequestBody) return -3;
+        value = (int)acc;
+        return 0;
     }
 
     public static Result ParseHeaders(byte[] buffer, int got)
@@ -2309,6 +2676,11 @@ internal static class HttpWire
         if (headerEnd < 0)
         {
             Fail(result, got >= MaxHeaderBlock ? 431 : 408, got >= MaxHeaderBlock ? "headers too large" : "timeout");
+            return result;
+        }
+        if (HeaderBytesUnsafe(buffer, headerEnd))
+        {
+            Fail(result, 400, "bad request");
             return result;
         }
         int lineEnd = -1;
@@ -2356,6 +2728,11 @@ internal static class HttpWire
             return result;
         }
         int contentLength = ContentLengthOf(head);
+        if (contentLength == -3)
+        {
+            Fail(result, 413, "body too large");
+            return result;
+        }
         if (contentLength == -2)
         {
             Fail(result, 400, "bad request");
@@ -2390,12 +2767,13 @@ internal static class HttpWire
     {
         if (headers == null || headers.Status != 0) return headers;
         Result result = headers;
-        int need = result.BodyAt + result.ContentLength;
-        if (need < result.BodyAt || need > buffer.Length)
+        long need64 = (long)result.BodyAt + result.ContentLength;
+        if (result.ContentLength < 0 || need64 < result.BodyAt || need64 > buffer.Length || need64 > int.MaxValue)
         {
             Fail(result, 413, "body too large");
             return result;
         }
+        int need = (int)need64;
         if (got < need)
         {
             Fail(result, 408, "timeout");
@@ -2428,6 +2806,30 @@ internal static class HttpWire
 
 sealed class Program
 {
+    internal static int WholeDiv(object left, object right, int line, int col)
+    {
+        double num;
+        double den;
+        if (!AsReal(left, out num) || !AsReal(right, out den)) throw new VireError("idiv needs numbers", line, col);
+        if (den == 0 || num < 0) return 0;
+        double quote = Math.Floor(num / den);
+        if (quote > int.MaxValue) return int.MaxValue;
+        return (int)quote;
+    }
+
+    static bool AsReal(object value, out double real)
+    {
+        real = 0;
+        if (value is int) { real = (int)value; return true; }
+        if (value is double) { real = (double)value; return true; }
+        return false;
+    }
+
+    internal static bool HeadlessDesktop()
+    {
+        return Environment.GetEnvironmentVariable("VIRE_HEADLESS") == "1";
+    }
+
     public static void RunFile(string program, string folder)
     {
         RunFile(program, folder, null);
@@ -2438,17 +2840,24 @@ sealed class Program
         Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
         if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
         Machine machine = new Machine(funcs, folder);
+        machine.UseSource(program);
         if (budget != null) machine.UseShared(budget);
         machine.Run();
     }
 
     internal static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
     {
+        return Load(program, folder, seen, new int[1]);
+    }
+
+    static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen, int[] loaded)
+    {
         string full = Path.GetFullPath(program);
         if (!full.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
             throw new VireError("vire only runs .vire files", 1);
         if (seen.Contains(full)) throw new VireError("use went in a circle at " + Path.GetFileName(full), 1);
-        if (seen.Count > 32) throw new VireError("too many files were used", 1);
+        if (loaded[0] >= 32) throw new VireError("too many files were used", 1);
+        loaded[0]++;
         seen.Add(full);
         try
         {
@@ -2459,24 +2868,52 @@ sealed class Program
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
-        Unit unit = new Parser(Lexer.Tokenize(File.ReadAllText(full))).Parse();
+        string text;
+        try { text = File.ReadAllText(full); }
+        catch (IOException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
+        catch (UnauthorizedAccessException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
+        return LoadText(full, text, folder, seen, loaded);
+        }
+        finally { seen.Remove(full); }
+    }
+
+    static Dictionary<string, Func> LoadText(string full, string text, string folder, HashSet<string> seen, int[] loaded)
+    {
+        try
+        {
+        Unit unit = new Parser(Lexer.Tokenize(text)).Parse();
         foreach (string used in unit.Uses)
         {
             string next = VirePaths.UseFile(folder, used, 1);
-            Dictionary<string, Func> imported = Load(next, folder, seen);
+            Dictionary<string, Func> imported = Load(next, folder, seen, loaded);
             Merge(unit, imported);
         }
         foreach (string package in unit.Needs)
         {
             if (!IsPackage(package))
                 throw new VireError("package names are plain words", 1);
+            string locked = LockedHash(folder, package);
             string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
-            Merge(unit, Load(next, folder, seen));
+            VirePaths.RefuseFileReparse(next, folder, 1, 1);
+            string body;
+            try { body = File.ReadAllText(next); }
+            catch (IOException) { throw new VireError("could not read lib.vire", 1); }
+            catch (UnauthorizedAccessException) { throw new VireError("could not read lib.vire", 1); }
+            if (!VirePaths.LockHexEqual(VireSeal.HashText(body), locked))
+                throw new VireError("deps.lock does not match " + package, 1);
+            if (seen.Contains(next)) throw new VireError("use went in a circle at " + Path.GetFileName(next), 1);
+            if (loaded[0] >= 32) throw new VireError("too many files were used", 1);
+            loaded[0]++;
+            seen.Add(next);
+            Merge(unit, LoadText(next, body, folder, seen, loaded));
         }
         return unit.Funcs;
         }
         finally { seen.Remove(full); }
     }
+
+    public const int ProgramStepCap = 5000000;
+    public const int CompilerStepCap = 50000000;
 
     public static int BudgetOf(string source)
     {
@@ -2485,44 +2922,124 @@ sealed class Program
         if (!string.IsNullOrWhiteSpace(chosen))
         {
             int value;
-            if (!int.TryParse(chosen.Trim(), out value) || value < 1 || value > 5000000)
+            if (!int.TryParse(chosen.Trim(), out value) || value < 1 || value > ProgramStepCap)
                 throw new VireError("VIRE_BUDGET must be from 1 to 5000000", 1);
             budget = value;
         }
         return budget;
     }
 
+    public static int BudgetFor(string program)
+    {
+        if (IsCompilerProgram(program)) return CompilerStepCap;
+        return BudgetOf(File.ReadAllText(program));
+    }
+
+    static bool IsCompilerProgram(string program)
+    {
+        string name = Path.GetFileName(program);
+        if (!name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
+            && !name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
+            return false;
+        string text;
+        try { text = File.ReadAllText(program); }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        return text.Contains("define main") && (text.Contains("emitU8") || text.Contains("compileUnit"));
+    }
+
     public static bool HeaderTokenMatches(string head, string expected)
     {
         if (string.IsNullOrEmpty(expected) || expected.Length < 16) return false;
         string provided = "";
-        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        int hits = 0;
+        string[] lines = head == null ? new string[0] : head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
         for (int i = 1; i < lines.Length; i++)
         {
-            if (lines[i].StartsWith("X-FCG-Token:", StringComparison.OrdinalIgnoreCase))
-            {
-                provided = lines[i].Substring(12).Trim();
-                break;
-            }
+            string line = lines[i];
+            int colon = line.IndexOf(':');
+            if (colon <= 0) continue;
+            string name = line.Substring(0, colon).Trim(' ', '\t');
+            if (!string.Equals(name, "X-FCG-Token", StringComparison.OrdinalIgnoreCase)) continue;
+            hits++;
+            provided = line.Substring(colon + 1).Trim(' ', '\t');
         }
-        byte[] left;
-        byte[] right;
-        using (SHA256 sha = SHA256.Create())
-        {
-            left = sha.ComputeHash(Encoding.UTF8.GetBytes(provided));
-            right = sha.ComputeHash(Encoding.UTF8.GetBytes(expected));
-        }
-        int diff = 0;
-        for (int i = 0; i < left.Length; i++) diff |= left[i] ^ right[i];
+        byte[] left = new byte[256];
+        byte[] right = new byte[256];
+        byte[] given = Encoding.UTF8.GetBytes(provided ?? "");
+        byte[] want = Encoding.UTF8.GetBytes(expected);
+        int copyGiven = given.Length > left.Length ? left.Length : given.Length;
+        int copyWant = want.Length > right.Length ? right.Length : want.Length;
+        Buffer.BlockCopy(given, 0, left, 0, copyGiven);
+        Buffer.BlockCopy(want, 0, right, 0, copyWant);
+        int diff = hits == 1 ? 0 : 1;
+        diff |= given.Length ^ want.Length;
+        diff |= CryptographicOperations.FixedTimeEquals(left, right) ? 0 : 1;
         return diff == 0;
     }
 
     static bool IsPackage(string name)
     {
         if (name.Length == 0) return false;
-        foreach (char ch in name)
-            if (!char.IsLetterOrDigit(ch) && ch != '_') return false;
+        for (int i = 0; i < name.Length; i++)
+        {
+            char ch = name[i];
+            if (ch >= '0' && ch <= '9') continue;
+            if (ch >= 'A' && ch <= 'Z') continue;
+            if (ch >= 'a' && ch <= 'z') continue;
+            if (ch == '_') continue;
+            return false;
+        }
         return true;
+    }
+
+    static bool IsLockHex(string hex)
+    {
+        if (hex == null || hex.Length != 64) return false;
+        for (int i = 0; i < hex.Length; i++)
+        {
+            char ch = hex[i];
+            if (ch >= '0' && ch <= '9') continue;
+            if (ch >= 'a' && ch <= 'f') continue;
+            return false;
+        }
+        return true;
+    }
+
+    static string LockedHash(string folder, string package)
+    {
+        Dictionary<string, string> map = ReadDepsLock(folder);
+        string hex;
+        if (!map.TryGetValue(package, out hex))
+            throw new VireError("deps.lock does not name " + package, 1);
+        return hex;
+    }
+
+    static Dictionary<string, string> ReadDepsLock(string folder)
+    {
+        string path = Path.Combine(folder, "deps.lock");
+        VirePaths.RefuseFileReparse(path, folder, 1, 1);
+        if (!File.Exists(path)) throw new VireError("deps.lock is required", 1);
+        string text;
+        try { text = File.ReadAllText(path); }
+        catch (IOException) { throw new VireError("deps.lock is required", 1); }
+        catch (UnauthorizedAccessException) { throw new VireError("deps.lock is required", 1); }
+        Dictionary<string, string> map = new Dictionary<string, string>();
+        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (line.Length == 0) continue;
+            int space = line.IndexOf(' ');
+            if (space <= 0 || line.IndexOf(' ', space + 1) >= 0)
+                throw new VireError("deps.lock is damaged", 1);
+            string name = line.Substring(0, space);
+            string hex = line.Substring(space + 1);
+            if (!IsPackage(name) || !IsLockHex(hex) || map.ContainsKey(name))
+                throw new VireError("deps.lock is damaged", 1);
+            map[name] = hex;
+        }
+        return map;
     }
 
     static void Merge(Unit unit, Dictionary<string, Func> imported)
@@ -2646,11 +3163,13 @@ sealed class Program
             }
             string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
-            int budget = BudgetOf(File.ReadAllText(program));
+            int budget = BudgetFor(program);
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
+            machine.UseSource(program);
             machine.UseBudget(budget);
+            if (IsCompilerProgram(program)) machine.UseCompilerLimits();
             List<object> extra = new List<object>();
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);

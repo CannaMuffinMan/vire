@@ -41,9 +41,21 @@ static class VireSeal
     public static void LoadFromFile(string path, string programFolder)
     {
         if (string.IsNullOrEmpty(path)) throw new VireError(NeedKey, 1);
+        if (VirePaths.HasStreamOrDevice(path))
+            throw new VireError("the seal key path is not allowed", 1);
         string full = Path.GetFullPath(path);
+        if (VirePaths.HasStreamOrDevice(full))
+            throw new VireError("the seal key path is not allowed", 1);
         if (!string.IsNullOrEmpty(programFolder) && VirePaths.InFolder(programFolder, full))
             throw new VireError("the seal key file must stay outside the program folder", 1);
+        try
+        {
+            if ((File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0)
+                throw new VireError("the seal key file must stay outside the program folder", 1);
+        }
+        catch (VireError) { throw; }
+        catch (IOException) { throw new VireError("could not read the seal key file", 1); }
+        catch (UnauthorizedAccessException) { throw new VireError("could not read the seal key file", 1); }
         byte[] data;
         try { data = File.ReadAllBytes(full); }
         catch (IOException) { throw new VireError("could not read the seal key file", 1); }
@@ -92,7 +104,28 @@ static class VireSeal
             Console.Error.WriteLine("usage: vire keygen --out <path>");
             return 2;
         }
-        string full = Path.GetFullPath(path);
+        if (VirePaths.HasStreamOrDevice(path))
+        {
+            Console.Error.WriteLine("the seal key path is not allowed");
+            return 2;
+        }
+        string full;
+        try { full = Path.GetFullPath(path); }
+        catch (ArgumentException)
+        {
+            Console.Error.WriteLine("the seal key path is not allowed");
+            return 2;
+        }
+        catch (NotSupportedException)
+        {
+            Console.Error.WriteLine("the seal key path is not allowed");
+            return 2;
+        }
+        if (VirePaths.HasStreamOrDevice(full))
+        {
+            Console.Error.WriteLine("the seal key path is not allowed");
+            return 2;
+        }
         byte[] material = RandomNumberGenerator.GetBytes(KeySize);
         try
         {

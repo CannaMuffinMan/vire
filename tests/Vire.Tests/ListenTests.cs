@@ -289,6 +289,11 @@ sealed class ListenHost : IDisposable
 
     public static ListenHost Start(string source)
     {
+        return Start(source, 0);
+    }
+
+    public static ListenHost Start(string source, int port)
+    {
         ListenHost host = new ListenHost();
         host.folder = Path.Combine(Path.GetTempPath(), "vire-listen-" + Guid.NewGuid().ToString("N"));
         host.Folder = host.folder;
@@ -300,7 +305,8 @@ sealed class ListenHost : IDisposable
         Machine machine = new Machine(funcs, host.folder);
         machine.UseBudget(5000000);
         host.cts = new CancellationTokenSource();
-        host.thread = new Thread(() => machine.ListenCore(0, 1, host.cts.Token));
+        if (port != 0) PortGuard.AssertAllowedPort(port);
+        host.thread = new Thread(() => machine.ListenCore(port, 1, host.cts.Token));
         host.thread.IsBackground = true;
         host.thread.Start();
         DateTime until = DateTime.UtcNow.AddSeconds(5);

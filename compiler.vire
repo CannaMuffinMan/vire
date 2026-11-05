@@ -139,6 +139,183 @@ define joinRel with dir, rel
   return dir + "/" + rel
 end
 
+define useRefused with rel
+  let raw be replace with rel, "\\", "/"
+  let low be lower with raw
+  if not (ends with low, ".vire")
+    say "use stays inside the program folder and only opens .vire files"
+    return true
+  end
+  let parts be split with raw, "/"
+  let i be 0
+  while i < (length with parts)
+    let part be parts at i
+    if part == ".."
+      say "files stay inside the program folder"
+      return true
+    end
+    if part == "."
+      say "files stay inside the program folder"
+      return true
+    end
+    let i be i + 1
+  end
+  if low == "data"
+    say "use stays out of data and site"
+    return true
+  end
+  if low == "site"
+    say "use stays out of data and site"
+    return true
+  end
+  if begins with low, "data/"
+    say "use stays out of data and site"
+    return true
+  end
+  if begins with low, "site/"
+    say "use stays out of data and site"
+    return true
+  end
+  return false
+end
+
+define lowerPath with text
+  return lower with (replace with text, "\\", "/")
+end
+
+define underZone with folder, path
+  let base be lowerPath with folder
+  let full be lowerPath with path
+  if not (begins with full, base)
+    return false
+  end
+  let rest be slice with full, (length with base), (length with full)
+  if begins with rest, "/"
+    let rest be slice with rest, 1, (length with rest)
+  end
+  if rest == "data" or (begins with rest, "data/")
+    return true
+  end
+  if rest == "site" or (begins with rest, "site/")
+    return true
+  end
+  return false
+end
+
+define stripEnd with text, ch
+  if (length with text) == 0
+    return text
+  end
+  let n be (length with text) - 1
+  if (text at n) == ch
+    return slice with text, 0, n
+  end
+  return text
+end
+
+define sameHex with left, right
+  let diff be 0
+  if not ((length with left) == 64)
+    let diff be 1
+  end
+  if not ((length with right) == 64)
+    let diff be 1
+  end
+  let i be 0
+  while i < 64
+    let a be ""
+    let b be ""
+    if i < (length with left)
+      let a be left at i
+    end
+    if i < (length with right)
+      let b be right at i
+    end
+    if not (a == b)
+      let diff be 1
+    end
+    let i be i + 1
+  end
+  return diff == 0
+end
+
+define isHex64 with text
+  if not ((length with text) == 64)
+    return false
+  end
+  let i be 0
+  while i < 64
+    let ch be text at i
+    if (find with "0123456789abcdef", ch) < 0
+      return false
+    end
+    let i be i + 1
+  end
+  return true
+end
+
+define parseLock with text, state
+  let map be {}
+  let lines be split with text, "\n"
+  let i be 0
+  while i < (length with lines)
+    let line be stripEnd with (lines at i), "\r"
+    if not (line == "")
+      let parts be split with line, " "
+      if not ((length with parts) == 2)
+        say "deps.lock is damaged"
+        put true into state at "bad"
+        return map
+      end
+      let name be parts at 0
+      let hex be parts at 1
+      if not (isPackage with name)
+        say "deps.lock is damaged"
+        put true into state at "bad"
+        return map
+      end
+      if not (isHex64 with hex)
+        say "deps.lock is damaged"
+        put true into state at "bad"
+        return map
+      end
+      if has with map, name
+        say "deps.lock is damaged"
+        put true into state at "bad"
+        return map
+      end
+      put hex into map at name
+    end
+    let i be i + 1
+  end
+  return map
+end
+
+define lockReady with state
+  if has with state, "lock"
+    return true
+  end
+  let path be joinRel with (state at "root"), "deps.lock"
+  let text be ""
+  let missing be false
+  try
+    let text be read with path
+  miss problem
+    let missing be true
+  end
+  if missing
+    say "deps.lock is required"
+    put true into state at "bad"
+    return false
+  end
+  let map be parseLock with text, state
+  if state at "bad"
+    return false
+  end
+  put map into state at "lock"
+  return true
+end
+
 define isPackage with name
   if (length with name) == 0
     return false
@@ -531,7 +708,7 @@ define parsePrimary with state
     let line be tokLine with (peek with state)
     let col be tokCol with (peek with state)
     bump with state
-    let idx be parseUnary with state
+    let idx be parseAtom with state
     let node be ["at", node, idx, line, col]
   end
   return node
@@ -901,11 +1078,6 @@ define mergeFuncs with funcs, extra, state
 end
 
 define compileUnit with path, seen, state
-  if (length with seen) > 32
-    say "too many files were used"
-    put true into state at "bad"
-    return []
-  end
   if has with seen, path
     if (seen at path) == 1
       say "use went in a circle"
@@ -913,12 +1085,41 @@ define compileUnit with path, seen, state
       return []
     end
   end
+  if not (has with seen, path)
+    if (length with seen) >= 32
+      say "too many files were used"
+      put true into state at "bad"
+      return []
+    end
+  end
   put 1 into seen at path
-  let source be read with path
+  let source be ""
+  let got be false
+  if has with state, "forcedPath"
+    if (state at "forcedPath") == path
+      let source be state at "forced"
+      let got be true
+      put "" into state at "forcedPath"
+    end
+  end
+  if not got
+    if has with state, "pinned"
+      if has with (state at "pinned"), path
+        let source be (state at "pinned") at path
+        let got be true
+      end
+    end
+  end
+  if not got
+    let source be read with path
+  end
   let tokens be tokenize with source
   let inner be {"i": 0, "toks": tokens, "bad": false}
   let funcs be []
   let folder be dirOf with path
+  if not (has with state, "root")
+    put folder into state at "root"
+  end
   while not ((tokenKind with inner) == "eof")
     if (tokenKind with inner) == "bad"
       say spelling with inner
@@ -940,7 +1141,18 @@ define compileUnit with path, seen, state
       end
       let rel be spelling with inner
       bump with inner
+      if useRefused with rel
+        put true into inner at "bad"
+        put true into state at "bad"
+        stop
+      end
       let next be joinRel with folder, rel
+      if underZone with folder, next
+        say "use stays out of data and site"
+        put true into inner at "bad"
+        put true into state at "bad"
+        stop
+      end
       let extra be compileUnit with next, seen, state
       let funcs be mergeFuncs with funcs, extra, state
     end
@@ -961,7 +1173,49 @@ define compileUnit with path, seen, state
           put true into state at "bad"
           stop
         end
+        if not (lockReady with state)
+          put true into inner at "bad"
+          put true into state at "bad"
+          stop
+        end
+        let locked be ""
+        if has with (state at "lock"), pkg
+          let locked be (state at "lock") at pkg
+        end
+        if locked == ""
+          say "deps.lock does not name " + pkg
+          put true into inner at "bad"
+          put true into state at "bad"
+          stop
+        end
         let next be joinRel with folder, (joinRel with "deps", (joinRel with pkg, "lib.vire"))
+        let body be ""
+        let missingLib be false
+        try
+          let body be read with next
+        miss problem
+          let missingLib be true
+        end
+        if missingLib
+          say "could not read lib.vire"
+          put true into inner at "bad"
+          put true into state at "bad"
+          stop
+        end
+        if not (sameHex with (hash with body), locked)
+          say "deps.lock does not match " + pkg
+          put true into inner at "bad"
+          put true into state at "bad"
+          stop
+        end
+        if not (has with state, "pinned")
+          put {} into state at "pinned"
+        end
+        let pins be state at "pinned"
+        put body into pins at next
+        put pins into state at "pinned"
+        put body into state at "forced"
+        put next into state at "forcedPath"
         let extra be compileUnit with next, seen, state
         let funcs be mergeFuncs with funcs, extra, state
       end

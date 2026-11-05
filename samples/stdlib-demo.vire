@@ -1,0 +1,19 @@
+need "jsonkit"
+need "filekit"
+need "numkit"
+
+define main
+  try
+    write_text with "site/stdlib-should-not.txt", "no"
+    say "refused-fail"
+  miss problem
+  end
+  let listed be to_json with [1, 2, 3]
+  let row be {"kit": "stdlib", "n": 2}
+  write_text with "stdlib-demo.json", (to_json with row)
+  let back be from_json with (read_text with "stdlib-demo.json")
+  let low be whole_min with 8, 3
+  let high be whole_max with 8, 3
+  let total be sum_of with [4, 5, 6]
+  say (listed + " " + (back at "kit") + " " + (text with (back at "n")) + " " + (text with low) + " " + (text with high) + " " + (text with total))
+end

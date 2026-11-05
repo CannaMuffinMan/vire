@@ -1,0 +1,17 @@
+define count_of with items, want
+  let n be 0
+  for item in items
+    if item == want
+      let n be n + 1
+    end
+  end
+  return n
+end
+
+define last with items
+  let n be length with items
+  if n < 1
+    return none
+  end
+  return items at (n - 1)
+end

@@ -1,0 +1,5 @@
+need "missingkit"
+
+define main
+  say "should not run"
+end

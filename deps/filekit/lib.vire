@@ -1,0 +1,52 @@
+define data_path with path
+  if not ((kind with path) == "text")
+    return number with "path is outside data"
+  end
+  if path == ""
+    return number with "path is outside data"
+  end
+  if (find with path, "..") >= 0
+    return number with "path is outside data"
+  end
+  if begins with path, "/"
+    return number with "path is outside data"
+  end
+  if begins with path, "\\"
+    return number with "path is outside data"
+  end
+  if (find with path, ":") >= 0
+    return number with "path is outside data"
+  end
+  if (find with path, "\\") >= 0
+    return number with "path is outside data"
+  end
+  if (find with path, "//") >= 0
+    return number with "path is outside data"
+  end
+  if begins with path, "data/"
+    if (length with path) < 6
+      return number with "path is outside data"
+    end
+    return path
+  end
+  if path == "data"
+    return number with "path is outside data"
+  end
+  if begins with (lower with path), "site/"
+    return number with "path is outside data"
+  end
+  if begins with (lower with path), "data"
+    return number with "path is outside data"
+  end
+  return "data/" + path
+end
+
+define read_text with path
+  return read with (data_path with path)
+end
+
+define write_text with path, body
+  let full be data_path with path
+  write with full, body
+  return full
+end

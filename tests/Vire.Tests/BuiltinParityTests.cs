@@ -8,6 +8,26 @@ using Xunit;
 public class BuiltinParityTests
 {
     [Fact]
+    public void TextSliceRejectsDecimalBoundsInBothModes()
+    {
+        string src = string.Join("\n", new string[]
+        {
+            "define main",
+            "  try",
+            "    say slice with \"abcd\", (4 / 2), 4",
+            "  miss problem",
+            "    say problem",
+            "  end",
+            "end",
+            ""
+        });
+        DualMode.DualRun both = DualMode.RunSource(src, null);
+        Assert.True(both.Matched, both.InterpOut + "\n" + both.CompOut + "\n" + both.InterpErr + "\n" + both.CompErr);
+        Assert.Equal(0, both.InterpCode);
+        Assert.Contains("slice bounds must be whole numbers", DualMode.Norm(both.InterpOut));
+    }
+
+    [Fact]
     public void AskReadsStdinInBothMachines()
     {
         string src = "define main\n  say (ask with \"n?\")\nend\n";

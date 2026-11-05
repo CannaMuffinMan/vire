@@ -1,0 +1,15 @@
+define to_json with value
+  let k be kind with value
+  if not ((k == "list") or (k == "map"))
+    return number with "json needs a list or a map"
+  end
+  return json with value
+end
+
+define from_json with raw
+  let value be parse with raw
+  if not ((kind with value) == "map")
+    return number with "json object expected"
+  end
+  return value
+end

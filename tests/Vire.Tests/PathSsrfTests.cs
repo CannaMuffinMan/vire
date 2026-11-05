@@ -64,6 +64,144 @@ public class PathSsrfTests
     }
 
     [Fact]
+    public void AdsShortNamesDevicesAndLockNamesAreRefused()
+    {
+        string[] names =
+        {
+            "data/file.txt:secret",
+            "data/evil.vire:secret",
+            "data/note.txt:evil.bat",
+            "CONOUT$",
+            "CONIN$",
+            "data/CON~1",
+            "data/COM1~1.TXT",
+            "data/NUL~1",
+            "aux~2.log"
+        };
+        for (int i = 0; i < names.Length; i++)
+        {
+            string name = names[i];
+            VireError err = Assert.Throws<VireError>(() => VirePaths.CheckName(name, 1));
+            Assert.Contains("program folder", err.Message);
+        }
+        string[] writes =
+        {
+            "data/file.txt:secret",
+            "data/evil.vire:secret",
+            "C:/sandbox/data/file.txt:secret",
+            "deps.lock",
+            "data/deps.lock",
+            "data/deps.lock.",
+            "data/payload.batch",
+            "data/payload.executable",
+            "data/payload.cmdx",
+            "data/payload.ps1x",
+            "data/payload.dllx",
+            "data/payload.virex",
+            "data/CONOUT$"
+        };
+        for (int i = 0; i < writes.Length; i++)
+            Assert.Throws<VireError>(() => VirePaths.RefuseProgram(writes[i], 1));
+        VirePaths.RefuseProgram("data/note.txt", 1);
+        VirePaths.RefuseProgram("data/app.json", 1);
+    }
+
+    [Fact]
+    public void WriteCannotPlantShortExecutableOrDepsLock()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-c4x-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        string batch = Path.Combine(dir, "data", "payload.batch");
+        string lockFile = Path.Combine(dir, "deps.lock");
+        File.WriteAllText(lockFile, "greet " + new string('a', 64) + "\n");
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "plant.vire"),
+                "define main\n  write with \"data/payload.batch\", \"@echo off\"\n  write with \"data/deps.lock\", \"greet " + new string('b', 64) + "\"\nend\n");
+            Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
+            Assert.False(File.Exists(batch));
+            Assert.Equal("greet " + new string('a', 64) + "\n", File.ReadAllText(lockFile));
+            Assert.False(File.Exists(Path.Combine(dir, "data", "deps.lock")));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void CompiledWriteStaysInDataEvenIfRootIsNamedData()
+    {
+        string parent = Path.Combine(Path.GetTempPath(), "vire-c4d-" + Guid.NewGuid().ToString("n"));
+        string dir = Path.Combine(parent, "data");
+        Directory.CreateDirectory(dir);
+        string lockFile = Path.Combine(dir, "deps.lock");
+        File.WriteAllText(lockFile, "kept");
+        try
+        {
+            Dictionary<string, object> func = new Dictionary<string, object>();
+            func["name"] = "main";
+            func["params"] = new List<object>();
+            List<object> call = new List<object>
+            {
+                "call",
+                "write",
+                new List<object>
+                {
+                    new List<object> { "text", "deps.lock", 2, 3 },
+                    new List<object> { "text", "hacked", 2, 3 }
+                },
+                2,
+                3
+            };
+            func["body"] = new List<object> { call };
+            Dictionary<string, object> funcs = new Dictionary<string, object>();
+            funcs["main"] = func;
+            Budget budget = new Budget();
+            budget.ApplyStepLimit(500000);
+            CompiledMachine machine = new CompiledMachine(funcs, dir, new List<object>(), budget);
+            VireError err = Assert.Throws<VireError>(() => machine.Call("main", new List<object>(), 1, 1));
+            Assert.Contains("data or site", err.Message);
+            Assert.Equal("kept", File.ReadAllText(lockFile));
+        }
+        finally
+        {
+            try { Directory.Delete(parent, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void HardLinkCannotRewriteDepsLock()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string dir = Path.Combine(Path.GetTempPath(), "vire-c4h-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        string lockFile = Path.Combine(dir, "deps.lock");
+        File.WriteAllText(lockFile, "original-lock");
+        string link = Path.Combine(dir, "data", "note.txt");
+        try
+        {
+            System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c mklink /H \"" + link + "\" \"" + lockFile + "\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            linkProc.WaitForExit(5000);
+            Assert.Equal(0, linkProc.ExitCode);
+            File.WriteAllText(Path.Combine(dir, "plant.vire"),
+                "define main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
+            Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
+            Assert.Equal("original-lock", File.ReadAllText(lockFile));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void RunAndUseRefuseWritableZonesAndPlantedPrograms()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-c4-" + Guid.NewGuid().ToString("n"));
@@ -221,6 +359,32 @@ public class PathSsrfTests
         }
     }
 
+    static void ServeOversize(TcpListener listener)
+    {
+        try
+        {
+            using (TcpClient client = listener.AcceptTcpClient())
+            using (NetworkStream stream = client.GetStream())
+            {
+                byte[] buf = new byte[1024];
+                while (stream.Read(buf, 0, buf.Length) > 0 && stream.DataAvailable) { }
+                byte[] head = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2000000\r\nConnection: close\r\n\r\n");
+                stream.Write(head, 0, head.Length);
+                byte[] chunk = new byte[8192];
+                int sent = 0;
+                while (sent < 1000001)
+                {
+                    int n = Math.Min(chunk.Length, 1000001 - sent);
+                    stream.Write(chunk, 0, n);
+                    sent += n;
+                }
+                stream.Flush();
+                Thread.Sleep(12000);
+            }
+        }
+        catch (Exception) { }
+    }
+
     static void ServeMany(TcpListener listener, int times)
     {
         try
@@ -286,6 +450,47 @@ public class PathSsrfTests
         Assert.True(walk.Matched, Diff(walk));
         Assert.Equal(1, walk.InterpCode);
         Assert.Contains("program folder", walk.InterpErr);
+    }
+
+    [Fact]
+    public void FetchRefusesNat64LocalAndSixToFourAnycast()
+    {
+        VireError nat = Assert.Throws<VireError>(() => VireNet.DemandPublic("https://[64:ff9b:1::127.0.0.1]/", 1));
+        Assert.Contains("private", nat.Message);
+        VireError anycast = Assert.Throws<VireError>(() => VireNet.DemandPublic("https://192.88.99.1/", 1));
+        Assert.Contains("private", anycast.Message);
+        VireError encoded = Assert.Throws<VireError>(() => VireNet.DemandPublic("https://[64:ff9b:1:7f00:0:1::]/", 1));
+        Assert.Contains("private", encoded.Message);
+    }
+
+    [Fact]
+    public void FetchAppliesSizeCapWhileStreaming()
+    {
+        int port = PortGuard.GetFreeLoopbackPort();
+        TcpListener listener = new TcpListener(IPAddress.Loopback, port);
+        listener.Start();
+        PortGuard.AssertAllowedPort(((IPEndPoint)listener.LocalEndpoint).Port);
+        port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Thread server = new Thread(() => ServeOversize(listener));
+        server.IsBackground = true;
+        server.Start();
+        try
+        {
+            VireNet.IsTestOrigin = host => host == "ssrf.test.vire";
+            VireNet.ResolveHost = host => new IPAddress[] { IPAddress.Parse("127.0.0.1") };
+            System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            VireError err = Assert.Throws<VireError>(() =>
+                VireNet.SendWeb(System.Net.Http.HttpMethod.Get, "http://ssrf.test.vire:" + port + "/big", null, 1));
+            watch.Stop();
+            Assert.Contains("too large", err.Message);
+            Assert.True(watch.Elapsed < TimeSpan.FromSeconds(6), "cap waited " + watch.Elapsed);
+        }
+        finally
+        {
+            VireNet.ResetHooks();
+            listener.Stop();
+            server.Join(1000);
+        }
     }
 
     [Fact]

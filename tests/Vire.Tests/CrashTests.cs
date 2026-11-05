@@ -97,7 +97,9 @@ public class CrashTests
 
         RunResult nested = Run(root, Path.Combine(crash, "nest-run.vire"), "50");
         Assert.Equal(1, nested.Code);
-        Assert.Contains("program ran too long", nested.StdErr);
+        Assert.True(
+            nested.StdErr.Contains("program ran too long") || nested.StdErr.Contains("while ran too long"),
+            nested.StdErr);
         Assert.DoesNotContain("parent", nested.StdOut);
 
         string wide = Path.Combine(crash, "wide-expr.vire");

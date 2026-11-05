@@ -155,6 +155,7 @@ public class SealTests
             Assert.Equal(32, written.Length);
             Assert.Contains("seal key fingerprint ", stdout.ToString());
             Assert.Equal(8, stdout.ToString().Trim().Substring("seal key fingerprint ".Length).Length);
+            Assert.DoesNotContain(Convert.ToBase64String(written), stdout.ToString());
             if (!OperatingSystem.IsWindows())
             {
                 UnixFileMode mode = File.GetUnixFileMode(path);
@@ -166,6 +167,68 @@ public class SealTests
         {
             Console.SetOut(oldOut);
             try { File.Delete(path); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void KeygenRefusesDeviceAndStreamPathsWithoutPrintingKey()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-keydev-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        string device = Path.Combine(dir, "CONOUT$");
+        string stream = Path.Combine(dir, "key.bin:secret");
+        TextWriter oldOut = Console.Out;
+        TextWriter oldErr = Console.Error;
+        StringWriter stdout = new StringWriter();
+        StringWriter stderr = new StringWriter();
+        Console.SetOut(stdout);
+        Console.SetError(stderr);
+        try
+        {
+            int code = VireSeal.Keygen(device);
+            Assert.Equal(2, code);
+            Assert.False(File.Exists(device));
+            int streamCode = VireSeal.Keygen(stream);
+            Assert.Equal(2, streamCode);
+            string all = stdout.ToString() + stderr.ToString();
+            Assert.Contains("not allowed", all);
+            Assert.DoesNotContain("fingerprint", all);
+            Assert.True(all.IndexOf('=') < 0);
+        }
+        finally
+        {
+            Console.SetOut(oldOut);
+            Console.SetError(oldErr);
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void KeyFileSymlinkIntoProgramFolderIsRefused()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-keylink-" + Guid.NewGuid().ToString("n"));
+        string outside = Path.Combine(Path.GetTempPath(), "vire-keyout-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        Directory.CreateDirectory(outside);
+        string inside = Path.Combine(dir, "hidden.key");
+        File.WriteAllBytes(inside, new byte[32]);
+        string link = Path.Combine(outside, "key.link");
+        try
+        {
+            try { File.CreateSymbolicLink(link, inside); }
+            catch (Exception ex)
+            {
+                Console.WriteLine("key symlink test skipped: " + ex.GetType().Name);
+                return;
+            }
+            VireError err = Assert.Throws<VireError>(() => VireSeal.LoadFromFile(link, dir));
+            Assert.Contains("outside the program folder", err.Message);
+        }
+        finally
+        {
+            VireSeal.ClearKey();
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+            try { Directory.Delete(outside, true); } catch (IOException) { }
         }
     }
 

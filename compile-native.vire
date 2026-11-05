@@ -106,7 +106,13 @@ define keyword with word
   if word == "while" or word == "stop" or word == "skip" or word == "put" or word == "into" or word == "at"
     return word
   end
+  if word == "for" or word == "in" or word == "try" or word == "miss"
+    return word
+  end
   if word == "and" or word == "or" or word == "not" or word == "true" or word == "false" or word == "none"
+    return word
+  end
+  if word == "use" or word == "need"
     return word
   end
   return "name"
@@ -447,7 +453,7 @@ define parseBlock with state, func
       stop
     end
     let k be form with state
-    if k == "end" or k == "else" or k == "eof"
+    if k == "end" or k == "else" or k == "miss" or k == "eof"
       stop
     end
     push with body, (parseStmt with state, func)
@@ -531,6 +537,44 @@ define parseStmt with state, func
     end
     bump with state
     return ["while", test, body]
+  end
+  if k == "for"
+    bump with state
+    if (form with state) != "name"
+      return markBad with state, "for needs a name"
+    end
+    let nm be spell with state
+    bump with state
+    if (form with state) != "in"
+      return markBad with state, "for needs in"
+    end
+    bump with state
+    let seq be parseExpr with state, func
+    let body be parseLoop with state, func
+    if (form with state) != "end"
+      return markBad with state, "the program needs end"
+    end
+    bump with state
+    return ["for", (bind with func, nm), seq, body]
+  end
+  if k == "try"
+    bump with state
+    let body be parseBlock with state, func
+    let caught be none
+    let handler be none
+    if (form with state) == "miss"
+      bump with state
+      if (form with state) == "name"
+        let caught be bind with func, (spell with state)
+        bump with state
+      end
+      let handler be parseBlock with state, func
+    end
+    if (form with state) != "end"
+      return markBad with state, "the program needs end"
+    end
+    bump with state
+    return ["try", body, caught, handler]
   end
   if k == "stop"
     bump with state
@@ -636,51 +680,441 @@ end
 define parseProgram with toks
   let state be {"toks": toks, "i": 0, "bad": false, "why": ""}
   let funcs be []
+  let uses be []
+  let needs be []
   while (form with state) != "eof"
     if state at "bad"
       stop
     end
-    if (form with state) != "define"
-      markBad with state, "a vire program needs define main"
-      stop
-    end
-    let func be parseDefine with state
-    if state at "bad"
-      stop
-    end
-    let i be 0
-    while i < (length with funcs)
-      if ((funcs at i) at "name") == (func at "name")
-        markBad with state, "that name is already defined"
+    if (form with state) == "use"
+      bump with state
+      if (form with state) != "text"
+        markBad with state, "use needs a file name in quotes"
         stop
       end
-      let i be i + 1
+      push with uses, (spell with state)
+      bump with state
     end
-    push with funcs, func
+    if (form with state) == "need"
+      bump with state
+      if (form with state) != "text"
+        markBad with state, "need takes a package name in quotes"
+        stop
+      end
+      push with needs, (spell with state)
+      bump with state
+    end
+    if (form with state) != "use" and (form with state) != "need" and (form with state) != "eof"
+      if (form with state) != "define"
+        markBad with state, "a vire program needs define main"
+        stop
+      end
+      let func be parseDefine with state
+      if state at "bad"
+        stop
+      end
+      let i be 0
+      while i < (length with funcs)
+        if ((funcs at i) at "name") == (func at "name")
+          markBad with state, "that name is already defined"
+          stop
+        end
+        let i be i + 1
+      end
+      push with funcs, func
+    end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs}
+end
+
+define normPath with path
+  let out be ""
+  let i be 0
+  let n be length with path
+  while i < n
+    let ch be path at i
+    if ch == "\\"
+      let out be out + "/"
+    end
+    if ch != "\\"
+      let out be out + (lower with ch)
+    end
+    let i be i + 1
+  end
+  return out
+end
+
+define dirOf with path
+  let flat be normPath with path
+  let n be length with flat
+  let i be n
+  while i > 0
+    let i be i - 1
+    if (flat at i) == "/"
+      return slice with flat, 0, i
+    end
+  end
+  return ""
+end
+
+define joinRel with dir, rel
+  let flat be normPath with rel
+  if dir == ""
+    return flat
+  end
+  return dir + "/" + flat
+end
+
+define baseName with path
+  let flat be normPath with path
+  let n be length with flat
+  let i be n
+  while i > 0
+    let i be i - 1
+    if (flat at i) == "/"
+      return slice with flat, (i + 1), n
+    end
+  end
+  return flat
+end
+
+define firstSeg with rel
+  let flat be normPath with rel
+  let n be length with flat
+  let i be 0
+  let seg be ""
+  while i < n
+    let ch be flat at i
+    if ch == "/"
+      stop
+    end
+    let seg be seg + ch
+    let i be i + 1
+  end
+  return seg
+end
+
+define badSeg with rel
+  let flat be normPath with rel
+  if (find with flat, ":") >= 0
+    return true
+  end
+  let n be length with flat
+  let i be 0
+  let seg be ""
+  while i <= n
+    let ch be ""
+    if i < n
+      let ch be flat at i
+    end
+    if i == n or ch == "/"
+      if seg == "." or seg == ".."
+        return true
+      end
+      let seg be ""
+    end
+    if i < n and ch != "/"
+      let seg be seg + ch
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define isPackage with name
+  if (length with name) == 0
+    return false
+  end
+  let i be 0
+  while i < (length with name)
+    let ch be name at i
+    if not (isLetter with ch) and not (isDigit with ch)
+      return false
+    end
+    let i be i + 1
+  end
+  return true
+end
+
+define checkUse with rel
+  if not (ends with (lower with rel), ".vire")
+    return {"bad": true, "why": "use stays inside the program folder and only opens .vire files"}
+  end
+  if badSeg with rel
+    return {"bad": true, "why": "files stay inside the program folder"}
+  end
+  let seg be lower with (firstSeg with rel)
+  if seg == "data" or seg == "site"
+    return {"bad": true, "why": "use stays out of data and site"}
+  end
+  return {"bad": false, "why": ""}
+end
+
+define stackCount with seen
+  let n be 0
+  let ks be keys with seen
+  let i be 0
+  while i < (length with ks)
+    if (seen at (ks at i)) == 1
+      let n be n + 1
+    end
+    let i be i + 1
+  end
+  return n
+end
+
+define mergeFuncs with funcs, extra
+  let i be 0
+  while i < (length with extra)
+    let item be extra at i
+    let j be 0
+    while j < (length with funcs)
+      if ((funcs at j) at "name") == (item at "name")
+        return {"bad": true, "why": ((item at "name") + " is already defined"), "funcs": funcs}
+      end
+      let j be j + 1
+    end
+    push with funcs, item
+    let i be i + 1
+  end
+  return {"bad": false, "why": "", "funcs": funcs}
+end
+
+define underZone with folder, path
+  let base be lower with (normPath with folder)
+  let full be lower with (normPath with path)
+  if not (begins with full, base)
+    return false
+  end
+  let rest be slice with full, (length with base), (length with full)
+  if begins with rest, "/"
+    let rest be slice with rest, 1, (length with rest)
+  end
+  if rest == "data" or (begins with rest, "data/")
+    return true
+  end
+  if rest == "site" or (begins with rest, "site/")
+    return true
+  end
+  return false
+end
+
+define sameHex with left, right
+  let diff be 0
+  if not ((length with left) == 64)
+    let diff be 1
+  end
+  if not ((length with right) == 64)
+    let diff be 1
+  end
+  let i be 0
+  while i < 64
+    let a be ""
+    let b be ""
+    if i < (length with left)
+      let a be left at i
+    end
+    if i < (length with right)
+      let b be right at i
+    end
+    if not (a == b)
+      let diff be 1
+    end
+    let i be i + 1
+  end
+  return diff == 0
+end
+
+define lockLine with text, pkg
+  let lines be split with text, "\n"
+  let i be 0
+  let found be ""
+  while i < (length with lines)
+    let line be lines at i
+    let n be length with line
+    if n > 0
+      if (line at (n - 1)) == "\r"
+        let line be slice with line, 0, (n - 1)
+      end
+    end
+    if not (line == "")
+      let parts be split with line, " "
+      if not ((length with parts) == 2)
+        return {"bad": true, "why": "deps.lock is damaged", "hex": ""}
+      end
+      if (parts at 0) == pkg
+        let found be parts at 1
+      end
+    end
+    let i be i + 1
+  end
+  if found == ""
+    return {"bad": true, "why": ("deps.lock does not name " + pkg), "hex": ""}
+  end
+  return {"bad": false, "why": "", "hex": found}
+end
+
+define loadUnit with path, folder, seen
+  let source be ""
+  let missing be false
+  try
+    let source be read with path
+  miss problem
+    let missing be true
+  end
+  if missing
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": []}
+  end
+  return loadText with path, source, folder, seen
+end
+
+define loadText with path, source, folder, seen
+  let key be normPath with path
+  if (stackCount with seen) > 32
+    return {"bad": true, "why": "too many files were used", "funcs": []}
+  end
+  if has with seen, key
+    if (seen at key) == 1
+      return {"bad": true, "why": ("use went in a circle at " + (baseName with path)), "funcs": []}
+    end
+  end
+  put 1 into seen at key
+  let scanned be tokenize with source
+  if scanned at "bad"
+    put 0 into seen at key
+    return {"bad": true, "why": scanned at "why", "funcs": []}
+  end
+  let parsed be parseProgram with (scanned at "toks")
+  if parsed at "bad"
+    put 0 into seen at key
+    return {"bad": true, "why": parsed at "why", "funcs": []}
+  end
+  let funcs be parsed at "funcs"
+  let uses be parsed at "uses"
+  let ui be 0
+  while ui < (length with uses)
+    let rel be uses at ui
+    let checked be checkUse with rel
+    if checked at "bad"
+      put 0 into seen at key
+      return {"bad": true, "why": checked at "why", "funcs": []}
+    end
+    let next be joinRel with folder, rel
+    if underZone with folder, next
+      put 0 into seen at key
+      return {"bad": true, "why": "use stays out of data and site", "funcs": []}
+    end
+    let extra be loadUnit with next, folder, seen
+    if extra at "bad"
+      put 0 into seen at key
+      return extra
+    end
+    let merged be mergeFuncs with funcs, (extra at "funcs")
+    if merged at "bad"
+      put 0 into seen at key
+      return {"bad": true, "why": merged at "why", "funcs": funcs}
+    end
+    let funcs be merged at "funcs"
+    let ui be ui + 1
+  end
+  let needs be parsed at "needs"
+  let ni be 0
+  while ni < (length with needs)
+    let pkg be needs at ni
+    if not (isPackage with pkg)
+      put 0 into seen at key
+      return {"bad": true, "why": "package names are plain words", "funcs": []}
+    end
+    let next be joinRel with folder, ("deps/" + pkg + "/lib.vire")
+    let lockPath be joinRel with folder, "deps.lock"
+    let lockText be ""
+    let missingLock be false
+    try
+      let lockText be read with lockPath
+    miss problem
+      let missingLock be true
+    end
+    if missingLock
+      put 0 into seen at key
+      return {"bad": true, "why": "deps.lock is required", "funcs": []}
+    end
+    let locked be lockLine with lockText, pkg
+    if locked at "bad"
+      put 0 into seen at key
+      return {"bad": true, "why": locked at "why", "funcs": []}
+    end
+    let body be ""
+    let missingLib be false
+    try
+      let body be read with next
+    miss problem
+      let missingLib be true
+    end
+    if missingLib
+      put 0 into seen at key
+      return {"bad": true, "why": "could not read lib.vire", "funcs": []}
+    end
+    let pinned be body
+    if not (sameHex with (hash with pinned), (locked at "hex"))
+      put 0 into seen at key
+      return {"bad": true, "why": ("deps.lock does not match " + pkg), "funcs": []}
+    end
+    let extra be loadText with next, pinned, folder, seen
+    if extra at "bad"
+      put 0 into seen at key
+      return extra
+    end
+    let merged be mergeFuncs with funcs, (extra at "funcs")
+    if merged at "bad"
+      put 0 into seen at key
+      return {"bad": true, "why": merged at "why", "funcs": funcs}
+    end
+    let funcs be merged at "funcs"
+    let ni be ni + 1
+  end
+  put 0 into seen at key
+  return {"bad": false, "why": "", "funcs": funcs}
 end
 
 define emitOp with gen, bytes
-  emitList with (gen at "image"), bytes
+  put (emitList with (gen at "image"), bytes) into gen at "image"
   return true
 end
 
 define emitCall with gen, name
-  emitU8 with (gen at "image"), 232
-  emitRel with (gen at "image"), (gen at "fixes"), name
+  put (emitU8 with (gen at "image"), 232) into gen at "image"
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
   return true
 end
 
 define emitJmp with gen, name
-  emitU8 with (gen at "image"), 233
-  emitRel with (gen at "image"), (gen at "fixes"), name
+  put (emitU8 with (gen at "image"), 233) into gen at "image"
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
+define emitLeaRcx with gen, name
+  emitOp with gen, [72, 141, 13]
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
+define saveTrap with gen
+  let slot be freshCounter with gen
+  emitLeaRcx with gen, slot
+  emitCall with gen, "rt_trap_save"
+  return slot
+end
+
+define restoreTrap with gen, slot
+  emitLeaRcx with gen, slot
+  emitCall with gen, "rt_trap_restore"
   return true
 end
 
 define emitJz with gen, name
   emitOp with gen, [15, 132]
-  emitRel with (gen at "image"), (gen at "fixes"), name
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
   return true
 end
 
@@ -735,13 +1169,13 @@ define builtinArity with nm
   if nm == "args"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex"
     return 1
   end
-  if nm == "push" or nm == "find" or nm == "has" or nm == "write"
+  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join"
     return 2
   end
-  if nm == "slice"
+  if nm == "slice" or nm == "replace"
     return 3
   end
   return -1
@@ -760,10 +1194,10 @@ define parkCounters with image, labels, counters
   let n be length with counters
   while i < n
     pin with labels, (counters at i), image
-    emitU64 with image, 0
+    let image be emitU64 with image, 0
     let i be i + 1
   end
-  return true
+  return image
 end
 
 define jumpLoop with gen, word, edge
@@ -785,7 +1219,7 @@ define emitExpr with gen, funcs, func, expr
   let k be expr at 0
   if k == "num"
     emitOp with gen, [72, 199, 193]
-    emitU32 with (gen at "image"), (expr at 1)
+    put (emitU32 with (gen at "image"), (expr at 1)) into gen at "image"
     emitCall with gen, "rt_push_int"
     return true
   end
@@ -795,13 +1229,13 @@ define emitExpr with gen, funcs, func, expr
       return true
     end
     emitOp with gen, [72, 141, 13]
-    emitRel with (gen at "image"), (gen at "fixes"), name
+    put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
     emitCall with gen, "rt_push_text"
     return true
   end
   if k == "bool"
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), (expr at 1)
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), (expr at 1)) into gen at "image"
     emitCall with gen, "rt_push_bool"
     return true
   end
@@ -812,8 +1246,8 @@ define emitExpr with gen, funcs, func, expr
   if k == "name"
     let nm be expr at 1
     if has with (func at "locals"), nm
-      emitU8 with (gen at "image"), 185
-      emitU32 with (gen at "image"), ((func at "locals") at nm)
+      put (emitU8 with (gen at "image"), 185) into gen at "image"
+      put (emitU32 with (gen at "image"), ((func at "locals") at nm)) into gen at "image"
       emitCall with gen, "rt_load"
       return true
     end
@@ -849,7 +1283,12 @@ define emitExpr with gen, funcs, func, expr
         emitExpr with gen, funcs, func, (args at i)
         let i be i + 1
       end
-      emitCall with gen, ("rt_" + nm)
+      if nm == "drop"
+        emitCall with gen, "rt_list_drop"
+      end
+      if nm != "drop"
+        emitCall with gen, ("rt_" + nm)
+      end
       return true
     end
     let found be findFunc with funcs, nm
@@ -890,8 +1329,8 @@ define emitExpr with gen, funcs, func, expr
     emitBoolAcc with gen
     emitJmp with gen, done
     pinHere with gen, no
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), 0
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), 0) into gen at "image"
     emitCall with gen, "rt_push_bool"
     pinHere with gen, done
     return true
@@ -902,16 +1341,16 @@ define emitExpr with gen, funcs, func, expr
     emitExpr with gen, funcs, func, (expr at 1)
     emitCall with gen, "rt_truth"
     emitOp with gen, [133, 192]
-    emitU8 with (gen at "image"), 15
-    emitU8 with (gen at "image"), 133
-    emitRel with (gen at "image"), (gen at "fixes"), yes
+    put (emitU8 with (gen at "image"), 15) into gen at "image"
+    put (emitU8 with (gen at "image"), 133) into gen at "image"
+    put (emitRel with (gen at "image"), (gen at "fixes"), yes) into gen at "image"
     emitExpr with gen, funcs, func, (expr at 2)
     emitCall with gen, "rt_truth"
     emitBoolAcc with gen
     emitJmp with gen, done
     pinHere with gen, yes
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), 1
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), 1) into gen at "image"
     emitCall with gen, "rt_push_bool"
     pinHere with gen, done
     return true
@@ -935,8 +1374,8 @@ define emitExpr with gen, funcs, func, expr
     if k == ">="
       let op be 5
     end
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), op
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), op) into gen at "image"
     emitCall with gen, "rt_cmp"
     return true
   end
@@ -1014,8 +1453,8 @@ define emitStmt with gen, funcs, func, stmt
   let k be stmt at 0
   if k == "let"
     emitExpr with gen, funcs, func, (stmt at 2)
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), (stmt at 1)
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), (stmt at 1)) into gen at "image"
     emitCall with gen, "rt_store"
     return true
   end
@@ -1048,19 +1487,74 @@ define emitStmt with gen, funcs, func, stmt
     let head be fresh with gen
     let done be fresh with gen
     let ctr be freshCounter with gen
+    let guard be saveTrap with gen
     push with (gen at "breaks"), {"head": head, "done": done}
     pinHere with gen, head
+    restoreTrap with gen, guard
     emitExpr with gen, funcs, func, (stmt at 1)
     emitCall with gen, "rt_truth"
     emitOp with gen, [133, 192]
     emitJz with gen, done
     emitOp with gen, [72, 141, 13]
-    emitRel with (gen at "image"), (gen at "fixes"), ctr
+    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
     emitCall with gen, "rt_loop_tick"
     emitBlock with gen, funcs, func, (stmt at 2)
     emitJmp with gen, head
     pinHere with gen, done
+    restoreTrap with gen, guard
     drop with (gen at "breaks")
+    return true
+  end
+  if k == "for"
+    let head be fresh with gen
+    let done be fresh with gen
+    let ctr be freshCounter with gen
+    emitExpr with gen, funcs, func, (stmt at 2)
+    emitCall with gen, "rt_for_prep"
+    let guard be saveTrap with gen
+    push with (gen at "breaks"), {"head": head, "done": done}
+    pinHere with gen, head
+    restoreTrap with gen, guard
+    emitCall with gen, "rt_for_more"
+    emitOp with gen, [133, 192]
+    emitJz with gen, done
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), (stmt at 1)) into gen at "image"
+    emitCall with gen, "rt_store"
+    emitOp with gen, [72, 141, 13]
+    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
+    emitCall with gen, "rt_loop_tick"
+    emitBlock with gen, funcs, func, (stmt at 3)
+    emitJmp with gen, head
+    pinHere with gen, done
+    restoreTrap with gen, guard
+    emitCall with gen, "rt_for_drop"
+    drop with (gen at "breaks")
+    return true
+  end
+  if k == "try"
+    if (stmt at 3) == none
+      emitBlock with gen, funcs, func, (stmt at 1)
+      return true
+    end
+    let landed be fresh with gen
+    let done be fresh with gen
+    emitLeaRcx with gen, landed
+    emitCall with gen, "rt_trap_push"
+    emitBlock with gen, funcs, func, (stmt at 1)
+    emitCall with gen, "rt_trap_pop"
+    emitJmp with gen, done
+    pinHere with gen, landed
+    if (stmt at 2) == none
+      emitCall with gen, "rt_drop"
+    end
+    if (stmt at 2) != none
+      put (emitU8 with (gen at "image"), 185) into gen at "image"
+      put (emitU32 with (gen at "image"), (stmt at 2)) into gen at "image"
+      emitCall with gen, "rt_store"
+    end
+    emitBlock with gen, funcs, func, (stmt at 3)
+    pinHere with gen, done
     return true
   end
   if k == "stop"
@@ -1074,8 +1568,8 @@ define emitStmt with gen, funcs, func, stmt
   if k == "put"
     emitExpr with gen, funcs, func, (stmt at 2)
     emitExpr with gen, funcs, func, (stmt at 3)
-    emitU8 with (gen at "image"), 185
-    emitU32 with (gen at "image"), (stmt at 1)
+    put (emitU8 with (gen at "image"), 185) into gen at "image"
+    put (emitU32 with (gen at "image"), (stmt at 1)) into gen at "image"
     emitCall with gen, "rt_set_slot"
     return true
   end
@@ -1092,10 +1586,10 @@ end
 define emitFunc with gen, funcs, func
   pinHere with gen, ("fn_" + (func at "name"))
   emitOp with gen, [72, 131, 236, 40]
-  emitU8 with (gen at "image"), 185
-  emitU32 with (gen at "image"), (func at "nparams")
-  emitU8 with (gen at "image"), 186
-  emitU32 with (gen at "image"), ((func at "n") - (func at "nparams"))
+  put (emitU8 with (gen at "image"), 185) into gen at "image"
+  put (emitU32 with (gen at "image"), (func at "nparams")) into gen at "image"
+  put (emitU8 with (gen at "image"), 186) into gen at "image"
+  put (emitU32 with (gen at "image"), ((func at "n") - (func at "nparams"))) into gen at "image"
   emitCall with gen, "rt_begin"
   emitBlock with gen, funcs, func, (func at "body")
   emitCall with gen, "rt_push_none"
@@ -1111,19 +1605,13 @@ define main
     say "compile failed"
     halt with 1
   end
-  let scanned be tokenize with (read with (files at 0))
-  if scanned at "bad"
-    say scanned at "why"
+  let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
+  if loaded at "bad"
+    say loaded at "why"
     say "compile failed"
     halt with 1
   end
-  let parsed be parseProgram with (scanned at "toks")
-  if parsed at "bad"
-    say parsed at "why"
-    say "compile failed"
-    halt with 1
-  end
-  let funcs be parsed at "funcs"
+  let funcs be loaded at "funcs"
   let saw be false
   let i be 0
   while i < (length with funcs)
@@ -1149,10 +1637,10 @@ define main
     say "compile failed"
     halt with 1
   end
-  parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")
-  parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")
-  parkRuntime with (gen at "image"), (gen at "labels")
-  finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")
+  put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
+  put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
+  put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
+  put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc")
   write with (files at 1), (hexOf with exe)
   say "compiled"

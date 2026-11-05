@@ -1,0 +1,5 @@
+need "kit"
+
+define main
+  say kitWord
+end

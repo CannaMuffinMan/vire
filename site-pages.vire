@@ -1,0 +1,8 @@
+~ Capability proof: two HTML pages under site/. Not a product site.
+define main
+  let home be "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Vire page proof</title>\n</head>\n<body>\n<p>This page is a Vire capability proof.</p>\n<p><a href=\"other.html\">Open the other page</a></p>\n</body>\n</html>\n"
+  let other be "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Vire linked page</title>\n</head>\n<body>\n<p>This second page was written by the same Vire program.</p>\n</body>\n</html>\n"
+  write with "site/index.html", home
+  write with "site/other.html", other
+  say "wrote site/index.html and site/other.html"
+end

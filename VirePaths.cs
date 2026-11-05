@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 static class VirePaths
 {
@@ -7,7 +8,8 @@ static class VirePaths
     {
         "CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CONIN$", "CONOUT$"
     };
 
     static readonly string[] BlockedWriteExt =
@@ -64,9 +66,21 @@ static class VirePaths
     {
         if (segment == null || segment.Length == 0) return false;
         string name = segment;
+        int colon = name.IndexOf(':');
+        if (colon >= 0) name = name.Substring(0, colon);
         int dot = name.IndexOf('.');
         if (dot >= 0) name = name.Substring(0, dot);
         name = name.TrimEnd('.', ' ').ToUpperInvariant();
+        int tilde = name.IndexOf('~');
+        if (tilde > 0 && tilde < name.Length - 1)
+        {
+            bool digits = true;
+            for (int i = tilde + 1; i < name.Length; i++)
+            {
+                if (name[i] < '0' || name[i] > '9') digits = false;
+            }
+            if (digits) name = name.Substring(0, tilde);
+        }
         for (int i = 0; i < Devices.Length; i++)
             if (name == Devices[i]) return true;
         return false;
@@ -74,9 +88,38 @@ static class VirePaths
 
     public static string NormalizedExtension(string path)
     {
-        string leaf = Path.GetFileName(path ?? "");
-        leaf = leaf.TrimEnd('.', ' ').ToLowerInvariant();
+        string leaf = LeafOf(path);
         return Path.GetExtension(leaf);
+    }
+
+    public static string LeafOf(string path)
+    {
+        string leaf = Path.GetFileName(path ?? "");
+        int colon = leaf.IndexOf(':');
+        if (colon >= 0) leaf = leaf.Substring(0, colon);
+        return leaf.TrimEnd('.', ' ').ToLowerInvariant();
+    }
+
+    static string ShortExtension(string ext)
+    {
+        if (ext == null || ext.Length < 2 || ext[0] != '.') return "";
+        string body = ext.Substring(1);
+        if (body.Length > 3) body = body.Substring(0, 3);
+        return "." + body;
+    }
+
+    static bool ShortExtensionBlocked(string ext)
+    {
+        if (ext == null || ext.Length < 5) return false;
+        string shortExt = ShortExtension(ext);
+        if (shortExt.Length != 4) return false;
+        for (int i = 0; i < BlockedWriteExt.Length; i++)
+        {
+            string blocked = BlockedWriteExt[i];
+            if (blocked.Length == 4 && shortExt == blocked) return true;
+        }
+        if (shortExt == ".vir") return true;
+        return false;
     }
 
     public static bool InFolder(string folder, string path)
@@ -166,12 +209,68 @@ static class VirePaths
 
     public static void RefuseProgram(string path, int line, int column)
     {
-        string ext = NormalizedExtension(path);
+        if (HasStreamOrDevice(path))
+            throw new VireError("vire will not write a program file", line, column);
+        string leaf = LeafOf(path);
+        if (leaf == "deps.lock")
+            throw new VireError("vire will not write a program file", line, column);
+        string ext = Path.GetExtension(leaf);
+        if (ShortExtensionBlocked(ext))
+            throw new VireError("vire will not write a program file", line, column);
         for (int i = 0; i < BlockedWriteExt.Length; i++)
         {
             if (ext == BlockedWriteExt[i])
                 throw new VireError("vire will not write a program file", line, column);
         }
+    }
+
+    public static bool HasStreamOrDevice(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        string text = path;
+        if (text.StartsWith(@"\\.\", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase))
+            return true;
+        int colon = text.IndexOf(':');
+        if (colon >= 0)
+        {
+            bool drive = colon == 1 && text.Length >= 2 && char.IsLetter(text[0]);
+            if (!drive || text.IndexOf(':', colon + 1) >= 0) return true;
+        }
+        string leaf = Path.GetFileName(text.TrimEnd('.', ' ', '\\', '/'));
+        return IsDeviceName(leaf);
+    }
+
+    public static bool LockHexEqual(string hashed, string locked)
+    {
+        int diff = 0;
+        if (hashed == null || locked == null) diff = 1;
+        int leftLen = hashed == null ? 0 : hashed.Length;
+        int rightLen = locked == null ? 0 : locked.Length;
+        diff |= leftLen ^ rightLen;
+        for (int i = 0; i < 64; i++)
+        {
+            int a = hashed != null && i < hashed.Length ? hashed[i] : 0;
+            int b = locked != null && i < locked.Length ? locked[i] : 0;
+            diff |= a ^ b;
+        }
+        return diff == 0;
+    }
+
+    public static void RefuseFileReparse(string path, string root, int line, int column)
+    {
+        RefuseReparse(path, root, line, column);
+        try
+        {
+            FileAttributes attrs = File.GetAttributes(path);
+            if ((attrs & FileAttributes.ReparsePoint) != 0)
+                throw new VireError("files stay inside the program folder", line, column);
+        }
+        catch (VireError) { throw; }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+        catch (IOException) { throw new VireError("files stay inside the program folder", line, column); }
+        catch (UnauthorizedAccessException) { throw new VireError("files stay inside the program folder", line, column); }
     }
 
     public static void RefuseReparse(string path, string root, int line)
@@ -187,9 +286,14 @@ static class VirePaths
         {
             try
             {
-                if ((File.Exists(cursor) || Directory.Exists(cursor)) &&
-                    (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                    throw new VireError("files stay inside the program folder", line, column);
+                if (File.Exists(cursor) || Directory.Exists(cursor))
+                {
+                    FileAttributes attr = File.GetAttributes(cursor);
+                    if ((attr & FileAttributes.ReparsePoint) != 0)
+                        throw new VireError("files stay inside the program folder", line, column);
+                    if ((attr & FileAttributes.Directory) == 0 && LinkCount(cursor) > 1)
+                        throw new VireError("files stay inside the program folder", line, column);
+                }
             }
             catch (VireError) { throw; }
             catch (IOException) { throw new VireError("files stay inside the program folder", line, column); }
@@ -199,4 +303,48 @@ static class VirePaths
             cursor = parent;
         }
     }
+
+    static int LinkCount(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return 1;
+        IntPtr handle = CreateFileW(path, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+        if (handle == new IntPtr(-1)) return 1;
+        try
+        {
+            ByHandleInfo info;
+            if (!GetFileInformationByHandle(handle, out info)) return 1;
+            return (int)info.NumberOfLinks;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct ByHandleInfo
+    {
+        public uint FileAttributes;
+        public uint CreationLow;
+        public uint CreationHigh;
+        public uint AccessLow;
+        public uint AccessHigh;
+        public uint WriteLow;
+        public uint WriteHigh;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetFileInformationByHandle(IntPtr handle, out ByHandleInfo info);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr handle);
 }
