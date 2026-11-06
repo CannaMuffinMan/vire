@@ -1,0 +1,14 @@
+~ hexOf of 18944 in-range bytes, matching a hello PE payload size.
+
+use "src/asm.vire"
+
+define main
+  let buf be []
+  let i be 0
+  while i < 18944
+    push with buf, 72
+    let i be i + 1
+  end
+  let hex be hexOf with buf
+  say length with hex
+end

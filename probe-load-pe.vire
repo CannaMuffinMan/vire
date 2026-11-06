@@ -1,0 +1,7 @@
+~ Parse and load pe.vire plus asm, rt, and rt-more. No emit.
+
+use "src/pe.vire"
+
+define main
+  say "loaded"
+end

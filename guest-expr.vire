@@ -1,0 +1,16 @@
+define add with x, y
+  return x + y
+end
+
+define main
+  let n be 0
+  let i be 0
+  while i < 20
+    let n be add with (n + i), (i * 2)
+    if n > 10
+      let n be n - 3
+    end
+    let i be i + 1
+  end
+  say n
+end
