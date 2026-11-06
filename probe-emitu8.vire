@@ -1,0 +1,13 @@
+~ Host microprobe. 21000 emitU8 of a byte already in 0..255.
+
+use "src/asm.vire"
+
+define main
+  let buf be []
+  let i be 0
+  while i < 21000
+    let buf be emitU8 with buf, 72
+    let i be i + 1
+  end
+  say length with buf
+end

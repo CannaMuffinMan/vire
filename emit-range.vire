@@ -1,0 +1,24 @@
+~ Range and list emit must match wrap semantics.
+
+use "src/asm.vire"
+use "src/rt.vire"
+
+define main
+  let a be emitU8 with [], -1
+  let b be emitU8 with [], 256
+  let c be emitU8 with [], 257
+  let d be emitU8 with [], 72
+  let e be emitU8 with [], -257
+  let f be emitList with [], [72, 300, -1, 0, 255]
+  say (a at 0)
+  say (b at 0)
+  say (c at 0)
+  say (d at 0)
+  say (e at 0)
+  say (f at 0)
+  say (f at 1)
+  say (f at 2)
+  say (f at 3)
+  say (f at 4)
+  say length with f
+end
