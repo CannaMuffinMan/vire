@@ -1,0 +1,102 @@
+using System;
+using System.IO;
+using Xunit;
+
+public class NativeArenaTests
+{
+    const int ArenaBytes = 33554432;
+
+    [Fact]
+    public void MappingAllocAndPeHeapShareThe32MbCap()
+    {
+        string root = DualMode.FindRoot();
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
+        string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        Assert.Contains("let image be emitU32 with image, " + ArenaBytes, rt);
+        Assert.Contains("emitU32 with image, " + ArenaBytes, more);
+        Assert.Contains("poke32 with head, 224, " + ArenaBytes, pe);
+        Assert.Contains("poke32 with head, 240, " + ArenaBytes, pe);
+        Assert.DoesNotContain("268435456", rt);
+        Assert.DoesNotContain("268435456", more);
+        Assert.DoesNotContain("268435456", pe);
+        Assert.Equal(5000000, Program.ProgramStepCap);
+        Assert.Contains("2000000", more);
+    }
+
+    [Fact]
+    public void AllocLimitLoadsTheSavedHeapBase()
+    {
+        string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
+        Assert.Contains("emitRel with image, fixes, \"heap_cell\"", more);
+        Assert.DoesNotContain("[77, 137, 250, 73, 129, 194]", more);
+    }
+
+    [Fact]
+    public void InternTableLivesInTheImageNotOnTheFrameCursor()
+    {
+        string root = DualMode.FindRoot();
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
+        string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        Assert.Contains("pin with labels, \"heap_cell\", image", rt);
+        Assert.Contains("pin with labels, \"intern_tab\", image", rt);
+        Assert.Contains("let image be emitRel with image, fixes, \"heap_cell\"", rt);
+        Assert.Contains("emitRel with image, fixes, \"intern_tab\"", more);
+        Assert.DoesNotContain("intern_fill", rt);
+        Assert.DoesNotContain("73, 141, 135", more);
+        Assert.DoesNotContain("73, 141, 151", rt);
+    }
+
+    [Fact]
+    public void TextIndexReusesInternedAsciiBytes()
+    {
+        string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
+        Assert.Contains("pin with labels, \"at_text_alloc\", image", more);
+        Assert.Contains("pin with labels, \"at_text_push\", image", more);
+        Assert.Contains("emitJcc with image, fixes, 131, \"at_text_alloc\"", more);
+        Assert.Contains("emitU32 with image, 128", more);
+        Assert.Contains("emitRel with image, fixes, \"at_text_push\"", more);
+    }
+
+    [Fact]
+    public void CompileNativeAndSrcStayTheOnlyNativeSources()
+    {
+        string root = DualMode.FindRoot();
+        string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
+        Assert.Contains("use \"src/pe.vire\"", native);
+        Assert.DoesNotContain("use \"data/src/", native);
+        string dataSrc = Path.Combine(root, "data", "src");
+        if (!Directory.Exists(dataSrc)) return;
+        foreach (string path in Directory.GetFiles(dataSrc, "*.vire"))
+        {
+            string name = Path.GetFileName(path);
+            string peer = Path.Combine(root, "src", name);
+            Assert.True(File.Exists(peer), "data/src/" + name + " has no src/ peer");
+            Assert.Equal(File.ReadAllText(peer), File.ReadAllText(path));
+        }
+    }
+
+    [Fact]
+    public void NativeSmokeCoversInternedIndexing()
+    {
+        string smoke = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-smoke.ps1"));
+        Assert.Contains("intern-chars", smoke);
+        Assert.Contains("tests/native/intern-chars.vire", smoke);
+    }
+
+    [Fact]
+    public void NativeSelfHostProofKeepsThe32MbCap()
+    {
+        string root = DualMode.FindRoot();
+        string proof = File.ReadAllText(Path.Combine(root, "tools", "native-selfhost-proof.ps1"));
+        Assert.Contains("compile-native.vire", proof);
+        Assert.Contains("Copy-Item -Recurse", proof);
+        Assert.Contains("SHA256", proof);
+        Assert.Contains("hello from stage", proof);
+        Assert.DoesNotContain("268435456", proof);
+        Assert.DoesNotContain("96MB", proof);
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        Assert.Contains("native-selfhost-proof.ps1", yml);
+        Assert.Contains("native-pe-emu-check.sh", yml);
+    }
+}
