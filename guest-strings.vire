@@ -1,0 +1,7 @@
+define main
+  let a be "alpha beta gamma delta epsilon"
+  let b be a + " " + a + " " + a
+  let c be b + " " + b
+  say c
+  say length with c
+end

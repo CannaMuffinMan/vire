@@ -41,9 +41,9 @@ From an isolated checkout of this branch, Release `dotnet` 10:
 ```text
 set VIRE_BUDGET=5000000
 dotnet exec bin\Release\net10.0\vire.dll probe-hexof.vire
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\guest-hello.vire data\guest-hello.hex
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\guest-strings.vire data\guest-strings.hex
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\guest-expr.vire data\guest-expr.hex
+dotnet exec bin\Release\net10.0\vire.dll compile-native.vire guest-hello.vire data\guest-hello.hex
+dotnet exec bin\Release\net10.0\vire.dll compile-native.vire guest-strings.vire data\guest-strings.hex
+dotnet exec bin\Release\net10.0\vire.dll compile-native.vire guest-expr.vire data\guest-expr.hex
 dotnet test tests\Vire.Tests\Vire.Tests.csproj -c Release --filter "FullyQualifiedName~HexOf|FullyQualifiedName~EmitU8"
 ```
 
