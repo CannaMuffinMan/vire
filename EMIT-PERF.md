@@ -31,6 +31,12 @@ Windows report at `18c2623` (user-supplied, not rerun here). Host compile hello-
 
 `emitU8` body fast-path did not move the 21000-call probe. Skipping the `emitU8` call in `emitList` did. Hello host emit dropped about 0.38s on this machine. Not Windows 31s and not a millisecond claim.
 
+## Tests (same VM, after the patch)
+
+Related filter (EmitU8, Conformance, BudgetCap, SuiteTests, BuiltinParity, UseNeed). 29 passed, 0 failed, 20 s.
+
+Full `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo` with `VIRE_BUDGET` unset. 117 passed, 8 failed, 3 m 2 s. The eight failures are this base's Linux Windows-only tests (`Foreign*`, driver, Android, APK, toolchain, headless ASCII vs em dash). They match `native-compiler` without PR #32. They are not emit-path regressions. This PR does not take those Linux contracts.
+
 ## Semantics
 
 `emitU8` still wraps. In-range 0..255 is `push`. Out of range still uses `floorDiv` and the negative clamp. `emitList` `push`es in-range bytes and calls `emitU8` otherwise.
