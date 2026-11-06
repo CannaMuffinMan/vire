@@ -1,0 +1,16 @@
+~ Host microprobe. Real emitList of 21000 in-range bytes.
+
+use "src/asm.vire"
+use "src/rt.vire"
+
+define main
+  let bytes be []
+  let i be 0
+  while i < 21000
+    push with bytes, 72
+    let i be i + 1
+  end
+  let image be []
+  let image be emitList with image, bytes
+  say length with image
+end

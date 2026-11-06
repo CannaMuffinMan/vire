@@ -20,6 +20,11 @@ define floorDiv with n, d
 end
 
 define emitU8 with buf, n
+  if n >= 0
+    if n < 256
+      return (push with buf, n)
+    end
+  end
   let x be n
   if x < 0
     let x be x + 256

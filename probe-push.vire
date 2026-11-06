@@ -1,0 +1,11 @@
+~ Host microprobe. 21000 bare push of the same byte.
+
+define main
+  let buf be []
+  let i be 0
+  while i < 21000
+    let buf be push with buf, 72
+    let i be i + 1
+  end
+  say length with buf
+end
