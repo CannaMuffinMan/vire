@@ -1307,6 +1307,33 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 255, 192, 233]
   emitRel with image, fixes, "path_loop"
   pin with labels, "path_ok", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 1, 72, 137, 69, 240, 72, 141, 73, 8, 72, 137, 77, 232, 72, 199, 69, 224, 0, 0, 0, 0]
+  pin with labels, "path_walk", image
+  emitList with image, [72, 139, 69, 224, 72, 59, 69, 240, 15, 131]
+  emitRel with image, fixes, "path_leaf"
+  emitList with image, [72, 139, 77, 232, 138, 4, 1, 60, 47, 15, 133]
+  emitRel with image, fixes, "path_walk_next"
+  emitList with image, [198, 4, 1, 0, 72, 139, 77, 232, 255, 21]
+  emitRel with image, fixes, "iat_ga"
+  emitList with image, [72, 139, 77, 232, 72, 139, 85, 224, 198, 4, 17, 47, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "path_walk_next"
+  emitList with image, [169]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "path_inside"
+  pin with labels, "path_walk_next", image
+  emitList with image, [72, 255, 69, 224, 233]
+  emitRel with image, fixes, "path_walk"
+  pin with labels, "path_leaf", image
+  emitList with image, [72, 139, 77, 232, 255, 21]
+  emitRel with image, fixes, "iat_ga"
+  emitList with image, [131, 248, 255, 15, 132]
+  emitRel with image, fixes, "path_done"
+  emitList with image, [169]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "path_inside"
+  pin with labels, "path_done", image
   emitEpi with image
   pin with labels, "path_notext", image
   emitFail with image, fixes, "msg_readtext"
@@ -1333,11 +1360,23 @@ define emitMore with image, fixes, labels
   emitJcc with image, fixes, 135, "write_big"
   emitList with image, [72, 139, 77, 232, 72, 141, 73, 8, 186]
   emitU32 with image, 1073741824
-  emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 2, 0, 0, 0, 72, 199, 68, 36, 40, 128, 0, 0, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
+  emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 2, 0, 0, 0, 199, 68, 36, 40]
+  emitU32 with image, 2097280
+  emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
   emitRel with image, fixes, "iat_cf"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "write_fail"
-  emitList with image, [72, 137, 69, 216, 72, 137, 193, 76, 139, 85, 224, 73, 141, 82, 8, 77, 139, 2, 76, 141, 13]
+  emitList with image, [72, 137, 69, 216, 72, 137, 193, 72, 141, 85, 160, 255, 21]
+  emitRel with image, fixes, "iat_fi"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [247, 69, 160]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [131, 125, 200, 1, 15, 135]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [72, 139, 77, 216, 76, 139, 85, 224, 73, 141, 82, 8, 77, 139, 2, 76, 141, 13]
   emitRel with image, fixes, "written"
   emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
   emitRel with image, fixes, "iat_wf"
@@ -1353,6 +1392,10 @@ define emitMore with image, fixes, labels
   emitFail with image, fixes, "msg_bigtxt"
   pin with labels, "write_fail", image
   emitFail with image, fixes, "msg_write"
+  pin with labels, "write_close_path", image
+  emitList with image, [72, 139, 77, 216, 255, 21]
+  emitRel with image, fixes, "iat_ch"
+  emitFail with image, fixes, "msg_path"
 
   pin with labels, "rt_args", image
   emitList with image, [72, 141, 5]
