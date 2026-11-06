@@ -1,0 +1,14 @@
+~ hexOf wrap must match hexIndex for whole numbers.
+
+use "src/asm.vire"
+
+define main
+  say (hexOf with [0])
+  say (hexOf with [72])
+  say (hexOf with [255])
+  say (hexOf with [256])
+  say (hexOf with [-1])
+  say (hexOf with [300])
+  say (hexOf with [72, 300, -1, 0, 255])
+  say (hexOf with [72.5])
+end

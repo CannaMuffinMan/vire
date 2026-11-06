@@ -148,7 +148,16 @@ define hexOf with buf
   let i be 0
   let n be length with buf
   while i < n
-    push with parts, (pairs at (hexIndex with (buf at i)))
+    let b be buf at i
+    try
+      if b >= 0 and b < 256
+        push with parts, (pairs at b)
+      else
+        push with parts, (pairs at (hexIndex with b))
+      end
+    miss unused
+      push with parts, (pairs at (hexIndex with b))
+    end
     let i be i + 1
   end
   return join with parts, ""
