@@ -12,6 +12,12 @@ public class ApkTests
         Directory.CreateDirectory(dir);
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                VireError err = Assert.Throws<VireError>(() => VireApk.Pack(dir, 1, 1));
+                Assert.Contains("not installed", err.Message);
+                return;
+            }
             string rel = VireApk.Pack(dir, 1, 1);
             Assert.Equal("data/app.apk", rel);
             string apk = Path.Combine(dir, "data", "app.apk");

@@ -22,6 +22,12 @@ public class ToolchainTests
             File.WriteAllText(Path.Combine(dir, "prog.vire"), src);
             Dictionary<string, Func> funcs = Program.Load(Path.Combine(dir, "prog.vire"), dir, new HashSet<string>());
             Machine machine = new Machine(funcs, dir);
+            if (!OperatingSystem.IsWindows())
+            {
+                VireError err = Assert.Throws<VireError>(() => machine.Call("main", new List<object>(), 1, 1));
+                Assert.Contains("not installed", err.Message);
+                return;
+            }
             TextWriter previous = Console.Out;
             StringWriter sink = new StringWriter();
             Console.SetOut(sink);

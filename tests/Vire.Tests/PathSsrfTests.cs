@@ -173,7 +173,6 @@ public class PathSsrfTests
     [Fact]
     public void HardLinkCannotRewriteDepsLock()
     {
-        if (!OperatingSystem.IsWindows()) return;
         string dir = Path.Combine(Path.GetTempPath(), "vire-c4h-" + Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(Path.Combine(dir, "data"));
         string lockFile = Path.Combine(dir, "deps.lock");
@@ -181,13 +180,28 @@ public class PathSsrfTests
         string link = Path.Combine(dir, "data", "note.txt");
         try
         {
-            System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            System.Diagnostics.ProcessStartInfo linkInfo;
+            if (OperatingSystem.IsWindows())
             {
-                FileName = "cmd.exe",
-                Arguments = "/c mklink /H \"" + link + "\" \"" + lockFile + "\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+                linkInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c mklink /H \"" + link + "\" \"" + lockFile + "\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+            else
+            {
+                linkInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ln",
+                    UseShellExecute = false
+                };
+                linkInfo.ArgumentList.Add(lockFile);
+                linkInfo.ArgumentList.Add(link);
+            }
+            System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(linkInfo);
             linkProc.WaitForExit(5000);
             Assert.Equal(0, linkProc.ExitCode);
             File.WriteAllText(Path.Combine(dir, "plant.vire"),

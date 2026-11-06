@@ -1307,6 +1307,15 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 255, 192, 233]
   emitRel with image, fixes, "path_loop"
   pin with labels, "path_ok", image
+  emitList with image, [72, 139, 77, 248, 72, 131, 193, 8, 255, 21]
+  emitRel with image, fixes, "iat_ga"
+  emitList with image, [131, 248, 255, 15, 132]
+  emitRel with image, fixes, "path_attr_ok"
+  emitList with image, [169]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "path_inside"
+  pin with labels, "path_attr_ok", image
   emitEpi with image
   pin with labels, "path_notext", image
   emitFail with image, fixes, "msg_readtext"
