@@ -42,6 +42,7 @@ jobs:
       - run: dotnet build vire.csproj -c Release
       - run: bash tools/selfhost-check.sh
       - run: bash tools/native-arena-check.sh
+      - run: bash tools/native-pe-emu-check.sh
   selfhost-windows:
     runs-on: windows-latest
     steps:

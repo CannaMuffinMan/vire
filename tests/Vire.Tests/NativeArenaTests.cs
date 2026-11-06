@@ -5,9 +5,6 @@ using Xunit;
 public class NativeArenaTests
 {
     const int ArenaBytes = 33554432;
-    const int InternOff = 4096;
-    const int InternCount = 128;
-    const int StackOff = 65536;
 
     [Fact]
     public void MappingAllocAndPeHeapShareThe32MbCap()
@@ -28,16 +25,26 @@ public class NativeArenaTests
     }
 
     [Fact]
-    public void InternTableIsInitializedBeforeArgsAndFitsUnderTheStack()
+    public void AllocLimitLoadsTheSavedHeapBase()
     {
-        string rt = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt.vire"));
-        Assert.Contains("pin with labels, \"intern_fill\", image", rt);
-        Assert.Contains("let image be emitU32 with image, " + InternOff, rt);
-        Assert.Contains("let image be emitU32 with image, " + InternCount, rt);
-        int intern = rt.IndexOf("intern_fill", StringComparison.Ordinal);
-        int args = rt.IndexOf("rt_args_init", intern, StringComparison.Ordinal);
-        Assert.True(intern >= 0 && args > intern, "intern_fill must run before rt_args_init");
-        Assert.True(InternOff + InternCount * 16 <= StackOff);
+        string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
+        Assert.Contains("emitRel with image, fixes, \"heap_cell\"", more);
+        Assert.DoesNotContain("[77, 137, 250, 73, 129, 194]", more);
+    }
+
+    [Fact]
+    public void InternTableLivesInTheImageNotOnTheFrameCursor()
+    {
+        string root = DualMode.FindRoot();
+        string rt = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
+        string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        Assert.Contains("pin with labels, \"heap_cell\", image", rt);
+        Assert.Contains("pin with labels, \"intern_tab\", image", rt);
+        Assert.Contains("let image be emitRel with image, fixes, \"heap_cell\"", rt);
+        Assert.Contains("emitRel with image, fixes, \"intern_tab\"", more);
+        Assert.DoesNotContain("intern_fill", rt);
+        Assert.DoesNotContain("73, 141, 135", more);
+        Assert.DoesNotContain("73, 141, 151", rt);
     }
 
     [Fact]
@@ -47,8 +54,7 @@ public class NativeArenaTests
         Assert.Contains("pin with labels, \"at_text_alloc\", image", more);
         Assert.Contains("pin with labels, \"at_text_push\", image", more);
         Assert.Contains("emitJcc with image, fixes, 131, \"at_text_alloc\"", more);
-        Assert.Contains("emitU32 with image, " + InternCount, more);
-        Assert.Contains("emitU32 with image, " + InternOff, more);
+        Assert.Contains("emitU32 with image, 128", more);
         Assert.Contains("emitRel with image, fixes, \"at_text_push\"", more);
     }
 
@@ -91,5 +97,6 @@ public class NativeArenaTests
         Assert.DoesNotContain("96MB", proof);
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.Contains("native-selfhost-proof.ps1", yml);
+        Assert.Contains("native-pe-emu-check.sh", yml);
     }
 }

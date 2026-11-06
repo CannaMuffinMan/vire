@@ -32,10 +32,13 @@ public class NativePeEmitTests
             Assert.Equal(33554432UL, BitConverter.ToUInt64(pe, oh + 0x58));
             Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x02 }) >= 0);
             Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x10 }) < 0);
-            Assert.True(IndexOf(pe, new byte[] { 0x4D, 0x89, 0xEE, 0x31, 0xC9 }) >= 0);
-            Assert.True(IndexOf(pe, new byte[] { 0x49, 0x8D, 0x97, 0x00, 0x10, 0x00, 0x00 }) >= 0);
+            Assert.True(IndexOf(pe, new byte[] { 0x49, 0x8D, 0x87, 0x00, 0x10, 0x00, 0x00 }) < 0);
+            Assert.True(IndexOf(pe, new byte[] { 0x49, 0x8D, 0x97, 0x00, 0x10, 0x00, 0x00 }) < 0);
+            Assert.True(IndexOf(pe, new byte[] { 0x4D, 0x89, 0xFA }) < 0);
             Assert.True(IndexOf(pe, new byte[] { 0x81, 0xF9, 0x80, 0x00, 0x00, 0x00 }) >= 0);
-            Assert.True(IndexOf(pe, new byte[] { 0x49, 0x8D, 0x87, 0x00, 0x10, 0x00, 0x00 }) >= 0);
+            Assert.True(IndexOf(pe, new byte[] { 0x4C, 0x8B, 0x15 }) >= 0);
+            int intern = IndexOf(pe, new byte[] { 1, 0, 0, 0, 0, 0, 0, 0, (byte)'A', 0, 0, 0, 0, 0, 0, 0 });
+            Assert.True(intern >= 0);
         }
         finally
         {
