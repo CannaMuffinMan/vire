@@ -173,7 +173,6 @@ public class PathSsrfTests
     [Fact]
     public void HardLinkCannotRewriteDepsLock()
     {
-        if (!OperatingSystem.IsWindows()) return;
         string dir = Path.Combine(Path.GetTempPath(), "vire-c4h-" + Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(Path.Combine(dir, "data"));
         string lockFile = Path.Combine(dir, "deps.lock");
@@ -181,15 +180,35 @@ public class PathSsrfTests
         string link = Path.Combine(dir, "data", "note.txt");
         try
         {
-            System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            if (OperatingSystem.IsWindows())
             {
-                FileName = "cmd.exe",
-                Arguments = "/c mklink /H \"" + link + "\" \"" + lockFile + "\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            linkProc.WaitForExit(5000);
-            Assert.Equal(0, linkProc.ExitCode);
+                System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c mklink /H \"" + link + "\" \"" + lockFile + "\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                linkProc.WaitForExit(5000);
+                Assert.Equal(0, linkProc.ExitCode);
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                System.Diagnostics.ProcessStartInfo info = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ln",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                info.ArgumentList.Add(lockFile);
+                info.ArgumentList.Add(link);
+                System.Diagnostics.Process linkProc = System.Diagnostics.Process.Start(info);
+                Assert.NotNull(linkProc);
+                linkProc.WaitForExit(5000);
+                Assert.Equal(0, linkProc.ExitCode);
+            }
+            else return;
+            if (!File.Exists(link)) return;
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
                 "define main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
@@ -271,6 +290,39 @@ public class PathSsrfTests
         {
             try { Directory.Delete(dir, true); } catch (IOException) { }
             try { File.Delete(outside); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void ParentDirectorySymlinkEscapeIsRefused()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-c4p-" + Guid.NewGuid().ToString("n"));
+        string outsideDir = Path.Combine(Path.GetTempPath(), "vire-c4p-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        Directory.CreateDirectory(outsideDir);
+        File.WriteAllText(Path.Combine(outsideDir, "secret.txt"), "outside-secret");
+        string dataLink = Path.Combine(dir, "data");
+        try
+        {
+            try { Directory.CreateSymbolicLink(dataLink, outsideDir); }
+            catch (Exception ex)
+            {
+                Console.WriteLine("parent symlink test skipped: " + ex.GetType().Name);
+                return;
+            }
+            if (!Directory.Exists(dataLink))
+            {
+                Console.WriteLine("parent symlink test skipped: link was not created");
+                return;
+            }
+            File.WriteAllText(Path.Combine(dir, "readparent.vire"),
+                "define main\n  say (read with \"data/secret.txt\")\nend\n");
+            Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "readparent.vire") }));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+            try { Directory.Delete(outsideDir, true); } catch (IOException) { }
         }
     }
 
