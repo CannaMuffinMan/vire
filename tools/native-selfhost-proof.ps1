@@ -1,7 +1,3 @@
-# Native PE self-host proof on Windows. Host-compile compile-native.vire
-# with the C# runner, run the exe on hello-stage, then have that exe compile
-# compile-native.vire again. Success is identical SHA-256 of the two hex
-# files. Does not raise the 32MB arena.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
