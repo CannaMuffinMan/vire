@@ -28,6 +28,7 @@ function Invoke-Vire {
 
 $programs = @(
     @{ Name = "hello"; Src = "samples/hello.vire"; Want = "hello from vire" }
+    @{ Name = "intern-chars"; Src = "tests/native/intern-chars.vire"; Want = "A`nb`n9`nAb9" }
 )
 
 $failed = $false

@@ -891,12 +891,22 @@ define emitMore with image, fixes, labels
   pin with labels, "at_text", image
   emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 76, 139, 85, 240, 73, 139, 10]
   emitCallTo with image, fixes, "rt_index"
-  emitList with image, [72, 137, 85, 216, 185]
+  emitList with image, [72, 137, 85, 216, 76, 139, 85, 240, 76, 139, 77, 216, 67, 15, 182, 76, 10, 8, 129, 249]
+  emitU32 with image, 128
+  emitJcc with image, fixes, 131, "at_text_alloc"
+  emitList with image, [193, 225, 4, 73, 141, 135]
+  emitU32 with image, 4096
+  emitList with image, [72, 1, 200, 233]
+  emitRel with image, fixes, "at_text_push"
+  pin with labels, "at_text_alloc", image
+  emitList with image, [185]
   emitU32 with image, 16
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 199, 0]
   emitU32 with image, 1
-  emitList with image, [76, 139, 85, 240, 76, 139, 77, 216, 71, 138, 92, 10, 8, 68, 136, 88, 8, 198, 64, 9, 0, 72, 137, 194]
+  emitList with image, [76, 139, 85, 240, 76, 139, 77, 216, 71, 138, 92, 10, 8, 68, 136, 88, 8, 198, 64, 9, 0]
+  pin with labels, "at_text_push", image
+  emitList with image, [72, 137, 194]
   emitPushTag with image, 2
   emitEpi with image
   pin with labels, "at_list", image
