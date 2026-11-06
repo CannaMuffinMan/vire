@@ -17,6 +17,15 @@ public class ForeignArgsTests
         Directory.CreateDirectory(dir);
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.WriteAllBytes(Path.Combine(dir, "kernel32.dll"), new byte[] { 0x4D, 0x5A });
+                VireError opened = Assert.Throws<VireError>(() => VireForeign.CallArgs(dir, "kernel32.dll", "GetCurrentProcessId", new int[0], 1, 1));
+                Assert.Contains("could not open that dll", opened.Message);
+                VireError linuxParent = Assert.Throws<VireError>(() => VireForeign.CallArgs(dir, "../kernel32.dll", "GetCurrentProcessId", new int[0], 1, 1));
+                Assert.Contains("program folder", linuxParent.Message);
+                return;
+            }
             File.Copy(Path.Combine(Environment.SystemDirectory, "kernel32.dll"), Path.Combine(dir, "kernel32.dll"));
             int pid = VireForeign.CallArgs(dir, "kernel32.dll", "GetCurrentProcessId", new int[0], 1, 1);
             Assert.Equal(Environment.ProcessId, pid);

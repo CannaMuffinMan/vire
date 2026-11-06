@@ -15,6 +15,17 @@ public class ForeignTextTests
         string dll = Path.Combine(dir, "echo.dll");
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.WriteAllBytes(dll, new byte[] { 0x4D, 0x5A });
+                string srcLinux = "define main\n  return (foreign with \"echo.dll\", \"vire_echo\", \"text\", \"hi\")\nend\n";
+                File.WriteAllText(Path.Combine(dir, "prog.vire"), srcLinux);
+                Dictionary<string, Func> funcsLinux = Program.Load(Path.Combine(dir, "prog.vire"), dir, new HashSet<string>());
+                Machine machineLinux = new Machine(funcsLinux, dir);
+                VireError opened = Assert.Throws<VireError>(() => machineLinux.Call("main", new List<object>(), 1, 1));
+                Assert.Contains("could not open that dll", opened.Message);
+                return;
+            }
             CompileEcho(dir);
             Assert.True(File.Exists(dll));
 

@@ -11,6 +11,13 @@ public class DriverImageTests
         Directory.CreateDirectory(dir);
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.WriteAllText(Path.Combine(dir, "entry.c"), "int x;\n");
+                VireError err = Assert.Throws<VireError>(() => VireBuild.Compile(dir, "driver", "entry.c", 1, 1));
+                Assert.Contains("not installed", err.Message);
+                return;
+            }
             File.WriteAllText(Path.Combine(dir, "entry.c"),
                 "#include <ntddk.h>\nNTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath){UNREFERENCED_PARAMETER(DriverObject);UNREFERENCED_PARAMETER(RegistryPath);return STATUS_SUCCESS;}\n");
             string rel = VireBuild.Compile(dir, "driver", "entry.c", 1, 1);

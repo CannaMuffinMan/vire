@@ -12,6 +12,19 @@ public class ForeignTests
         Directory.CreateDirectory(dir);
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.WriteAllBytes(Path.Combine(dir, "kernel32.dll"), new byte[] { 0x4D, 0x5A });
+                string linuxSrc = "define main\n  return (foreign with \"kernel32.dll\", \"GetTickCount\")\nend\n";
+                File.WriteAllText(Path.Combine(dir, "prog.vire"), linuxSrc);
+                Dictionary<string, Func> linuxFuncs = Program.Load(Path.Combine(dir, "prog.vire"), dir, new HashSet<string>());
+                Machine linuxMachine = new Machine(linuxFuncs, dir);
+                VireError opened = Assert.Throws<VireError>(() => linuxMachine.Call("main", new List<object>(), 1, 1));
+                Assert.Contains("could not open that dll", opened.Message);
+                VireError linuxRooted = Assert.Throws<VireError>(() => linuxMachine.Call("foreign", new List<object> { "C:/Windows/System32/kernel32.dll", "GetTickCount" }, 1, 1));
+                Assert.Contains("program folder", linuxRooted.Message);
+                return;
+            }
             File.Copy(Path.Combine(Environment.SystemDirectory, "kernel32.dll"), Path.Combine(dir, "kernel32.dll"));
             string src = string.Join("\n", new string[]
             {

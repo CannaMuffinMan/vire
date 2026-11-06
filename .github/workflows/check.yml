@@ -21,6 +21,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
+      - run: bash tools/portable-check.sh
   tracked-binaries:
     runs-on: ubuntu-latest
     steps:

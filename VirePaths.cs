@@ -306,6 +306,13 @@ static class VirePaths
 
     static int LinkCount(string path)
     {
+        if (OperatingSystem.IsLinux())
+        {
+            LinuxStat stat;
+            if (LStat(path, out stat) != 0) return 1;
+            if (stat.Nlink > int.MaxValue) return int.MaxValue;
+            return (int)stat.Nlink;
+        }
         if (!OperatingSystem.IsWindows()) return 1;
         IntPtr handle = CreateFileW(path, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
         if (handle == new IntPtr(-1)) return 1;
@@ -347,4 +354,32 @@ static class VirePaths
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr handle);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct LinuxStat
+    {
+        public ulong Dev;
+        public ulong Ino;
+        public ulong Nlink;
+        public uint Mode;
+        public uint Uid;
+        public uint Gid;
+        public int Pad;
+        public ulong Rdev;
+        public long Size;
+        public long Blksize;
+        public long Blocks;
+        public long AtimSec;
+        public long AtimNsec;
+        public long MtimSec;
+        public long MtimNsec;
+        public long CtimSec;
+        public long CtimNsec;
+        public long Unused1;
+        public long Unused2;
+        public long Unused3;
+    }
+
+    [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
+    static extern int LStat(string path, out LinuxStat buf);
 }

@@ -11,6 +11,13 @@ public class AndroidSoTests
         Directory.CreateDirectory(dir);
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.WriteAllText(Path.Combine(dir, "add.c"), "int add(int a,int b){return a+b;}\n");
+                VireError err = Assert.Throws<VireError>(() => VireBuild.Compile(dir, "android", "add.c", 1, 1));
+                Assert.Contains("not installed", err.Message);
+                return;
+            }
             File.WriteAllText(Path.Combine(dir, "add.c"), "int add(int a,int b){return a+b;}\n");
             string rel = VireBuild.Compile(dir, "android", "add.c", 1, 1);
             Assert.Equal("data/add.so", rel);
