@@ -1,6 +1,6 @@
-# Security audit (2026-11-06)
+# Security audit
 
-Dedicated security lane against `native-compiler` at `0f758e7`. Not a CVE filing. No live targets.
+Dedicated security lane. Base `native-compiler` `0f758e7`. Head of this branch is the git commit that ships with this file. Not a CVE filing. No live targets.
 
 ## Tracks
 
@@ -10,77 +10,63 @@ Dedicated security lane against `native-compiler` at `0f758e7`. Not a CVE filing
 
 ## Dependency inventory
 
-Runtime product (`vire.csproj`) has no PackageReference. It is a .NET 10 executable (`net10.0`, SDK pin `10.0.403` in `global.json`).
+Runtime product (`vire.csproj`) has no PackageReference. SDK pin `10.0.403` in `global.json`.
 
-Test-only packages (`tests/Vire.Tests/Vire.Tests.csproj`):
+Test-only: `Microsoft.NET.Test.Sdk` 17.14.1, `xunit` 2.9.3, `xunit.runner.visualstudio` 3.1.4.
 
-- `Microsoft.NET.Test.Sdk` 17.14.1
-- `xunit` 2.9.3
-- `xunit.runner.visualstudio` 3.1.4
-
-`dotnet list package --vulnerable --include-transitive` on this VM (SDK 10.0.403, nuget.org) reported no vulnerable packages for `vire.csproj` (no PackageReference) and for `Vire.Tests` including transitives:
-
-- `Microsoft.CodeCoverage` 17.14.1
-- `Microsoft.TestPlatform.ObjectModel` 17.14.1
-- `Microsoft.TestPlatform.TestHost` 17.14.1
-- `Newtonsoft.Json` 13.0.3
-- `xunit.abstractions` 2.0.3
-- `xunit.analyzers` 1.18.0
-- `xunit.assert` 2.9.3
-- `xunit.core` 2.9.3
-- `xunit.extensibility.core` 2.9.3
-- `xunit.extensibility.execution` 2.9.3
-
-That is not a clean bill for the shared .NET 10 runtime on every OS. It is the NuGet advisory feed for the restored packages. No package bump in this PR.
-
-.NET 10 servicing after 10.0.403 is outside this change. Hosting/runtime CVEs need an SDK bump Canna chooses, not a silent `global.json` edit.
+`dotnet list package --vulnerable --include-transitive` (SDK 10.0.403, nuget.org) reported no vulnerable packages for `vire` or `Vire.Tests` including transitives (`Newtonsoft.Json` 13.0.3 and the xunit/test-platform closures listed in the 2026-11-06 scan). That is the NuGet feed for restored packages, not a runtime-wide clean bill. No package bump.
 
 ## First-party findings
 
-### F1. Linux host hardlink bypass of `deps.lock` / sandbox files
+### F1. Linux host hardlink bypass
 
-- **Surface:** interpreter `VirePaths.LinkCount` on Linux. Version: `native-compiler` `0f758e7`.
-- **Evidence:** `LinkCount` returned 1 on non-Windows, so `RefuseReparse` never saw `nlink > 1`. `PathSsrfTests.HardLinkCannotRewriteDepsLock` returned on Linux before this change.
-- **Prerequisites:** attacker can create a hardlink from `data/` to `deps.lock` or another file in the program folder (same filesystem).
-- **Impact:** `write` through the link rewrites the target. First-party issue, no CVE.
-- **Status:** **fixed** on this branch with `lstat` `st_nlink`. Regression: `HardLinkCannotRewriteDepsLock` now runs `ln` on Linux.
-- **Overlap:** PR 32 drafts the same host `lstat`. This branch does not take PR 32's gap plan, workflow, or foreign-test Linux contracts.
+Host `VirePaths.LinkCount` returned 1 on Linux. `write` through `data/` onto `deps.lock` could rewrite the lock. **Fixed** with `lstat` `st_nlink`. `PathSsrfTests.HardLinkCannotRewriteDepsLock` uses `ln` and passed on this VM. Overlaps PR 32's host `lstat` only. This branch does not take PR 32's gap plan or Linux foreign-test contracts.
 
-### F2. Native `read`/`write` follow leaf and parent reparse points
+### F2. Native parent/leaf reparse
 
-- **Surface:** native PE `rt_read`, `rt_check_path`, `CreateFileA`. Host already refuses via `GetFullPath` plus `ReparsePoint`.
-- **Evidence:** native path scan only rejects `..`, `:`, `\`, and NUL in the string. `rt_read` opened with `CreateFileA` and `FILE_ATTRIBUTE_NORMAL` (128) and never called `rt_check_path`. Parent directory junctions are followed by Win32.
-- **Prerequisites:** Windows native image, symlink or junction under `data/` or `site/` pointing outside the tree, and a program that `read`/`write`s that path.
-- **Impact:** sandbox escape for native programs. First-party. **Windows PE execute unproven on this Linux VM.**
-- **Status:** **fixed in source** (fail closed). Prefix `GetFileAttributesA` walk, `FILE_FLAG_OPEN_REPARSE_POINT`, `GetFileInformationByHandle` reparse and `nlink` checks, `rt_read` calls `rt_check_path`. Source tests in `NativePathSafetyTests`. PE run **unproven**.
+Native `CreateFileA` followed reparse points. **Fixed in emit** with prefix `GetFileAttributesA` (lstat-style last component in the Unicorn stub) and `FILE_FLAG_OPEN_REPARSE_POINT`. Unicorn: parent name `data` returns 0x420, `CREATE []`, message `files stay inside the program folder`. Linux Unicorn is not Windows `CreateFileA`. Windows recipe `tools/native-sec-windows.ps1` is **blocked** on this VM.
 
-### F3. Native frame chain vs value stack (heap+64KB)
+### F3. Native frame chain vs heap+64KB
 
-- **Surface:** `rt_save_frame` vs entry stub `r13 = heap+65536`. Native has no `MaxCalls`.
-- **Evidence:** `rt_save_frame` was `mov [r15], r14; add r15, 8` with no bound. Interpreter `Budget.MaxCalls` is 64.
-- **Prerequisites:** native PE, recursion or call chain deeper than 8192 frames to reach 64KB, or any depth past 64 to mismatch host.
-- **Impact:** overwrite of the value stack / memory corruption. First-party.
-- **Status:** **fixed in source** at 64 frames (512 bytes from `frame_base`), matching host depth. Fail closed with `definitions called too deeply`. PE run **unproven**. Independent of PR 31 intern/`heap_cell` work. Overlaps `src/rt.vire` with PR 31.
+Unbounded `rt_save_frame`. **Fixed** at 64 frames (512 bytes from `frame_base`). Unicorn `boom with 65` printed `definitions called too deeply` and not `survived`. Independent of PR 31 intern/`heap_cell`. Hot file `src/rt.vire`.
 
 ### F4. Native hardlinks
 
-Covered by F2 handle `nlink` check. **Unproven on Windows.**
+`GetFileInformationByHandle` `nlink` at offset 40. Write opens `OPEN_EXISTING` first. Unicorn `nlink2` refused and left `SECRET`. Then `CREATE_ALWAYS` only after a clean nlink check so a normal file still truncates. Windows hardlink execute **blocked** (same recipe).
 
-## Draft PRs inspected (not imported)
+### F5. Path index and length clobbered (this review)
 
-- PR 31 intern RIP-relative / `heap_cell`. Performance/native-arena. Do not duplicate as a security finding. Hot file `src/rt.vire` / `src/rt-more.vire`.
-- PR 32 Linux `lstat` + leaf GFA only. This branch walks **parents** and adds handle `nlink`, and wires `rt_read`.
-- PR 33 `emitList` speed. No security import. `src/rt.vire` `emitList` left unchanged.
+`mov al, [rcx+rax]` replaced the index with `'/'` (47). A later `movzx edx` on the scan overwrote `rdx` (the length), so the scan walked into the terminating NUL and refused legal long names. Proven by CPU probe and Unicorn. **Fixed** with `movzx r8d` in the scan (length stays in `rdx`) and `movzx edx` in the walk (length already on the stack). Unicorn long name GFA is `data` then the full leaf. `data/../outside.txt` fails closed with `CREATE []`.
 
-## Deferred / not claimed
+### F6. `CREATE_ALWAYS` truncated before nlink (this review)
 
-- macOS `nlink` (still returns 1).
-- Native PE execute, Unicorn, self-host fixed-point.
-- Raising 32MB arena, 5M steps, or list cap 100000.
-- Public CVE submission.
-- FCG product policy (`POST /block`).
-- `/interrogate` four-model army (blocked: scoped review). Blast radius proven by the Linux hardlink test, not by a panel.
+Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. **Fixed** by `OPEN_EXISTING` inspect, refuse without truncate, `CREATE_ALWAYS` only after nlink==1.
+
+## Overlap (do not concatenate drafts)
+
+| PR | Head (as of 2026-11-07 fetch) | Hot files vs this branch | Resolution |
+|---|---|---|---|
+| 31 intern | `18c2623` | `src/rt.vire`, `src/rt-more.vire` | Keep intern/`heap_cell` on 31. This branch adds `frame_base` and path checks only. |
+| 32 gap/lstat | `3550d5c` | `VirePaths.cs`, `src/pe.vire`, `src/rt-more.vire` | Same Linux `lstat` idea. This walk covers **parents** and `rt_read`. Do not import GAP-CLOSURE.md. |
+| 33 emitList | `3f9e0cd` | `src/rt.vire` `emitList` | Untouched here. Performance agent owns 33/34. |
+| 34 hexOf | `7cbc63c` (base 33) | none expected | Do not pull. |
+
+CI `test` 8 failures on this PR match base Linux Windows-only foreign/Android/APK/toolchain/headless contracts. Not introduced here. `native-windows` **PASS hello** on GitHub (real `hello.exe`). That is not the junction/hardlink recipe.
+
+## Verification on this Linux VM
+
+- PathSsrf + NativePathSafety: 20 passed.
+- `bash tools/native-sec-emu-check.sh`: hello stdout, long-name GFA `data`, parent reparse, nlink2 keeps `SECRET`, depth 65, `data/../outside.txt` refused, `data/linkdir` symlink refused. Unicorn 2.1.4. Heap mapping `0x2000000`.
+- Windows junction/hardlink: **blocked**. Recipe `tools/native-sec-windows.ps1`.
+- Self-host `files stay in data or site` on CI: pre-existing vs compiler.vire. Not treated as this patch. Hours-long selfhost not run.
+
+## Gates
+
+- `/poteto-mode`: smallest fail-closed emit fixes after proven probes.
+- `/setup-pstack`: **blocked** (interactive).
+- `/interrogate`: two Grok adversaries, not four (Opus weekly cap). Findings F5 and F6 survived reruns and were fixed. Remaining "emu follows leaf symlink" was an emu `stat` vs `lstat` bug and was fixed in the stub.
+- `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; hello still prints.
 
 ## Caps
 
-32MB arena, `ProgramStepCap` 5_000_000, list cap 100_000: unchanged.
+32MB arena, `ProgramStepCap` 5_000_000, list 100_000: unchanged.
