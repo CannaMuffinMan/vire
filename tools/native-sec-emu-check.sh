@@ -104,4 +104,12 @@ echo "$plink"
 echo "$plink" | grep -F -q 'files stay inside the program folder'
 echo "$plink" | grep -F -q 'CREATE []'
 
+printf 'define main\n  say (read with "src/rt.vire")\nend\n' > "$work/readsrc.vire"
+compile "$work/readsrc.vire" "$work/readsrc.hex"
+srcread=$(emu "$work/readsrc.hex" "$work" plain)
+echo "$srcread"
+echo "$srcread" | grep -F -q 'files stay in data or site'
+echo "$srcread" | grep -F -q 'EXIT 1'
+echo "$srcread" | grep -F -q 'CREATE []'
+
 echo native sec emu check ok

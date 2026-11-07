@@ -58,4 +58,15 @@ public class NativePathSafetyTests
         Assert.Contains("heap_cell", rt);
         Assert.Contains("intern_tab", rt);
     }
+
+    [Fact]
+    public void NativeReadBuiltinIsDataOrSiteOnly()
+    {
+        string rt = File.ReadAllText(Path.Combine(Root(), "src", "rt.vire"));
+        Assert.Contains("128, 122, 8, 100, 15, 133", rt);
+        Assert.Contains("128, 122, 8, 115, 15, 133", rt);
+        Assert.Contains("msg_folder", rt);
+        Assert.Contains("102, 105, 108, 101, 115, 32, 115, 116, 97, 121, 32, 105, 110, 32, 100, 97, 116, 97, 32, 111, 114, 32, 115, 105, 116, 101", rt);
+        Assert.DoesNotContain("\"src/\"", rt);
+    }
 }

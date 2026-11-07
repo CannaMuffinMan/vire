@@ -639,6 +639,20 @@ public class PathSsrfTests
         return new Machine(funcs, dir);
     }
 
+    [Fact]
+    public void UseFileAllowsSrcVireButDataOrSiteRefuses()
+    {
+        string root = DualMode.FindRoot();
+        string src = "src/rt.vire";
+        Assert.True(File.Exists(Path.Combine(root, src)));
+        string used = VirePaths.UseFile(root, src, 1);
+        Assert.EndsWith("/src/rt.vire", used.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
+        VireError read = Assert.Throws<VireError>(() => VirePaths.DataOrSite(root, src, 1));
+        Assert.Contains("data or site", read.Message);
+        string program = VirePaths.ProgramFile(root, src, 1);
+        Assert.Equal(used, program);
+    }
+
     static Dictionary<string, object> FetchFunc(string url)
     {
         Dictionary<string, object> func = new Dictionary<string, object>();

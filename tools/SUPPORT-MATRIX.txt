@@ -1,0 +1,31 @@
+Vire native / host support matrix. Portability means this table, not "works anywhere".
+Recorded 2026-11-07 against PR38 e0d70a0 plus this handoff branch. Caps 32MB / list 100000 / 5M steps.
+
+Target                         Kind                         Evidence
+-----------------------------  ---------------------------  -----------------------------------------------
+Linux x86_64 host interpreter  tested this VM               uname Linux cursor 6.12.113+ x86_64
+                               SDK 10.0.403 RID linux-x64   PathSsrf + Native* xunit; host read src refused
+Linux x86_64 Unicorn PE emu    tested this VM               unicorn 2.1.4 stubbed kernel32
+                               NOT OS proof                 tools/native-sec-emu-check.sh PASS
+                               intern HEAP_BUMP 0x500a0     tools/native-pe-emu-check.sh PASS
+GitHub ubuntu-latest           cloud CI on PR38             build/image/publish/tracked-binaries PASS
+                               (this head e0d70a0)          selfhost FAIL compiler.vire:1114 data or site
+                               test FAIL                    8 Linux Windows-only foreign/Android/APK/headless
+GitHub windows-latest hello    cloud CI on PR38 e0d70a0     native-windows PASS (tools/native-smoke.ps1 hello)
+                               NOT junction/hardlink/frame  selfhost-windows FAIL same data or site line
+Windows x64 real PE sandbox    BLOCKED here                 tools/native-sec-windows.ps1 (180s)
+                               local CLI handoff only
+Windows native gen1→gen2       BLOCKED                      needs real PE + src use vs data read split
+macOS x64 / arm64              UNSUPPORTED as native PE     README publish RIDs exist; no job on this head
+Linux native ELF               UNSUPPORTED this lane        Phase 3B ELF drafts (PR27/30) not this runtime
+Android / APK / foreign DLL    UNSUPPORTED on Linux CI      tests fail without Windows/cmd.exe toolchains
+WoW64 / ARM Windows            UNSUPPORTED                  not in matrix
+
+Host vs native source sandbox (selfcompile prerequisite, not relaxed here):
+- Host UseFile: src/*.vire allowed, data/ and site/ refused
+- Host read/write: DataOrSite only (src/rt.vire → "files stay in data or site") proven this VM
+- Native rt_read: prefix data/ or site/ only; src/ → msg_folder "files stay in data or site" Unicorn-proven
+- compile-native.vire uses use "src/pe.vire" (host C# include when compiling the compiler).
+  Guest loadUnit uses Vire read, so gen1 cannot load src/*.vire. Do not widen native read.
+- VC selfhost stage2: run data/stage1.vc compiler.vire with sandbox root=data/
+  still calls read without a data/ prefix → CI fail. Compiler-agent overlap; not edited here.

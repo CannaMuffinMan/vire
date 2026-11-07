@@ -99,5 +99,12 @@ public class NativeArenaTests
         Assert.DoesNotContain("96MB", proof);
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.DoesNotContain("native-selfhost-proof.ps1", yml);
+        string handoff = File.ReadAllText(Path.Combine(root, "tools", "native-sec-windows.ps1"));
+        Assert.Contains("vire-native-sec-", handoff);
+        Assert.Contains("mklink /J", handoff);
+        Assert.Contains("mklink /H", handoff);
+        Assert.Contains("definitions called too deeply", handoff);
+        Assert.Contains("outside-secret", handoff);
+        Assert.DoesNotContain("268435456", handoff);
     }
 }
