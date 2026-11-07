@@ -1,4 +1,7 @@
-data/
+data/*
+!data/src/
+!data/src/**
+!data/compile-native.vire
 site/
 err.txt
 out.txt

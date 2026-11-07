@@ -1,0 +1,617 @@
+~ Native runtime emitted with the entry stub. Vire links the relocations.
+
+use "src/rt-more.vire"
+
+define emitList with image, bytes
+  return (extend with image, bytes)
+end
+
+define emitRuntime with image, fixes, labels
+  pin with labels, "code", image
+  let image be emitList with image, [72, 131, 236, 40, 185]
+  let image be emitU32 with image, 4294967285
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_gs"
+  let image be emitList with image, [72, 137, 195, 49, 201, 186]
+  let image be emitU32 with image, 33554432
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 12288
+  let image be emitList with image, [65, 185]
+  let image be emitU32 with image, 4
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_va"
+  let image be emitList with image, [72, 133, 192, 15, 132]
+  let image be emitRel with image, fixes, "entry_fail"
+  let image be emitList with image, [73, 137, 199, 73, 137, 197, 73, 129, 197]
+  let image be emitU32 with image, 65536
+  let image be emitList with image, [73, 137, 196, 73, 129, 196]
+  let image be emitU32 with image, 327680
+  let image be emitList with image, [72, 137, 5]
+  let image be emitRel with image, fixes, "heap_cell"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "frame_base"
+  let image be emitList with image, [76, 137, 57]
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "trap_slots"
+  let image be emitList with image, [72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [77, 137, 238, 232]
+  let image be emitRel with image, fixes, "rt_args_init"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "fn_main"
+  let image be emitList with image, [49, 201, 255, 21]
+  let image be emitRel with image, fixes, "iat_ep"
+  pin with labels, "entry_fail", image
+  let image be emitList with image, [185]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ep"
+  pin with labels, "rt_push_int", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "rt_push_text", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "rt_push_bool", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitU32 with image, 3
+  let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "rt_push_none", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [73, 199, 69, 8]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [73, 131, 197, 16, 201, 195]
+  pin with labels, "rt_load", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 193, 225, 4, 76, 1, 241, 72, 139, 1, 72, 61]
+  let image be emitU32 with image, 255
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "load_unset"
+  let image be emitList with image, [72, 139, 81, 8, 73, 137, 69, 0, 73, 137, 85, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "load_unset", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_noname"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "rt_store", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 193, 225, 4, 76, 1, 241, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 137, 1, 72, 137, 81, 8, 201, 195]
+  pin with labels, "rt_begin", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 77, 137, 238, 72, 193, 225, 4, 73, 41, 206, 72, 133, 210, 15, 132]
+  let image be emitRel with image, fixes, "begin_done"
+  pin with labels, "begin_loop", image
+  let image be emitList with image, [73, 199, 69, 0]
+  let image be emitU32 with image, 255
+  let image be emitList with image, [73, 199, 69, 8]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [73, 131, 197, 16, 72, 255, 202, 15, 133]
+  let image be emitRel with image, fixes, "begin_loop"
+  pin with labels, "begin_done", image
+  let image be emitList with image, [72, 139, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [73, 137, 7, 73, 131, 199, 8, 201, 195]
+  pin with labels, "rt_return", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 73, 137, 6, 73, 137, 86, 8, 77, 141, 110, 16, 73, 131, 239, 8, 73, 139, 7, 72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [201, 195]
+  pin with labels, "rt_drop", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 201, 195]
+  pin with labels, "rt_save_frame", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 141, 71, 8, 72, 139, 13]
+  let image be emitRel with image, fixes, "frame_base"
+  let image be emitList with image, [72, 129, 193]
+  let image be emitU32 with image, 512
+  let image be emitList with image, [72, 57, 200, 15, 131]
+  let image be emitRel with image, fixes, "frame_deep"
+  let image be emitList with image, [77, 137, 55, 73, 137, 199, 201, 195]
+  pin with labels, "frame_deep", image
+  let image be emitFail with image, fixes, "msg_deep"
+  pin with labels, "rt_restore_frame", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 239, 8, 77, 139, 55, 201, 195]
+  pin with labels, "rt_truth", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 132]
+  let image be emitRel with image, fixes, "truth_text"
+  let image be emitList with image, [72, 131, 248, 4, 15, 132]
+  let image be emitRel with image, fixes, "truth_text"
+  let image be emitList with image, [72, 131, 248, 5, 15, 132]
+  let image be emitRel with image, fixes, "truth_text"
+  let image be emitList with image, [72, 133, 192, 15, 132]
+  let image be emitRel with image, fixes, "truth_no"
+  let image be emitList with image, [72, 61]
+  let image be emitU32 with image, 255
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "truth_no"
+  let image be emitList with image, [72, 133, 210, 15, 132]
+  let image be emitRel with image, fixes, "truth_no"
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [201, 195]
+  pin with labels, "truth_text", image
+  let image be emitList with image, [72, 139, 2, 72, 133, 192, 15, 132]
+  let image be emitRel with image, fixes, "truth_no"
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [201, 195]
+  pin with labels, "truth_no", image
+  let image be emitList with image, [49, 192, 201, 195]
+  pin with labels, "rt_not", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 232]
+  let image be emitRel with image, fixes, "rt_truth"
+  let image be emitList with image, [131, 240, 1, 72, 152, 73, 199, 69, 0]
+  let image be emitU32 with image, 3
+  let image be emitList with image, [73, 137, 69, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "rt_cmp", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 137, 77, 248, 73, 131, 237, 16, 77, 139, 85, 0, 77, 139, 93, 8, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 1, 15, 133]
+  let image be emitRel with image, fixes, "cmp_notint"
+  let image be emitList with image, [73, 131, 250, 1, 15, 133]
+  let image be emitRel with image, fixes, "cmp_notint"
+  let image be emitList with image, [72, 139, 77, 248, 72, 131, 249, 0, 15, 133]
+  let image be emitRel with image, fixes, "cmp_op1"
+  let image be emitList with image, [76, 57, 218, 15, 148, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_op1", image
+  let image be emitList with image, [72, 131, 249, 1, 15, 133]
+  let image be emitRel with image, fixes, "cmp_op2"
+  let image be emitList with image, [76, 57, 218, 15, 149, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_op2", image
+  let image be emitList with image, [72, 131, 249, 2, 15, 133]
+  let image be emitRel with image, fixes, "cmp_op3"
+  let image be emitList with image, [76, 57, 218, 15, 156, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_op3", image
+  let image be emitList with image, [72, 131, 249, 3, 15, 133]
+  let image be emitRel with image, fixes, "cmp_op4"
+  let image be emitList with image, [76, 57, 218, 15, 158, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_op4", image
+  let image be emitList with image, [72, 131, 249, 4, 15, 133]
+  let image be emitRel with image, fixes, "cmp_op5"
+  let image be emitList with image, [76, 57, 218, 15, 159, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_op5", image
+  let image be emitList with image, [76, 57, 218, 15, 157, 192, 233]
+  let image be emitRel with image, fixes, "cmp_push"
+  pin with labels, "cmp_notint", image
+  let image be emitList with image, [72, 139, 77, 248, 72, 131, 249, 2, 15, 141]
+  let image be emitRel with image, fixes, "cmp_badnum"
+  let image be emitList with image, [72, 131, 248, 2, 15, 133]
+  let image be emitRel with image, fixes, "cmp_nottext"
+  let image be emitList with image, [73, 131, 250, 2, 15, 133]
+  let image be emitRel with image, fixes, "cmp_nottext"
+  let image be emitList with image, [72, 139, 2, 73, 139, 11, 72, 57, 200, 15, 133]
+  let image be emitRel with image, fixes, "cmp_textdiff"
+  let image be emitList with image, [76, 141, 66, 8, 77, 141, 75, 8, 72, 137, 193, 49, 192]
+  pin with labels, "cmp_tloop", image
+  let image be emitList with image, [72, 57, 200, 15, 132]
+  let image be emitRel with image, fixes, "cmp_texteq"
+  let image be emitList with image, [65, 138, 20, 0, 65, 58, 20, 1, 15, 133]
+  let image be emitRel with image, fixes, "cmp_textdiff"
+  let image be emitList with image, [72, 255, 192, 233]
+  let image be emitRel with image, fixes, "cmp_tloop"
+  pin with labels, "cmp_texteq", image
+  let image be emitList with image, [176, 1, 233]
+  let image be emitRel with image, fixes, "cmp_fromop"
+  pin with labels, "cmp_textdiff", image
+  let image be emitList with image, [48, 192, 233]
+  let image be emitRel with image, fixes, "cmp_fromop"
+  pin with labels, "cmp_nottext", image
+  let image be emitList with image, [72, 131, 248, 3, 15, 133]
+  let image be emitRel with image, fixes, "cmp_notbool"
+  let image be emitList with image, [73, 131, 250, 3, 15, 133]
+  let image be emitRel with image, fixes, "cmp_ne"
+  let image be emitList with image, [76, 57, 218, 15, 148, 192, 233]
+  let image be emitRel with image, fixes, "cmp_fromop"
+  pin with labels, "cmp_notbool", image
+  let image be emitList with image, [72, 133, 192, 15, 133]
+  let image be emitRel with image, fixes, "cmp_ne"
+  let image be emitList with image, [77, 133, 210, 15, 133]
+  let image be emitRel with image, fixes, "cmp_ne"
+  let image be emitList with image, [176, 1, 233]
+  let image be emitRel with image, fixes, "cmp_fromop"
+  pin with labels, "cmp_ne", image
+  let image be emitList with image, [48, 192]
+  pin with labels, "cmp_fromop", image
+  let image be emitList with image, [72, 139, 77, 248, 72, 131, 249, 1, 15, 133]
+  let image be emitRel with image, fixes, "cmp_push"
+  let image be emitList with image, [52, 1]
+  pin with labels, "cmp_push", image
+  let image be emitList with image, [15, 182, 192, 73, 199, 69, 0]
+  let image be emitU32 with image, 3
+  let image be emitList with image, [73, 137, 69, 8, 73, 131, 197, 16, 201, 195]
+  pin with labels, "cmp_badnum", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_nums"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "rt_say", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 61]
+  let image be emitU32 with image, 255
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "say_unset"
+  let image be emitList with image, [72, 131, 248, 1, 15, 132]
+  let image be emitRel with image, fixes, "say_int"
+  let image be emitList with image, [72, 131, 248, 2, 15, 132]
+  let image be emitRel with image, fixes, "say_text"
+  let image be emitList with image, [72, 131, 248, 3, 15, 132]
+  let image be emitRel with image, fixes, "say_bool"
+  let image be emitList with image, [72, 131, 248, 4, 15, 132]
+  let image be emitRel with image, fixes, "say_coll"
+  let image be emitList with image, [72, 131, 248, 5, 15, 132]
+  let image be emitRel with image, fixes, "say_coll"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "lit_none"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 4
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "say_write"
+  pin with labels, "say_unset", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_noname"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "say_bool", image
+  let image be emitList with image, [72, 133, 210, 15, 132]
+  let image be emitRel with image, fixes, "say_false"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "lit_true"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 4
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "say_write"
+  pin with labels, "say_false", image
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "lit_false"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 5
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "say_write"
+  pin with labels, "say_coll", image
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_to_text"
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "say_text"
+  pin with labels, "say_text", image
+  let image be emitList with image, [76, 139, 2, 72, 141, 82, 8, 233]
+  let image be emitRel with image, fixes, "say_write"
+  pin with labels, "say_int", image
+  let image be emitList with image, [76, 141, 69, 240, 77, 137, 193, 72, 133, 210, 15, 141]
+  let image be emitRel with image, fixes, "say_pos"
+  let image be emitList with image, [72, 247, 218, 65, 178, 1, 233]
+  let image be emitRel with image, fixes, "say_digits"
+  pin with labels, "say_pos", image
+  let image be emitList with image, [69, 48, 210, 72, 133, 210, 15, 133]
+  let image be emitRel with image, fixes, "say_digits"
+  let image be emitList with image, [73, 255, 201, 65, 198, 1, 48, 233]
+  let image be emitRel with image, fixes, "say_sign"
+  pin with labels, "say_digits", image
+  let image be emitList with image, [72, 133, 210, 15, 132]
+  let image be emitRel with image, fixes, "say_sign"
+  let image be emitList with image, [72, 137, 208, 49, 210, 72, 199, 193]
+  let image be emitU32 with image, 10
+  let image be emitList with image, [72, 247, 241, 128, 194, 48, 73, 255, 201, 65, 136, 17, 72, 137, 194, 233]
+  let image be emitRel with image, fixes, "say_digits"
+  pin with labels, "say_sign", image
+  let image be emitList with image, [69, 132, 210, 15, 132]
+  let image be emitRel with image, fixes, "say_ready"
+  let image be emitList with image, [73, 255, 201, 65, 198, 1, 45]
+  pin with labels, "say_ready", image
+  let image be emitList with image, [76, 137, 202, 76, 137, 192, 76, 41, 200, 73, 137, 192, 233]
+  let image be emitRel with image, fixes, "say_write"
+  pin with labels, "say_write", image
+  let image be emitList with image, [72, 137, 217, 76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "nlchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [201, 195]
+  pin with labels, "rt_fail", image
+  let image be emitList with image, [72, 139, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "trap_slots"
+  let image be emitList with image, [72, 57, 208, 15, 134]
+  let image be emitRel with image, fixes, "rt_fail_exit"
+  let image be emitList with image, [72, 131, 232, 48, 72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [76, 139, 104, 24, 76, 139, 112, 32, 76, 139, 120, 40, 72, 139, 96, 8, 72, 139, 104, 16, 73, 199, 69, 0]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 255, 32]
+  pin with labels, "rt_fail_exit", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "nlchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [185]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ep"
+  let image be emitList with image, [201, 195]
+  pin with labels, "rt_read", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 133]
+  let image be emitRel with image, fixes, "read_nottext"
+  let image be emitList with image, [72, 137, 85, 216, 72, 139, 10, 72, 131, 249, 5, 15, 130]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 8, 100, 15, 133]
+  let image be emitRel with image, fixes, "read_site"
+  let image be emitList with image, [128, 122, 9, 97, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 10, 116, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 11, 97, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 12, 47, 15, 132]
+  let image be emitRel with image, fixes, "read_scan"
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "read_folder"
+  pin with labels, "read_site", image
+  let image be emitList with image, [128, 122, 8, 115, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 9, 105, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 10, 116, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 11, 101, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  let image be emitList with image, [128, 122, 12, 47, 15, 133]
+  let image be emitRel with image, fixes, "read_folder"
+  pin with labels, "read_scan", image
+  let image be emitList with image, [49, 192]
+  pin with labels, "read_loop", image
+  let image be emitList with image, [72, 57, 200, 15, 132]
+  let image be emitRel with image, fixes, "read_open"
+  let image be emitList with image, [68, 138, 68, 2, 8, 65, 128, 248, 58, 15, 132]
+  let image be emitRel with image, fixes, "read_path"
+  let image be emitList with image, [65, 128, 248, 92, 15, 132]
+  let image be emitRel with image, fixes, "read_path"
+  let image be emitList with image, [65, 128, 248, 0, 15, 132]
+  let image be emitRel with image, fixes, "read_path"
+  let image be emitList with image, [65, 128, 248, 46, 15, 133]
+  let image be emitRel with image, fixes, "read_next"
+  let image be emitList with image, [76, 141, 72, 1, 73, 57, 201, 15, 131]
+  let image be emitRel with image, fixes, "read_next"
+  let image be emitList with image, [66, 128, 124, 10, 8, 46, 15, 132]
+  let image be emitRel with image, fixes, "read_path"
+  pin with labels, "read_next", image
+  let image be emitList with image, [72, 255, 192, 233]
+  let image be emitRel with image, fixes, "read_loop"
+  pin with labels, "read_open", image
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [72, 139, 77, 216]
+  let image be emitCallTo with image, fixes, "rt_check_path"
+  let image be emitList with image, [72, 139, 85, 216, 72, 141, 74, 8, 186]
+  let image be emitU32 with image, 2147483648
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [69, 49, 201, 199, 68, 36, 32]
+  let image be emitU32 with image, 3
+  let image be emitList with image, [199, 68, 36, 40]
+  let image be emitU32 with image, 2097280
+  let image be emitList with image, [72, 199, 68, 36, 48]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_cf"
+  let image be emitList with image, [72, 131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "read_miss"
+  let image be emitList with image, [72, 137, 69, 248, 72, 137, 193, 72, 141, 85, 160, 255, 21]
+  let image be emitRel with image, fixes, "iat_fi"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "read_close_miss"
+  let image be emitList with image, [247, 69, 160]
+  let image be emitU32 with image, 1024
+  let image be emitList with image, [15, 133]
+  let image be emitRel with image, fixes, "read_close_path"
+  let image be emitList with image, [131, 125, 200, 1, 15, 135]
+  let image be emitRel with image, fixes, "read_close_path"
+  let image be emitList with image, [72, 139, 77, 248, 49, 210, 255, 21]
+  let image be emitRel with image, fixes, "iat_sz"
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 4294967295
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "read_close_miss"
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 1000000
+  let image be emitList with image, [15, 135]
+  let image be emitRel with image, fixes, "read_close_big"
+  let image be emitList with image, [137, 69, 240, 137, 193, 72, 131, 193, 9, 232]
+  let image be emitRel with image, fixes, "rt_alloc"
+  let image be emitList with image, [73, 137, 194, 139, 69, 240, 73, 137, 2, 73, 141, 82, 8, 76, 137, 85, 224, 72, 139, 77, 248, 68, 139, 69, 240, 76, 141, 77, 232, 72, 199, 68, 36, 32]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_rf"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "read_close_miss"
+  let image be emitList with image, [76, 139, 85, 224, 139, 69, 240, 65, 198, 68, 2, 8, 0, 73, 199, 69, 0]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [77, 137, 85, 8, 73, 131, 197, 16, 72, 139, 77, 248, 255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  let image be emitList with image, [201, 195]
+  pin with labels, "read_nottext", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_readtext"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "read_folder", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_folder"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "read_path", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_path"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "read_miss", image
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_read"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "read_close_miss", image
+  let image be emitList with image, [72, 139, 77, 248, 255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "read_miss"
+  pin with labels, "read_close_path", image
+  let image be emitList with image, [72, 139, 77, 248, 255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "read_path"
+  pin with labels, "read_close_big", image
+  let image be emitList with image, [72, 139, 77, 248, 255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "msg_big"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_fail"
+  pin with labels, "rt_trap_push", image
+  let image be emitPro with image
+  let image be emitList with image, [72, 139, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "trap_end"
+  let image be emitList with image, [72, 57, 208, 15, 131]
+  let image be emitRel with image, fixes, "trap_overflow"
+  let image be emitList with image, [72, 137, 8, 72, 141, 85, 16, 72, 137, 80, 8, 72, 139, 85, 0, 72, 137, 80, 16, 76, 137, 104, 24, 76, 137, 112, 32, 76, 137, 120, 40, 72, 131, 192, 48, 72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitEpi with image
+  pin with labels, "trap_overflow", image
+  let image be emitList with image, [185]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ep"
+  let image be emitEpi with image
+  pin with labels, "rt_trap_pop", image
+  let image be emitList with image, [72, 139, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [72, 131, 232, 48, 72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [195]
+  pin with labels, "rt_trap_save", image
+  let image be emitList with image, [72, 139, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [72, 137, 1, 195]
+  pin with labels, "rt_trap_restore", image
+  let image be emitList with image, [72, 139, 1, 72, 137, 5]
+  let image be emitRel with image, fixes, "trap_sp"
+  let image be emitList with image, [195]
+  pin with labels, "rt_for_prep", image
+  let image be emitPro with image
+  let image be emitPop1 with image
+  let image be emitList with image, [72, 131, 248, 4, 15, 133]
+  let image be emitRel with image, fixes, "for_bad"
+  let image be emitList with image, [73, 199, 69, 0]
+  let image be emitU32 with image, 4
+  let image be emitList with image, [73, 137, 85, 8, 73, 131, 197, 16, 73, 199, 69, 0]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [73, 199, 69, 8]
+  let image be emitU32 with image, 0
+  let image be emitList with image, [73, 131, 197, 16]
+  let image be emitEpi with image
+  pin with labels, "for_bad", image
+  let image be emitFail with image, fixes, "msg_for"
+  pin with labels, "rt_for_more", image
+  let image be emitList with image, [73, 139, 69, 248, 73, 139, 77, 232, 72, 139, 17, 72, 57, 208, 15, 131]
+  let image be emitRel with image, fixes, "for_done"
+  let image be emitList with image, [72, 193, 224, 4, 72, 141, 84, 1, 16, 76, 139, 2, 76, 139, 74, 8, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16, 73, 255, 69, 232, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [195]
+  pin with labels, "for_done", image
+  let image be emitList with image, [49, 192, 195]
+  pin with labels, "rt_for_drop", image
+  let image be emitList with image, [73, 131, 237, 32, 195]
+  let image be emitMore with image, fixes, labels
+  return image
+end
+
+define parkRuntime with image, labels
+  pin with labels, "nlchar", image
+  let image be emitList with image, [10]
+  pin with labels, "lit_true", image
+  let image be emitList with image, [116, 114, 117, 101]
+  pin with labels, "lit_false", image
+  let image be emitList with image, [102, 97, 108, 115, 101]
+  pin with labels, "lit_none", image
+  let image be emitList with image, [110, 111, 110, 101]
+  pin with labels, "msg_noname", image
+  let image be emitU64 with image, 23
+  let image be emitList with image, [116, 104, 101, 114, 101, 32, 105, 115, 32, 110, 111, 32, 118, 97, 108, 117, 101, 32, 110, 97, 109, 101, 100]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_nums", image
+  let image be emitU64 with image, 17
+  let image be emitList with image, [110, 101, 101, 100, 115, 32, 116, 119, 111, 32, 110, 117, 109, 98, 101, 114, 115]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_readtext", image
+  let image be emitU64 with image, 24
+  let image be emitList with image, [97, 32, 102, 105, 108, 101, 32, 112, 97, 116, 104, 32, 109, 117, 115, 116, 32, 98, 101, 32, 116, 101, 120, 116]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_folder", image
+  let image be emitU64 with image, 26
+  let image be emitList with image, [102, 105, 108, 101, 115, 32, 115, 116, 97, 121, 32, 105, 110, 32, 100, 97, 116, 97, 32, 111, 114, 32, 115, 105, 116, 101]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_path", image
+  let image be emitU64 with image, 36
+  let image be emitList with image, [102, 105, 108, 101, 115, 32, 115, 116, 97, 121, 32, 105, 110, 115, 105, 100, 101, 32, 116, 104, 101, 32, 112, 114, 111, 103, 114, 97, 109, 32, 102, 111, 108, 100, 101, 114]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_read", image
+  let image be emitU64 with image, 24
+  let image be emitList with image, [99, 111, 117, 108, 100, 32, 110, 111, 116, 32, 114, 101, 97, 100, 32, 116, 104, 97, 116, 32, 102, 105, 108, 101]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_big", image
+  let image be emitU64 with image, 17
+  let image be emitList with image, [102, 105, 108, 101, 32, 105, 115, 32, 116, 111, 111, 32, 108, 97, 114, 103, 101]
+  let image be emitU8 with image, 0
+  pin with labels, "msg_deep", image
+  let image be emitU64 with image, 29
+  let image be emitList with image, [100, 101, 102, 105, 110, 105, 116, 105, 111, 110, 115, 32, 99, 97, 108, 108, 101, 100, 32, 116, 111, 111, 32, 100, 101, 101, 112, 108, 121]
+  let image be emitU8 with image, 0
+  pin with labels, "frame_base", image
+  let image be emitU64 with image, 0
+  pin with labels, "heap_cell", image
+  let image be emitU64 with image, 0
+  pin with labels, "intern_tab", image
+  let internI be 0
+  while internI < 128
+    let image be emitU64 with image, 1
+    let image be emitU8 with image, internI
+    let image be emitList with image, [0, 0, 0, 0, 0, 0, 0]
+    let internI be internI + 1
+  end
+  pin with labels, "written", image
+  let image be emitU64 with image, 0
+  pin with labels, "trap_sp", image
+  let image be emitU64 with image, 0
+  pin with labels, "trap_slots", image
+  let trapN be 0
+  while trapN < 384
+    let image be emitU64 with image, 0
+    let trapN be trapN + 1
+  end
+  pin with labels, "trap_end", image
+  let image be parkMore with image, labels
+  return image
+end

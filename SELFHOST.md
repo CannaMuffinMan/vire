@@ -7,7 +7,7 @@ This file is the compiler/performance lane. Native path/frame/intern stay PR #35
 ## Proof steps
 
 1. Host interprets `compile-native.vire` and emits a PE that includes `rt_extend` (this PR). `compile-native` must accept `extend` as a 2-arg builtin. **Host emit of an `extend` guest: required. Running that PE: Windows-only.**
-2. Copy compiler sources under `data/` (or `data/src/`) so native `read` can load them. **Open.** This tree has no `data/src/`.
+2. Copy compiler sources under `data/` (or `data/src/`) so native `read` can load them. **Host staging is in this integrate branch** (`tools/stage-compiler-src.sh`). Native gen1 using those copies is still Windows-only.
 3. Windows: host-compile `compile-native.vire` itself (timeout, do not run overnight). **Open. Linux cannot run the PE.**
 4. Windows: gen1.exe compiles hello. stdout `hello from stage`, exit 0. **Open.**
 5. Windows: gen1.exe compiles `compile-native.vire` to gen2. hex SHA match. **Open. 32MB / intern (PR #31) is the likely arena blocker.**
