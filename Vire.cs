@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv",
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend",
         "start", "wait", "result"
     });
 
@@ -592,7 +592,7 @@ sealed class Machine
                 throw new VireError("start takes a definition name and at most one value", line, col);
             need = args.Count;
         }
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend") need = 2;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -614,6 +614,12 @@ sealed class Machine
             if (list.Count >= itemCap) throw new VireError("list is too large", line, col);
             list.Add(args[1]);
             return list;
+        }
+        if (name == "extend")
+        {
+            List<object> dest = args[0] as List<object>;
+            List<object> extra = args[1] as List<object>;
+            return Program.ExtendList(dest, extra, itemCap, line, col);
         }
         if (name == "text") return Show(args[0]);
         if (name == "number")
@@ -2806,6 +2812,41 @@ internal static class HttpWire
 
 sealed class Program
 {
+    internal static object ExtendList(List<object> dest, List<object> extra, int cap, int line, int col)
+    {
+        if (dest == null || extra == null) throw new VireError("extend needs two lists", line, col);
+        if (extra.Count > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
+        if (extra.Count > cap - dest.Count) throw new VireError("list is too large", line, col);
+        for (int i = 0; i < extra.Count; i++) dest.Add(EmitU8Byte(extra[i], line, col));
+        return dest;
+    }
+
+    static object EmitU8Byte(object n, int line, int col)
+    {
+        if (n is int)
+        {
+            int whole = (int)n;
+            if (whole >= 0 && whole < 256) return n;
+        }
+        else if (n is double)
+        {
+            double real = (double)n;
+            if (real >= 0 && real < 256) return n;
+        }
+        else throw new VireError("extend needs numbers in the extra list", line, col);
+        double x;
+        if (!AsReal(n, out x)) throw new VireError("extend needs numbers in the extra list", line, col);
+        if (x < 0) x += 256;
+        if (x >= 256)
+        {
+            int q = WholeDiv(x, 256, line, col);
+            x = x - (q * 256);
+        }
+        if (x < 0) x = 0;
+        if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;
+        return x;
+    }
+
     internal static int WholeDiv(object left, object right, int line, int col)
     {
         double num;

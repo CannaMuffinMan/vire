@@ -3,18 +3,7 @@
 use "src/rt-more.vire"
 
 define emitList with image, bytes
-  let i be 0
-  let n be length with bytes
-  while i < n
-    let b be bytes at i
-    if b >= 0 and b < 256
-      let image be push with image, b
-    else
-      let image be emitU8 with image, b
-    end
-    let i be i + 1
-  end
-  return image
+  return (extend with image, bytes)
 end
 
 define emitRuntime with image, fixes, labels

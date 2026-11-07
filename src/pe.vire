@@ -221,10 +221,5 @@ define buildExe with image, entry, imp
   poke32 with head, 404, 4096
   poke32 with head, 412, 512
   poke32 with head, 428, 3758096416
-  let i be 0
-  while i < rawSize
-    let head be push with head, (image at i)
-    let i be i + 1
-  end
-  return head
+  return head + image
 end
