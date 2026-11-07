@@ -1594,6 +1594,49 @@ define emitMore with image, fixes, labels
   emitFail with image, fixes, "msg_join"
   pin with labels, "join_oom", image
   emitFail with image, fixes, "msg_bigtxt"
+
+  pin with labels, "rt_extend", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 4, 15, 133]
+  emitRel with image, fixes, "extend_bad"
+  emitList with image, [73, 131, 248, 4, 15, 133]
+  emitRel with image, fixes, "extend_bad"
+  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240, 72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "extend_loop", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 10, 72, 139, 69, 232, 72, 57, 200, 15, 141]
+  emitRel with image, fixes, "extend_done"
+  emitList with image, [72, 193, 224, 4, 72, 139, 85, 240, 72, 139, 82, 16, 72, 1, 194, 76, 139, 2, 76, 139, 74, 8, 73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "extend_slot"
+  emitList with image, [73, 131, 249, 0, 15, 140]
+  emitRel with image, fixes, "extend_neg"
+  emitList with image, [73, 129, 249]
+  emitU32 with image, 256
+  emitList with image, [15, 140]
+  emitRel with image, fixes, "extend_slot"
+  emitList with image, [73, 129, 225]
+  emitU32 with image, 255
+  emitList with image, [233]
+  emitRel with image, fixes, "extend_slot"
+  pin with labels, "extend_neg", image
+  emitList with image, [73, 129, 193]
+  emitU32 with image, 256
+  emitList with image, [73, 131, 249, 0, 15, 141]
+  emitRel with image, fixes, "extend_slot"
+  emitList with image, [77, 49, 201]
+  pin with labels, "extend_slot", image
+  emitList with image, [72, 139, 85, 248, 73, 199, 69, 0]
+  emitU32 with image, 4
+  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16]
+  emitCallTo with image, fixes, "rt_push"
+  emitList with image, [73, 131, 237, 16, 73, 139, 85, 8, 72, 137, 85, 248, 72, 255, 69, 232, 233]
+  emitRel with image, fixes, "extend_loop"
+  pin with labels, "extend_done", image
+  emitList with image, [72, 139, 85, 248]
+  emitPushTag with image, 4
+  emitEpi with image
+  pin with labels, "extend_bad", image
+  emitFail with image, fixes, "msg_extend"
   return image
 end
 
@@ -1692,6 +1735,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_minus", "minus applies to numbers"
   parkMsg with image, labels, "msg_biglist", "list is too large"
   parkMsg with image, labels, "msg_push", "push needs a list"
+  parkMsg with image, labels, "msg_extend", "extend needs two lists"
   parkMsg with image, labels, "msg_length", "length needs text, a list, or a map"
   parkMsg with image, labels, "msg_slice", "slice needs text or a list"
   parkMsg with image, labels, "msg_bounds", "slice bounds must be whole numbers"
