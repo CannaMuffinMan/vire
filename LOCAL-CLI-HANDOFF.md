@@ -6,7 +6,7 @@ Do not run this on a cloud agent. Do not touch production, OBS, Station, or secr
 
 - Remote: `https://github.com/CannaMuffinMan/vire`
 - Branch: `cursor/integrate-perf-38-0258`
-- SHA: see the tip of that branch after fetch (this file is updated when the SHA is known)
+- SHA: ab8a82e6bd0e5a7b13cb5536c389e667e618a998
 - Depends on: PR #38 `e0d70a075147113a1d3ba569fad879f8982224ea` plus the compiler stack through PR #37 `f119db8db2e9ff2b8bad5c35761886dbf76ebf50`
 - Do not check out `cursor/native-runtime-32mb-0b9c` to apply these compiler commits. That branch stays PR #38.
 
