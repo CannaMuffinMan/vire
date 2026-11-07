@@ -46,7 +46,7 @@ Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. *
 
 | PR | Head (as of 2026-11-07 fetch) | Hot files vs this branch | Resolution |
 |---|---|---|---|
-| 31 intern | `18c2623` | `src/rt.vire`, `src/rt-more.vire` | Keep intern/`heap_cell` on 31. This branch adds `frame_base` and path checks only. |
+| 31 intern | `18c2623` | `src/rt.vire`, `src/rt-more.vire` | Ported intern/`heap_cell` onto this integration draft. PR31 branch left at `18c2623`. |
 | 32 gap/lstat | `3550d5c` | `VirePaths.cs`, `src/pe.vire`, `src/rt-more.vire` | Same Linux `lstat` idea. This walk covers **parents** and `rt_read`. Do not import GAP-CLOSURE.md. |
 | 33 emitList | `3f9e0cd` | `src/rt.vire` `emitList` | Untouched here. Performance agent owns 33/34. |
 | 34 hexOf | `7cbc63c` (base 33) | none expected | Do not pull. |
@@ -55,9 +55,12 @@ CI `test` 8 failures on this PR match base Linux Windows-only foreign/Android/AP
 
 ## Verification on this Linux VM
 
-- PathSsrf + NativePathSafety: 20 passed.
+- PathSsrf + NativePathSafety + NativeArena + NativePeEmit: Native* filter 11 passed after intern port. Full suite still has the same Linux Windows-only foreign/Android/APK/toolchain/headless failures as base.
 - `bash tools/native-sec-emu-check.sh`: hello stdout, long-name GFA `data`, parent reparse, nlink2 keeps `SECRET`, depth 65, `data/../outside.txt` refused, `data/linkdir` symlink refused. Unicorn 2.1.4. Heap mapping `0x2000000`.
+- `bash tools/native-pe-emu-check.sh`: intern-chars prints `A`/`b`/`9`/`Ab9`, hello-stage prints `hello from stage`, HEAP_SIZE `0x2000000`. intern-chars HEAP_BUMP `0x500a0` (value stack 0x50000 plus ~160B). Stubbed kernel32, not OS proof.
+- Host `dotnet compile-native` medians (3 runs, python `perf_counter`, no GNU time): hello.vire 2.551s, intern-chars.vire 2.599s. Protection path/frame/nlink still on. Intern is an alloc cut at runtime, not a compile-speed claim.
 - Windows junction/hardlink: **blocked**. Recipe `tools/native-sec-windows.ps1`.
+- Native fixed-point gen1→gen2 hash + hello: **not run**. `tools/native-selfhost-proof.ps1` is the bounded Windows recipe. Not wired into `check.yml`.
 - Self-host `files stay in data or site` on CI: pre-existing vs compiler.vire. Not treated as this patch. Hours-long selfhost not run.
 
 ## Gates
@@ -70,3 +73,18 @@ CI `test` 8 failures on this PR match base Linux Windows-only foreign/Android/AP
 ## Caps
 
 32MB arena, `ProgramStepCap` 5_000_000, list 100_000: unchanged.
+
+## Integration (PR31 intern + PR35 path/frame)
+
+Branch `cursor/native-runtime-32mb-0b9c` stacks on PR35 `f292325` and ports intern/`heap_cell` from PR31 `18c2623` by hand. Original branches are unchanged.
+
+Included:
+
+- PR35 `6a43ec2`, `f292325` (host lstat, path walk, frame 64, Unicorn sec tests)
+- PR31 intern table + `heap_cell` alloc ceiling (source port, not a merge commit)
+- PR31 tests `NativeArenaTests`, `NativePeEmitTests`, `tests/native/*`, `tools/native-pe-emu.py` (IAT extended to 11 imports)
+
+Not included: PR33/34/36 emitList/hexOf/bulk extend. PR32 gap doc. PR31 `check.yml` unicorn CI step.
+
+Conflict reasoning: `src/rt.vire` entry stub needed both `mov [heap_cell], rax` (rax still the mapping) and `frame_base = r15`. `rt_alloc` must not add 32MB to live `r15`. Intern lives in the image, not at heap+4096 (that overlapped the frame chain).
+

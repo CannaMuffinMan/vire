@@ -55,5 +55,7 @@ public class NativePathSafetyTests
         Assert.Contains("emitU32 with image, 512", rt);
         Assert.Contains("msg_deep", rt);
         Assert.Contains("frame_deep", rt);
+        Assert.Contains("heap_cell", rt);
+        Assert.Contains("intern_tab", rt);
     }
 }
