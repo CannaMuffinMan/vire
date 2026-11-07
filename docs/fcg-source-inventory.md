@@ -48,7 +48,7 @@ Inspected at Vire `native-compiler` `0f758e702771ed3276ee553a76c7a86cc83846dd`. 
 | Chain files | `data/chain/*.json` SHA via `hash` | Segment cap 64, 512KiB grow (`appendBlock`). No migration language. | Tests on `verifyChain` before any storage change. |
 | Landing / CPA pages | String `write` of HTML/CSS | Direct HTML/CSS frontend is ML3. Remote fonts must not fetch at compile. | After ML1. |
 | Skinned browser / Proof of Rot app | None in-tree | Entire client. Language unknown until local handoff. | Blocked on missing source. |
-| `cl.exe` C plugins | `VireBuild.cs` shells MSVC | Direct C subset is ML2. | After ML1. Not FCG-critical until a `.c` file appears in FCG sources. |
+| `cl.exe` C plugins | `VireBuild.cs` shells MSVC. Sample `samples/project-demo/hello.c` is `int main(void) { return 0; }`. | Direct C subset is ML2. Not an FCG app source. | After ML1. Not FCG-critical until a `.c` file appears in FCG sources. |
 | Advisory / CVE | `deps.lock` file hashes only | OSV/NVD snapshots (ML4). Compiling source does not clear CVEs. | Parallel after ML1. |
 
 ## Drafts that are not this plan
