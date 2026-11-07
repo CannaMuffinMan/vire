@@ -20,6 +20,11 @@ define floorDiv with n, d
 end
 
 define emitU8 with buf, n
+  if n >= 0
+    if n < 256
+      return (push with buf, n)
+    end
+  end
   let x be n
   if x < 0
     let x be x + 256
@@ -143,7 +148,16 @@ define hexOf with buf
   let i be 0
   let n be length with buf
   while i < n
-    push with parts, (pairs at (hexIndex with (buf at i)))
+    let b be buf at i
+    try
+      if b >= 0 and b < 256
+        push with parts, (pairs at b)
+      else
+        push with parts, (pairs at (hexIndex with b))
+      end
+    miss unused
+      push with parts, (pairs at (hexIndex with b))
+    end
     let i be i + 1
   end
   return join with parts, ""
