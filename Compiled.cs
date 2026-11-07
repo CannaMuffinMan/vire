@@ -534,6 +534,13 @@ sealed class CompiledMachine
             list.Add(args[1]);
             return args[0];
         }
+        if (name == "extend")
+        {
+            if (args.Count != 2) throw new VireError("extend takes 2 values, got " + args.Count, line, col);
+            List<object> dest = args[0] as List<object>;
+            List<object> extra = args[1] as List<object>;
+            return Program.ExtendList(dest, extra, MaxItems, line, col);
+        }
         if (name == "text") return Show(args[0]);
         if (name == "number")
         {
