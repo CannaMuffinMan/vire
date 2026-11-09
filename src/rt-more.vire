@@ -1394,11 +1394,11 @@ define emitMore with image, fixes, labels
   emitU32 with image, 64
   emitList with image, [232]
   emitRel with image, fixes, "rt_alloc"
-  emitList with image, [72, 137, 69, 160, 72, 139, 77, 216, 72, 137, 194, 255, 21]
+  emitList with image, [72, 137, 69, 192, 72, 139, 77, 216, 72, 137, 194, 255, 21]
   emitRel with image, fixes, "iat_fi"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "write_close_path"
-  emitList with image, [72, 139, 85, 160, 247, 2]
+  emitList with image, [72, 139, 85, 192, 247, 2]
   emitU32 with image, 1024
   emitList with image, [15, 133]
   emitRel with image, fixes, "write_close_path"
