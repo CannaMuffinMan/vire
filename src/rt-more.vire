@@ -1042,12 +1042,8 @@ define emitMore with image, fixes, labels
   emitList with image, [185]
   emitU32 with image, 24
   emitCallTo with image, fixes, "rt_alloc"
-  emitList with image, [72, 137, 69, 248, 72, 199, 0, 0, 0, 0, 0, 72, 199, 64, 8, 4, 0, 0, 0, 185]
-  emitU32 with image, 64
-  emitCallTo with image, fixes, "rt_alloc"
-  emitList with image, [72, 139, 77, 248, 72, 137, 65, 16, 72, 137, 202, 73, 199, 69, 0]
-  emitU32 with image, 4
-  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
+  emitList with image, [72, 199, 0, 0, 0, 0, 0, 72, 199, 64, 8, 0, 0, 0, 0, 72, 199, 64, 16, 0, 0, 0, 0, 72, 137, 194]
+  emitPushTag with image, 4
   emitEpi with image
 
   pin with labels, "rt_map_new", image

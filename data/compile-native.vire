@@ -382,13 +382,54 @@ define parseAtom with state, func
       bump with state
       return ["list", items]
     end
-    push with items, (parseExpr with state, func)
-    while (form with state) == ","
-      bump with state
-      if (form with state) == "]"
-        stop
+    if (form with state) == "num" or (form with state) == "-"
+      let n be 0
+      if (form with state) == "-"
+        bump with state
+        if (form with state) != "num"
+          return markBad with state, "that expression is not ready"
+        end
+        let n be 0 - (valueOf with state)
+        bump with state
       end
+      if (form with state) == "num"
+        let n be valueOf with state
+        bump with state
+      end
+      push with items, n
+      while (form with state) == ","
+        bump with state
+        if (form with state) == "]"
+          stop
+        end
+        if (form with state) != "num" and (form with state) != "-"
+          return markBad with state, "that expression is not ready"
+        end
+        let n be 0
+        if (form with state) == "-"
+          bump with state
+          if (form with state) != "num"
+            return markBad with state, "that expression is not ready"
+          end
+          let n be 0 - (valueOf with state)
+          bump with state
+        end
+        if (form with state) == "num"
+          let n be valueOf with state
+          bump with state
+        end
+        push with items, n
+      end
+    end
+    if (form with state) != "num" and (length with items) == 0
       push with items, (parseExpr with state, func)
+      while (form with state) == ","
+        bump with state
+        if (form with state) == "]"
+          stop
+        end
+        push with items, (parseExpr with state, func)
+      end
     end
     if (form with state) != "]"
       return markBad with state, "that expression is not ready"
@@ -993,13 +1034,11 @@ define loadText with path, source, folder, seen
   end
   put 1 into seen at key
   let scanned be tokenize with source
-  say ("t " + (baseName with path) + " " + (text with (length with source)))
   if scanned at "bad"
     put 0 into seen at key
     return {"bad": true, "why": scanned at "why", "funcs": []}
   end
   let parsed be parseProgram with scanned
-  say ("p " + (baseName with path))
   if parsed at "bad"
     put 0 into seen at key
     return {"bad": true, "why": parsed at "why", "funcs": []}
@@ -1429,7 +1468,13 @@ define emitExpr with gen, funcs, func, expr
     let items be expr at 1
     let i be 0
     while i < (length with items)
-      emitExpr with gen, funcs, func, (items at i)
+      try
+        emitExpr with gen, funcs, func, (items at i)
+      miss unused
+        emitOp with gen, [72, 199, 193]
+        put (emitU32 with (gen at "image"), (items at i)) into gen at "image"
+        emitCall with gen, "rt_push_int"
+      end
       emitCall with gen, "rt_push"
       let i be i + 1
     end
@@ -1622,14 +1667,12 @@ define main
     say "compile failed"
     halt with 1
   end
-  say "m"
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
     halt with 1
   end
-  say "loaded"
   let funcs be loaded at "funcs"
   let saw be false
   let i be 0
@@ -1644,9 +1687,8 @@ define main
     say "compile failed"
     halt with 1
   end
-  say "o"
   let opened be openImage
-  say "opened"
+  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
