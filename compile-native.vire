@@ -138,11 +138,13 @@ define tokenize with source
     end
     if ch != "\""
       if isDigit with ch
-        let start be i
+        let v be 0
         while i < n
-          if not (isDigit with (source at i))
+          let mark be source at i
+          if not (isDigit with mark)
             stop
           end
+          let v be (v * 10) + (number with mark)
           let i be i + 1
         end
         if i < n
@@ -150,23 +152,22 @@ define tokenize with source
             return {"bad": true, "why": "that number is not ready"}
           end
         end
-        let raw be slice with source, start, i
         push with ks, "num"
-        push with ss, raw
-        push with ns, (number with raw)
+        push with ss, ""
+        push with ns, v
         let i be gap with source, i
       end
       if not (isDigit with ch)
         if isLetter with ch
-          let start be i
+          let word be ""
           while i < n
             let mark be source at i
             if not (isLetter with mark) and not (isDigit with mark)
               stop
             end
+            let word be word + mark
             let i be i + 1
           end
-          let word be slice with source, start, i
           let key be keyword with word
           push with ks, key
           push with ss, word
@@ -176,7 +177,7 @@ define tokenize with source
         if not (isLetter with ch)
           let two be ""
           if i + 1 < n
-            let two be slice with source, i, (i + 2)
+            let two be (source at i) + (source at (i + 1))
           end
           if two == "==" or two == "!=" or two == "<=" or two == ">="
             push with ks, two
