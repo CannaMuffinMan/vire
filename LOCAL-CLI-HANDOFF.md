@@ -6,7 +6,7 @@ Do not run this on a cloud agent. Do not touch production, OBS, Station, or secr
 
 - Remote: `https://github.com/CannaMuffinMan/vire`
 - Branch (mutable, do not check out by name): `cursor/integrate-perf-38-0258`
-- SHA (immutable pin): `c8d514e82c23fe0bf88c125aeee371a02cd7fc1f`
+- SHA (immutable pin): `PLACEHOLDER_SHA`
 - Depends on: PR #38 `e0d70a075147113a1d3ba569fad879f8982224ea` plus the compiler stack through PR #37 `f119db8db2e9ff2b8bad5c35761886dbf76ebf50`
 - Do not check out `cursor/native-runtime-32mb-0b9c` to apply these compiler commits. That branch stays PR #38.
 
@@ -24,94 +24,45 @@ Native arena 32MB. Host list cap 100000. Do not raise them.
 ```text
 git clone https://github.com/CannaMuffinMan/vire C:\scratch\vire-integrate-38
 cd C:\scratch\vire-integrate-38
-git fetch origin c8d514e82c23fe0bf88c125aeee371a02cd7fc1f
-git checkout --detach c8d514e82c23fe0bf88c125aeee371a02cd7fc1f
+git fetch origin PLACEHOLDER_SHA
+git checkout --detach PLACEHOLDER_SHA
+set VIRE_BUDGET=5000000
+set VIRE_HEADLESS=1
 dotnet build vire.csproj -c Release
 ```
 
-## Stage compiler sources (read stays data/site)
+## Commands (PowerShell only)
 
-Needed for gen1 (compiler as guest). Not required for the hello emit below (`compile-native.vire` `use`s `src/`).
-
-```text
-bash tools/stage-compiler-src.sh
-```
-
-If bash is missing, copy `compile-native.vire` to `data\compile-native.vire` and copy `src\asm.vire`, `src\pe.vire`, `src\rt.vire`, `src\rt-more.vire` into `data\src\`. SHA-256 of each pair must match.
-
-`data\guest-hello.vire` is gitignored. Always copy it:
+Hello emit + host info + `total_steps` (timeout 120s):
 
 ```text
-mkdir data 2>nul
-copy /Y guest-hello.vire data\guest-hello.vire
+pwsh -File tools/native-hello-handoff.ps1
 ```
 
-## Commands, timeouts, expected
-
-Host emit hello (timeout **120s**; CI `native-windows` times this in `tools/native-hello-handoff.ps1`). Do not use 30s. Linux is ~1.4s and does not prove Windows. stderr prints `vire: starting compile-native.vire`, `vire: loading …`, then `vire: loaded, running main`, and a `vire: still running steps=…` line every 2s until `compiled` on stdout. Empty stdout+stderr until kill means the wrapper is not capturing the child, not a silent compile.
-
-Feed NUL stdin so a wrapper pipe cannot block on `Console.ReadLine`:
+Sandbox junctions/hardlinks (must get past hello compile; was broken when `compile-native.vire` bound to `[int]$TimeoutSec`):
 
 ```text
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data/guest-hello.vire data/guest-hello.hex < NUL
+pwsh -File tools/native-sec-windows.ps1
 ```
 
-Or: `pwsh -File tools/native-hello-handoff.ps1`
-
-Expect stdout to contain `compiled`, exit 0, and stderr to start with `vire: starting`. Keep both streams.
-
-Run the PE on Windows (timeout 10s):
+Full bounded selfhost (stage, hello PE, gen1, gen1 hello, gen2 SHA). Timeouts: hello host 120s, hello run 15s, gen1 host 300s, gen1 hello 120s, gen1 hello run 15s, gen2 native 600s. Stop at first fail. Do not run `native-selfhost-proof.ps1` overnight.
 
 ```text
-certutil -hashfile data\guest-hello.hex SHA256
-python -c "p=open('data/guest-hello.hex').read().strip(); open('data/guest-hello.exe','wb').write(bytes.fromhex(p))"
-data\guest-hello.exe
-echo %ERRORLEVEL%
+pwsh -File tools/native-selfhost-handoff.ps1
 ```
 
-Expect stdout `hello from stage` and exit 0. If that fails, stop. Do not fall back to Unicorn as a Win32 proof.
+Expect `hello from stage` from both PEs, `compiled` on emits, `gen1_sha256` == `gen2_sha256`, and stderr `vire: total_steps=N`. Heartbeats every 2s wall print `steps=` so far (N is `budget.Steps`, one count per 64 interpreter `Step` calls). More heartbeat lines means a slower machine, not extra compiler work. Compare `total_steps` across hosts.
 
-Host emit of the compiler as a `data/` guest (timeout 180s, stop if longer):
-
-```text
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\compile-native.vire data\gen1.hex < NUL
-```
-
-Linux did this in 66s. If it OOMs or exceeds 180s, log the message and stop.
-
-Optional native gen1 run on Windows (timeout 10 minutes, then stop):
-
-```text
-python -c "p=open('data/gen1.hex').read().strip(); open('data/gen1.exe','wb').write(bytes.fromhex(p))"
-data\gen1.exe data\guest-hello.vire data\gen1-hello.hex
-```
-
-Expect `compiled`. Then run the new PE for `hello from stage`. Then:
-
-```text
-data\gen1.exe data\compile-native.vire data\gen2.hex
-certutil -hashfile data\gen1.hex SHA256
-certutil -hashfile data\gen2.hex SHA256
-```
-
-gen1 SHA == gen2 SHA is the fixed-point proof. Anything else is not.
+Linux hello ~1.1s / CI windows-latest hello 3.1s / CouchStation hello 31.4s. Do not treat Linux times as Windows.
 
 ## Logs to keep
 
-- stdout **and** stderr of each command
+- stdout and stderr
+- `hello_host_compile_sec`, `step_*_sec`, `cpu`, `cores`, `dotnet_sdk`, `total_steps`
 - SHA-256 of `data\guest-hello.hex`, `data\gen1.hex`, `data\gen2.hex`
-- wall times (`hello_host_compile_sec` from the handoff script)
-- first error line if a step fails
 
 ## Stop criteria
 
 - Stop at the first missing `data/src` read, 32MB / out of memory, step-budget stop, or timeout.
-- Do not run `tools/native-selfhost-proof.ps1` overnight.
 - Do not merge, deploy, or change OBS.
 - Unicorn on Linux is not this proof.
-
-## Tests that already passed on Linux (not Windows)
-
-`dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --filter "FullyQualifiedName~CompilerStage|FullyQualifiedName~NativeExtend|FullyQualifiedName~NativePath|FullyQualifiedName~NativeArena|FullyQualifiedName~NativePe|FullyQualifiedName~Extend|FullyQualifiedName~PathSsrf|FullyQualifiedName~EmitU8|FullyQualifiedName~HexOf|FullyQualifiedName~BudgetCap"`
-
-Re-run on Windows if you want a Windows xUnit log. Do not skip NativePath / Arena.

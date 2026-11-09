@@ -419,6 +419,10 @@ sealed class Machine
 
     public void UseArgs(List<object> values) { programArgs = values; }
 
+    public int ChargedSteps() { return budget.Steps; }
+
+    public int PendingSteps() { return budget.Pending; }
+
     internal static int RequirePort(object value, int line)
     {
         int whole;
@@ -3271,6 +3275,8 @@ sealed class Program
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);
             machine.Run();
+            if (IsCompilerProgram(program))
+                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch);
             return 0;
         }
         catch (HaltSignal halt)

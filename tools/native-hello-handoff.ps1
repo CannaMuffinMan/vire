@@ -3,6 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
@@ -31,6 +32,7 @@ if (-not $p.WaitForExit($timeoutMs)) {
 $sw.Stop()
 $stdout = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
 $stderr = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+Write-VireHostInfo
 Write-Output "hello_host_compile_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
 Write-Output "hello_host_compile_exit $($p.ExitCode)"
 if ($stderr) { Write-Output $stderr.TrimEnd() }

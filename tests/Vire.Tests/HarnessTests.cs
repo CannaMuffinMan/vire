@@ -117,9 +117,18 @@ public class HarnessTests
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.Contains("WaitForExit", sec);
         Assert.Contains("timed out after", sec);
+        Assert.Contains("PositionalBinding = $false", sec);
+        Assert.Contains("[string[]]$VireArgs", sec);
         Assert.Contains("WaitForExit", hello);
         Assert.Contains("120000", hello);
         Assert.Contains("native-hello-handoff.ps1", yml);
+        Assert.Contains("native-sec-windows.ps1", yml);
+        Assert.Contains("native-selfhost-handoff.ps1", yml);
+        string self = File.ReadAllText(Path.Combine(root, "tools", "native-selfhost-handoff.ps1"));
+        Assert.Contains("WaitForExit", self);
+        Assert.Contains("gen1_sha256", self);
+        Assert.DoesNotContain("python -c", self);
+        Assert.DoesNotContain("bash ", self);
     }
 
     [Fact]
