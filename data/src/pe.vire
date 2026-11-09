@@ -290,6 +290,6 @@ define buildExe with image, entry, imp, dataOff
   pokeSection with head, 392, ".idata", 4096, 4096, 4096, 512, 3221225536
   pokeSection with head, 432, ".text", textRaw, 8192, textRaw, 4608, 1610612768
   pokeSection with head, 472, ".data", dataRaw, (4096 + dataOff), dataRaw, (512 + dataOff), 3221225536
-  let pe be head + image
+  let pe be extend with head, image
   return peChecksum with pe
 end
