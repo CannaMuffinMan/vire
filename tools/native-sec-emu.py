@@ -147,7 +147,11 @@ class Emu:
         return False
 
     def api_GetStdHandle(self):
-        self.wr(UC_X86_REG_RAX, 1)
+        n = self.rd(UC_X86_REG_RCX) & 0xFFFFFFFF
+        if n == 0xFFFFFFF4:
+            self.wr(UC_X86_REG_RAX, 2)
+        else:
+            self.wr(UC_X86_REG_RAX, 1)
 
     def api_GetCommandLineA(self):
         self.wr(UC_X86_REG_RAX, 0x500000000)
@@ -176,7 +180,7 @@ class Emu:
                 os.makedirs(os.path.dirname(full), exist_ok=True)
                 with open(full, "wb") as f:
                     f.write(data)
-        else:
+        elif handle != 2:
             self.out += data
         written = self.rd(UC_X86_REG_R9)
         if written:

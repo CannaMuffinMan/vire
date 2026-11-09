@@ -224,6 +224,10 @@ define finishImage with image, labels, fixes, hints, ilts, iats
 end
 
 define buildExe with image, entry, imp, dataOff
+  ~ Well-formed PE32+: W^X .text/.data, checksum, nonzero timestamp, linker 14.40,
+  ~ OS/subsystem 6.0, 1MB stack/heap reserve (arena stays VirtualAlloc 32MB),
+  ~ NX + HIGH_ENTROPY_VA + TERMINAL_SERVER_AWARE. No DYNAMIC_BASE without relocs.
+  ~ Do not add RWX, raise caps, or Defender exclusions.
   let head be zeros with 512
   poke32 with head, 0, 23117
   poke32 with head, 60, 128
@@ -235,7 +239,7 @@ define buildExe with image, entry, imp, dataOff
   poke16 with head, 150, 35
   poke16 with head, 152, 523
   put 14 into head at 154
-  put 0 into head at 155
+  put 40 into head at 155
   poke32 with head, 168, (4096 + entry)
   poke32 with head, 172, 8192
   poke32 with head, 176, 1073741824
@@ -243,9 +247,9 @@ define buildExe with image, entry, imp, dataOff
   poke32 with head, 184, 4096
   poke32 with head, 188, 512
   poke16 with head, 192, 6
-  poke16 with head, 194, 1
+  poke16 with head, 194, 0
   poke16 with head, 200, 6
-  poke16 with head, 202, 1
+  poke16 with head, 202, 0
   let image be alignTo with image, 512
   let rawSize be length with image
   let idataRaw be 4096
@@ -264,10 +268,10 @@ define buildExe with image, entry, imp, dataOff
   poke32 with head, 208, (8192 + (textPages * 4096) + (dataPages * 4096))
   poke32 with head, 212, 512
   poke16 with head, 220, 3
-  poke16 with head, 222, 33024
-  poke32 with head, 224, 33554432
+  poke16 with head, 222, 33056
+  poke32 with head, 224, 1048576
   poke32 with head, 232, 4096
-  poke32 with head, 240, 33554432
+  poke32 with head, 240, 1048576
   poke32 with head, 248, 4096
   poke32 with head, 260, 16
   poke32 with head, 272, (4096 + imp)

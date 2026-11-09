@@ -168,7 +168,11 @@ class Emu:
         return False
 
     def api_GetStdHandle(self):
-        self.wr(UC_X86_REG_RAX, 1)
+        n = self.rd(UC_X86_REG_RCX) & 0xFFFFFFFF
+        if n == 0xFFFFFFF4:
+            self.wr(UC_X86_REG_RAX, 2)
+        else:
+            self.wr(UC_X86_REG_RAX, 1)
 
     def api_GetCommandLineA(self):
         self.wr(UC_X86_REG_RAX, 0x500000000)
@@ -189,7 +193,9 @@ class Emu:
         n = self.rd(UC_X86_REG_R8) & 0xFFFFFFFF
         written = self.rd(UC_X86_REG_R9)
         data = bytes(self.mu.mem_read(buf, n)) if n else b""
-        self.out += data
+        handle = self.rd(UC_X86_REG_RCX)
+        if handle != 2:
+            self.out += data
         if written:
             self.mu.mem_write(written, struct.pack("<I", n))
         self.wr(UC_X86_REG_RAX, 1)
