@@ -12,7 +12,7 @@ public class HeadlessWindowTests
         string root = DualMode.FindRoot();
         DualMode.Proc proc = RunHeadless(root, new string[] { "work.vire" }, root);
         Assert.Equal(0, proc.Code);
-        Assert.Contains("Write Vire - done", DualMode.Norm(proc.Out));
+        Assert.Contains("Write Vire — done", DualMode.Norm(proc.Out));
         Assert.DoesNotContain("0 close", DualMode.Norm(proc.Out));
     }
 

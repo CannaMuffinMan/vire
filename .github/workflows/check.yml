@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
+      - name: host C and Java toolchains
+        run: sudo apt-get update && sudo apt-get install -y gcc clang mingw-w64 default-jdk-headless
       - run: dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
   tracked-binaries:
     runs-on: ubuntu-latest

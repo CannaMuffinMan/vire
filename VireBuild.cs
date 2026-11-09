@@ -28,13 +28,22 @@ static class VireBuild
         string data = Path.Combine(root, "data");
         Directory.CreateDirectory(data);
         if (kind == "c") return RunC(root, source, Path.Combine(data, stem + ".exe"), line, col);
-        if (kind == "android") return RunAndroid(root, source, Path.Combine(data, stem + ".o"), line, col);
+        if (kind == "android") return RunAndroid(root, source, Path.Combine(data, stem + ".so"), line, col);
         if (kind == "driver") return RunDriver(root, source, Path.Combine(data, stem + ".obj"), line, col);
         throw new VireError("build kind must be c, android, or driver", line, col);
     }
 
     static string RunC(string root, string source, string output, int line, int col)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            string cc = FindOnPath("gcc") ?? FindOnPath("clang") ?? FindOnPath("cc");
+            if (cc == null) throw new VireError("the C compiler is not installed", 1);
+            RunTool(cc, new string[] { "-O2", "-o", output, source }, "", "", Path.GetDirectoryName(cc), root, line, col);
+            if (!File.Exists(output)) throw new VireError("could not compile", line, col);
+            TryChmodExecute(output);
+            return "data/" + Path.GetFileName(output);
+        }
         string cl = FindCl();
         string kit = FindKit();
         string msvc = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(cl))));
@@ -58,15 +67,34 @@ static class VireBuild
 
     static string RunAndroid(string root, string source, string output, int line, int col)
     {
-        string so = Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".so");
+        string so = output.EndsWith(".so", StringComparison.OrdinalIgnoreCase)
+            ? output
+            : Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".so");
         string clang = FindClang();
-        RunTool(clang, new string[] { "--target=aarch64-linux-android35", "-shared", "-fPIC", "-o", so, source }, "", "", Path.GetDirectoryName(clang), root, line, col);
+        string[] args;
+        if (clang.IndexOf("ndk", StringComparison.OrdinalIgnoreCase) >= 0)
+            args = new string[] { "--target=aarch64-linux-android35", "-shared", "-fPIC", "-o", so, source };
+        else
+            args = new string[] { "-shared", "-fPIC", "-o", so, source };
+        RunTool(clang, args, "", "", Path.GetDirectoryName(clang) ?? "", root, line, col);
         if (!File.Exists(so) || new FileInfo(so).Length < 8) throw new VireError("could not compile", line, col);
         return "data/" + Path.GetFileName(so);
     }
 
     static string RunDriver(string root, string source, string output, int line, int col)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            string cc = FindOnPath("x86_64-w64-mingw32-gcc");
+            if (cc == null) throw new VireError("the C compiler is not installed", 1);
+            string stub = WriteKmStub();
+            RunTool(cc, new string[] { "-c", "-o", output, "-I", stub, source }, "", "", Path.GetDirectoryName(cc), root, line, col);
+            if (!File.Exists(output) || new FileInfo(output).Length < 8) throw new VireError("could not compile", line, col);
+            string sys = Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".sys");
+            RunTool(cc, new string[] { "-nostdlib", "-Wl,--subsystem,native", "-Wl,-e,DriverEntry", "-o", sys, output }, "", "", Path.GetDirectoryName(cc), root, line, col);
+            if (!File.Exists(sys) || new FileInfo(sys).Length <= 512) throw new VireError("could not compile", line, col);
+            return "data/" + Path.GetFileName(sys);
+        }
         string cl = FindCl();
         string kit = FindKit();
         string include = string.Join(";", new string[]
@@ -77,7 +105,7 @@ static class VireBuild
         });
         RunTool(cl, new string[] { "/nologo", "/c", "/kernel", "/GS-", "/D_AMD64_", "/Fo" + output, source }, include, "", Path.GetDirectoryName(cl), root, line, col);
         if (!File.Exists(output) || new FileInfo(output).Length < 8) throw new VireError("could not compile", line, col);
-        string sys = Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".sys");
+        string winSys = Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".sys");
         string link = FindLink(cl);
         string lib = Path.Combine(KitLib(kit), "km", "x64");
         RunTool(link, new string[]
@@ -87,11 +115,11 @@ static class VireBuild
             "/SUBSYSTEM:NATIVE",
             "/ENTRY:DriverEntry",
             "/NODEFAULTLIB",
-            "/OUT:" + sys,
+            "/OUT:" + winSys,
             output
         }, "", lib, Path.GetDirectoryName(link), root, line, col);
-        if (!File.Exists(sys) || new FileInfo(sys).Length <= 512) throw new VireError("could not compile", line, col);
-        return "data/" + Path.GetFileName(sys);
+        if (!File.Exists(winSys) || new FileInfo(winSys).Length <= 512) throw new VireError("could not compile", line, col);
+        return "data/" + Path.GetFileName(winSys);
     }
 
     static void RunTool(string file, string[] args, string include, string lib, string toolDir, string root, int line, int col)
@@ -107,7 +135,7 @@ static class VireBuild
         if (include.Length > 0) info.Environment["INCLUDE"] = include;
         if (lib.Length > 0) info.Environment["LIB"] = lib;
         string path = Environment.GetEnvironmentVariable("PATH") ?? "";
-        info.Environment["PATH"] = toolDir + ";" + path;
+        info.Environment["PATH"] = string.IsNullOrEmpty(toolDir) ? path : toolDir + Path.PathSeparator + path;
         using (Process proc = Process.Start(info))
         {
             if (proc == null) throw new VireError("could not compile", line, col);
@@ -179,17 +207,89 @@ static class VireBuild
 
     static string FindClang()
     {
-        string ndk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
-        if (string.IsNullOrEmpty(ndk)) ndk = "D:\\Android";
-        string root = Path.Combine(ndk, "ndk");
-        if (!Directory.Exists(root)) throw new VireError("the phone SDK is not installed", 1);
-        string[] versions = Directory.GetDirectories(root);
-        Array.Sort(versions);
-        for (int i = versions.Length - 1; i >= 0; i--)
+        string ndkRoot = Environment.GetEnvironmentVariable("ANDROID_NDK_HOME");
+        if (string.IsNullOrEmpty(ndkRoot)) ndkRoot = Environment.GetEnvironmentVariable("ANDROID_NDK_ROOT");
+        string sdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
+        if (string.IsNullOrEmpty(sdk)) sdk = Environment.GetEnvironmentVariable("ANDROID_HOME");
+        if (string.IsNullOrEmpty(sdk)) sdk = "D:\\Android";
+        string[] prebuilts = OperatingSystem.IsWindows()
+            ? new string[] { "windows-x86_64" }
+            : new string[] { "linux-x86_64", "linux-aarch64" };
+        string[] search = new string[] { ndkRoot, Path.Combine(sdk, "ndk") };
+        for (int s = 0; s < search.Length; s++)
         {
-            string clang = Path.Combine(versions[i], "toolchains", "llvm", "prebuilt", "windows-x86_64", "bin", "clang.exe");
-            if (File.Exists(clang)) return clang;
+            string root = search[s];
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
+            string[] versions;
+            if (Directory.Exists(Path.Combine(root, "toolchains")))
+                versions = new string[] { root };
+            else
+            {
+                versions = Directory.GetDirectories(root);
+                Array.Sort(versions);
+            }
+            for (int i = versions.Length - 1; i >= 0; i--)
+            {
+                for (int p = 0; p < prebuilts.Length; p++)
+                {
+                    string clang = Path.Combine(versions[i], "toolchains", "llvm", "prebuilt", prebuilts[p], "bin",
+                        OperatingSystem.IsWindows() ? "clang.exe" : "clang");
+                    if (File.Exists(clang)) return clang;
+                }
+            }
         }
+        string host = FindOnPath(OperatingSystem.IsWindows() ? "clang.exe" : "clang");
+        if (host != null) return host;
         throw new VireError("the phone SDK is not installed", 1);
+    }
+
+    static string FindOnPath(string name)
+    {
+        string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        string[] dirs = path.Split(Path.PathSeparator);
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            if (string.IsNullOrEmpty(dirs[i])) continue;
+            string candidate = Path.Combine(dirs[i], name);
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    static string WriteKmStub()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-km-stub");
+        Directory.CreateDirectory(dir);
+        string header = Path.Combine(dir, "ntddk.h");
+        if (!File.Exists(header))
+        {
+            File.WriteAllText(header,
+                "typedef int NTSTATUS;\n" +
+                "typedef void *PDRIVER_OBJECT;\n" +
+                "typedef void *PUNICODE_STRING;\n" +
+                "#define STATUS_SUCCESS 0\n" +
+                "#define UNREFERENCED_PARAMETER(x) ((void)(x))\n");
+        }
+        return dir;
+    }
+
+    static void TryChmodExecute(string path)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        try
+        {
+            ProcessStartInfo info = new ProcessStartInfo("chmod");
+            info.ArgumentList.Add("+x");
+            info.ArgumentList.Add(path);
+            info.UseShellExecute = false;
+            info.CreateNoWindow = true;
+            using (Process proc = Process.Start(info))
+            {
+                if (proc != null) proc.WaitForExit(5000);
+            }
+        }
+        catch (Exception)
+        {
+        }
     }
 }

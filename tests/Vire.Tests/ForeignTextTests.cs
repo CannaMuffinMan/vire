@@ -64,12 +64,17 @@ public class ForeignTextTests
         string src = string.Join("\n", new string[]
         {
             "#include <string.h>",
+            "#if defined(_WIN32)",
+            "#define VIRE_EXPORT __declspec(dllexport)",
+            "#else",
+            "#define VIRE_EXPORT __attribute__((visibility(\"default\")))",
+            "#endif",
             "static char buf[4097];",
-            "__declspec(dllexport) int vire_len(const char* s) {",
+            "VIRE_EXPORT int vire_len(const char* s) {",
             "    if (!s) return -1;",
             "    return (int)strlen(s);",
             "}",
-            "__declspec(dllexport) const char* vire_echo(const char* s) {",
+            "VIRE_EXPORT const char* vire_echo(const char* s) {",
             "    buf[0] = 0;",
             "    if (!s) return buf;",
             "    strncpy(buf, s, 4096);",
@@ -79,6 +84,11 @@ public class ForeignTextTests
             ""
         });
         File.WriteAllText(Path.Combine(dir, "echo.c"), src);
+        if (!OperatingSystem.IsWindows())
+        {
+            ForeignHost.CompileShared(dir, Path.Combine(dir, "echo.c"), Path.Combine(dir, "echo.dll"));
+            return;
+        }
         string vcvars = @"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat";
         string cl = @"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\cl.exe";
         string command = "call \"" + vcvars + "\" && \"" + cl + "\" /nologo /LD /O2 /utf-8 echo.c /Fe:echo.dll";

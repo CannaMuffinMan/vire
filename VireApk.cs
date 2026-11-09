@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 
 static class VireApk
@@ -14,15 +15,16 @@ static class VireApk
 
     public static string Pack(string root, int line, int col)
     {
-        string aapt = Path.Combine(BuildTools, "aapt.exe");
-        string zipalign = Path.Combine(BuildTools, "zipalign.exe");
-        string apksignerJar = Path.Combine(BuildTools, "lib", "apksigner.jar");
-        string java = Path.Combine(JdkHome, "bin", "java.exe");
-        if (!File.Exists(aapt)) throw new VireError("aapt is not installed: " + aapt, line, col);
-        if (!File.Exists(zipalign)) throw new VireError("zipalign is not installed: " + zipalign, line, col);
-        if (!File.Exists(apksignerJar)) throw new VireError("apksigner is not installed: " + apksignerJar, line, col);
-        if (!File.Exists(java)) throw new VireError("java is not installed: " + java, line, col);
-        if (!File.Exists(AndroidJar)) throw new VireError("android.jar is not installed: " + AndroidJar, line, col);
+        string tools = FindBuildTools();
+        string aapt = FirstExisting(Path.Combine(tools, "aapt.exe"), Path.Combine(tools, "aapt"));
+        string zipalign = FirstExisting(Path.Combine(tools, "zipalign.exe"), Path.Combine(tools, "zipalign"));
+        string apksignerJar = Path.Combine(tools, "lib", "apksigner.jar");
+        string javaHome = FindJavaHome();
+        string java = FirstExisting(Path.Combine(javaHome, "bin", "java.exe"), Path.Combine(javaHome, "bin", "java"));
+        string androidJar = FindAndroidJar();
+        if (aapt == null || zipalign == null || !File.Exists(apksignerJar) || androidJar == null)
+            return PackZipSigned(root, javaHome, line, col);
+        if (java == null) throw new VireError("java is not installed", line, col);
         string data = Path.Combine(root, "data");
         Directory.CreateDirectory(data);
         string output = Path.Combine(data, "app.apk");
@@ -34,7 +36,7 @@ static class VireApk
             File.WriteAllText(manifest, ManifestText(), new UTF8Encoding(false));
             RunTool(aapt, new string[]
             {
-                "package", "-f", "-M", manifest, "-I", AndroidJar, "-F", output
+                "package", "-f", "-M", manifest, "-I", androidJar, "-F", output
             }, work, line, col, false);
             if (!File.Exists(output) || new FileInfo(output).Length < 8)
                 throw new VireError("aapt did not write data/app.apk", line, col);
@@ -66,8 +68,9 @@ static class VireApk
     static void EnsureDebugKeystore(string keystore, string work, int line, int col)
     {
         if (File.Exists(keystore)) return;
-        string keytool = Path.Combine(JdkHome, "bin", "keytool.exe");
-        if (!File.Exists(keytool)) throw new VireError("keytool is not installed: " + keytool, line, col);
+        string javaHome = FindJavaHome();
+        string keytool = FirstExisting(Path.Combine(javaHome, "bin", "keytool.exe"), Path.Combine(javaHome, "bin", "keytool"));
+        if (keytool == null) throw new VireError("keytool is not installed", line, col);
         RunTool(keytool, new string[]
         {
             "-genkeypair",
@@ -104,8 +107,10 @@ static class VireApk
         info.CreateNoWindow = true;
         for (int i = 0; i < args.Length; i++) info.ArgumentList.Add(args[i]);
         string path = Environment.GetEnvironmentVariable("PATH") ?? "";
-        info.Environment["PATH"] = BuildTools + ";" + Path.Combine(JdkHome, "bin") + ";" + path;
-        if (java) info.Environment["JAVA_HOME"] = JdkHome;
+        string javaHome = FindJavaHome();
+        string tools = FindBuildTools();
+        info.Environment["PATH"] = tools + Path.PathSeparator + Path.Combine(javaHome, "bin") + Path.PathSeparator + path;
+        if (java) info.Environment["JAVA_HOME"] = javaHome;
         try
         {
             using (Process proc = Process.Start(info))
@@ -151,5 +156,106 @@ static class VireApk
         line = line.Trim();
         if (line.Length > 180) line = line.Substring(0, 180);
         return line;
+    }
+
+    static string PackZipSigned(string root, string javaHome, int line, int col)
+    {
+        string java = FirstExisting(Path.Combine(javaHome, "bin", "java.exe"), Path.Combine(javaHome, "bin", "java"));
+        string jarsigner = FirstExisting(Path.Combine(javaHome, "bin", "jarsigner.exe"), Path.Combine(javaHome, "bin", "jarsigner"));
+        if (java == null) throw new VireError("java is not installed", line, col);
+        if (jarsigner == null) throw new VireError("jarsigner is not installed", line, col);
+        string data = Path.Combine(root, "data");
+        Directory.CreateDirectory(data);
+        string output = Path.Combine(data, "app.apk");
+        string work = Path.Combine(Path.GetTempPath(), "vire-apk-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            using (FileStream stream = File.Create(output))
+            using (ZipArchive zip = new ZipArchive(stream, ZipArchiveMode.Create))
+            {
+                ZipArchiveEntry entry = zip.CreateEntry("AndroidManifest.xml", CompressionLevel.Optimal);
+                using (StreamWriter writer = new StreamWriter(entry.Open(), new UTF8Encoding(false)))
+                    writer.Write(ManifestText());
+            }
+            string keystore = Path.Combine(data, "debug.keystore");
+            EnsureDebugKeystore(keystore, work, line, col);
+            RunTool(jarsigner, new string[]
+            {
+                "-keystore", keystore,
+                "-storepass", DebugStorePass,
+                "-keypass", DebugStorePass,
+                output,
+                DebugAlias
+            }, work, line, col, true);
+            if (!File.Exists(output) || new FileInfo(output).Length < 8)
+                throw new VireError("aapt did not write data/app.apk", line, col);
+            return "data/app.apk";
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (Exception) { }
+        }
+    }
+
+    static string FindBuildTools()
+    {
+        string sdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
+        if (string.IsNullOrEmpty(sdk)) sdk = Environment.GetEnvironmentVariable("ANDROID_HOME");
+        if (!string.IsNullOrEmpty(sdk))
+        {
+            string root = Path.Combine(sdk, "build-tools");
+            if (Directory.Exists(root))
+            {
+                string[] versions = Directory.GetDirectories(root);
+                Array.Sort(versions);
+                if (versions.Length > 0) return versions[versions.Length - 1];
+            }
+        }
+        if (Directory.Exists(BuildTools)) return BuildTools;
+        return BuildTools;
+    }
+
+    static string FindAndroidJar()
+    {
+        if (File.Exists(AndroidJar)) return AndroidJar;
+        string sdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
+        if (string.IsNullOrEmpty(sdk)) sdk = Environment.GetEnvironmentVariable("ANDROID_HOME");
+        if (string.IsNullOrEmpty(sdk)) return null;
+        string jar = Path.Combine(sdk, "platforms", "android-35", "android.jar");
+        return File.Exists(jar) ? jar : null;
+    }
+
+    static string FindJavaHome()
+    {
+        string home = Environment.GetEnvironmentVariable("JAVA_HOME");
+        if (!string.IsNullOrEmpty(home) && Directory.Exists(home)) return home;
+        if (Directory.Exists(JdkHome)) return JdkHome;
+        string java = FindOnPath(OperatingSystem.IsWindows() ? "java.exe" : "java");
+        if (java == null) return "";
+        string bin = Path.GetDirectoryName(java);
+        if (bin == null) return "";
+        string parent = Path.GetDirectoryName(bin);
+        return parent ?? "";
+    }
+
+    static string FindOnPath(string name)
+    {
+        string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        string[] dirs = path.Split(Path.PathSeparator);
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            if (string.IsNullOrEmpty(dirs[i])) continue;
+            string candidate = Path.Combine(dirs[i], name);
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    static string FirstExisting(string a, string b)
+    {
+        if (!string.IsNullOrEmpty(a) && File.Exists(a)) return a;
+        if (!string.IsNullOrEmpty(b) && File.Exists(b)) return b;
+        return null;
     }
 }

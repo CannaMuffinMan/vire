@@ -17,12 +17,15 @@ public class ForeignArgsTests
         Directory.CreateDirectory(dir);
         try
         {
-            File.Copy(Path.Combine(Environment.SystemDirectory, "kernel32.dll"), Path.Combine(dir, "kernel32.dll"));
+            ForeignHost.PlaceKernel32(dir);
             int pid = VireForeign.CallArgs(dir, "kernel32.dll", "GetCurrentProcessId", new int[0], 1, 1);
             Assert.Equal(Environment.ProcessId, pid);
 
             int feature = VireForeign.CallArgs(dir, "kernel32.dll", "IsProcessorFeaturePresent", new int[] { PfXmmiInstructionsAvailable }, 1, 1);
-            Assert.Equal(IsProcessorFeaturePresent(PfXmmiInstructionsAvailable), feature);
+            int expectedFeature = OperatingSystem.IsWindows()
+                ? IsProcessorFeaturePresent(PfXmmiInstructionsAvailable)
+                : 1;
+            Assert.Equal(expectedFeature, feature);
 
             VireError parent = Assert.Throws<VireError>(() => VireForeign.CallArgs(dir, "../kernel32.dll", "GetCurrentProcessId", new int[0], 1, 1));
             Assert.Contains("program folder", parent.Message);
