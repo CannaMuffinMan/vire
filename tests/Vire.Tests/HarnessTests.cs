@@ -124,6 +124,7 @@ public class HarnessTests
         Assert.Contains("native-hello-handoff.ps1", yml);
         Assert.Contains("native-sec-windows.ps1", yml);
         Assert.Contains("native-selfhost-handoff.ps1", yml);
+        Assert.Contains("native-selfhost-windows", yml);
         string self = File.ReadAllText(Path.Combine(root, "tools", "native-selfhost-handoff.ps1"));
         Assert.Contains("WaitForExit", self);
         Assert.Contains("gen1_sha256", self);
