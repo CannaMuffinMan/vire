@@ -63,6 +63,11 @@ function Invoke-Bounded {
     if ($stdout) { Write-Host $stdout.TrimEnd() }
     if ($p.ExitCode -eq -1073741819 -or $p.ExitCode -eq 0xC0000005) {
         Write-Host "crash_access_violation $Name pid $($p.Id)"
+        foreach ($ripFile in @((Join-Path $Root "crash-rip.txt"), (Join-Path $Data "crash-rip.txt"), (Join-Path $Root "data/crash-rip.txt"))) {
+            if (Test-Path $ripFile) {
+                Write-Host ("crash_rip_file " + $ripFile + " " + ((Get-Content -Raw $ripFile) -replace '\s+', ' '))
+            }
+        }
         try {
             Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = (Get-Date).AddMinutes(-10) } -MaxEvents 5 -ErrorAction SilentlyContinue |
                 ForEach-Object { Write-Host ("wer_app_error " + $_.TimeCreated + " " + ($_.Message -replace '\s+', ' ').Substring(0, [Math]::Min(800, $_.Message.Length))) }

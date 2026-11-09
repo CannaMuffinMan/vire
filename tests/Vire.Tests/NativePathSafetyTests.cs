@@ -22,6 +22,7 @@ public class NativePathSafetyTests
         Assert.Contains("GetFileAttributesA", pe);
         Assert.Contains("GetFileInformationByHandle", pe);
         Assert.Contains("SetUnhandledExceptionFilter", pe);
+        Assert.Contains("AddVectoredExceptionHandler", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
         Assert.Contains("iat_ue", pe);

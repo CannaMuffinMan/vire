@@ -30,6 +30,7 @@ NAMES = [
     "GetFileAttributesA",
     "GetFileInformationByHandle",
     "SetUnhandledExceptionFilter",
+    "AddVectoredExceptionHandler",
 ]
 
 
@@ -270,6 +271,9 @@ class Emu:
 
     def api_SetUnhandledExceptionFilter(self):
         self.wr(UC_X86_REG_RAX, 0)
+
+    def api_AddVectoredExceptionHandler(self):
+        self.wr(UC_X86_REG_RAX, 1)
 
     def run(self):
         self.mu.emu_start(self.image + self.entry, 0, timeout=8_000_000, count=5_000_000)
