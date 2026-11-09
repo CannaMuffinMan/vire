@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -721,6 +721,7 @@ sealed class Machine
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
         if (name == "idiv") return Program.WholeDiv(args[0], args[1], line, col);
         if (name == "shl8") return Program.Shl8(args[0], line, col);
+        if (name == "hex") return Program.HexBytes(args[0], line, col);
         if (name == "start") return StartThread(args, line, col);
         if (name == "wait") { VireThreads.Wait(threads, args[0], line, col); return 0; }
         if (name == "result") return VireThreads.Result(threads, args[0], line, col);
@@ -2875,6 +2876,25 @@ sealed class Program
         double quote = Math.Floor(num / den);
         if (quote > int.MaxValue) return int.MaxValue;
         return (int)quote;
+    }
+
+    internal static string HexBytes(object value, int line, int col)
+    {
+        List<object> list = value as List<object>;
+        if (list == null) throw new VireError("hex needs a list of whole numbers", line, col);
+        int n = list.Count;
+        if (n > 500000) throw new VireError("out of memory", line, col);
+        char[] chars = new char[n * 2];
+        string digits = "0123456789abcdef";
+        for (int i = 0; i < n; i++)
+        {
+            double real;
+            if (!AsReal(list[i], out real) || real != Math.Floor(real)) throw new VireError("hex needs a list of whole numbers", line, col);
+            int b = (int)real & 255;
+            chars[i * 2] = digits[b >> 4];
+            chars[i * 2 + 1] = digits[b & 15];
+        }
+        return new string(chars);
     }
 
     internal static object Shl8(object value, int line, int col)

@@ -583,6 +583,11 @@ sealed class CompiledMachine
             if (args.Count != 1) throw new VireError("shl8 takes 1 values, got " + args.Count, line, col);
             return Program.Shl8(args[0], line, col);
         }
+        if (name == "hex")
+        {
+            if (args.Count != 1) throw new VireError("hex takes 1 values, got " + args.Count, line, col);
+            return Program.HexBytes(args[0], line, col);
+        }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {
