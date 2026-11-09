@@ -22,7 +22,8 @@ end
 
 define emitRuntime with image, fixes, labels
   pin with labels, "code", image
-  let image be emitList with image, [72, 129, 236, 128, 0, 0, 0, 185]
+  ~ sub rsp, 40 keeps Win64 entry alignment (RSP%16==0 before calls). sub rsp, 128 here is 0 mod 16 and makes kernel32 AV after crumbs/main.
+  let image be emitList with image, [72, 131, 236, 40, 185]
   let image be emitU32 with image, 4294967285
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_gs"

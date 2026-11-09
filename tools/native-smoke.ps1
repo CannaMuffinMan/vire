@@ -51,7 +51,7 @@ foreach ($program in $programs) {
         $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)
     }
     [System.IO.File]::WriteAllBytes($exePath, $bytes)
-    $got = & $exePath 2>&1 | Out-String
+    $got = & $exePath | Out-String
     $exit = $LASTEXITCODE
     $got = $got.Trim()
     if ($got -eq $program.Want -and $exit -eq 0) {

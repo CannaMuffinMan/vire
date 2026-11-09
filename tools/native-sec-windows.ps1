@@ -66,14 +66,22 @@ function Test-DefenderBlock {
 }
 function Invoke-NativeExe {
     param([string]$ExePath, [string]$WorkingDirectory)
+    $tag = [guid]::NewGuid().ToString("N")
+    $outFile = Join-Path $WorkingDirectory ("run-" + $tag + ".out")
+    $errFile = Join-Path $WorkingDirectory ("run-" + $tag + ".err")
     try {
-        $out = cmd /c "cd /d `"$WorkingDirectory`" && `"$ExePath`"" 2>&1 | Out-String
-        $code = $LASTEXITCODE
-        if (Test-DefenderBlock -ErrorRecord $null -ExitCode $code -Output $out) {
+        $p = Start-Process -FilePath $ExePath -WorkingDirectory $WorkingDirectory -Wait -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $out = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+        $err = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+        $code = $p.ExitCode
+        $combo = "$out $err"
+        if (Test-DefenderBlock -ErrorRecord $null -ExitCode $code -Output $combo) {
             Write-Host "native_sec_defender_block: Windows Defender refused $ExePath (exit $code)"
+            if ($err) { Write-Host $err.TrimEnd() }
             $script:DefenderBlocked = $true
             return @{ Blocked = $true; Output = $out; Code = $code }
         }
+        if ($err) { Write-Host $err.TrimEnd() }
         return @{ Blocked = $false; Output = $out; Code = $code }
     }
     catch {
