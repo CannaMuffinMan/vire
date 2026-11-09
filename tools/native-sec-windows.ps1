@@ -7,7 +7,7 @@ Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
 $Work = Join-Path $Root "data/native-sec-windows"
 if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
-New-Item -ItemType Directory -Path (Join-Path $Work "data") | Out-Null
+New-Item -ItemType Directory -Path $Work | Out-Null
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 function Invoke-Vire {
     [CmdletBinding(PositionalBinding = $false)]
@@ -57,13 +57,14 @@ $outside = Join-Path $Work "outside"
 New-Item -ItemType Directory -Path $outside | Out-Null
 Set-Content -Path (Join-Path $outside "secret.txt") -Value "outside-secret" -NoNewline
 $link = Join-Path $Work "data"
+if (Test-Path $link) { Remove-Item -Recurse -Force $link }
 cmd /c mklink /J "$link" "$outside"
 if ($LASTEXITCODE -ne 0) { throw "junction skipped or failed" }
 Set-Content -Path (Join-Path $Work "read.vire") -Value "define main`n  say (read with `"data/secret.txt`")`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/read.vire" "data/native-sec-windows/read.hex"
 if ($code -ne 0) { throw "read compile failed" }
 HexToExe "data/native-sec-windows/read.hex" (Join-Path $Work "read.exe")
-$got = & (Join-Path $Work "read.exe") 2>&1 | Out-String
+$got = cmd /c "cd /d `"$Work`" && read.exe" 2>&1 | Out-String
 if ($got.Contains("outside-secret")) { throw "parent junction leaked" }
 if ($LASTEXITCODE -eq 0) { throw "parent junction did not fail closed" }
 
@@ -78,7 +79,7 @@ Set-Content -Path (Join-Path $Work "write.vire") -Value "define main`n  write wi
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/write.vire" "data/native-sec-windows/write.hex"
 if ($code -ne 0) { throw "write compile failed" }
 HexToExe "data/native-sec-windows/write.hex" (Join-Path $Work "write.exe")
-$got = & (Join-Path $Work "write.exe") 2>&1 | Out-String
+$got = cmd /c "cd /d `"$Work`" && write.exe" 2>&1 | Out-String
 $kept = [System.IO.File]::ReadAllText($alias)
 if ($kept -ne "SECRET") { throw "hardlink truncated: $kept" }
 if ($LASTEXITCODE -eq 0) { throw "hardlink write did not fail closed" }
