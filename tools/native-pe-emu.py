@@ -72,6 +72,7 @@ class Emu:
             "GetCommandLineA",
             "GetFileAttributesA",
             "GetFileInformationByHandle",
+            "SetUnhandledExceptionFilter",
         ]
         self.stubs = {}
         for i, name in enumerate(names):
@@ -125,6 +126,7 @@ class Emu:
             "GetCommandLineA",
             "GetFileAttributesA",
             "GetFileInformationByHandle",
+            "SetUnhandledExceptionFilter",
         ]
         iat = runs[-1]
         if len(iat) < len(names):
@@ -250,6 +252,9 @@ class Emu:
         self.wr(UC_X86_REG_RAX, 0xFFFFFFFF)
 
     def api_GetFileInformationByHandle(self):
+        self.wr(UC_X86_REG_RAX, 0)
+
+    def api_SetUnhandledExceptionFilter(self):
         self.wr(UC_X86_REG_RAX, 0)
 
     def run(self, count=200000000):

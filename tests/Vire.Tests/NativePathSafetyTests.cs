@@ -21,8 +21,10 @@ public class NativePathSafetyTests
         string pe = File.ReadAllText(Path.Combine(Root(), "src", "pe.vire"));
         Assert.Contains("GetFileAttributesA", pe);
         Assert.Contains("GetFileInformationByHandle", pe);
+        Assert.Contains("SetUnhandledExceptionFilter", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
+        Assert.Contains("iat_ue", pe);
     }
 
     [Fact]

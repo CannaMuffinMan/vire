@@ -29,6 +29,7 @@ NAMES = [
     "GetCommandLineA",
     "GetFileAttributesA",
     "GetFileInformationByHandle",
+    "SetUnhandledExceptionFilter",
 ]
 
 
@@ -266,6 +267,9 @@ class Emu:
         struct.pack_into("<I", buf, 40, nlink)
         self.mu.mem_write(info, bytes(buf))
         self.wr(UC_X86_REG_RAX, 1)
+
+    def api_SetUnhandledExceptionFilter(self):
+        self.wr(UC_X86_REG_RAX, 0)
 
     def run(self):
         self.mu.emu_start(self.image + self.entry, 0, timeout=8_000_000, count=5_000_000)

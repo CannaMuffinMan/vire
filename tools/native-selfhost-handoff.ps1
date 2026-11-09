@@ -64,8 +64,8 @@ function Invoke-Bounded {
     if ($p.ExitCode -eq -1073741819 -or $p.ExitCode -eq 0xC0000005) {
         Write-Host "crash_access_violation $Name pid $($p.Id)"
         try {
-            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; StartTime = (Get-Date).AddMinutes(-10) } -MaxEvents 5 -ErrorAction SilentlyContinue |
-                ForEach-Object { Write-Host ("wer_event1000 " + $_.TimeCreated + " " + ($_.Message -replace '\s+', ' ').Substring(0, [Math]::Min(800, $_.Message.Length))) }
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = (Get-Date).AddMinutes(-10) } -MaxEvents 5 -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host ("wer_app_error " + $_.TimeCreated + " " + ($_.Message -replace '\s+', ' ').Substring(0, [Math]::Min(800, $_.Message.Length))) }
         } catch {
             Write-Host "wer_event1000_query_failed $($_.Exception.Message)"
         }
