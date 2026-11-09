@@ -19,33 +19,6 @@ define floorDiv with n, d
   return idiv with n, d
 end
 
-~ Native rt_mul rejects a non-int tag. Host `*` does not run in gen1.
-~ Shift-add keeps PE byte helpers on rt_add only (CI gen1_hello: "* needs two numbers").
-define times256 with x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  return x
-end
-
-define times4096 with x
-  let x be times256 with x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  return x
-end
-
-define times65536 with x
-  return times256 with (times256 with x)
-end
-
 define emitU8 with buf, n
   if n >= 0
     if n < 256
@@ -57,7 +30,7 @@ define emitU8 with buf, n
     let x be x + 256
   end
   if x >= 256
-    let x be x - (times256 with (floorDiv with x, 256))
+    let x be x % 256
   end
   if x < 0
     let x be 0
@@ -85,7 +58,7 @@ define emitU32 with buf, n
   let i be 0
   while i < 4
     let q be floorDiv with x, 256
-    let byte be x - (times256 with q)
+    let byte be x % 256
     if byte < 0
       let byte be 0
     end
@@ -136,7 +109,7 @@ define patchRel with buf, labels, fixes
     let k be 0
     while k < 4
       let q be floorDiv with x, 256
-      let byte be x - (times256 with q)
+      let byte be x % 256
       put byte into buf at (pos + k)
       let x be q
       let k be k + 1
@@ -164,7 +137,7 @@ define hexIndex with n
     return 0
   end
   if x >= 256
-    let x be x - (times256 with (floorDiv with x, 256))
+    let x be x % 256
   end
   return x
 end
