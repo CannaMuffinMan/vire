@@ -1190,6 +1190,8 @@ define freshCounter with gen
 end
 
 define parkCounters with image, labels, counters
+  ~ Must run after parkRuntime so these u64 slots land in .data (RW).
+  ~ while/for save trap_sp here; RX .text makes that ACCESS_VIOLATION.
   let i be 0
   let n be length with counters
   while i < n
@@ -1638,8 +1640,8 @@ define main
     halt with 1
   end
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
-  put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
+  put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")
   write with (files at 1), (hexOf with exe)

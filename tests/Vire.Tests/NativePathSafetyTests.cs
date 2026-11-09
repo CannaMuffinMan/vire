@@ -61,4 +61,13 @@ public class NativePathSafetyTests
         Assert.Contains("heap_cell", rt);
         Assert.Contains("intern_tab", rt);
     }
+
+    [Fact]
+    public void LoopCountersParkInDataAfterFrameBase()
+    {
+        string src = File.ReadAllText(Path.Combine(Root(), "compile-native.vire"));
+        int runtime = src.LastIndexOf("parkRuntime with (gen at \"image\")", StringComparison.Ordinal);
+        int counters = src.LastIndexOf("parkCounters with (gen at \"image\")", StringComparison.Ordinal);
+        Assert.True(runtime >= 0 && counters > runtime);
+    }
 }
