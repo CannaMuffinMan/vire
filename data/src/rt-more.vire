@@ -1197,9 +1197,9 @@ define emitMore with image, fixes, labels
   emitPop1 with image
   emitList with image, [76, 139, 85, 232, 73, 139, 10]
   emitCallTo with image, fixes, "rt_index"
-  emitList with image, [76, 139, 77, 232, 77, 139, 73, 16, 76, 1, 202, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 1, 15, 133]
+  emitList with image, [76, 139, 77, 232, 77, 139, 73, 16, 76, 1, 202, 73, 131, 237, 16, 77, 139, 69, 0, 77, 139, 77, 8, 73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "set_bytes_bad"
-  emitList with image, [136, 17]
+  emitList with image, [68, 136, 10]
   emitEpi with image
   pin with labels, "set_bytes_bad", image
   emitFail with image, fixes, "msg_put"
