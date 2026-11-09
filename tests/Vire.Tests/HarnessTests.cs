@@ -109,6 +109,20 @@ public class HarnessTests
     }
 
     [Fact]
+    public void NativeSecAndHelloHandoffBoundTheCompileWait()
+    {
+        string root = FindRoot();
+        string sec = File.ReadAllText(Path.Combine(root, "tools", "native-sec-windows.ps1"));
+        string hello = File.ReadAllText(Path.Combine(root, "tools", "native-hello-handoff.ps1"));
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        Assert.Contains("WaitForExit", sec);
+        Assert.Contains("timed out after", sec);
+        Assert.Contains("WaitForExit", hello);
+        Assert.Contains("120000", hello);
+        Assert.Contains("native-hello-handoff.ps1", yml);
+    }
+
+    [Fact]
     public void NativeSmokeKeepsVireStdoutOffTheExitCode()
     {
         string text = File.ReadAllText(Path.Combine(FindRoot(), "tools", "native-smoke.ps1"));

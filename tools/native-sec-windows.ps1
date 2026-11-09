@@ -10,12 +10,28 @@ if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
 New-Item -ItemType Directory -Path (Join-Path $Work "data") | Out-Null
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 function Invoke-Vire {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    $out = & dotnet exec $VireDll @Args
-    $code = $LASTEXITCODE
-    if ($null -ne $out) { $out | Write-Host }
-    if ($null -eq $code) { return 0 }
-    return [int]$code
+    param(
+        [int]$TimeoutSec = 120,
+        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Args
+    )
+    $work = Join-Path $Work ("invoke-" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Force -Path $work | Out-Null
+    $outFile = Join-Path $work "out.txt"
+    $errFile = Join-Path $work "err.txt"
+    $inFile = Join-Path $work "in.txt"
+    Set-Content -Path $inFile -Value "" -NoNewline
+    $argList = @("exec", $VireDll) + $Args
+    $p = Start-Process -FilePath "dotnet" -ArgumentList $argList -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+        try { $p.Kill($true) } catch { }
+        throw "vire timed out after ${TimeoutSec}s: $($Args -join ' ')"
+    }
+    $out = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+    $err = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+    if ($out) { $out.TrimEnd() | Write-Host }
+    if ($err) { $err.TrimEnd() | Write-Host }
+    if ($null -eq $p.ExitCode) { return 0 }
+    return [int]$p.ExitCode
 }
 function HexToExe($hexRel, $exePath) {
     $hex = [System.IO.File]::ReadAllText((Join-Path $Root $hexRel)).Trim()

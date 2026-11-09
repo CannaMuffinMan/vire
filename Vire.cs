@@ -396,9 +396,14 @@ sealed class Machine
 
     public void UseSource(string path) { sourceFile = path; }
 
+    bool compilerProgress;
+    long compilerBeatMs;
+
     public void UseCompilerLimits()
     {
         itemCap = 1000000;
+        compilerProgress = true;
+        compilerBeatMs = Environment.TickCount64;
     }
 
     public void UseBudget(int limit)
@@ -438,6 +443,15 @@ sealed class Machine
         if (pending % Budget.StepBatch != 0) return;
         int steps = System.Threading.Interlocked.Increment(ref budget.Steps);
         if (steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        if (compilerProgress)
+        {
+            long now = Environment.TickCount64;
+            if (now - compilerBeatMs >= 2000)
+            {
+                compilerBeatMs = now;
+                Program.CompilerNote("still running steps=" + steps);
+            }
+        }
     }
 
     string SafePath(object text, int line)
@@ -2906,6 +2920,7 @@ sealed class Program
         if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
         VirePaths.RefuseReparse(full, folder, 1);
+        if (CompilerProgress != 0) CompilerNote("loading " + Path.GetFileName(full));
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
@@ -3099,8 +3114,44 @@ sealed class Program
         return Execute(args);
     }
 
+    internal static int CompilerProgress;
+
+    internal static void CompilerNote(string message)
+    {
+        Console.Error.WriteLine("vire: " + message);
+        Console.Error.Flush();
+    }
+
+    static bool CompilerArg(string[] args)
+    {
+        if (args == null || args.Length < 1) return false;
+        int i = 0;
+        if (args[0] == "--key-file" && args.Length >= 2) i = 2;
+        if (i >= args.Length) return false;
+        string name = Path.GetFileName(args[i]);
+        return name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static int Execute(string[] args)
     {
+        if (CompilerArg(args))
+        {
+            CompilerProgress = 1;
+            try { Console.SetIn(TextReader.Null); }
+            catch (IOException) { }
+            string shown = args[0];
+            for (int n = 0; n < args.Length; n++)
+            {
+                if (Path.GetFileName(args[n]).Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
+                    || Path.GetFileName(args[n]).Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
+                {
+                    shown = args[n];
+                    break;
+                }
+            }
+            CompilerNote("starting " + Path.GetFileName(shown));
+        }
         int code = 0;
         Exception failure = null;
         Thread thread = new Thread(delegate ()
@@ -3111,6 +3162,7 @@ sealed class Program
         thread.IsBackground = true;
         thread.Start();
         thread.Join();
+        CompilerProgress = 0;
         if (failure == null) return code;
         if (failure is HaltSignal halt) return halt.Code;
         if (failure is VireError exc)
@@ -3210,7 +3262,11 @@ sealed class Program
             Machine machine = new Machine(funcs, folder);
             machine.UseSource(program);
             machine.UseBudget(budget);
-            if (IsCompilerProgram(program)) machine.UseCompilerLimits();
+            if (IsCompilerProgram(program))
+            {
+                machine.UseCompilerLimits();
+                CompilerNote("loaded, running main");
+            }
             List<object> extra = new List<object>();
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);

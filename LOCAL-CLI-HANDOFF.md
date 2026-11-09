@@ -6,7 +6,7 @@ Do not run this on a cloud agent. Do not touch production, OBS, Station, or secr
 
 - Remote: `https://github.com/CannaMuffinMan/vire`
 - Branch (mutable, do not check out by name): `cursor/integrate-perf-38-0258`
-- SHA (immutable pin): `6750c373019451ee24f4adafef54941adb1f9aa3`
+- SHA (immutable pin): `PLACEHOLDER_SHA`
 - Depends on: PR #38 `e0d70a075147113a1d3ba569fad879f8982224ea` plus the compiler stack through PR #37 `f119db8db2e9ff2b8bad5c35761886dbf76ebf50`
 - Do not check out `cursor/native-runtime-32mb-0b9c` to apply these compiler commits. That branch stays PR #38.
 
@@ -14,6 +14,7 @@ Do not run this on a cloud agent. Do not touch production, OBS, Station, or secr
 
 ```text
 set VIRE_BUDGET=5000000
+set VIRE_HEADLESS=1
 ```
 
 Native arena 32MB. Host list cap 100000. Do not raise them.
@@ -23,12 +24,14 @@ Native arena 32MB. Host list cap 100000. Do not raise them.
 ```text
 git clone https://github.com/CannaMuffinMan/vire C:\scratch\vire-integrate-38
 cd C:\scratch\vire-integrate-38
-git fetch origin 6750c373019451ee24f4adafef54941adb1f9aa3
-git checkout --detach 6750c373019451ee24f4adafef54941adb1f9aa3
+git fetch origin PLACEHOLDER_SHA
+git checkout --detach PLACEHOLDER_SHA
 dotnet build vire.csproj -c Release
 ```
 
 ## Stage compiler sources (read stays data/site)
+
+Needed for gen1 (compiler as guest). Not required for the hello emit below (`compile-native.vire` `use`s `src/`).
 
 ```text
 bash tools/stage-compiler-src.sh
@@ -36,15 +39,26 @@ bash tools/stage-compiler-src.sh
 
 If bash is missing, copy `compile-native.vire` to `data\compile-native.vire` and copy `src\asm.vire`, `src\pe.vire`, `src\rt.vire`, `src\rt-more.vire` into `data\src\`. SHA-256 of each pair must match.
 
-## Commands, timeouts, expected
-
-Host emit hello (timeout 30s):
+`data\guest-hello.vire` is gitignored. Always copy it:
 
 ```text
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\guest-hello.vire data\guest-hello.hex
+mkdir data 2>nul
+copy /Y guest-hello.vire data\guest-hello.vire
 ```
 
-Expect `compiled` exit 0. Linux integrated tree: about 1.1–1.3s. Do not treat Linux times as Windows.
+## Commands, timeouts, expected
+
+Host emit hello (timeout **120s**; CI `native-windows` times this in `tools/native-hello-handoff.ps1`). Do not use 30s. Linux is ~1.4s and does not prove Windows. stderr prints `vire: starting compile-native.vire`, `vire: loading …`, then `vire: loaded, running main`, and a `vire: still running steps=…` line every 2s until `compiled` on stdout. Empty stdout+stderr until kill means the wrapper is not capturing the child, not a silent compile.
+
+Feed NUL stdin so a wrapper pipe cannot block on `Console.ReadLine`:
+
+```text
+dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data/guest-hello.vire data/guest-hello.hex < NUL
+```
+
+Or: `pwsh -File tools/native-hello-handoff.ps1`
+
+Expect stdout to contain `compiled`, exit 0, and stderr to start with `vire: starting`. Keep both streams.
 
 Run the PE on Windows (timeout 10s):
 
@@ -60,7 +74,7 @@ Expect stdout `hello from stage` and exit 0. If that fails, stop. Do not fall ba
 Host emit of the compiler as a `data/` guest (timeout 180s, stop if longer):
 
 ```text
-dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\compile-native.vire data\gen1.hex
+dotnet exec bin\Release\net10.0\vire.dll compile-native.vire data\compile-native.vire data\gen1.hex < NUL
 ```
 
 Linux did this in 66s. If it OOMs or exceeds 180s, log the message and stop.
@@ -84,9 +98,9 @@ gen1 SHA == gen2 SHA is the fixed-point proof. Anything else is not.
 
 ## Logs to keep
 
-- stdout/stderr of each command
+- stdout **and** stderr of each command
 - SHA-256 of `data\guest-hello.hex`, `data\gen1.hex`, `data\gen2.hex`
-- wall times
+- wall times (`hello_host_compile_sec` from the handoff script)
 - first error line if a step fails
 
 ## Stop criteria
@@ -100,4 +114,4 @@ gen1 SHA == gen2 SHA is the fixed-point proof. Anything else is not.
 
 `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --filter "FullyQualifiedName~CompilerStage|FullyQualifiedName~NativeExtend|FullyQualifiedName~NativePath|FullyQualifiedName~NativeArena|FullyQualifiedName~NativePe|FullyQualifiedName~Extend|FullyQualifiedName~PathSsrf|FullyQualifiedName~EmitU8|FullyQualifiedName~HexOf|FullyQualifiedName~BudgetCap"`
 
-42 passed on the integrated tree. Re-run on Windows if you want a Windows xUnit log. Do not skip NativePath / Arena.
+Re-run on Windows if you want a Windows xUnit log. Do not skip NativePath / Arena.
