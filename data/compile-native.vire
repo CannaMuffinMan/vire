@@ -1311,6 +1311,10 @@ define emitExpr with gen, funcs, func, expr
       emitCall with gen, "rt_args"
       return true
     end
+    if nm == "bytes"
+      emitCall with gen, "rt_bytes"
+      return true
+    end
     let found be findFunc with funcs, nm
     if found at "ok"
       if ((found at "func") at "nparams") == 0

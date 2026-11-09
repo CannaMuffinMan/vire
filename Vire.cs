@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -602,7 +602,7 @@ sealed class Machine
     object Builtin(string name, List<object> args, int line, int col)
     {
         int need = 1;
-        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
+        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes") need = 0;
         if (name == "wait" || name == "result") need = 1;
         if (name == "start")
         {
@@ -710,6 +710,7 @@ sealed class Machine
             return map.ContainsKey(KeyOf(args[1], line));
         }
         if (name == "args") return programArgs;
+        if (name == "bytes") return new List<object>();
         if (name == "halt")
         {
             if (!(args[0] is int)) throw new VireError("halt needs a whole number", line, col);
@@ -1578,7 +1579,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "ticks"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks"))
                 return Builtin(name, new List<object>(), line, col);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), line, col);

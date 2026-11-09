@@ -492,6 +492,8 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "length_ok"
   emitList with image, [72, 131, 248, 5, 15, 132]
   emitRel with image, fixes, "length_ok"
+  emitList with image, [72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "length_ok"
   emitFail with image, fixes, "msg_length"
   pin with labels, "length_ok", image
   emitList with image, [72, 139, 18]
@@ -890,6 +892,8 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "at_list"
   emitList with image, [72, 131, 248, 5, 15, 132]
   emitRel with image, fixes, "at_map"
+  emitList with image, [72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "at_bytes"
   emitFail with image, fixes, "msg_index"
   pin with labels, "at_text", image
   emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 76, 139, 85, 240, 73, 139, 10]
@@ -916,6 +920,13 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 76, 139, 85, 240, 73, 139, 10]
   emitCallTo with image, fixes, "rt_index"
   emitList with image, [72, 193, 226, 4, 76, 139, 85, 240, 77, 139, 82, 16, 73, 1, 210, 77, 139, 2, 77, 139, 74, 8, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16]
+  emitEpi with image
+  pin with labels, "at_bytes", image
+  emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 76, 139, 85, 240, 73, 139, 10]
+  emitCallTo with image, fixes, "rt_index"
+  emitList with image, [76, 139, 85, 240, 77, 139, 82, 16, 73, 1, 210, 65, 15, 182, 18, 73, 199, 69, 0]
+  emitU32 with image, 1
+  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
   emitEpi with image
   pin with labels, "at_map", image
   emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 72, 131, 248, 2, 15, 132]
@@ -1014,10 +1025,33 @@ define emitMore with image, fixes, labels
   pin with labels, "grow_oom", image
   emitFail with image, fixes, "msg_oom"
 
+  pin with labels, "rt_grow_bytes", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 139, 65, 8, 72, 133, 192, 15, 133]
+  emitRel with image, fixes, "growb_dbl"
+  emitList with image, [184]
+  emitU32 with image, 64
+  emitJmpTo with image, fixes, "growb_cap"
+  pin with labels, "growb_dbl", image
+  emitList with image, [72, 209, 224]
+  emitJcc with image, fixes, 130, "growb_oom"
+  pin with labels, "growb_cap", image
+  emitList with image, [72, 137, 69, 240, 72, 137, 193]
+  emitJcc with image, fixes, 130, "growb_oom"
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
+  emitEpi with image
+  pin with labels, "growb_oom", image
+  emitFail with image, fixes, "msg_oom"
+
   pin with labels, "rt_push", image
   emitPro with image
   emitPop2 with image
-  emitList with image, [76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 4, 15, 133]
+  emitList with image, [76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "push_byte"
+  emitList with image, [72, 131, 248, 4, 15, 133]
   emitRel with image, fixes, "push_bad"
   emitList with image, [72, 137, 85, 232, 72, 139, 10, 72, 129, 249]
   emitU32 with image, 2000000
@@ -1032,10 +1066,35 @@ define emitMore with image, fixes, labels
   emitU32 with image, 4
   emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
   emitEpi with image
+  pin with labels, "push_byte", image
+  emitList with image, [76, 137, 69, 248, 76, 137, 77, 240, 73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "push_bad"
+  emitList with image, [72, 137, 85, 232, 72, 139, 10, 72, 129, 249]
+  emitU32 with image, 2000000
+  emitJcc with image, fixes, 131, "push_big"
+  emitList with image, [72, 139, 66, 8, 72, 57, 193, 15, 130]
+  emitRel with image, fixes, "push_broom"
+  emitList with image, [72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_grow_bytes"
+  emitList with image, [72, 137, 69, 232]
+  pin with labels, "push_broom", image
+  emitList with image, [72, 139, 85, 232, 72, 139, 10, 72, 139, 66, 16, 72, 1, 200, 76, 139, 77, 240, 68, 136, 8, 72, 255, 2, 73, 199, 69, 0]
+  emitU32 with image, 6
+  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
+  emitEpi with image
   pin with labels, "push_bad", image
   emitFail with image, fixes, "msg_push"
   pin with labels, "push_big", image
   emitFail with image, fixes, "msg_biglist"
+
+  pin with labels, "rt_bytes", image
+  emitPro with image
+  emitList with image, [185]
+  emitU32 with image, 24
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 199, 0, 0, 0, 0, 0, 72, 199, 64, 8, 0, 0, 0, 0, 72, 199, 64, 16, 0, 0, 0, 0, 72, 137, 194]
+  emitPushTag with image, 6
+  emitEpi with image
 
   pin with labels, "rt_list_new", image
   emitPro with image
@@ -1129,9 +1188,21 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "set_map"
   emitList with image, [73, 131, 248, 2, 15, 132]
   emitRel with image, fixes, "set_text"
+  emitList with image, [73, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "set_bytes"
   emitFail with image, fixes, "msg_put"
   pin with labels, "set_text", image
   emitFail with image, fixes, "msg_textput"
+  pin with labels, "set_bytes", image
+  emitPop1 with image
+  emitList with image, [76, 139, 85, 232, 73, 139, 10]
+  emitCallTo with image, fixes, "rt_index"
+  emitList with image, [76, 139, 77, 232, 77, 139, 73, 16, 76, 1, 202, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "set_bytes_bad"
+  emitList with image, [136, 17]
+  emitEpi with image
+  pin with labels, "set_bytes_bad", image
+  emitFail with image, fixes, "msg_put"
   pin with labels, "set_list", image
   emitPop1 with image
   emitList with image, [76, 139, 85, 232, 73, 139, 10]
@@ -1547,8 +1618,11 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_hex", image
   emitPro with image
   emitPop1 with image
-  emitList with image, [72, 137, 85, 248, 72, 131, 248, 4, 15, 133]
+  emitList with image, [72, 137, 85, 248, 72, 137, 69, 208, 72, 131, 248, 4, 15, 132]
+  emitRel with image, fixes, "hex_ready"
+  emitList with image, [72, 131, 248, 6, 15, 133]
   emitRel with image, fixes, "hex_bad"
+  pin with labels, "hex_ready", image
   emitList with image, [72, 139, 10, 72, 137, 77, 240, 72, 137, 200, 72, 209, 224, 72, 61]
   emitU32 with image, 1000000
   emitJcc with image, fixes, 135, "hex_big"
@@ -1558,9 +1632,16 @@ define emitMore with image, fixes, labels
   pin with labels, "hex_loop", image
   emitList with image, [76, 59, 93, 240, 15, 131]
   emitRel with image, fixes, "hex_end"
+  emitList with image, [72, 131, 125, 208, 6, 15, 132]
+  emitRel with image, fixes, "hex_bload"
   emitList with image, [73, 139, 195, 72, 193, 224, 4, 72, 139, 85, 248, 72, 139, 82, 16, 72, 141, 12, 2, 72, 131, 57, 1, 15, 133]
   emitRel with image, fixes, "hex_bad"
-  emitList with image, [72, 139, 65, 8, 37]
+  emitList with image, [72, 139, 65, 8, 233]
+  emitRel with image, fixes, "hex_have"
+  pin with labels, "hex_bload", image
+  emitList with image, [72, 139, 85, 248, 72, 139, 82, 16, 66, 15, 182, 4, 26]
+  pin with labels, "hex_have", image
+  emitList with image, [37]
   emitU32 with image, 255
   emitList with image, [72, 137, 69, 216, 137, 193, 193, 233, 4, 128, 249, 10, 15, 130]
   emitRel with image, fixes, "hex_hi_digit"
@@ -1693,11 +1774,14 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_extend", image
   emitPro with image
   emitPop2 with image
-  emitList with image, [72, 131, 248, 4, 15, 133]
+  emitList with image, [72, 131, 248, 4, 15, 132]
+  emitRel with image, fixes, "extend_dest_ok"
+  emitList with image, [72, 131, 248, 6, 15, 133]
   emitRel with image, fixes, "extend_bad"
+  pin with labels, "extend_dest_ok", image
   emitList with image, [73, 131, 248, 4, 15, 133]
   emitRel with image, fixes, "extend_bad"
-  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240, 72, 199, 69, 232, 0, 0, 0, 0]
+  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240, 72, 137, 69, 216, 72, 199, 69, 232, 0, 0, 0, 0]
   pin with labels, "extend_loop", image
   emitList with image, [72, 139, 85, 240, 72, 139, 10, 72, 139, 69, 232, 72, 57, 200, 15, 141]
   emitRel with image, fixes, "extend_done"
@@ -1720,15 +1804,13 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "extend_slot"
   emitList with image, [77, 49, 201]
   pin with labels, "extend_slot", image
-  emitList with image, [72, 139, 85, 248, 73, 199, 69, 0]
-  emitU32 with image, 4
-  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16]
+  emitList with image, [72, 139, 85, 248, 72, 139, 69, 216, 73, 137, 69, 0, 73, 137, 85, 8, 73, 131, 197, 16, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16]
   emitCallTo with image, fixes, "rt_push"
   emitList with image, [73, 131, 237, 16, 73, 139, 85, 8, 72, 137, 85, 248, 72, 255, 69, 232, 233]
   emitRel with image, fixes, "extend_loop"
   pin with labels, "extend_done", image
-  emitList with image, [72, 139, 85, 248]
-  emitPushTag with image, 4
+  emitList with image, [72, 139, 85, 248, 72, 139, 69, 216]
+  emitList with image, [73, 137, 69, 0, 73, 137, 85, 8, 73, 131, 197, 16]
   emitEpi with image
   pin with labels, "extend_bad", image
   emitFail with image, fixes, "msg_extend"

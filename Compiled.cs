@@ -312,7 +312,7 @@ sealed class CompiledMachine
             string called = (string)expr[1];
             object found;
             if (env.TryGetValue(called, out found)) return found;
-            if (called == "args" || called == "now" || called == "ticks" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
+            if (called == "args" || called == "bytes" || called == "now" || called == "ticks" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
                 return Builtin(called, new List<object>(), AsLine(expr), AsCol(expr));
             if (funcs.ContainsKey(called))
             {
@@ -509,6 +509,7 @@ sealed class CompiledMachine
             return VireThreads.Result(threads, args[0], line, col);
         }
         if (name == "args") return programArgs;
+        if (name == "bytes") return new List<object>();
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "ticks") return Machine.ClockTicks();
         if (name == "halt")
