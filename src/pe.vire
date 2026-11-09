@@ -116,15 +116,6 @@ define peChecksum with pe
   return pe
 end
 
-define pagesToRva with pages
-  let x be shl8 with pages
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  let x be x + x
-  return x
-end
-
 define zeros with n
   let buf be []
   let i be 0
@@ -274,7 +265,18 @@ define buildExe with image, entry, imp, dataOff
   let dataPages be floorDiv with (dataRaw + 4095), 4096
   poke32 with head, 156, textRaw
   poke32 with head, 160, (idataRaw + dataRaw)
-  poke32 with head, 208, (8192 + (pagesToRva with textPages) + (pagesToRva with dataPages))
+  let imageSize be 8192
+  let p be 0
+  while p < textPages
+    let imageSize be imageSize + 4096
+    let p be p + 1
+  end
+  let p be 0
+  while p < dataPages
+    let imageSize be imageSize + 4096
+    let p be p + 1
+  end
+  poke32 with head, 208, imageSize
   poke32 with head, 212, 512
   poke16 with head, 220, 3
   poke16 with head, 222, 33056
