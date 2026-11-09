@@ -46,6 +46,20 @@ public class PathSsrfTests
     }
 
     [Fact]
+    public void FolderForCompiledHopsOnceOutOfDataOrSite()
+    {
+        string root = DualMode.FindRoot();
+        string dataVc = Path.Combine(root, "data", "stage1.vc");
+        string siteVc = Path.Combine(root, "site", "app.vc");
+        string nested = Path.Combine(root, "data", "conformance", "guid", "prog.vc");
+        Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(VirePaths.FolderForCompiled(dataVc)));
+        Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(VirePaths.FolderForCompiled(siteVc)));
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(root, "data", "conformance", "guid")),
+            Path.GetFullPath(VirePaths.FolderForCompiled(nested)));
+    }
+
+    [Fact]
     public void RefuseProgramUsesNormalizedExtension()
     {
         Assert.Equal(".vire", VirePaths.NormalizedExtension("x.vire."));

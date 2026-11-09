@@ -1,9 +1,10 @@
 # Stage-1/2/3 self-host check for compiler.vire.
 # Real CLI:
 #   dotnet exec vire.dll compiler.vire data/compiler.vire data/stage1.vc
-#   dotnet exec vire.dll run data/stage1.vc compiler.vire stage2.vc
-# Stage 2+ run with the .vc sandbox root = data/, so remaining args are
-# relative to data/ (compiler.vire and stageN.vc names only).
+#   dotnet exec vire.dll run data/stage1.vc data/compiler.vire data/stage2.vc
+# Stage 2+ .vc files sit in data/. FolderForCompiled hops to the repo so
+# DataOrSite still means data/ and site/ (same as interpreter compiler.vire).
+# Remaining args keep the data/ prefix.
 # Seal: throwaway 32-byte key in VIRE_SEAL_KEY (base64). VC2 uses a random
 # nonce, so sealed files differ. This script compares unsealed payloads
 # byte-for-byte via payload-write + Compare-Object, and also payload-sha256.
@@ -39,9 +40,9 @@ function Invoke-Vire {
 Write-Output "stage 1: interpreter compiles compiler.vire"
 Invoke-Vire compiler.vire data/compiler.vire data/stage1.vc
 Write-Output "stage 2: stage1.vc compiles compiler.vire"
-Invoke-Vire run data/stage1.vc compiler.vire stage2.vc
+Invoke-Vire run data/stage1.vc data/compiler.vire data/stage2.vc
 Write-Output "stage 3: stage2.vc compiles compiler.vire"
-Invoke-Vire run data/stage2.vc compiler.vire stage3.vc
+Invoke-Vire run data/stage2.vc data/compiler.vire data/stage3.vc
 
 function Get-PayloadSha([string]$Path) {
     $out = Invoke-Vire payload-sha256 $Path

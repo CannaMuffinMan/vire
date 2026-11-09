@@ -139,6 +139,26 @@ static class VirePaths
         return InFolder(data, path) || InFolder(site, path);
     }
 
+    // .vc files must live in data/ or site/. Using that directory as the
+    // sandbox would require reads under data/data or data/site. One hop up
+    // when the file sits directly in data/ or site/ matches interpreter
+    // compiler.vire (repo root) so selfhost can pass data/compiler.vire.
+    // Nested paths such as data/conformance/<id>/prog.vc stay nested.
+    public static string FolderForCompiled(string compiled)
+    {
+        string folder = Path.GetDirectoryName(compiled);
+        if (string.IsNullOrEmpty(folder)) folder = Directory.GetCurrentDirectory();
+        string leaf = Path.GetFileName(folder);
+        if (leaf != null &&
+            (string.Equals(leaf, "data", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(leaf, "site", StringComparison.OrdinalIgnoreCase)))
+        {
+            string parent = Path.GetDirectoryName(folder);
+            if (!string.IsNullOrEmpty(parent)) folder = parent;
+        }
+        return folder;
+    }
+
     public static string CombineUnder(string root, string rel, int line)
     {
         return CombineUnder(root, rel, line, 1);

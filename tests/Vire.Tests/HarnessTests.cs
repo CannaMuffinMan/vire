@@ -84,8 +84,10 @@ public class HarnessTests
         string ps = File.ReadAllText(Path.Combine(root, "tools", "selfhost-check.ps1"));
         Assert.Contains("payload-write", sh);
         Assert.Contains("cmp -s", sh);
+        Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", sh);
         Assert.Contains("payload-write", ps);
         Assert.Contains("Compare-Object", ps);
+        Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", ps);
     }
 
     [Fact]

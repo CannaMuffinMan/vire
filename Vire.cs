@@ -3165,7 +3165,7 @@ sealed class Program
             }
             string programFolder = null;
             if (rest.Length >= 2 && rest[0] == "run")
-                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[1]));
+                programFolder = VirePaths.FolderForCompiled(Path.GetFullPath(rest[1]));
             else if (rest.Length >= 1)
                 programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[0]));
             VireSeal.ClearKey();
@@ -3196,7 +3196,7 @@ sealed class Program
             {
                 if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);
                 string compiled = Path.GetFullPath(rest[1]);
-                string compiledFolder = Path.GetDirectoryName(compiled);
+                string compiledFolder = VirePaths.FolderForCompiled(compiled);
                 List<object> compiledArgs = new List<object>();
                 for (int i = 2; i < rest.Length; i++) compiledArgs.Add(rest[i]);
                 CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
