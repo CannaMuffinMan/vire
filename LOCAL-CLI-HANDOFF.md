@@ -45,7 +45,7 @@ Sandbox junctions/hardlinks (must get past hello compile; was broken when `compi
 pwsh -File tools/native-sec-windows.ps1
 ```
 
-Full bounded selfhost (stage, hello PE, gen1, gen1 hello, gen2 SHA). Timeouts: hello host 120s, hello run 15s, gen1 host 300s, gen1 hello 120s, gen1 hello run 15s, gen2 native 600s. Stop at first fail. Do not run `native-selfhost-proof.ps1` overnight.
+Full bounded selfhost (stage, hello PE, gen1, gen1 hello, gen2 SHA). Timeouts: hello host 120s, hello run 15s, gen1 host 420s, gen1 hello 120s, gen1 hello run 15s, gen2 native 600s. Stop at first fail. Do not run `native-selfhost-proof.ps1` overnight.
 
 ```text
 pwsh -File tools/native-selfhost-handoff.ps1

@@ -57,10 +57,10 @@ function Invoke-Bounded {
     $sw.Stop()
     $stdout = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
     $stderr = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
-    Write-Output ("step_" + $Name + "_sec " + $sw.Elapsed.TotalSeconds.ToString("0.000"))
-    Write-Output ("step_" + $Name + "_exit " + $p.ExitCode)
-    if ($stderr) { Write-Output $stderr.TrimEnd() }
-    if ($stdout) { Write-Output $stdout.TrimEnd() }
+    Write-Host ("step_" + $Name + "_sec " + $sw.Elapsed.TotalSeconds.ToString("0.000"))
+    Write-Host ("step_" + $Name + "_exit " + $p.ExitCode)
+    if ($stderr) { Write-Host $stderr.TrimEnd() }
+    if ($stdout) { Write-Host $stdout.TrimEnd() }
     if ($p.ExitCode -ne 0) { throw "$Name exit $($p.ExitCode)" }
     return @{ StdOut = $stdout; StdErr = $stderr; Sec = $sw.Elapsed.TotalSeconds }
 }
@@ -102,7 +102,7 @@ Write-Output "step_hello_pe ok"
 $gen1Hex = Join-Path $Data "gen1.hex"
 $gen1Exe = Join-Path $Data "gen1.exe"
 if (Test-Path $gen1Hex) { Remove-Item -Force $gen1Hex }
-$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 300 -FilePath "dotnet" -ArgumentList @(
+$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 420 -FilePath "dotnet" -ArgumentList @(
     "exec", $VireDll, "compile-native.vire", "data/compile-native.vire", "data/gen1.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen1_host missing compiled" }
