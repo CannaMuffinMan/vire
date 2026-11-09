@@ -6,7 +6,7 @@ Do not run this on a cloud agent. Do not touch production, OBS, Station, or secr
 
 - Remote: `https://github.com/CannaMuffinMan/vire`
 - Branch (mutable, do not check out by name): `cursor/integrate-perf-38-0258`
-- SHA (immutable pin): `ed0c0b4f5569ed07a0200b1218536790b44e5b38`
+- SHA (immutable pin): `0dd9dae6bbf02df396358e77f635cc5420f7514a`
 - Depends on: PR #38 `e0d70a075147113a1d3ba569fad879f8982224ea` plus the compiler stack through PR #37 `f119db8db2e9ff2b8bad5c35761886dbf76ebf50`
 - Do not check out `cursor/native-runtime-32mb-0b9c` to apply these compiler commits. That branch stays PR #38.
 
@@ -24,8 +24,8 @@ Native arena 32MB. Host list cap 100000. Do not raise them.
 ```text
 git clone https://github.com/CannaMuffinMan/vire C:\scratch\vire-integrate-38
 cd C:\scratch\vire-integrate-38
-git fetch origin ed0c0b4f5569ed07a0200b1218536790b44e5b38
-git checkout --detach ed0c0b4f5569ed07a0200b1218536790b44e5b38
+git fetch origin 0dd9dae6bbf02df396358e77f635cc5420f7514a
+git checkout --detach 0dd9dae6bbf02df396358e77f635cc5420f7514a
 set VIRE_BUDGET=5000000
 set VIRE_HEADLESS=1
 dotnet build vire.csproj -c Release
