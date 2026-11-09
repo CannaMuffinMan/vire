@@ -1390,15 +1390,19 @@ define emitMore with image, fixes, labels
   emitList with image, [233]
   emitRel with image, fixes, "write_ready"
   pin with labels, "write_have", image
-  emitList with image, [72, 137, 69, 216, 72, 137, 193, 72, 141, 85, 160, 255, 21]
+  emitList with image, [72, 137, 69, 216, 185]
+  emitU32 with image, 64
+  emitList with image, [232]
+  emitRel with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 160, 72, 139, 77, 216, 72, 137, 194, 255, 21]
   emitRel with image, fixes, "iat_fi"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "write_close_path"
-  emitList with image, [247, 69, 160]
+  emitList with image, [72, 139, 85, 160, 247, 2]
   emitU32 with image, 1024
   emitList with image, [15, 133]
   emitRel with image, fixes, "write_close_path"
-  emitList with image, [131, 125, 200, 1, 15, 135]
+  emitList with image, [131, 122, 40, 1, 15, 135]
   emitRel with image, fixes, "write_close_path"
   emitList with image, [72, 139, 77, 216, 255, 21]
   emitRel with image, fixes, "iat_ch"
