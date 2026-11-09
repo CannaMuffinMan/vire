@@ -55,7 +55,7 @@ public class NativePathSafetyTests
     {
         string rt = File.ReadAllText(Path.Combine(Root(), "src", "rt.vire"));
         Assert.Contains("frame_base", rt);
-        Assert.Contains("emitU32 with image, 512", rt);
+        Assert.Contains("emitU32 with image, 1024", rt);
         Assert.Contains("msg_deep", rt);
         Assert.Contains("frame_deep", rt);
         Assert.Contains("heap_cell", rt);
