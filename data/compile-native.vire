@@ -119,7 +119,9 @@ define keyword with word
 end
 
 define tokenize with source
-  let toks be []
+  let ks be []
+  let ss be []
+  let ns be []
   let i be gap with source, 0
   let n be length with source
   while i < n
@@ -127,9 +129,11 @@ define tokenize with source
     if ch == "\""
       let item be readString with source, i
       if item at "bad"
-        return {"bad": true, "why": "broken string", "toks": toks}
+        return {"bad": true, "why": "broken string"}
       end
-      push with toks, ["text", item at "text", 0]
+      push with ks, "text"
+      push with ss, (item at "text")
+      push with ns, 0
       let i be gap with source, (item at "i")
     end
     if ch != "\""
@@ -143,11 +147,13 @@ define tokenize with source
         end
         if i < n
           if (source at i) == "."
-            return {"bad": true, "why": "that number is not ready", "toks": toks}
+            return {"bad": true, "why": "that number is not ready"}
           end
         end
         let raw be slice with source, start, i
-        push with toks, ["num", raw, number with raw]
+        push with ks, "num"
+        push with ss, raw
+        push with ns, (number with raw)
         let i be gap with source, i
       end
       if not (isDigit with ch)
@@ -162,7 +168,9 @@ define tokenize with source
           end
           let word be slice with source, start, i
           let key be keyword with word
-          push with toks, [key, word, 0]
+          push with ks, key
+          push with ss, word
+          push with ns, 0
           let i be gap with source, i
         end
         if not (isLetter with ch)
@@ -171,39 +179,43 @@ define tokenize with source
             let two be slice with source, i, (i + 2)
           end
           if two == "==" or two == "!=" or two == "<=" or two == ">="
-            push with toks, [two, two, 0]
+            push with ks, two
+            push with ss, two
+            push with ns, 0
             let i be gap with source, (i + 2)
           end
           if two != "==" and two != "!=" and two != "<=" and two != ">="
             if (find with "+-*/%<>=(),[]{}:", ch) >= 0
-              push with toks, [ch, ch, 0]
+              push with ks, ch
+              push with ss, ch
+              push with ns, 0
               let i be gap with source, (i + 1)
             end
             if (find with "+-*/%<>=(),[]{}:", ch) < 0
-              return {"bad": true, "why": "that expression is not ready", "toks": toks}
+              return {"bad": true, "why": "that expression is not ready"}
             end
           end
         end
       end
     end
   end
-  return {"bad": false, "why": "", "toks": toks}
+  return {"bad": false, "why": "", "ks": ks, "ss": ss, "ns": ns}
 end
 
 define form with state
-  let toks be state at "toks"
-  if (state at "i") >= (length with toks)
+  let ks be state at "ks"
+  if (state at "i") >= (length with ks)
     return "eof"
   end
-  return (toks at (state at "i")) at 0
+  return ks at (state at "i")
 end
 
 define spell with state
-  return ((state at "toks") at (state at "i")) at 1
+  return (state at "ss") at (state at "i")
 end
 
 define valueOf with state
-  return ((state at "toks") at (state at "i")) at 2
+  return (state at "ns") at (state at "i")
 end
 
 define bump with state
@@ -677,8 +689,8 @@ define parseDefine with state
   return func
 end
 
-define parseProgram with toks
-  let state be {"toks": toks, "i": 0, "bad": false, "why": ""}
+define parseProgram with scanned
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": ""}
   let funcs be []
   let uses be []
   let needs be []
@@ -984,7 +996,7 @@ define loadText with path, source, folder, seen
     put 0 into seen at key
     return {"bad": true, "why": scanned at "why", "funcs": []}
   end
-  let parsed be parseProgram with (scanned at "toks")
+  let parsed be parseProgram with scanned
   if parsed at "bad"
     put 0 into seen at key
     return {"bad": true, "why": parsed at "why", "funcs": []}
