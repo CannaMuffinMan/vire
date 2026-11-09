@@ -129,7 +129,7 @@ define tokenize with source
       if item at "bad"
         return {"bad": true, "why": "broken string", "toks": toks}
       end
-      push with toks, {"k": "text", "s": item at "text", "n": 0}
+      push with toks, ["text", item at "text", 0]
       let i be gap with source, (item at "i")
     end
     if ch != "\""
@@ -147,7 +147,7 @@ define tokenize with source
           end
         end
         let raw be slice with source, start, i
-        push with toks, {"k": "num", "s": raw, "n": number with raw}
+        push with toks, ["num", raw, number with raw]
         let i be gap with source, i
       end
       if not (isDigit with ch)
@@ -162,7 +162,7 @@ define tokenize with source
           end
           let word be slice with source, start, i
           let key be keyword with word
-          push with toks, {"k": key, "s": word, "n": 0}
+          push with toks, [key, word, 0]
           let i be gap with source, i
         end
         if not (isLetter with ch)
@@ -171,12 +171,12 @@ define tokenize with source
             let two be slice with source, i, (i + 2)
           end
           if two == "==" or two == "!=" or two == "<=" or two == ">="
-            push with toks, {"k": two, "s": two, "n": 0}
+            push with toks, [two, two, 0]
             let i be gap with source, (i + 2)
           end
           if two != "==" and two != "!=" and two != "<=" and two != ">="
             if (find with "+-*/%<>=(),[]{}:", ch) >= 0
-              push with toks, {"k": ch, "s": ch, "n": 0}
+              push with toks, [ch, ch, 0]
               let i be gap with source, (i + 1)
             end
             if (find with "+-*/%<>=(),[]{}:", ch) < 0
@@ -195,15 +195,15 @@ define form with state
   if (state at "i") >= (length with toks)
     return "eof"
   end
-  return (toks at (state at "i")) at "k"
+  return (toks at (state at "i")) at 0
 end
 
 define spell with state
-  return ((state at "toks") at (state at "i")) at "s"
+  return ((state at "toks") at (state at "i")) at 1
 end
 
 define valueOf with state
-  return ((state at "toks") at (state at "i")) at "n"
+  return ((state at "toks") at (state at "i")) at 2
 end
 
 define bump with state
