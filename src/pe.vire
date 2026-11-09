@@ -48,7 +48,7 @@ define poke32 with buf, pos, n
   let k be 0
   while k < 4
     let q be floorDiv with x, 256
-    let byte be x - (q * 256)
+    let byte be x - (times256 with q)
     put byte into buf at (pos + k)
     let x be q
     let k be k + 1
@@ -62,7 +62,7 @@ define poke16 with buf, pos, n
     let x be x + 65536
   end
   let q be floorDiv with x, 256
-  let lo be x - (q * 256)
+  let lo be x - (times256 with q)
   put q into buf at (pos + 1)
   put lo into buf at pos
   return buf
@@ -101,16 +101,16 @@ define peChecksum with pe
   while i + 1 < n
     let lo be pe at i
     let hi be pe at (i + 1)
-    let word be lo + (hi * 256)
+    let word be lo + (times256 with hi)
     let sum be sum + word
-    let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+    let sum be (sum - (times65536 with (floorDiv with sum, 65536))) + (floorDiv with sum, 65536)
     let i be i + 2
   end
   if i < n
     let sum be sum + (pe at i)
-    let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+    let sum be (sum - (times65536 with (floorDiv with sum, 65536))) + (floorDiv with sum, 65536)
   end
-  let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+  let sum be (sum - (times65536 with (floorDiv with sum, 65536))) + (floorDiv with sum, 65536)
   let sum be sum + n
   poke32 with pe, 216, sum
   return pe
@@ -128,7 +128,7 @@ end
 
 define alignTo with buf, n
   let len be length with buf
-  let rem be len - ((floorDiv with len, n) * n)
+  let rem be len % n
   let pad be 0
   if rem != 0
     let pad be n - rem
@@ -265,7 +265,7 @@ define buildExe with image, entry, imp, dataOff
   let dataPages be floorDiv with (dataRaw + 4095), 4096
   poke32 with head, 156, textRaw
   poke32 with head, 160, (idataRaw + dataRaw)
-  poke32 with head, 208, (8192 + (textPages * 4096) + (dataPages * 4096))
+  poke32 with head, 208, (8192 + (times4096 with textPages) + (times4096 with dataPages))
   poke32 with head, 212, 512
   poke16 with head, 220, 3
   poke16 with head, 222, 33056

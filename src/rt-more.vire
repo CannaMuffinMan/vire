@@ -1612,9 +1612,9 @@ define emitMore with image, fixes, labels
   emitPro with image
   emitPop2 with image
   emitList with image, [72, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "idiv_zero"
+  emitRel with image, fixes, "idiv_bad"
   emitList with image, [73, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "idiv_zero"
+  emitRel with image, fixes, "idiv_bad"
   emitList with image, [77, 133, 201, 15, 142]
   emitRel with image, fixes, "idiv_zero"
   emitList with image, [72, 133, 210, 15, 136]
@@ -1626,6 +1626,8 @@ define emitMore with image, fixes, labels
   emitList with image, [49, 210]
   emitPushTag with image, 1
   emitEpi with image
+  pin with labels, "idiv_bad", image
+  emitFail with image, fixes, "msg_div"
 
   pin with labels, "rt_join", image
   emitPro with image
