@@ -71,8 +71,16 @@ function Invoke-NativeExe {
     $errFile = Join-Path $WorkingDirectory ("run-" + $tag + ".err")
     try {
         $p = Start-Process -FilePath $ExePath -WorkingDirectory $WorkingDirectory -Wait -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
-        $out = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
-        $err = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+        $out = ""
+        if (Test-Path $outFile) {
+            $rawOut = Get-Content -Raw $outFile
+            if ($null -ne $rawOut) { $out = $rawOut }
+        }
+        $err = ""
+        if (Test-Path $errFile) {
+            $rawErr = Get-Content -Raw $errFile
+            if ($null -ne $rawErr) { $err = $rawErr }
+        }
         $code = $p.ExitCode
         $combo = "$out $err"
         if (Test-DefenderBlock -ErrorRecord $null -ExitCode $code -Output $combo) {
@@ -102,7 +110,7 @@ if ($code -ne 0) { throw "hello compile failed" }
 HexToExe "data/native-sec-windows/hello.hex" (Join-Path $Work "hello.exe")
 $helloRun = Invoke-NativeExe -ExePath (Join-Path $Work "hello.exe") -WorkingDirectory $Work
 if (-not $helloRun.Blocked) {
-    if ($helloRun.Code -ne 0 -or $helloRun.Output.Trim() -ne "hello from vire") { throw "hello exe failed: $($helloRun.Output)" }
+    if ($helloRun.Code -ne 0 -or ([string]$helloRun.Output).Trim() -ne "hello from vire") { throw "hello exe failed: $($helloRun.Output)" }
 }
 
 # 2. Parent directory junction. Compile always; execute only if Defender allows.
@@ -119,7 +127,7 @@ if ($code -ne 0) { throw "read compile failed" }
 HexToExe "data/native-sec-windows/read.hex" (Join-Path $Work "read.exe")
 $got = Invoke-NativeExe -ExePath (Join-Path $Work "read.exe") -WorkingDirectory $Work
 if (-not $got.Blocked) {
-    if ($got.Output.Contains("outside-secret")) { throw "parent junction leaked" }
+    if (([string]$got.Output).Contains("outside-secret")) { throw "parent junction leaked" }
     if ($got.Code -eq 0) { throw "parent junction did not fail closed" }
 } else {
     Write-Host "native_sec_junction_compile_ok (PE execute skipped: Defender)"
