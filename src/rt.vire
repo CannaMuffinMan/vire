@@ -77,7 +77,7 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_ep"
   pin with labels, "crash_filter", image
-  let image be emitList with image, [72, 131, 236, 80, 72, 139, 1, 72, 139, 64, 16, 76, 141, 13]
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 80, 72, 139, 1, 72, 139, 64, 16, 76, 141, 13]
   let image be emitRel with image, fixes, "crash_hex"
   let image be emitList with image, [185]
   let image be emitU32 with image, 16
@@ -521,7 +521,9 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "iat_cf"
   let image be emitList with image, [72, 131, 248, 255, 15, 132]
   let image be emitRel with image, fixes, "read_miss"
-  let image be emitList with image, [72, 137, 69, 248, 185]
+  let image be emitList with image, [72, 137, 69, 248]
+  let image be emitCrumb with image, fixes, "crumb_rd"
+  let image be emitList with image, [185]
   let image be emitU32 with image, 64
   let image be emitList with image, [232]
   let image be emitRel with image, fixes, "rt_alloc"
@@ -529,6 +531,7 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "iat_fi"
   let image be emitList with image, [133, 192, 15, 132]
   let image be emitRel with image, fixes, "read_close_miss"
+  let image be emitCrumb with image, fixes, "crumb_fi"
   let image be emitList with image, [72, 139, 85, 160, 247, 2]
   let image be emitU32 with image, 1024
   let image be emitList with image, [15, 133]
@@ -715,6 +718,10 @@ define parkRuntime with image, labels
   let image be emitList with image, [72]
   pin with labels, "crumb_args", image
   let image be emitList with image, [65]
+  pin with labels, "crumb_rd", image
+  let image be emitList with image, [82]
+  pin with labels, "crumb_fi", image
+  let image be emitList with image, [73]
   pin with labels, "intern_tab", image
   let internI be 0
   while internI < 128
