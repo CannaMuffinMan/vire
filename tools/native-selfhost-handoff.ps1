@@ -27,7 +27,8 @@ function Invoke-Bounded {
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][int]$TimeoutSec,
         [Parameter(Mandatory = $true)][string]$FilePath,
-        [Parameter(Mandatory = $true)][string[]]$ArgumentList
+        [AllowEmptyCollection()]
+        [string[]]$ArgumentList = @()
     )
     $stamp = Join-Path $Data ("handoff-" + $Name)
     $outFile = "$stamp.out.txt"
@@ -37,7 +38,17 @@ function Invoke-Bounded {
     if (Test-Path $outFile) { Remove-Item -Force $outFile }
     if (Test-Path $errFile) { Remove-Item -Force $errFile }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $start = @{
+        FilePath = $FilePath
+        WorkingDirectory = $Root
+        NoNewWindow = $true
+        PassThru = $true
+        RedirectStandardInput = $inFile
+        RedirectStandardOutput = $outFile
+        RedirectStandardError = $errFile
+    }
+    if ($ArgumentList -and $ArgumentList.Count -gt 0) { $start.ArgumentList = $ArgumentList }
+    $p = Start-Process @start
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         try { $p.Kill($true) } catch { }
         $sw.Stop()
