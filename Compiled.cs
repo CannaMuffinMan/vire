@@ -578,6 +578,11 @@ sealed class CompiledMachine
             if (args.Count != 2) throw new VireError("idiv takes 2 values, got " + args.Count, line, col);
             return Program.WholeDiv(args[0], args[1], line, col);
         }
+        if (name == "shl8")
+        {
+            if (args.Count != 1) throw new VireError("shl8 takes 1 values, got " + args.Count, line, col);
+            return Program.Shl8(args[0], line, col);
+        }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")
         {

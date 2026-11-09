@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend",
+        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -720,6 +720,7 @@ sealed class Machine
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
         if (name == "idiv") return Program.WholeDiv(args[0], args[1], line, col);
+        if (name == "shl8") return Program.Shl8(args[0], line, col);
         if (name == "start") return StartThread(args, line, col);
         if (name == "wait") { VireThreads.Wait(threads, args[0], line, col); return 0; }
         if (name == "result") return VireThreads.Result(threads, args[0], line, col);
@@ -2874,6 +2875,15 @@ sealed class Program
         double quote = Math.Floor(num / den);
         if (quote > int.MaxValue) return int.MaxValue;
         return (int)quote;
+    }
+
+    internal static object Shl8(object value, int line, int col)
+    {
+        double n;
+        if (!AsReal(value, out n)) throw new VireError("shl8 needs a number", line, col);
+        double shifted = n * 256;
+        if (shifted == Math.Floor(shifted) && shifted <= int.MaxValue && shifted >= int.MinValue) return (int)shifted;
+        return shifted;
     }
 
     static bool AsReal(object value, out double real)

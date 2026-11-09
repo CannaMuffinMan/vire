@@ -68,4 +68,15 @@ public class EmitU8Tests
         Assert.Equal(0, run.InterpCode);
         Assert.Equal("255\n72\n44\n255\n", DualMode.Norm(run.InterpOut));
     }
+
+    [Fact]
+    public void Shl8ScalesAWholeNumberBy256()
+    {
+        DualMode.DualRun run = DualMode.RunSource(
+            "define main\n  say (shl8 with 2)\n  say (shl8 with 0)\nend\n",
+            null);
+        Assert.True(run.Matched, run.InterpOut + run.CompOut + run.InterpErr + run.CompErr);
+        Assert.Equal(0, run.InterpCode);
+        Assert.Equal("512\n0\n", DualMode.Norm(run.InterpOut));
+    }
 }

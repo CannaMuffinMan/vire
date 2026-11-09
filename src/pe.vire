@@ -101,7 +101,7 @@ define peChecksum with pe
   while i + 1 < n
     let lo be pe at i
     let hi be pe at (i + 1)
-    let word be lo + (hi * 256)
+    let word be lo + (shl8 with hi)
     let sum be sum + word
     let sum be (sum % 65536) + (floorDiv with sum, 65536)
     let i be i + 2
@@ -114,6 +114,15 @@ define peChecksum with pe
   let sum be sum + n
   poke32 with pe, 216, sum
   return pe
+end
+
+define pagesToRva with pages
+  let x be shl8 with pages
+  let x be x + x
+  let x be x + x
+  let x be x + x
+  let x be x + x
+  return x
 end
 
 define zeros with n
@@ -265,7 +274,7 @@ define buildExe with image, entry, imp, dataOff
   let dataPages be floorDiv with (dataRaw + 4095), 4096
   poke32 with head, 156, textRaw
   poke32 with head, 160, (idataRaw + dataRaw)
-  poke32 with head, 208, (8192 + (textPages * 4096) + (dataPages * 4096))
+  poke32 with head, 208, (8192 + (pagesToRva with textPages) + (pagesToRva with dataPages))
   poke32 with head, 212, 512
   poke16 with head, 220, 3
   poke16 with head, 222, 33056

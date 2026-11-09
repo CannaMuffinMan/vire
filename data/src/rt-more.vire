@@ -1629,6 +1629,17 @@ define emitMore with image, fixes, labels
   pin with labels, "idiv_bad", image
   emitFail with image, fixes, "msg_div"
 
+  pin with labels, "rt_shl8", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "shl8_bad"
+  emitList with image, [72, 193, 226, 8]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "shl8_bad", image
+  emitFail with image, fixes, "msg_shl8"
+
   pin with labels, "rt_join", image
   emitPro with image
   emitPop2 with image
@@ -1817,6 +1828,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_plus", "plus needs numbers, text, or lists"
   parkMsg with image, labels, "msg_sub", "- needs two numbers"
   parkMsg with image, labels, "msg_mul", "* needs two numbers"
+  parkMsg with image, labels, "msg_shl8", "shl8 needs a number"
   parkMsg with image, labels, "msg_div", "/ needs two numbers"
   parkMsg with image, labels, "msg_mod", "% needs two numbers"
   parkMsg with image, labels, "msg_zero", "division by zero"
