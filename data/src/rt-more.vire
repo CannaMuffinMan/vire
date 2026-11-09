@@ -1,7 +1,8 @@
 ~ More native runtime: numbers, text, lists, maps, loops, files, and args.
 
 define emitPro with image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96]
+  ~ sub rsp, 128 (imm32): 96-byte frames put BY_HANDLE_FILE_INFORMATION at [rsp+0], which is Win64 shadow space. kernel32 then spills over the struct and can AV (0xC0000005) on GetFileInformationByHandle.
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0]
   return image
 end
 

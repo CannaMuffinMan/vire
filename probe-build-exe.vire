@@ -4,6 +4,6 @@ use "src/pe.vire"
 
 define main
   let opened be openImage
-  let exe be buildExe with (opened at "image"), ((opened at "labels") at "code"), ((opened at "labels") at "desc")
+  let exe be buildExe with (opened at "image"), ((opened at "labels") at "code"), ((opened at "labels") at "desc"), ((opened at "labels") at "frame_base")
   say length with exe
 end

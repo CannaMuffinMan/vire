@@ -68,6 +68,54 @@ define poke16 with buf, pos, n
   return buf
 end
 
+define pokeName with buf, pos, raw
+  let i be 0
+  while i < 8
+    put 0 into buf at (pos + i)
+    let i be i + 1
+  end
+  let i be 0
+  let n be length with raw
+  while i < n
+    put (ord with (raw at i)) into buf at (pos + i)
+    let i be i + 1
+  end
+  return buf
+end
+
+define pokeSection with head, off, name, vsize, va, rsize, rptr, chars
+  pokeName with head, off, name
+  poke32 with head, (off + 8), vsize
+  poke32 with head, (off + 12), va
+  poke32 with head, (off + 16), rsize
+  poke32 with head, (off + 20), rptr
+  poke32 with head, (off + 36), chars
+  return head
+end
+
+define peChecksum with pe
+  poke32 with pe, 216, 0
+  let sum be 0
+  let n be length with pe
+  let i be 0
+  while i + 1 < n
+    let lo be pe at i
+    let hi be pe at (i + 1)
+    let word be lo + (hi * 256)
+    let sum be sum + word
+    let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+    let i be i + 2
+  end
+  if i < n
+    let sum be sum + (pe at i)
+    let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+  end
+  let sum be (sum - ((floorDiv with sum, 65536) * 65536)) + (floorDiv with sum, 65536)
+  let sum be sum + n
+  poke32 with pe, 216, sum
+  return pe
+end
+
 define zeros with n
   let buf be []
   let i be 0
@@ -134,6 +182,7 @@ define openImage
     let i be i + 1
   end
   let image be alignTo with image, 16
+  let image be alignTo with image, 4096
   let image be emitRuntime with image, fixes, labels
   return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats}
 end
@@ -174,35 +223,48 @@ define finishImage with image, labels, fixes, hints, ilts, iats
   return image
 end
 
-define buildExe with image, entry, imp
+define buildExe with image, entry, imp, dataOff
   let head be zeros with 512
   poke32 with head, 0, 23117
   poke32 with head, 60, 128
   poke32 with head, 128, 17744
   poke16 with head, 132, 34404
-  poke16 with head, 134, 1
+  poke16 with head, 134, 3
+  poke32 with head, 136, 1744830464
   poke16 with head, 148, 240
-  poke16 with head, 150, 34
+  poke16 with head, 150, 35
   poke16 with head, 152, 523
+  put 14 into head at 154
+  put 0 into head at 155
   poke32 with head, 168, (4096 + entry)
-  poke32 with head, 172, 4096
+  poke32 with head, 172, 8192
   poke32 with head, 176, 1073741824
   poke32 with head, 180, 1
   poke32 with head, 184, 4096
   poke32 with head, 188, 512
   poke16 with head, 192, 6
+  poke16 with head, 194, 1
   poke16 with head, 200, 6
-  let raw be length with image
+  poke16 with head, 202, 1
   let image be alignTo with image, 512
   let rawSize be length with image
-  let pages be floorDiv with ((length with image) + 4095), 4096
-  if pages < 1
-    let pages be 1
+  let idataRaw be 4096
+  let textRaw be dataOff - 4096
+  let dataRaw be rawSize - dataOff
+  if textRaw < 512
+    let textRaw be 512
   end
-  poke32 with head, 208, (4096 + (pages * 4096))
+  if dataRaw < 512
+    let dataRaw be 512
+  end
+  let textPages be floorDiv with (textRaw + 4095), 4096
+  let dataPages be floorDiv with (dataRaw + 4095), 4096
+  poke32 with head, 156, textRaw
+  poke32 with head, 160, (idataRaw + dataRaw)
+  poke32 with head, 208, (8192 + (textPages * 4096) + (dataPages * 4096))
   poke32 with head, 212, 512
   poke16 with head, 220, 3
-  poke16 with head, 222, 352
+  poke16 with head, 222, 33024
   poke32 with head, 224, 33554432
   poke32 with head, 232, 4096
   poke32 with head, 240, 33554432
@@ -210,16 +272,9 @@ define buildExe with image, entry, imp
   poke32 with head, 260, 16
   poke32 with head, 272, (4096 + imp)
   poke32 with head, 276, 40
-  let nameAt be 392
-  put 46 into head at nameAt
-  put 116 into head at (nameAt + 1)
-  put 101 into head at (nameAt + 2)
-  put 120 into head at (nameAt + 3)
-  put 116 into head at (nameAt + 4)
-  poke32 with head, 400, raw
-  poke32 with head, 408, rawSize
-  poke32 with head, 404, 4096
-  poke32 with head, 412, 512
-  poke32 with head, 428, 3758096416
-  return head + image
+  pokeSection with head, 392, ".idata", 4096, 4096, 4096, 512, 3221225536
+  pokeSection with head, 432, ".text", textRaw, 8192, textRaw, 4608, 1610612768
+  pokeSection with head, 472, ".data", dataRaw, (4096 + dataOff), dataRaw, (512 + dataOff), 3221225536
+  let pe be head + image
+  return peChecksum with pe
 end

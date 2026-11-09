@@ -28,8 +28,16 @@ public class NativePeEmitTests
             int e = BitConverter.ToInt32(pe, 0x3c);
             int oh = e + 24;
             Assert.Equal(0x20b, BitConverter.ToUInt16(pe, oh));
+            Assert.Equal((ushort)3, BitConverter.ToUInt16(pe, e + 6));
+            Assert.NotEqual(0u, BitConverter.ToUInt32(pe, e + 8));
+            Assert.NotEqual(0u, BitConverter.ToUInt32(pe, oh + 64));
             Assert.Equal(33554432UL, BitConverter.ToUInt64(pe, oh + 0x48));
             Assert.Equal(33554432UL, BitConverter.ToUInt64(pe, oh + 0x58));
+            uint textChars = BitConverter.ToUInt32(pe, 432 + 36);
+            uint dataChars = BitConverter.ToUInt32(pe, 472 + 36);
+            Assert.Equal(0x60000020u, textChars);
+            Assert.Equal(0xC0000040u, dataChars);
+            Assert.Equal(0, (int)(textChars & 0x80000000));
             Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x02 }) >= 0);
             Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x10 }) < 0);
             Assert.True(IndexOf(pe, new byte[] { 0x49, 0x8D, 0x87, 0x00, 0x10, 0x00, 0x00 }) < 0);

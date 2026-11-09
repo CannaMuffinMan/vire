@@ -47,25 +47,25 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_ep"
   pin with labels, "rt_push_int", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 199, 69, 0]
   let image be emitU32 with image, 1
   let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
   pin with labels, "rt_push_text", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 199, 69, 0]
   let image be emitU32 with image, 2
   let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
   pin with labels, "rt_push_bool", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 199, 69, 0]
   let image be emitU32 with image, 3
   let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 201, 195]
   pin with labels, "rt_push_none", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 199, 69, 0]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 199, 69, 0]
   let image be emitU32 with image, 0
   let image be emitList with image, [73, 199, 69, 8]
   let image be emitU32 with image, 0
   let image be emitList with image, [73, 131, 197, 16, 201, 195]
   pin with labels, "rt_load", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 193, 225, 4, 76, 1, 241, 72, 139, 1, 72, 61]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 193, 225, 4, 76, 1, 241, 72, 139, 1, 72, 61]
   let image be emitU32 with image, 255
   let image be emitList with image, [15, 132]
   let image be emitRel with image, fixes, "load_unset"
@@ -76,9 +76,9 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [232]
   let image be emitRel with image, fixes, "rt_fail"
   pin with labels, "rt_store", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 193, 225, 4, 76, 1, 241, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 137, 1, 72, 137, 81, 8, 201, 195]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 193, 225, 4, 76, 1, 241, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 137, 1, 72, 137, 81, 8, 201, 195]
   pin with labels, "rt_begin", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 77, 137, 238, 72, 193, 225, 4, 73, 41, 206, 72, 133, 210, 15, 132]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 77, 137, 238, 72, 193, 225, 4, 73, 41, 206, 72, 133, 210, 15, 132]
   let image be emitRel with image, fixes, "begin_done"
   pin with labels, "begin_loop", image
   let image be emitList with image, [73, 199, 69, 0]
@@ -92,13 +92,13 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "trap_sp"
   let image be emitList with image, [73, 137, 7, 73, 131, 199, 8, 201, 195]
   pin with labels, "rt_return", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 73, 137, 6, 73, 137, 86, 8, 77, 141, 110, 16, 73, 131, 239, 8, 73, 139, 7, 72, 137, 5]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 73, 137, 6, 73, 137, 86, 8, 77, 141, 110, 16, 73, 131, 239, 8, 73, 139, 7, 72, 137, 5]
   let image be emitRel with image, fixes, "trap_sp"
   let image be emitList with image, [201, 195]
   pin with labels, "rt_drop", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 201, 195]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 237, 16, 201, 195]
   pin with labels, "rt_save_frame", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 141, 71, 8, 72, 139, 13]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 141, 71, 8, 72, 139, 13]
   let image be emitRel with image, fixes, "frame_base"
   let image be emitList with image, [72, 129, 193]
   let image be emitU32 with image, 512
@@ -108,9 +108,9 @@ define emitRuntime with image, fixes, labels
   pin with labels, "frame_deep", image
   let image be emitFail with image, fixes, "msg_deep"
   pin with labels, "rt_restore_frame", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 239, 8, 77, 139, 55, 201, 195]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 239, 8, 77, 139, 55, 201, 195]
   pin with labels, "rt_truth", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 132]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 132]
   let image be emitRel with image, fixes, "truth_text"
   let image be emitList with image, [72, 131, 248, 4, 15, 132]
   let image be emitRel with image, fixes, "truth_text"
@@ -136,13 +136,13 @@ define emitRuntime with image, fixes, labels
   pin with labels, "truth_no", image
   let image be emitList with image, [49, 192, 201, 195]
   pin with labels, "rt_not", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 232]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 232]
   let image be emitRel with image, fixes, "rt_truth"
   let image be emitList with image, [131, 240, 1, 72, 152, 73, 199, 69, 0]
   let image be emitU32 with image, 3
   let image be emitList with image, [73, 137, 69, 8, 73, 131, 197, 16, 201, 195]
   pin with labels, "rt_cmp", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 72, 137, 77, 248, 73, 131, 237, 16, 77, 139, 85, 0, 77, 139, 93, 8, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 1, 15, 133]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 137, 77, 248, 73, 131, 237, 16, 77, 139, 85, 0, 77, 139, 93, 8, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 1, 15, 133]
   let image be emitRel with image, fixes, "cmp_notint"
   let image be emitList with image, [73, 131, 250, 1, 15, 133]
   let image be emitRel with image, fixes, "cmp_notint"
@@ -226,7 +226,7 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [232]
   let image be emitRel with image, fixes, "rt_fail"
   pin with labels, "rt_say", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 61]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 61]
   let image be emitU32 with image, 255
   let image be emitList with image, [15, 132]
   let image be emitRel with image, fixes, "say_unset"
@@ -330,7 +330,7 @@ define emitRuntime with image, fixes, labels
   let image be emitU32 with image, 2
   let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 255, 32]
   pin with labels, "rt_fail_exit", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32]
   let image be emitU32 with image, 0
@@ -352,7 +352,7 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "iat_ep"
   let image be emitList with image, [201, 195]
   pin with labels, "rt_read", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 96, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 133]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 73, 131, 237, 16, 73, 139, 69, 0, 73, 139, 85, 8, 72, 131, 248, 2, 15, 133]
   let image be emitRel with image, fixes, "read_nottext"
   let image be emitList with image, [72, 137, 85, 216, 72, 139, 10, 72, 131, 249, 5, 15, 130]
   let image be emitRel with image, fixes, "read_folder"
@@ -589,6 +589,7 @@ define parkRuntime with image, labels
   let image be emitU64 with image, 29
   let image be emitList with image, [100, 101, 102, 105, 110, 105, 116, 105, 111, 110, 115, 32, 99, 97, 108, 108, 101, 100, 32, 116, 111, 111, 32, 100, 101, 101, 112, 108, 121]
   let image be emitU8 with image, 0
+  let image be alignTo with image, 4096
   pin with labels, "frame_base", image
   let image be emitU64 with image, 0
   pin with labels, "heap_cell", image
