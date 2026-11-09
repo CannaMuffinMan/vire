@@ -993,11 +993,13 @@ define loadText with path, source, folder, seen
   end
   put 1 into seen at key
   let scanned be tokenize with source
+  say ("t " + (baseName with path) + " " + (text with (length with source)))
   if scanned at "bad"
     put 0 into seen at key
     return {"bad": true, "why": scanned at "why", "funcs": []}
   end
   let parsed be parseProgram with scanned
+  say ("p " + (baseName with path))
   if parsed at "bad"
     put 0 into seen at key
     return {"bad": true, "why": parsed at "why", "funcs": []}
@@ -1620,12 +1622,14 @@ define main
     say "compile failed"
     halt with 1
   end
+  say "m"
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
     halt with 1
   end
+  say "loaded"
   let funcs be loaded at "funcs"
   let saw be false
   let i be 0
@@ -1640,8 +1644,9 @@ define main
     say "compile failed"
     halt with 1
   end
+  say "o"
   let opened be openImage
-  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
+  say "opened"
   let i be 0
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
@@ -1660,3 +1665,4 @@ define main
   write with (files at 1), (hex with exe)
   say "compiled"
 end
+
