@@ -24,115 +24,21 @@ define emitNetInit with image, fixes, labels
   pin with labels, "rt_net_init", image
   emitPro with image
   emitList with image, [72, 139, 5]
-  emitRel with image, fixes, "ws2_mod"
+  emitRel with image, fixes, "ws2_ready"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 133, "net_init_done"
-  emitLeaRcxLab with image, fixes, "str_ws2"
-  emitList with image, [72, 131, 193, 8]
-  emitIatCall with image, fixes, "iat_ll"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "ws2_mod"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_WSAStartup"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_WSAStartup"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_socket"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_socket"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_bind"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_bind"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_listen"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_listen"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_accept"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_accept"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_recv"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_recv"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_send"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_send"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_closesocket"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_closesocket"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_setsockopt"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_setsockopt"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "ws2_mod"
-  emitLeaRdxLab with image, fixes, "str_getsockname"
-  emitList with image, [72, 131, 194, 8]
-  emitIatCall with image, fixes, "iat_gp"
-  emitList with image, [72, 133, 192]
-  emitJcc with image, fixes, 132, "net_init_fail"
-  emitList with image, [72, 137, 5]
-  emitRel with image, fixes, "p_getsockname"
   emitList with image, [185]
   emitU32 with image, 512
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 248, 185]
   emitU32 with image, 514
   emitList with image, [72, 139, 85, 248]
-  emitIatCall with image, fixes, "p_WSAStartup"
+  emitIatCall with image, fixes, "iat_wsa"
   emitList with image, [133, 192]
   emitJcc with image, fixes, 133, "net_init_fail"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "ws2_ready"
+  emitU32 with image, 1
   pin with labels, "net_init_done", image
   emitEpi with image
   pin with labels, "net_init_fail", image
@@ -163,7 +69,7 @@ define emitNetSendAll with image, fixes, labels
   emitList with image, [72, 139, 69, 232, 72, 133, 192]
   emitJcc with image, fixes, 132, "send_done"
   emitList with image, [72, 139, 77, 248, 72, 139, 85, 240, 76, 139, 69, 232, 69, 49, 201]
-  emitIatCall with image, fixes, "p_send"
+  emitIatCall with image, fixes, "iat_sd"
   emitList with image, [72, 131, 248, 255]
   emitJcc with image, fixes, 132, "send_done"
   emitList with image, [72, 133, 192]
@@ -824,7 +730,7 @@ define emitNetClient with image, fixes, labels, has_route
   emitU32 with image, 4102
   emitList with image, [76, 141, 77, 232, 65, 185]
   emitU32 with image, 4
-  emitIatCall with image, fixes, "p_setsockopt"
+  emitIatCall with image, fixes, "iat_ss"
   emitIatCall with image, fixes, "iat_gt"
   emitList with image, [72, 139, 77, 248, 137, 65, 32]
   emitList with image, [185]
@@ -842,7 +748,7 @@ define emitNetClient with image, fixes, labels, has_route
   emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 80, 8, 72, 3, 80, 16, 65, 184]
   emitU32 with image, 16384
   emitList with image, [76, 43, 64, 16, 69, 49, 201]
-  emitIatCall with image, fixes, "p_recv"
+  emitIatCall with image, fixes, "iat_rv"
   emitList with image, [72, 131, 248, 255]
   emitJcc with image, fixes, 132, "cl_408"
   emitList with image, [72, 133, 192]
@@ -1013,7 +919,7 @@ define emitNetClient with image, fixes, labels, has_route
   emitJcc with image, fixes, 135, "cl_408"
   emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 80, 8, 72, 3, 80, 16]
   emitList with image, [72, 139, 64, 24, 72, 131, 192, 4, 72, 3, 64, 72, 72, 43, 64, 16, 73, 137, 192, 69, 49, 201]
-  emitIatCall with image, fixes, "p_recv"
+  emitIatCall with image, fixes, "iat_rv"
   emitList with image, [72, 131, 248, 255]
   emitJcc with image, fixes, 132, "cl_408"
   emitList with image, [72, 133, 192]
@@ -1215,7 +1121,7 @@ define emitNetListenCore with image, fixes, labels, has_route
   emitU32 with image, 1
   emitList with image, [65, 184]
   emitU32 with image, 6
-  emitIatCall with image, fixes, "p_socket"
+  emitIatCall with image, fixes, "iat_sk"
   emitList with image, [72, 131, 248, 255]
   emitJcc with image, fixes, 132, "listen_fail"
   emitList with image, [72, 137, 69, 240]
@@ -1225,17 +1131,17 @@ define emitNetListenCore with image, fixes, labels, has_route
   emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
   emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
   emitU32 with image, 16
-  emitIatCall with image, fixes, "p_bind"
+  emitIatCall with image, fixes, "iat_bd"
   emitList with image, [133, 192]
   emitJcc with image, fixes, 133, "listen_fail"
   emitList with image, [72, 139, 77, 240, 186]
   emitU32 with image, 8
-  emitIatCall with image, fixes, "p_listen"
+  emitIatCall with image, fixes, "iat_ln"
   emitList with image, [133, 192]
   emitJcc with image, fixes, 133, "listen_fail"
   emitList with image, [72, 199, 69, 200, 16, 0, 0, 0]
   emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 76, 141, 69, 200]
-  emitIatCall with image, fixes, "p_getsockname"
+  emitIatCall with image, fixes, "iat_gn"
   emitList with image, [15, 183, 69, 210, 102, 134, 224, 137, 69, 248]
   emitList with image, [72, 139, 85, 248]
   emitCallTo with image, fixes, "rt_int_text"
@@ -1248,13 +1154,13 @@ define emitNetListenCore with image, fixes, labels, has_route
   emitCallTo with image, fixes, "rt_say"
   pin with labels, "listen_loop", image
   emitList with image, [72, 139, 77, 240, 49, 210, 69, 49, 192]
-  emitIatCall with image, fixes, "p_accept"
+  emitIatCall with image, fixes, "iat_ac"
   emitList with image, [72, 131, 248, 255]
   emitJcc with image, fixes, 132, "listen_loop"
   emitList with image, [72, 137, 69, 184, 72, 137, 193]
   emitCallTo with image, fixes, "rt_net_client"
   emitList with image, [72, 139, 77, 184]
-  emitIatCall with image, fixes, "p_closesocket"
+  emitIatCall with image, fixes, "iat_cs"
   emitJmpTo with image, fixes, "listen_loop"
   pin with labels, "listen_bad_port", image
   emitFail with image, fixes, "msg_port"
@@ -1264,17 +1170,6 @@ define emitNetListenCore with image, fixes, labels, has_route
 end
 
 define parkNet with image, labels
-  parkMsg with image, labels, "str_ws2", "ws2_32.dll"
-  parkMsg with image, labels, "str_WSAStartup", "WSAStartup"
-  parkMsg with image, labels, "str_socket", "socket"
-  parkMsg with image, labels, "str_bind", "bind"
-  parkMsg with image, labels, "str_listen", "listen"
-  parkMsg with image, labels, "str_accept", "accept"
-  parkMsg with image, labels, "str_recv", "recv"
-  parkMsg with image, labels, "str_send", "send"
-  parkMsg with image, labels, "str_closesocket", "closesocket"
-  parkMsg with image, labels, "str_setsockopt", "setsockopt"
-  parkMsg with image, labels, "str_getsockname", "getsockname"
   parkMsg with image, labels, "txt_listen", "listening on 127.0.0.1:"
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
   parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
@@ -1304,48 +1199,30 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
   parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
   parkMsg with image, labels, "msg_json", "json is not valid"
-  pin with labels, "ws2_mod", image
-  emitU64 with image, 0
-  pin with labels, "p_WSAStartup", image
-  emitU64 with image, 0
-  pin with labels, "p_socket", image
-  emitU64 with image, 0
-  pin with labels, "p_bind", image
-  emitU64 with image, 0
-  pin with labels, "p_listen", image
-  emitU64 with image, 0
-  pin with labels, "p_accept", image
-  emitU64 with image, 0
-  pin with labels, "p_recv", image
-  emitU64 with image, 0
-  pin with labels, "p_send", image
-  emitU64 with image, 0
-  pin with labels, "p_closesocket", image
-  emitU64 with image, 0
-  pin with labels, "p_setsockopt", image
-  emitU64 with image, 0
-  pin with labels, "p_getsockname", image
+  pin with labels, "ws2_ready", image
   emitU64 with image, 0
   return image
 end
 
-define emitNetRuntime with image, fixes, labels, has_route
-  emitNetInit with image, fixes, labels
-  emitNetMkText with image, fixes, labels
-  emitNetSendAll with image, fixes, labels
-  emitNetSendHttp with image, fixes, labels
-  emitNetHdrEnd with image, fixes, labels
-  emitNetHdrUnsafe with image, fixes, labels
-  emitNetPathOk with image, fixes, labels
-  emitNetPrefixCi with image, fixes, labels
-  emitNetClVal with image, fixes, labels
+define emitNetRuntime with image, fixes, labels, has_route, need_net
+  if need_net
+    emitNetInit with image, fixes, labels
+    emitNetMkText with image, fixes, labels
+    emitNetSendAll with image, fixes, labels
+    emitNetSendHttp with image, fixes, labels
+    emitNetHdrEnd with image, fixes, labels
+    emitNetHdrUnsafe with image, fixes, labels
+    emitNetPathOk with image, fixes, labels
+    emitNetPrefixCi with image, fixes, labels
+    emitNetClVal with image, fixes, labels
+    emitNetClient with image, fixes, labels, has_route
+    emitNetListenCore with image, fixes, labels, has_route
+  end
   emitJsonSkip with image, fixes, labels
   emitJsonKw with image, fixes, labels
   emitJsonEnc with image, fixes, labels
   emitJson with image, fixes, labels
   emitJsonVal with image, fixes, labels
   emitJsonParse with image, fixes, labels
-  emitNetClient with image, fixes, labels, has_route
-  emitNetListenCore with image, fixes, labels, has_route
   return image
 end

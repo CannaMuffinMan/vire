@@ -1609,6 +1609,54 @@ define emitStmt with gen, funcs, func, stmt
   return true
 end
 
+define walkNode with node, hit
+  try
+    let n be length with node
+    if n == 0
+      return true
+    end
+    let head be node at 0
+    if head == "call"
+      let nm be node at 1
+      if nm == "listen"
+        put true into hit at "net"
+      end
+      if nm == "json"
+        put true into hit at "json"
+      end
+      if nm == "parse"
+        put true into hit at "json"
+      end
+    end
+    if head == "call" or head == "let" or head == "say" or head == "return" or head == "if" or head == "while" or head == "for" or head == "try" or head == "put" or head == "list" or head == "map" or head == "not" or head == "neg" or head == "and" or head == "or" or head == "at" or head == "num" or head == "text" or head == "bool" or head == "none" or head == "name" or head == "==" or head == "!=" or head == "<" or head == ">" or head == "<=" or head == ">=" or head == "+" or head == "-" or head == "*" or head == "/" or head == "%"
+      let i be 1
+      while i < n
+        walkNode with (node at i), hit
+        let i be i + 1
+      end
+      return true
+    end
+    let i be 0
+    while i < n
+      walkNode with (node at i), hit
+      let i be i + 1
+    end
+  miss
+    return true
+  end
+  return true
+end
+
+define guestNeeds with funcs
+  let hit be {"net": false, "json": false}
+  let i be 0
+  while i < (length with funcs)
+    walkNode with ((funcs at i) at "body"), hit
+    let i be i + 1
+  end
+  return hit
+end
+
 define emitFunc with gen, funcs, func
   pinHere with gen, ("fn_" + (func at "name"))
   emitOp with gen, [72, 131, 236, 40]
@@ -1651,7 +1699,11 @@ define main
     say "compile failed"
     halt with 1
   end
+  let hits be guestNeeds with funcs
   let opened be openImage
+  if hits at "net"
+    let opened be openNetImage
+  end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
   let hasRoute be false
@@ -1664,18 +1716,22 @@ define main
     end
     let i be i + 1
   end
-  put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute) into gen at "image"
   if gen at "bad"
     say gen at "why"
     say "compile failed"
     halt with 1
   end
+  if (hits at "net") or (hits at "json")
+    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"
+  end
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
-  put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
+  if (hits at "net") or (hits at "json")
+    put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
+  end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
-  let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")
+  let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)
   say "compiled"
 end

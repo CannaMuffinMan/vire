@@ -30,12 +30,89 @@ $p = Start-Process -FilePath $gen1 -ArgumentList @("data/guest-health.vire", "da
 if ($p.ExitCode -ne 0) { throw "gen1 health compile exit $($p.ExitCode)" }
 if (-not (Test-Path $hex)) { throw "no health hex" }
 Convert-HexToExe $hex $exe
+
+function Get-PeImportNames([byte[]]$pe) {
+    $names = New-Object System.Collections.Generic.List[string]
+    $peOff = [BitConverter]::ToInt32($pe, 60)
+    $magic = [BitConverter]::ToUInt16($pe, $peOff + 24)
+    $dirOff = if ($magic -eq 0x20b) { $peOff + 24 + 112 } else { $peOff + 24 + 96 }
+    $importRva = [BitConverter]::ToInt32($pe, $dirOff + 8)
+    if ($importRva -eq 0) { return $names }
+    function RvaToOff([byte[]]$buf, [int]$hdr, [int]$rva) {
+        $nsec = [BitConverter]::ToUInt16($buf, $hdr + 6)
+        $opt = [BitConverter]::ToUInt16($buf, $hdr + 20)
+        $sec = $hdr + 24 + $opt
+        for ($i = 0; $i -lt $nsec; $i++) {
+            $s = $sec + $i * 40
+            $vs = [BitConverter]::ToInt32($buf, $s + 8)
+            $va = [BitConverter]::ToInt32($buf, $s + 12)
+            $raw = [BitConverter]::ToInt32($buf, $s + 20)
+            $size = if ($vs -gt 0) { $vs } else { [BitConverter]::ToInt32($buf, $s + 16) }
+            if ($rva -ge $va -and $rva -lt ($va + $size)) { return $raw + ($rva - $va) }
+        }
+        throw "rva $rva"
+    }
+    function ReadZ([byte[]]$buf, [int]$off) {
+        $n = 0
+        while (($off + $n) -lt $buf.Length -and $buf[$off + $n] -ne 0) { $n++ }
+        return [System.Text.Encoding]::ASCII.GetString($buf, $off, $n)
+    }
+    $importOff = RvaToOff $pe $peOff $importRva
+    for ($desc = $importOff; ($desc + 20) -le $pe.Length; $desc += 20) {
+        $lookup = [BitConverter]::ToInt32($pe, $desc)
+        $nameRva = [BitConverter]::ToInt32($pe, $desc + 12)
+        $iat = [BitConverter]::ToInt32($pe, $desc + 16)
+        if ($lookup -eq 0 -and $nameRva -eq 0 -and $iat -eq 0) { break }
+        $thunkRva = if ($lookup -ne 0) { $lookup } else { $iat }
+        $thunk = RvaToOff $pe $peOff $thunkRva
+        $stride = if ($magic -eq 0x20b) { 8 } else { 4 }
+        for ($t = $thunk; ($t + $stride) -le $pe.Length; $t += $stride) {
+            $entry = if ($stride -eq 8) { [BitConverter]::ToInt64($pe, $t) } else { [BitConverter]::ToUInt32($pe, $t) }
+            if ($entry -eq 0) { break }
+            $ordbit = if ($stride -eq 8) { [int64]0x8000000000000000 } else { 0x80000000 }
+            if (($entry -band $ordbit) -ne 0) { continue }
+            $hint = RvaToOff $pe $peOff ([int]($entry -band 0x7fffffff))
+            [void]$names.Add((ReadZ $pe ($hint + 2)))
+        }
+    }
+    return $names
+}
+
+function Assert-NoDangerIat([string]$Label, [string]$Path) {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $imp = Get-PeImportNames $bytes
+    Write-Output ("iat_dump " + $Label + " " + ($imp -join ","))
+    foreach ($bad in @("LoadLibraryA", "GetProcAddress", "CreateProcessA", "CreateProcessW", "WinExec", "ShellExecuteA")) {
+        if ($imp -contains $bad) { throw "$Label IAT contains $bad" }
+    }
+}
+
+Assert-NoDangerIat "health" $exe
 $pe = [System.IO.File]::ReadAllBytes($exe)
 $ascii = [System.Text.Encoding]::ASCII.GetString($pe)
-if ($ascii -notmatch "LoadLibraryA") { throw "PE missing LoadLibraryA" }
-if ($ascii -notmatch "GetProcAddress") { throw "PE missing GetProcAddress" }
+$healthImp = Get-PeImportNames $pe
 if ($ascii -notmatch "ws2_32.dll") { throw "PE missing ws2_32.dll" }
-Write-Output "health_pe_iat LoadLibraryA GetProcAddress ws2_32.dll"
+if ($healthImp -notcontains "WSAStartup") { throw "health IAT missing WSAStartup" }
+if ($healthImp -contains "LoadLibraryA") { throw "health IAT has LoadLibraryA" }
+Write-Output "health_pe_iat ws2_32.dll WSAStartup (no LoadLibraryA/GetProcAddress)"
+
+$helloSrc = Join-Path $Data "guest-hello.vire"
+if (-not (Test-Path $helloSrc)) { Copy-Item (Join-Path $Root "guest-hello.vire") $helloSrc -Force }
+$helloHex = Join-Path $Data "iat-hello.hex"
+$helloExe = Join-Path $Data "iat-hello.exe"
+if (Test-Path $helloHex) { Remove-Item -Force $helloHex }
+$hp = Start-Process -FilePath $gen1 -ArgumentList @("data/guest-hello.vire", "data/iat-hello.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
+if ($hp.ExitCode -ne 0) { throw "gen1 hello compile exit $($hp.ExitCode)" }
+Convert-HexToExe $helloHex $helloExe
+Assert-NoDangerIat "hello" $helloExe
+Assert-NoDangerIat "compiler" $gen1
+
+$badVire = Join-Path $Data "bad-resolve.vire"
+Set-Content -Path $badVire -Value "define main`n  LoadLibraryA with `"kernel32.dll`"`nend`n"
+$badHex = Join-Path $Data "bad-resolve.hex"
+$bp = Start-Process -FilePath $gen1 -ArgumentList @("data/bad-resolve.vire", "data/bad-resolve.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
+if ($bp.ExitCode -eq 0) { throw "non-allowlisted resolve compiled" }
+Write-Output "inexpressible_resolve exit $($bp.ExitCode)"
 
 $outFile = Join-Path $Data "guest-health.out.txt"
 $errFile = Join-Path $Data "guest-health.err.txt"
@@ -110,6 +187,12 @@ $partial = [System.Text.Encoding]::ASCII.GetString($buf, 0, [Math]::Max(0, $n))
 Write-Output "adversary_slowloris_ms $($sw.ElapsedMilliseconds) $partial"
 if ($sw.ElapsedMilliseconds -lt 1000) { throw "slowloris returned too fast" }
 if ($n -gt 0 -and $partial -notmatch "408") { throw "slowloris expected timeout 408" }
+
+$kids = @(Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $server.Id })
+Write-Output ("child_process_count " + $kids.Count)
+if ($kids.Count -gt 0) {
+    throw ("health PE spawned child process: " + (($kids | ForEach-Object { $_.Name + ":" + $_.ProcessId }) -join ","))
+}
 
 try { $server.Kill() } catch { }
 Write-Output "native net windows ok"

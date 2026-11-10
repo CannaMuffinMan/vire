@@ -145,11 +145,10 @@ define openImage
   let image be bytes
   let labels be {}
   let fixes be []
-  ~ IAT_NET: LoadLibraryA+GetProcAddress+GetTickCount so rt-net.vire can bind ws2_32 without a second import descriptor. Rebase after L2 freeze.
-  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "LoadLibraryA", "GetProcAddress", "GetTickCount"]
-  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_ll", "ilt_gp", "ilt_gt"]
-  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_ll", "iat_gp", "iat_gt"]
-  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_ll", "hint_gp", "hint_gt"]
+  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile"]
+  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se"]
+  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se"]
+  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se"]
   let i be 0
   while i < (length with names)
     pin with labels, (ilts at i), image
@@ -185,7 +184,114 @@ define openImage
   let image be alignTo with image, 16
   let image be alignTo with image, 4096
   let image be emitRuntime with image, fixes, labels
-  return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats}
+  return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats, "impSize": 40, "net": false}
+end
+
+define openNetImage
+  ~ IAT_NET: kernel32 + GetTickCount, and a second descriptor for a fixed ws2_32 allowlist.
+  ~ Only guests that call listen. No LoadLibraryA, no GetProcAddress, no CreateProcess.
+  let image be bytes
+  let labels be {}
+  let fixes be []
+  let k32 be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetTickCount"]
+  let kilt be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_gt"]
+  let kiat be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_gt"]
+  let khint be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_gt"]
+  let ws be ["WSAStartup", "socket", "bind", "listen", "accept", "recv", "send", "closesocket", "setsockopt", "getsockname"]
+  let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn"]
+  let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn"]
+  let whint be ["hint_wsa", "hint_sk", "hint_bd", "hint_ln", "hint_ac", "hint_rv", "hint_sd", "hint_cs", "hint_ss", "hint_gn"]
+  let i be 0
+  while i < (length with k32)
+    pin with labels, (kilt at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be emitU64 with image, 0
+  let i be 0
+  while i < (length with ws)
+    pin with labels, (wilt at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be emitU64 with image, 0
+  let i be 0
+  while i < (length with kiat)
+    pin with labels, (kiat at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be emitU64 with image, 0
+  let i be 0
+  while i < (length with wiat)
+    pin with labels, (wiat at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be emitU64 with image, 0
+  pin with labels, "desc", image
+  let i be 0
+  while i < 5
+    let image be emitU32 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "desc_ws", image
+  let i be 0
+  while i < 5
+    let image be emitU32 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "desc_end", image
+  let i be 0
+  while i < 5
+    let image be emitU32 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "dll", image
+  let image be emitStr with image, "kernel32.dll"
+  let image be alignTo with image, 2
+  pin with labels, "dll_ws", image
+  let image be emitStr with image, "ws2_32.dll"
+  let image be alignTo with image, 2
+  let i be 0
+  while i < (length with khint)
+    pin with labels, (khint at i), image
+    let image be emitU8 with image, 0
+    let image be emitU8 with image, 0
+    let image be emitStr with image, (k32 at i)
+    let image be alignTo with image, 2
+    let i be i + 1
+  end
+  let i be 0
+  while i < (length with whint)
+    pin with labels, (whint at i), image
+    let image be emitU8 with image, 0
+    let image be emitU8 with image, 0
+    let image be emitStr with image, (ws at i)
+    let image be alignTo with image, 2
+    let i be i + 1
+  end
+  let image be alignTo with image, 16
+  let image be alignTo with image, 4096
+  let image be emitRuntime with image, fixes, labels
+  let hints be []
+  let ilts be []
+  let iats be []
+  let i be 0
+  while i < (length with khint)
+    push with hints, (khint at i)
+    push with ilts, (kilt at i)
+    push with iats, (kiat at i)
+    let i be i + 1
+  end
+  let i be 0
+  while i < (length with whint)
+    push with hints, (whint at i)
+    push with ilts, (wilt at i)
+    push with iats, (wiat at i)
+    let i be i + 1
+  end
+  return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats, "impSize": 60, "net": true}
 end
 
 define parkPool with image, labels, pool
@@ -221,10 +327,20 @@ define finishImage with image, labels, fixes, hints, ilts, iats
   poke32 with image, desc, (4096 + (labels at "ilt_gs"))
   poke32 with image, (desc + 12), (4096 + (labels at "dll"))
   poke32 with image, (desc + 16), (4096 + (labels at "iat_gs"))
+  if has with labels, "desc_ws"
+    let dw be labels at "desc_ws"
+    poke32 with image, dw, (4096 + (labels at "ilt_wsa"))
+    poke32 with image, (dw + 12), (4096 + (labels at "dll_ws"))
+    poke32 with image, (dw + 16), (4096 + (labels at "iat_wsa"))
+  end
   return image
 end
 
 define buildExe with image, entry, imp, dataOff
+  return buildPe with image, entry, imp, dataOff, 40
+end
+
+define buildPe with image, entry, imp, dataOff, impSize
   ~ Well-formed PE32+: W^X .text/.data, checksum, nonzero timestamp, linker 14.40,
   ~ OS/subsystem 6.0, 1MB stack/heap reserve (arena stays VirtualAlloc 32MB),
   ~ NX + HIGH_ENTROPY_VA + TERMINAL_SERVER_AWARE. No DYNAMIC_BASE without relocs.
@@ -287,7 +403,7 @@ define buildExe with image, entry, imp, dataOff
   poke32 with head, 248, 4096
   poke32 with head, 260, 16
   poke32 with head, 272, (4096 + imp)
-  poke32 with head, 276, 40
+  poke32 with head, 276, impSize
   pokeSection with head, 392, ".idata", 4096, 4096, 4096, 512, 3221225536
   pokeSection with head, 432, ".text", textRaw, 8192, textRaw, 4608, 1610612768
   pokeSection with head, 472, ".data", dataRaw, (4096 + dataOff), dataRaw, (512 + dataOff), 3221225536
