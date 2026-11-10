@@ -363,6 +363,7 @@ define parseAtom with state, func
         bump with state
         push with args, (parseProduct with state, func)
       end
+      noteNeed with state, nm
       return ["call", nm, args]
     end
     return ["name", nm]
@@ -632,6 +633,7 @@ define parseStmt with state, func
   end
   if (expr at 0) == "name"
     let bare be []
+    noteNeed with state, (expr at 1)
     return ["call", expr at 1, bare]
   end
   return markBad with state, "that statement is not ready"
@@ -691,8 +693,21 @@ define parseDefine with state
   return func
 end
 
+define noteNeed with state, nm
+  if nm == "listen"
+    put true into state at "needNet"
+  end
+  if nm == "json"
+    put true into state at "needJson"
+  end
+  if nm == "parse"
+    put true into state at "needJson"
+  end
+  return true
+end
+
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": ""}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false}
   let funcs be []
   let uses be []
   let needs be []
@@ -738,7 +753,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson"}
 end
 
 define normPath with path
@@ -977,7 +992,7 @@ define loadUnit with path, folder, seen
     let missing be true
   end
   if missing
-    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": []}
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false}
   end
   return loadText with path, source, folder, seen
 end
@@ -1005,6 +1020,8 @@ define loadText with path, source, folder, seen
   end
   let funcs be parsed at "funcs"
   let uses be parsed at "uses"
+  let needNet be parsed at "needNet"
+  let needJson be parsed at "needJson"
   let ui be 0
   while ui < (length with uses)
     let rel be uses at ui
@@ -1029,6 +1046,12 @@ define loadText with path, source, folder, seen
       return {"bad": true, "why": merged at "why", "funcs": funcs}
     end
     let funcs be merged at "funcs"
+    if extra at "needNet"
+      let needNet be true
+    end
+    if extra at "needJson"
+      let needJson be true
+    end
     let ui be ui + 1
   end
   let needs be parsed at "needs"
@@ -1084,10 +1107,16 @@ define loadText with path, source, folder, seen
       return {"bad": true, "why": merged at "why", "funcs": funcs}
     end
     let funcs be merged at "funcs"
+    if extra at "needNet"
+      let needNet be true
+    end
+    if extra at "needJson"
+      let needJson be true
+    end
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson}
 end
 
 define emitOp with gen, bytes
@@ -1609,68 +1638,6 @@ define emitStmt with gen, funcs, func, stmt
   return true
 end
 
-define walkNode with node, hit
-  try
-    let n be length with node
-    if n == 0
-      return true
-    end
-    let head be node at 0
-    if head == "text" or head == "num" or head == "name" or head == "bool" or head == "none"
-      return true
-    end
-    if head == "call"
-      let nm be node at 1
-      if nm == "listen"
-        put true into hit at "net"
-      end
-      if nm == "json"
-        put true into hit at "json"
-      end
-      if nm == "parse"
-        put true into hit at "json"
-      end
-      if n > 2
-        walkNode with (node at 2), hit
-      end
-      return true
-    end
-    if head == "let" or head == "say" or head == "return" or head == "if" or head == "while" or head == "for" or head == "try" or head == "put" or head == "list" or head == "map" or head == "not" or head == "neg" or head == "and" or head == "or" or head == "at" or head == "==" or head == "!=" or head == "<" or head == ">" or head == "<=" or head == ">=" or head == "+" or head == "-" or head == "*" or head == "/" or head == "%"
-      let i be 1
-      while i < n
-        walkNode with (node at i), hit
-        let i be i + 1
-      end
-      return true
-    end
-    try
-      let inner be head at 0
-      if inner == "call" or inner == "let" or inner == "say" or inner == "return" or inner == "if" or inner == "while" or inner == "for" or inner == "try" or inner == "put" or inner == "stop" or inner == "skip"
-        let i be 0
-        while i < n
-          walkNode with (node at i), hit
-          let i be i + 1
-        end
-      end
-    miss
-      return true
-    end
-  miss
-    return true
-  end
-  return true
-end
-
-define guestNeeds with funcs
-  let hit be {"net": false, "json": false}
-  let i be 0
-  while i < (length with funcs)
-    walkNode with ((funcs at i) at "body"), hit
-    let i be i + 1
-  end
-  return hit
-end
-
 define emitFunc with gen, funcs, func
   pinHere with gen, ("fn_" + (func at "name"))
   emitOp with gen, [72, 131, 236, 40]
@@ -1688,12 +1655,14 @@ end
 
 define main
   let files be args
+  say "go"
   if (length with files) < 2
     say "usage: compile-native source.vire out.hex"
     say "compile failed"
     halt with 1
   end
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
+  say "loaded"
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
@@ -1713,7 +1682,7 @@ define main
     say "compile failed"
     halt with 1
   end
-  let hits be guestNeeds with funcs
+  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
   let opened be openImage
   if hits at "net"
