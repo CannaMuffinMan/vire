@@ -119,7 +119,9 @@ define keyword with word
 end
 
 define tokenize with source
-  let toks be []
+  let ks be []
+  let ss be []
+  let ns be []
   let i be gap with source, 0
   let n be length with source
   while i < n
@@ -127,83 +129,94 @@ define tokenize with source
     if ch == "\""
       let item be readString with source, i
       if item at "bad"
-        return {"bad": true, "why": "broken string", "toks": toks}
+        return {"bad": true, "why": "broken string"}
       end
-      push with toks, {"k": "text", "s": item at "text", "n": 0}
+      push with ks, "text"
+      push with ss, (item at "text")
+      push with ns, 0
       let i be gap with source, (item at "i")
     end
     if ch != "\""
       if isDigit with ch
-        let start be i
+        let v be 0
         while i < n
-          if not (isDigit with (source at i))
+          let mark be source at i
+          if not (isDigit with mark)
             stop
           end
+          let v be (v * 10) + (number with mark)
           let i be i + 1
         end
         if i < n
           if (source at i) == "."
-            return {"bad": true, "why": "that number is not ready", "toks": toks}
+            return {"bad": true, "why": "that number is not ready"}
           end
         end
-        let raw be slice with source, start, i
-        push with toks, {"k": "num", "s": raw, "n": number with raw}
+        push with ks, "num"
+        push with ss, ""
+        push with ns, v
         let i be gap with source, i
       end
       if not (isDigit with ch)
         if isLetter with ch
-          let start be i
+          let word be ""
           while i < n
             let mark be source at i
             if not (isLetter with mark) and not (isDigit with mark)
               stop
             end
+            let word be word + mark
             let i be i + 1
           end
-          let word be slice with source, start, i
           let key be keyword with word
-          push with toks, {"k": key, "s": word, "n": 0}
+          push with ks, key
+          push with ss, word
+          push with ns, 0
           let i be gap with source, i
         end
         if not (isLetter with ch)
           let two be ""
           if i + 1 < n
-            let two be slice with source, i, (i + 2)
+            let two be (source at i) + (source at (i + 1))
           end
           if two == "==" or two == "!=" or two == "<=" or two == ">="
-            push with toks, {"k": two, "s": two, "n": 0}
+            push with ks, two
+            push with ss, two
+            push with ns, 0
             let i be gap with source, (i + 2)
           end
           if two != "==" and two != "!=" and two != "<=" and two != ">="
             if (find with "+-*/%<>=(),[]{}:", ch) >= 0
-              push with toks, {"k": ch, "s": ch, "n": 0}
+              push with ks, ch
+              push with ss, ch
+              push with ns, 0
               let i be gap with source, (i + 1)
             end
             if (find with "+-*/%<>=(),[]{}:", ch) < 0
-              return {"bad": true, "why": "that expression is not ready", "toks": toks}
+              return {"bad": true, "why": "that expression is not ready"}
             end
           end
         end
       end
     end
   end
-  return {"bad": false, "why": "", "toks": toks}
+  return {"bad": false, "why": "", "ks": ks, "ss": ss, "ns": ns}
 end
 
 define form with state
-  let toks be state at "toks"
-  if (state at "i") >= (length with toks)
+  let ks be state at "ks"
+  if (state at "i") >= (length with ks)
     return "eof"
   end
-  return (toks at (state at "i")) at "k"
+  return ks at (state at "i")
 end
 
 define spell with state
-  return ((state at "toks") at (state at "i")) at "s"
+  return (state at "ss") at (state at "i")
 end
 
 define valueOf with state
-  return ((state at "toks") at (state at "i")) at "n"
+  return (state at "ns") at (state at "i")
 end
 
 define bump with state
@@ -369,13 +382,54 @@ define parseAtom with state, func
       bump with state
       return ["list", items]
     end
-    push with items, (parseExpr with state, func)
-    while (form with state) == ","
-      bump with state
-      if (form with state) == "]"
-        stop
+    if (form with state) == "num" or (form with state) == "-"
+      let n be 0
+      if (form with state) == "-"
+        bump with state
+        if (form with state) != "num"
+          return markBad with state, "that expression is not ready"
+        end
+        let n be 0 - (valueOf with state)
+        bump with state
       end
+      if (form with state) == "num"
+        let n be valueOf with state
+        bump with state
+      end
+      push with items, n
+      while (form with state) == ","
+        bump with state
+        if (form with state) == "]"
+          stop
+        end
+        if (form with state) != "num" and (form with state) != "-"
+          return markBad with state, "that expression is not ready"
+        end
+        let n be 0
+        if (form with state) == "-"
+          bump with state
+          if (form with state) != "num"
+            return markBad with state, "that expression is not ready"
+          end
+          let n be 0 - (valueOf with state)
+          bump with state
+        end
+        if (form with state) == "num"
+          let n be valueOf with state
+          bump with state
+        end
+        push with items, n
+      end
+    end
+    if (form with state) != "num" and (length with items) == 0
       push with items, (parseExpr with state, func)
+      while (form with state) == ","
+        bump with state
+        if (form with state) == "]"
+          stop
+        end
+        push with items, (parseExpr with state, func)
+      end
     end
     if (form with state) != "]"
       return markBad with state, "that expression is not ready"
@@ -677,8 +731,8 @@ define parseDefine with state
   return func
 end
 
-define parseProgram with toks
-  let state be {"toks": toks, "i": 0, "bad": false, "why": ""}
+define parseProgram with scanned
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": ""}
   let funcs be []
   let uses be []
   let needs be []
@@ -984,7 +1038,7 @@ define loadText with path, source, folder, seen
     put 0 into seen at key
     return {"bad": true, "why": scanned at "why", "funcs": []}
   end
-  let parsed be parseProgram with (scanned at "toks")
+  let parsed be parseProgram with scanned
   if parsed at "bad"
     put 0 into seen at key
     return {"bad": true, "why": parsed at "why", "funcs": []}
@@ -1169,10 +1223,10 @@ define builtinArity with nm
   if nm == "args"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8"
     return 1
   end
-  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join"
+  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
     return 2
   end
   if nm == "slice" or nm == "replace"
@@ -1190,6 +1244,8 @@ define freshCounter with gen
 end
 
 define parkCounters with image, labels, counters
+  ~ Must run after parkRuntime so these u64 slots land in .data (RW).
+  ~ while/for save trap_sp here; RX .text makes that ACCESS_VIOLATION.
   let i be 0
   let n be length with counters
   while i < n
@@ -1253,6 +1309,10 @@ define emitExpr with gen, funcs, func, expr
     end
     if nm == "args"
       emitCall with gen, "rt_args"
+      return true
+    end
+    if nm == "bytes"
+      emitCall with gen, "rt_bytes"
       return true
     end
     let found be findFunc with funcs, nm
@@ -1412,7 +1472,13 @@ define emitExpr with gen, funcs, func, expr
     let items be expr at 1
     let i be 0
     while i < (length with items)
-      emitExpr with gen, funcs, func, (items at i)
+      try
+        emitExpr with gen, funcs, func, (items at i)
+      miss unused
+        emitOp with gen, [72, 199, 193]
+        put (emitU32 with (gen at "image"), (items at i)) into gen at "image"
+        emitCall with gen, "rt_push_int"
+      end
       emitCall with gen, "rt_push"
       let i be i + 1
     end
@@ -1638,10 +1704,11 @@ define main
     halt with 1
   end
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
-  put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
+  put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
-  let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc")
-  write with (files at 1), (hexOf with exe)
+  let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")
+  write with (files at 1), (hex with exe)
   say "compiled"
 end
+

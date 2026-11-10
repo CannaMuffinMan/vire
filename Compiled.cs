@@ -312,7 +312,7 @@ sealed class CompiledMachine
             string called = (string)expr[1];
             object found;
             if (env.TryGetValue(called, out found)) return found;
-            if (called == "args" || called == "now" || called == "ticks" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
+            if (called == "args" || called == "bytes" || called == "now" || called == "ticks" || called == "term" || called == "screen" || called == "show" || called == "marks" || called == "clear")
                 return Builtin(called, new List<object>(), AsLine(expr), AsCol(expr));
             if (funcs.ContainsKey(called))
             {
@@ -509,6 +509,7 @@ sealed class CompiledMachine
             return VireThreads.Result(threads, args[0], line, col);
         }
         if (name == "args") return programArgs;
+        if (name == "bytes") return new List<object>();
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "ticks") return Machine.ClockTicks();
         if (name == "halt")
@@ -533,6 +534,13 @@ sealed class CompiledMachine
             if (list.Count >= MaxItems) throw new VireError("list is too large", line, col);
             list.Add(args[1]);
             return args[0];
+        }
+        if (name == "extend")
+        {
+            if (args.Count != 2) throw new VireError("extend takes 2 values, got " + args.Count, line, col);
+            List<object> dest = args[0] as List<object>;
+            List<object> extra = args[1] as List<object>;
+            return Program.ExtendList(dest, extra, MaxItems, line, col);
         }
         if (name == "text") return Show(args[0]);
         if (name == "number")
@@ -570,6 +578,16 @@ sealed class CompiledMachine
         {
             if (args.Count != 2) throw new VireError("idiv takes 2 values, got " + args.Count, line, col);
             return Program.WholeDiv(args[0], args[1], line, col);
+        }
+        if (name == "shl8")
+        {
+            if (args.Count != 1) throw new VireError("shl8 takes 1 values, got " + args.Count, line, col);
+            return Program.Shl8(args[0], line, col);
+        }
+        if (name == "hex")
+        {
+            if (args.Count != 1) throw new VireError("hex takes 1 values, got " + args.Count, line, col);
+            return Program.HexBytes(args[0], line, col);
         }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
         if (name == "read")

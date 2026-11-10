@@ -1,0 +1,13 @@
+define main
+  let word be "Ab9"
+  say word at 0
+  say word at 1
+  say word at 2
+  let i be 0
+  let out be ""
+  while i < (length with word)
+    let out be out + (word at i)
+    let i be i + 1
+  end
+  say out
+end

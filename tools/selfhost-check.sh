@@ -2,9 +2,10 @@
 # Stage-1/2/3 self-host check for compiler.vire.
 # Real CLI:
 #   dotnet exec vire.dll compiler.vire data/compiler.vire data/stage1.vc
-#   dotnet exec vire.dll run data/stage1.vc compiler.vire stage2.vc
-# Stage 2+ run with the .vc sandbox root = data/, so remaining args are
-# relative to data/ (compiler.vire and stageN.vc names only).
+#   dotnet exec vire.dll run data/stage1.vc data/compiler.vire data/stage2.vc
+# Stage 2+ .vc files sit in data/. FolderForCompiled hops to the repo so
+# DataOrSite still means data/ and site/ (same as interpreter compiler.vire).
+# Remaining args keep the data/ prefix.
 # Seal: throwaway 32-byte key in VIRE_SEAL_KEY (base64). VC2 uses a random
 # nonce, so sealed files differ. This script compares unsealed payloads
 # byte-for-byte via payload-write + cmp, and also payload-sha256.
@@ -30,10 +31,10 @@ echo "stage 1: interpreter compiles compiler.vire"
 run_vire compiler.vire data/compiler.vire data/stage1.vc
 
 echo "stage 2: stage1.vc compiles compiler.vire"
-run_vire run data/stage1.vc compiler.vire stage2.vc
+run_vire run data/stage1.vc data/compiler.vire data/stage2.vc
 
 echo "stage 3: stage2.vc compiles compiler.vire"
-run_vire run data/stage2.vc compiler.vire stage3.vc
+run_vire run data/stage2.vc data/compiler.vire data/stage3.vc
 
 hash1="$(run_vire payload-sha256 data/stage1.vc | tail -n 1)"
 hash2="$(run_vire payload-sha256 data/stage2.vc | tail -n 1)"

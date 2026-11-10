@@ -84,7 +84,7 @@ static class VireForeign
         finally
         {
             for (int i = 0; i < pinsUsed; i++) pins[i].Free();
-            if (!already) FreeLibrary(module);
+            if (!already) CloseModule(module);
         }
     }
 
@@ -119,22 +119,45 @@ static class VireForeign
         return Encoding.UTF8.GetString(buf);
     }
 
+    static void CloseModule(IntPtr module)
+    {
+        if (module == IntPtr.Zero) return;
+        if (OperatingSystem.IsWindows()) FreeLibrary(module);
+        else NativeLibrary.Free(module);
+    }
+
     static int CallInt(IntPtr proc, int count, IntPtr a0, IntPtr a1, IntPtr a2, IntPtr a3)
     {
-        if (count == 0) return Marshal.GetDelegateForFunctionPointer<ForeignInt>(proc)();
-        if (count == 1) return Marshal.GetDelegateForFunctionPointer<ForeignSlot1>(proc)(a0);
-        if (count == 2) return Marshal.GetDelegateForFunctionPointer<ForeignSlot2>(proc)(a0, a1);
-        if (count == 3) return Marshal.GetDelegateForFunctionPointer<ForeignSlot3>(proc)(a0, a1, a2);
-        return Marshal.GetDelegateForFunctionPointer<ForeignSlot4>(proc)(a0, a1, a2, a3);
+        if (OperatingSystem.IsWindows())
+        {
+            if (count == 0) return Marshal.GetDelegateForFunctionPointer<ForeignInt>(proc)();
+            if (count == 1) return Marshal.GetDelegateForFunctionPointer<ForeignSlot1>(proc)(a0);
+            if (count == 2) return Marshal.GetDelegateForFunctionPointer<ForeignSlot2>(proc)(a0, a1);
+            if (count == 3) return Marshal.GetDelegateForFunctionPointer<ForeignSlot3>(proc)(a0, a1, a2);
+            return Marshal.GetDelegateForFunctionPointer<ForeignSlot4>(proc)(a0, a1, a2, a3);
+        }
+        if (count == 0) return Marshal.GetDelegateForFunctionPointer<UnixInt>(proc)();
+        if (count == 1) return Marshal.GetDelegateForFunctionPointer<UnixSlot1>(proc)(a0);
+        if (count == 2) return Marshal.GetDelegateForFunctionPointer<UnixSlot2>(proc)(a0, a1);
+        if (count == 3) return Marshal.GetDelegateForFunctionPointer<UnixSlot3>(proc)(a0, a1, a2);
+        return Marshal.GetDelegateForFunctionPointer<UnixSlot4>(proc)(a0, a1, a2, a3);
     }
 
     static IntPtr CallText(IntPtr proc, int count, IntPtr a0, IntPtr a1, IntPtr a2, IntPtr a3)
     {
-        if (count == 0) return Marshal.GetDelegateForFunctionPointer<ForeignText0>(proc)();
-        if (count == 1) return Marshal.GetDelegateForFunctionPointer<ForeignText1>(proc)(a0);
-        if (count == 2) return Marshal.GetDelegateForFunctionPointer<ForeignText2>(proc)(a0, a1);
-        if (count == 3) return Marshal.GetDelegateForFunctionPointer<ForeignText3>(proc)(a0, a1, a2);
-        return Marshal.GetDelegateForFunctionPointer<ForeignText4>(proc)(a0, a1, a2, a3);
+        if (OperatingSystem.IsWindows())
+        {
+            if (count == 0) return Marshal.GetDelegateForFunctionPointer<ForeignText0>(proc)();
+            if (count == 1) return Marshal.GetDelegateForFunctionPointer<ForeignText1>(proc)(a0);
+            if (count == 2) return Marshal.GetDelegateForFunctionPointer<ForeignText2>(proc)(a0, a1);
+            if (count == 3) return Marshal.GetDelegateForFunctionPointer<ForeignText3>(proc)(a0, a1, a2);
+            return Marshal.GetDelegateForFunctionPointer<ForeignText4>(proc)(a0, a1, a2, a3);
+        }
+        if (count == 0) return Marshal.GetDelegateForFunctionPointer<UnixText0>(proc)();
+        if (count == 1) return Marshal.GetDelegateForFunctionPointer<UnixText1>(proc)(a0);
+        if (count == 2) return Marshal.GetDelegateForFunctionPointer<UnixText2>(proc)(a0, a1);
+        if (count == 3) return Marshal.GetDelegateForFunctionPointer<UnixText3>(proc)(a0, a1, a2);
+        return Marshal.GetDelegateForFunctionPointer<UnixText4>(proc)(a0, a1, a2, a3);
     }
 
     static IntPtr LoadExport(string root, object dllValue, object exportValue, int line, int col, out IntPtr module, out bool already)
@@ -159,21 +182,42 @@ static class VireForeign
         VirePaths.RefuseFileReparse(full, root, line, col);
         if (!File.Exists(full))
             throw new VireError("there is no file by that name", line, col);
-        if (!OperatingSystem.IsWindows())
-            throw new VireError("could not open that dll", line, col);
-        string leaf = Path.GetFileName(full);
-        already = GetModuleHandleW(leaf) != IntPtr.Zero || GetModuleHandleW(full) != IntPtr.Zero;
-        module = LoadLibraryExW(full, IntPtr.Zero, SearchFlags);
-        if (module == IntPtr.Zero)
-            throw new VireError("could not open that dll", line, col);
-        IntPtr proc = GetProcAddress(module, export);
-        if (proc == IntPtr.Zero)
+        if (OperatingSystem.IsWindows())
         {
-            if (!already) FreeLibrary(module);
+            string leaf = Path.GetFileName(full);
+            already = GetModuleHandleW(leaf) != IntPtr.Zero || GetModuleHandleW(full) != IntPtr.Zero;
+            module = LoadLibraryExW(full, IntPtr.Zero, SearchFlags);
+            if (module == IntPtr.Zero)
+                throw new VireError("could not open that dll", line, col);
+            IntPtr proc = GetProcAddress(module, export);
+            if (proc == IntPtr.Zero)
+            {
+                if (!already) FreeLibrary(module);
+                module = IntPtr.Zero;
+                throw new VireError("there is no export by that name", line, col);
+            }
+            return proc;
+        }
+        try
+        {
+            module = NativeLibrary.Load(full);
+        }
+        catch (Exception)
+        {
+            throw new VireError("could not open that dll", line, col);
+        }
+        IntPtr unixProc;
+        try
+        {
+            unixProc = NativeLibrary.GetExport(module, export);
+        }
+        catch (Exception)
+        {
+            NativeLibrary.Free(module);
             module = IntPtr.Zero;
             throw new VireError("there is no export by that name", line, col);
         }
-        return proc;
+        return unixProc;
     }
 
     static bool ExportOk(string name)
@@ -245,4 +289,34 @@ static class VireForeign
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool FreeLibrary(IntPtr module);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate int UnixInt();
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate int UnixSlot1(IntPtr a);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate int UnixSlot2(IntPtr a, IntPtr b);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate int UnixSlot3(IntPtr a, IntPtr b, IntPtr c);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate int UnixSlot4(IntPtr a, IntPtr b, IntPtr c, IntPtr d);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate IntPtr UnixText0();
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate IntPtr UnixText1(IntPtr a);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate IntPtr UnixText2(IntPtr a, IntPtr b);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate IntPtr UnixText3(IntPtr a, IntPtr b, IntPtr c);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    delegate IntPtr UnixText4(IntPtr a, IntPtr b, IntPtr c, IntPtr d);
 }

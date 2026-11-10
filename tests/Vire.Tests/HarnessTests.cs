@@ -84,8 +84,10 @@ public class HarnessTests
         string ps = File.ReadAllText(Path.Combine(root, "tools", "selfhost-check.ps1"));
         Assert.Contains("payload-write", sh);
         Assert.Contains("cmp -s", sh);
+        Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", sh);
         Assert.Contains("payload-write", ps);
         Assert.Contains("Compare-Object", ps);
+        Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", ps);
     }
 
     [Fact]
@@ -104,6 +106,30 @@ public class HarnessTests
                 "Dockerfile must copy " + name);
         }
         Assert.Contains("vire.csproj", spec);
+    }
+
+    [Fact]
+    public void NativeSecAndHelloHandoffBoundTheCompileWait()
+    {
+        string root = FindRoot();
+        string sec = File.ReadAllText(Path.Combine(root, "tools", "native-sec-windows.ps1"));
+        string hello = File.ReadAllText(Path.Combine(root, "tools", "native-hello-handoff.ps1"));
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        Assert.Contains("WaitForExit", sec);
+        Assert.Contains("timed out after", sec);
+        Assert.Contains("PositionalBinding = $false", sec);
+        Assert.Contains("[string[]]$VireArgs", sec);
+        Assert.Contains("WaitForExit", hello);
+        Assert.Contains("120000", hello);
+        Assert.Contains("native-hello-handoff.ps1", yml);
+        Assert.Contains("native-sec-windows.ps1", yml);
+        Assert.Contains("native-selfhost-handoff.ps1", yml);
+        Assert.Contains("native-selfhost-windows", yml);
+        string self = File.ReadAllText(Path.Combine(root, "tools", "native-selfhost-handoff.ps1"));
+        Assert.Contains("WaitForExit", self);
+        Assert.Contains("gen1_sha256", self);
+        Assert.DoesNotContain("python -c", self);
+        Assert.DoesNotContain("bash ", self);
     }
 
     [Fact]

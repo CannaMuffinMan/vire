@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "seal", "run", "sources", "args", "listen", "halt", "foreign", "build", "idiv",
+        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -396,9 +396,14 @@ sealed class Machine
 
     public void UseSource(string path) { sourceFile = path; }
 
+    bool compilerProgress;
+    long compilerBeatMs;
+
     public void UseCompilerLimits()
     {
         itemCap = 1000000;
+        compilerProgress = true;
+        compilerBeatMs = Environment.TickCount64;
     }
 
     public void UseBudget(int limit)
@@ -413,6 +418,10 @@ sealed class Machine
     }
 
     public void UseArgs(List<object> values) { programArgs = values; }
+
+    public int ChargedSteps() { return budget.Steps; }
+
+    public int PendingSteps() { return budget.Pending; }
 
     internal static int RequirePort(object value, int line)
     {
@@ -438,6 +447,15 @@ sealed class Machine
         if (pending % Budget.StepBatch != 0) return;
         int steps = System.Threading.Interlocked.Increment(ref budget.Steps);
         if (steps > budget.MaxSteps) throw new VireError("program ran too long and was stopped", line);
+        if (compilerProgress)
+        {
+            long now = Environment.TickCount64;
+            if (now - compilerBeatMs >= 2000)
+            {
+                compilerBeatMs = now;
+                Program.CompilerNote("still running steps=" + steps);
+            }
+        }
     }
 
     string SafePath(object text, int line)
@@ -584,7 +602,7 @@ sealed class Machine
     object Builtin(string name, List<object> args, int line, int col)
     {
         int need = 1;
-        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args") need = 0;
+        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes") need = 0;
         if (name == "wait" || name == "result") need = 1;
         if (name == "start")
         {
@@ -592,7 +610,7 @@ sealed class Machine
                 throw new VireError("start takes a definition name and at most one value", line, col);
             need = args.Count;
         }
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend") need = 2;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -614,6 +632,12 @@ sealed class Machine
             if (list.Count >= itemCap) throw new VireError("list is too large", line, col);
             list.Add(args[1]);
             return list;
+        }
+        if (name == "extend")
+        {
+            List<object> dest = args[0] as List<object>;
+            List<object> extra = args[1] as List<object>;
+            return Program.ExtendList(dest, extra, itemCap, line, col);
         }
         if (name == "text") return Show(args[0]);
         if (name == "number")
@@ -686,6 +710,7 @@ sealed class Machine
             return map.ContainsKey(KeyOf(args[1], line));
         }
         if (name == "args") return programArgs;
+        if (name == "bytes") return new List<object>();
         if (name == "halt")
         {
             if (!(args[0] is int)) throw new VireError("halt needs a whole number", line, col);
@@ -696,6 +721,8 @@ sealed class Machine
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
         if (name == "idiv") return Program.WholeDiv(args[0], args[1], line, col);
+        if (name == "shl8") return Program.Shl8(args[0], line, col);
+        if (name == "hex") return Program.HexBytes(args[0], line, col);
         if (name == "start") return StartThread(args, line, col);
         if (name == "wait") { VireThreads.Wait(threads, args[0], line, col); return 0; }
         if (name == "result") return VireThreads.Result(threads, args[0], line, col);
@@ -1552,7 +1579,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "ticks"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks"))
                 return Builtin(name, new List<object>(), line, col);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), line, col);
@@ -2806,6 +2833,41 @@ internal static class HttpWire
 
 sealed class Program
 {
+    internal static object ExtendList(List<object> dest, List<object> extra, int cap, int line, int col)
+    {
+        if (dest == null || extra == null) throw new VireError("extend needs two lists", line, col);
+        if (extra.Count > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
+        if (extra.Count > cap - dest.Count) throw new VireError("list is too large", line, col);
+        for (int i = 0; i < extra.Count; i++) dest.Add(EmitU8Byte(extra[i], line, col));
+        return dest;
+    }
+
+    static object EmitU8Byte(object n, int line, int col)
+    {
+        if (n is int)
+        {
+            int whole = (int)n;
+            if (whole >= 0 && whole < 256) return n;
+        }
+        else if (n is double)
+        {
+            double real = (double)n;
+            if (real >= 0 && real < 256) return n;
+        }
+        else throw new VireError("extend needs numbers in the extra list", line, col);
+        double x;
+        if (!AsReal(n, out x)) throw new VireError("extend needs numbers in the extra list", line, col);
+        if (x < 0) x += 256;
+        if (x >= 256)
+        {
+            int q = WholeDiv(x, 256, line, col);
+            x = x - (q * 256);
+        }
+        if (x < 0) x = 0;
+        if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;
+        return x;
+    }
+
     internal static int WholeDiv(object left, object right, int line, int col)
     {
         double num;
@@ -2815,6 +2877,34 @@ sealed class Program
         double quote = Math.Floor(num / den);
         if (quote > int.MaxValue) return int.MaxValue;
         return (int)quote;
+    }
+
+    internal static string HexBytes(object value, int line, int col)
+    {
+        List<object> list = value as List<object>;
+        if (list == null) throw new VireError("hex needs a list of whole numbers", line, col);
+        int n = list.Count;
+        if (n > 500000) throw new VireError("out of memory", line, col);
+        char[] chars = new char[n * 2];
+        string digits = "0123456789abcdef";
+        for (int i = 0; i < n; i++)
+        {
+            double real;
+            if (!AsReal(list[i], out real) || real != Math.Floor(real)) throw new VireError("hex needs a list of whole numbers", line, col);
+            int b = (int)real & 255;
+            chars[i * 2] = digits[b >> 4];
+            chars[i * 2 + 1] = digits[b & 15];
+        }
+        return new string(chars);
+    }
+
+    internal static object Shl8(object value, int line, int col)
+    {
+        double n;
+        if (!AsReal(value, out n)) throw new VireError("shl8 needs a number", line, col);
+        double shifted = n * 256;
+        if (shifted == Math.Floor(shifted) && shifted <= int.MaxValue && shifted >= int.MinValue) return (int)shifted;
+        return shifted;
     }
 
     static bool AsReal(object value, out double real)
@@ -2865,6 +2955,7 @@ sealed class Program
         if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
         VirePaths.RefuseReparse(full, folder, 1);
+        if (CompilerProgress != 0) CompilerNote("loading " + Path.GetFileName(full));
         FileInfo info = new FileInfo(full);
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
@@ -3058,8 +3149,44 @@ sealed class Program
         return Execute(args);
     }
 
+    internal static int CompilerProgress;
+
+    internal static void CompilerNote(string message)
+    {
+        Console.Error.WriteLine("vire: " + message);
+        Console.Error.Flush();
+    }
+
+    static bool CompilerArg(string[] args)
+    {
+        if (args == null || args.Length < 1) return false;
+        int i = 0;
+        if (args[0] == "--key-file" && args.Length >= 2) i = 2;
+        if (i >= args.Length) return false;
+        string name = Path.GetFileName(args[i]);
+        return name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static int Execute(string[] args)
     {
+        if (CompilerArg(args))
+        {
+            CompilerProgress = 1;
+            try { Console.SetIn(TextReader.Null); }
+            catch (IOException) { }
+            string shown = args[0];
+            for (int n = 0; n < args.Length; n++)
+            {
+                if (Path.GetFileName(args[n]).Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
+                    || Path.GetFileName(args[n]).Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
+                {
+                    shown = args[n];
+                    break;
+                }
+            }
+            CompilerNote("starting " + Path.GetFileName(shown));
+        }
         int code = 0;
         Exception failure = null;
         Thread thread = new Thread(delegate ()
@@ -3070,6 +3197,7 @@ sealed class Program
         thread.IsBackground = true;
         thread.Start();
         thread.Join();
+        CompilerProgress = 0;
         if (failure == null) return code;
         if (failure is HaltSignal halt) return halt.Code;
         if (failure is VireError exc)
@@ -3124,7 +3252,7 @@ sealed class Program
             }
             string programFolder = null;
             if (rest.Length >= 2 && rest[0] == "run")
-                programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[1]));
+                programFolder = VirePaths.FolderForCompiled(Path.GetFullPath(rest[1]));
             else if (rest.Length >= 1)
                 programFolder = Path.GetDirectoryName(Path.GetFullPath(rest[0]));
             VireSeal.ClearKey();
@@ -3155,7 +3283,7 @@ sealed class Program
             {
                 if (rest.Length < 2) throw new VireError("usage: vire run file.vc", 1);
                 string compiled = Path.GetFullPath(rest[1]);
-                string compiledFolder = Path.GetDirectoryName(compiled);
+                string compiledFolder = VirePaths.FolderForCompiled(compiled);
                 List<object> compiledArgs = new List<object>();
                 for (int i = 2; i < rest.Length; i++) compiledArgs.Add(rest[i]);
                 CompiledProgram.Run(compiled, compiledFolder, compiledArgs);
@@ -3169,11 +3297,17 @@ sealed class Program
             Machine machine = new Machine(funcs, folder);
             machine.UseSource(program);
             machine.UseBudget(budget);
-            if (IsCompilerProgram(program)) machine.UseCompilerLimits();
+            if (IsCompilerProgram(program))
+            {
+                machine.UseCompilerLimits();
+                CompilerNote("loaded, running main");
+            }
             List<object> extra = new List<object>();
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);
             machine.Run();
+            if (IsCompilerProgram(program))
+                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch);
             return 0;
         }
         catch (HaltSignal halt)

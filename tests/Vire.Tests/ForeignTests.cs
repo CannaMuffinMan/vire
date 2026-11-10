@@ -12,7 +12,7 @@ public class ForeignTests
         Directory.CreateDirectory(dir);
         try
         {
-            File.Copy(Path.Combine(Environment.SystemDirectory, "kernel32.dll"), Path.Combine(dir, "kernel32.dll"));
+            ForeignHost.PlaceKernel32(dir);
             string src = string.Join("\n", new string[]
             {
                 "define main",

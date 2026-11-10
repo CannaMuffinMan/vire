@@ -20,12 +20,17 @@ define floorDiv with n, d
 end
 
 define emitU8 with buf, n
+  if n >= 0
+    if n < 256
+      return (push with buf, n)
+    end
+  end
   let x be n
   if x < 0
     let x be x + 256
   end
   if x >= 256
-    let x be x - ((floorDiv with x, 256) * 256)
+    let x be x % 256
   end
   if x < 0
     let x be 0
@@ -53,7 +58,7 @@ define emitU32 with buf, n
   let i be 0
   while i < 4
     let q be floorDiv with x, 256
-    let byte be x - (q * 256)
+    let byte be x % 256
     if byte < 0
       let byte be 0
     end
@@ -104,7 +109,7 @@ define patchRel with buf, labels, fixes
     let k be 0
     while k < 4
       let q be floorDiv with x, 256
-      let byte be x - (q * 256)
+      let byte be x % 256
       put byte into buf at (pos + k)
       let x be q
       let k be k + 1
@@ -132,18 +137,24 @@ define hexIndex with n
     return 0
   end
   if x >= 256
-    let x be x - ((floorDiv with x, 256) * 256)
+    let x be x % 256
   end
   return x
 end
 
+define hexTable
+  return "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+end
+
 define hexOf with buf
-  let pairs be hexPairs
+  let digits be hexTable
   let parts be []
   let i be 0
   let n be length with buf
   while i < n
-    push with parts, (pairs at (hexIndex with (buf at i)))
+    let b be hexIndex with (buf at i)
+    let o be b + b
+    push with parts, (slice with digits, o, (o + 2))
     let i be i + 1
   end
   return join with parts, ""

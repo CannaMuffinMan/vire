@@ -1,0 +1,8 @@
+~ Parse plus emitRuntime via openImage. No guest compile. No hexOf.
+
+use "src/pe.vire"
+
+define main
+  let opened be openImage
+  say length with (opened at "image")
+end

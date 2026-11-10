@@ -139,6 +139,26 @@ static class VirePaths
         return InFolder(data, path) || InFolder(site, path);
     }
 
+    // .vc files must live in data/ or site/. Using that directory as the
+    // sandbox would require reads under data/data or data/site. One hop up
+    // when the file sits directly in data/ or site/ matches interpreter
+    // compiler.vire (repo root) so selfhost can pass data/compiler.vire.
+    // Nested paths such as data/conformance/<id>/prog.vc stay nested.
+    public static string FolderForCompiled(string compiled)
+    {
+        string folder = Path.GetDirectoryName(compiled);
+        if (string.IsNullOrEmpty(folder)) folder = Directory.GetCurrentDirectory();
+        string leaf = Path.GetFileName(folder);
+        if (leaf != null &&
+            (string.Equals(leaf, "data", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(leaf, "site", StringComparison.OrdinalIgnoreCase)))
+        {
+            string parent = Path.GetDirectoryName(folder);
+            if (!string.IsNullOrEmpty(parent)) folder = parent;
+        }
+        return folder;
+    }
+
     public static string CombineUnder(string root, string rel, int line)
     {
         return CombineUnder(root, rel, line, 1);
@@ -306,6 +326,7 @@ static class VirePaths
 
     static int LinkCount(string path)
     {
+        if (OperatingSystem.IsLinux()) return LinuxLinkCount(path);
         if (!OperatingSystem.IsWindows()) return 1;
         IntPtr handle = CreateFileW(path, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
         if (handle == new IntPtr(-1)) return 1;
@@ -347,4 +368,42 @@ static class VirePaths
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr handle);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static int LinuxLinkCount(string path)
+    {
+        LinuxStat stat;
+        if (LinuxLStat(path, out stat) != 0) return 1;
+        if (stat.Nlink > int.MaxValue) return int.MaxValue;
+        return (int)stat.Nlink;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct LinuxStat
+    {
+        public ulong Dev;
+        public ulong Ino;
+        public ulong Nlink;
+        public uint Mode;
+        public uint Uid;
+        public uint Gid;
+        public int Pad;
+        public ulong Rdev;
+        public long Size;
+        public long Blksize;
+        public long Blocks;
+        public long AtimSec;
+        public long AtimNsec;
+        public long MtimSec;
+        public long MtimNsec;
+        public long CtimSec;
+        public long CtimNsec;
+        public long Unused1;
+        public long Unused2;
+        public long Unused3;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
+    static extern int LinuxLStat(string path, out LinuxStat stat);
 }
