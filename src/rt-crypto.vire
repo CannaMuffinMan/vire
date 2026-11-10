@@ -21,6 +21,12 @@ define times8 with n
   return v + v
 end
 
+define times256 with n
+  let v be times8 with n
+  let v be times8 with v
+  return times4 with v
+end
+
 define cryptoAnd16 with a, b
   let r be 0
   let p be 1
@@ -291,9 +297,9 @@ define cryptoLoadWord with buf, off
   let b1 be buf at i1
   let b2 be buf at i2
   let b3 be buf at i3
-  let hi be shl8 with b0
+  let hi be times256 with b0
   let hi be hi + b1
-  let lo be shl8 with b2
+  let lo be times256 with b2
   let lo be lo + b3
   return [hi, lo]
 end
@@ -374,7 +380,7 @@ end
 
 define cryptoPad with buf
   let n be length with buf
-  let out be buf + []
+  let out be copy_bytes with buf
   push with out, 128
   while true
     let nout be length with out
@@ -585,8 +591,32 @@ define hex_to_bytes with raw
   return ["ok", out]
 end
 
+define copy_bytes with src
+  let out be []
+  let i be 0
+  let n be length with src
+  while i < n
+    let b be src at i
+    push with out, b
+    let i be i + 1
+  end
+  return out
+end
+
+define cat_bytes with a, b
+  let out be copy_bytes with a
+  let i be 0
+  let n be length with b
+  while i < n
+    let b1 be b at i
+    push with out, b1
+    let i be i + 1
+  end
+  return out
+end
+
 define hmac_sha256 with key, msg
-  let k be key + []
+  let k be copy_bytes with key
   if (length with k) > 64
     let k be sha256_bytes with k
   end
@@ -598,13 +628,15 @@ define hmac_sha256 with key, msg
   let i be 0
   while i < 64
     let b be k at i
-    push with ip, (cryptoXor16 with b, 54)
-    push with op, (cryptoXor16 with b, 92)
+    let x be cryptoXor16 with b, 54
+    push with ip, x
+    let y be cryptoXor16 with b, 92
+    push with op, y
     let i be i + 1
   end
-  let cat be ip + msg
+  let cat be cat_bytes with ip, msg
   let inner be sha256_bytes with cat
-  let cat be op + inner
+  let cat be cat_bytes with op, inner
   return sha256_bytes with cat
 end
 
@@ -695,10 +727,20 @@ define b64url_decode with text
     let b be times4 with c0
     let b be b + (idiv with c1, 16)
     push with out, b
+    if left == 2
+      if (c1 % 16) != 0
+        return ["bad", "bad b64url leftover"]
+      end
+    end
     if left > 2
       let b be times16 with c1 % 16
       let b be b + (idiv with n2, 4)
       push with out, b
+    end
+    if left == 3
+      if (n2 % 4) != 0
+        return ["bad", "bad b64url leftover"]
+      end
     end
     if left > 3
       let t be times16 with n2 % 4
@@ -772,86 +814,388 @@ define jwt_skip_space with text, i
   return i
 end
 
-define jwt_field_string with text, key
-  let needle be "\"" + key + "\""
-  let found be find with text, needle
-  if found < 0
-    return ["miss", ""]
-  end
-  let after be found + (length with needle)
-  let i be jwt_skip_space with text, after
-  if i >= (length with text)
-    return ["bad", "truncated json"]
-  end
-  if (text at i) != ":"
-    return ["bad", "bad json"]
-  end
-  let i be jwt_skip_space with text, (i + 1)
-  if i >= (length with text)
-    return ["bad", "truncated json"]
-  end
-  if (text at i) != "\""
-    return ["bad", "alg not a string"]
-  end
-  let i be i + 1
-  let out be ""
+define jwt_skip_string with text, i
   let n be length with text
+  let i be i + 1
   while i < n
     let ch be text at i
+    if ch == "\\"
+      let i be i + 1
+      if i >= n
+        return 0 - 1
+      end
+      let i be i + 1
+      skip
+    end
     if ch == "\""
-      return ["ok", out]
+      return i + 1
+    end
+    let i be i + 1
+  end
+  return 0 - 1
+end
+
+define jwt_read_string with text, i
+  let n be length with text
+  let i be i + 1
+  let out be ""
+  while i < n
+    let ch be text at i
+    if ch == "\\"
+      return ["bad", ""]
+    end
+    if ch == "\""
+      let nxt be i + 1
+      return ["ok", out, nxt]
     end
     let out be out + ch
     let i be i + 1
   end
-  return ["bad", "truncated json"]
+  return ["bad", ""]
 end
 
-define jwt_field_number with text, key
-  let needle be "\"" + key + "\""
-  let found be find with text, needle
-  if found < 0
-    return ["miss", 0]
-  end
-  let after be found + (length with needle)
-  let i be jwt_skip_space with text, after
-  if i >= (length with text)
-    return ["bad", 0]
-  end
-  if (text at i) != ":"
-    return ["bad", 0]
-  end
-  let i be jwt_skip_space with text, (i + 1)
+define jwt_skip_value with text, i
   let n be length with text
+  let i be jwt_skip_space with text, i
   if i >= n
-    return ["bad", 0]
+    return 0 - 1
   end
-  let sign be 1
-  if (text at i) == "-"
-    let sign be 0 - 1
+  let ch be text at i
+  if ch == "\""
+    return jwt_skip_string with text, i
+  end
+  if ch == "{"
+    let depth be 1
     let i be i + 1
+    while i < n
+      let ch be text at i
+      if ch == "\""
+        let i be jwt_skip_string with text, i
+        if i < 0
+          return 0 - 1
+        end
+        skip
+      end
+      if ch == "{"
+        let depth be depth + 1
+      end
+      if ch == "["
+        let depth be depth + 1
+      end
+      if ch == "}"
+        let depth be depth - 1
+        if depth == 0
+          return i + 1
+        end
+      end
+      if ch == "]"
+        let depth be depth - 1
+        if depth == 0
+          return i + 1
+        end
+      end
+      let i be i + 1
+    end
+    return 0 - 1
   end
-  if i >= n
-    return ["bad", 0]
+  if ch == "["
+    let depth be 1
+    let i be i + 1
+    while i < n
+      let ch be text at i
+      if ch == "\""
+        let i be jwt_skip_string with text, i
+        if i < 0
+          return 0 - 1
+        end
+        skip
+      end
+      if ch == "{"
+        let depth be depth + 1
+      end
+      if ch == "["
+        let depth be depth + 1
+      end
+      if ch == "}"
+        let depth be depth - 1
+        if depth == 0
+          return i + 1
+        end
+      end
+      if ch == "]"
+        let depth be depth - 1
+        if depth == 0
+          return i + 1
+        end
+      end
+      let i be i + 1
+    end
+    return 0 - 1
   end
-  let raw be ""
   while i < n
     let ch be text at i
-    if (find with "0123456789", ch) >= 0
-      let raw be raw + ch
+    if ch == ","
+      return i
+    end
+    if ch == "}"
+      return i
+    end
+    if ch == "]"
+      return i
+    end
+    if ch == " "
+      return i
+    end
+    let i be i + 1
+  end
+  return i
+end
+
+define jwt_field_string with text, key
+  let n be length with text
+  let i be jwt_skip_space with text, 0
+  if i >= n
+    return ["miss", ""]
+  end
+  if (text at i) != "{"
+    return ["bad", "bad json"]
+  end
+  let i be i + 1
+  let found be "miss"
+  let val be ""
+  while i < n
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", "truncated json"]
+    end
+    if (text at i) == "}"
+      if found == "ok"
+        return ["ok", val]
+      end
+      return ["miss", ""]
+    end
+    if (text at i) != "\""
+      return ["bad", "bad json"]
+    end
+    let ks be jwt_read_string with text, i
+    if (ks at 0) != "ok"
+      return ["bad", "bad json"]
+    end
+    let kn be ks at 1
+    let i be ks at 2
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", "truncated json"]
+    end
+    if (text at i) != ":"
+      return ["bad", "bad json"]
+    end
+    let i be i + 1
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", "truncated json"]
+    end
+    if kn == key
+      if (text at i) != "\""
+        return ["bad", "alg not a string"]
+      end
+      let vs be jwt_read_string with text, i
+      if (vs at 0) != "ok"
+        return ["bad", "truncated json"]
+      end
+      let found be "ok"
+      let val be vs at 1
+      let i be vs at 2
+    end
+    if kn != key
+      let i be jwt_skip_value with text, i
+      if i < 0
+        return ["bad", "bad json"]
+      end
+    end
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", "truncated json"]
+    end
+    if (text at i) == ","
       let i be i + 1
       skip
     end
-    stop
+    if (text at i) == "}"
+      skip
+    end
+    if (text at i) != "}"
+      if (text at i) != ","
+        return ["bad", "bad json"]
+      end
+    end
   end
-  if (length with raw) == 0
+  if found == "ok"
+    return ["ok", val]
+  end
+  return ["miss", ""]
+end
+
+define jwt_field_number with text, key
+  let n be length with text
+  let i be jwt_skip_space with text, 0
+  if i >= n
+    return ["miss", 0]
+  end
+  if (text at i) != "{"
     return ["bad", 0]
   end
-  let expn be number with raw
-  if sign < 0
-    let expn be 0 - expn
+  let i be i + 1
+  let found be "miss"
+  let val be 0
+  while i < n
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", 0]
+    end
+    if (text at i) == "}"
+      if found == "ok"
+        return ["ok", val]
+      end
+      return ["miss", 0]
+    end
+    if (text at i) != "\""
+      return ["bad", 0]
+    end
+    let ks be jwt_read_string with text, i
+    if (ks at 0) != "ok"
+      return ["bad", 0]
+    end
+    let kn be ks at 1
+    let i be ks at 2
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", 0]
+    end
+    if (text at i) != ":"
+      return ["bad", 0]
+    end
+    let i be i + 1
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", 0]
+    end
+    if kn == key
+      let sign be 1
+      if (text at i) == "-"
+        let sign be 0 - 1
+        let i be i + 1
+      end
+      let raw be ""
+      while i < n
+        let ch be text at i
+        if (find with "0123456789", ch) >= 0
+          let raw be raw + ch
+          let i be i + 1
+          skip
+        end
+        stop
+      end
+      if (length with raw) == 0
+        return ["bad", 0]
+      end
+      if (length with raw) > 15
+        return ["bad", 0]
+      end
+      if i < n
+        let ch be text at i
+        if ch == "."
+          return ["bad", 0]
+        end
+        if ch == "e"
+          return ["bad", 0]
+        end
+        if ch == "E"
+          return ["bad", 0]
+        end
+      end
+      let expn be number with raw
+      if sign < 0
+        let expn be 0 - expn
+      end
+      let found be "ok"
+      let val be expn
+    end
+    if kn != key
+      let i be jwt_skip_value with text, i
+      if i < 0
+        return ["bad", 0]
+      end
+    end
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return ["bad", 0]
+    end
+    if (text at i) == ","
+      let i be i + 1
+    end
   end
-  return ["ok", expn]
+  if found == "ok"
+    return ["ok", val]
+  end
+  return ["miss", 0]
+end
+
+define jwt_has_crit with text
+  let crit be jwt_field_string with text, "crit"
+  if (crit at 0) != "miss"
+    return true
+  end
+  let n be length with text
+  let i be jwt_skip_space with text, 0
+  if i >= n
+    return false
+  end
+  if (text at i) != "{"
+    return false
+  end
+  let i be i + 1
+  while i < n
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return false
+    end
+    if (text at i) == "}"
+      return false
+    end
+    if (text at i) != "\""
+      return false
+    end
+    let ks be jwt_read_string with text, i
+    if (ks at 0) != "ok"
+      return false
+    end
+    let kn be ks at 1
+    let i be ks at 2
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return false
+    end
+    if (text at i) != ":"
+      return false
+    end
+    let i be i + 1
+    if kn == "crit"
+      return true
+    end
+    let i be jwt_skip_value with text, i
+    if i < 0
+      return false
+    end
+    let i be jwt_skip_space with text, i
+    if i >= n
+      return false
+    end
+    if (text at i) == ","
+      let i be i + 1
+    end
+  end
+  return false
 end
 
 define jwt_split with token
@@ -932,7 +1276,11 @@ define jwt_hs256_verify with token, secret, clock
   if (ht at 0) != "ok"
     return ["bad", ht at 1]
   end
-  let alg be jwt_field_string with (ht at 1), "alg"
+  let hdr be ht at 1
+  if jwt_has_crit with hdr
+    return ["bad", "crit rejected"]
+  end
+  let alg be jwt_field_string with hdr, "alg"
   if (alg at 0) != "ok"
     return ["bad", "alg missing"]
   end
@@ -953,14 +1301,27 @@ define jwt_hs256_verify with token, secret, clock
     return ["bad", pt at 1]
   end
   if clock != none
-    let exp be jwt_field_number with (pt at 1), "exp"
+    let body be pt at 1
+    let exp be jwt_field_number with body, "exp"
     if (exp at 0) == "ok"
       if (exp at 1) < clock
+        return ["bad", "expired"]
+      end
+      if (exp at 1) == clock
         return ["bad", "expired"]
       end
     end
     if (exp at 0) == "bad"
       return ["bad", "bad exp"]
+    end
+    let nbf be jwt_field_number with body, "nbf"
+    if (nbf at 0) == "ok"
+      if clock < (nbf at 1)
+        return ["bad", "not yet"]
+      end
+    end
+    if (nbf at 0) == "bad"
+      return ["bad", "bad nbf"]
     end
   end
   return ["ok", pt at 1]
