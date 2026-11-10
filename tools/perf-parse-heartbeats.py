@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from datetime import datetime
 import re
 import sys
 
 STEP_RE = re.compile(r"still running steps=(\d+)")
+STAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T[0-9.:+-]+)\s+.*still running steps=(\d+)")
 TOTAL_RE = re.compile(r"total_steps=(\d+)\s+total_pending=(\d+)\s+step_batch=(\d+)")
 SEC_RE = re.compile(r"step_(\w+)_sec\s+([0-9.]+)")
 SHA_RE = re.compile(r"gen1_sha256\s+([0-9a-f]+)")
@@ -13,6 +15,7 @@ HOST_RE = re.compile(r"^(os |framework |cores |cpu |dotnet_sdk |DOTNET_)")
 
 def main(path: str) -> int:
     steps = []
+    stamps = []
     totals = []
     secs = {}
     sha = None
@@ -23,8 +26,14 @@ def main(path: str) -> int:
             if "os " in text or "cores " in text or "cpu " in text or "dotnet_sdk" in text or "DOTNET_" in text:
                 if "vire:" not in text:
                     host.append(text.split("Z ", 1)[-1] if "Z " in text else text)
+            sm = STAMP_RE.search(text)
+            if sm:
+                stamps.append(sm.group(1))
+                steps.append(int(sm.group(2)))
+                continue
             m = STEP_RE.search(text)
             if m:
+                stamps.append(None)
                 steps.append(int(m.group(1)))
             m = TOTAL_RE.search(text)
             if m:
@@ -47,28 +56,51 @@ def main(path: str) -> int:
     print("heartbeat_count", len(gen1_beats))
     if not gen1_beats:
         return 1
+    pairs = list(zip(stamps, gen1_beats))
     runs = []
-    cur = [gen1_beats[0]]
-    for s in gen1_beats[1:]:
-        if s >= cur[-1]:
-            cur.append(s)
+    cur = [pairs[0]]
+    for item in pairs[1:]:
+        if item[1] >= cur[-1][1]:
+            cur.append(item)
         else:
             runs.append(cur)
-            cur = [s]
+            cur = [item]
     runs.append(cur)
-    run = max(runs, key=len)
+    run_pairs = max(runs, key=len)
+    run = [p[1] for p in run_pairs]
+    run_stamps = [p[0] for p in run_pairs]
     print("longest_run_beats", len(run), "first", run[0], "last", run[-1])
     deltas = [run[i] - run[i - 1] for i in range(1, len(run))]
     if not deltas:
         return 0
     heartbeat_ms = 2000
     heartbeat_s = heartbeat_ms / 1000.0
-    rates = [d / heartbeat_s for d in deltas]
-    rates.sort()
+
+    def parse_ts(raw):
+        if not raw:
+            return None
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        return datetime.fromisoformat(raw)
+
+    wall_s = []
+    for i in range(1, len(run)):
+        a = parse_ts(run_stamps[i - 1])
+        b = parse_ts(run_stamps[i])
+        if a and b:
+            wall_s.append(max((b - a).total_seconds(), 1e-6))
+        else:
+            wall_s.append(heartbeat_s)
+    rates = [deltas[i] / wall_s[i] for i in range(len(deltas))]
+    rates_sorted = sorted(rates)
     print("heartbeat_ms", heartbeat_ms)
-    print("bin_s", heartbeat_s)
-    print("delta_min", min(deltas), "delta_median", rates[len(rates) // 2] * heartbeat_s, "delta_max", max(deltas))
-    print("rate_min_steps_s", min(rates), "rate_median_steps_s", rates[len(rates) // 2], "rate_max_steps_s", max(rates))
+    print("stamped", sum(1 for s in stamps if s is not None))
+    print("bin_s_assumed", heartbeat_s)
+    print("wall_s_min", min(wall_s), "wall_s_max", max(wall_s))
+    print("delta_min", min(deltas), "delta_max", max(deltas))
+    print("rate_min_steps_s", min(rates), "rate_median_steps_s", rates_sorted[len(rates_sorted) // 2], "rate_max_steps_s", max(rates))
+    stall = [i for i, w in enumerate(wall_s) if w >= 6.0]
+    print("stall_bins_ge_6s", stall[:12], "count", len(stall))
     if "gen1_host" in secs and totals:
         wall = secs["gen1_host"]
         charged = totals[-1][0]

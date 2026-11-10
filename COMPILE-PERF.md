@@ -75,22 +75,40 @@ This agent did not run on Grok Build. Operator facts only: hello passed, 420s, 2
 
 If local hello is ~30s (older CouchStation note in `LOCAL-CLI-HANDOFF.md`) vs CI 6s, the same 5–10× factor predicts gen1 timeout. If local hello is CI-like (~6s) and gen1 still crawls, that would be a new, compile-size-only bug. We do not have that hello wall. The CI gen1 means are 649.5 and 471.5 charged steps/s, not a round 470 from this tree.
 
-## Safe Windows handoff (parent posts, this agent does not)
+## CouchStation profile (timestamped heartbeats and Break miss cost)
 
-Isolated checkout of `3d9fc58c80629f1fd6ac11b3576831f5c869087d`. Release build. Do not run `native-selfhost-proof.ps1`. Do not raise caps.
+Isolated checkout of this PR branch. Release build. Caps unchanged. Do not run `native-selfhost-proof.ps1`. Do not change Defender.
 
 ```text
+git fetch origin cursor/host-compile-perf-93dd
+git checkout --detach origin/cursor/host-compile-perf-93dd
 set VIRE_BUDGET=5000000
 set VIRE_HEADLESS=1
 dotnet build vire.csproj -c Release
-pwsh -File tools/perf-handoff-windows.ps1
+pwsh -File tools/perf-profile-windows.ps1
+python tools/perf-parse-heartbeats.py data\perf-hello.stamp.txt
+python tools/perf-parse-heartbeats.py data\perf-gen1host.stamp.txt 25363 420
 ```
 
-Keep `data/perf-hello.err.txt` heartbeats. Compare `phase_hello_sec` to CI 5.6–7.1s. If hello is already ≥8× CI, gen1 at 420s is explained without a compiler change. Optional: one `native-selfhost-handoff.ps1` only after hello rate matches CI within 2×.
+Expected artifacts under `data/`:
+
+- `perf-hello.stamp.txt` and `perf-gen1host.stamp.txt`. Each `vire:` line is prefixed with a UTC ISO stamp from the tailer, not from `Vire.cs`.
+- `perf-hello.err.txt` and `perf-gen1host.err.txt`. Raw child stderr.
+- `perf-break-miss.txt`. `break_miss_calls`, `break_miss_wall_s`, `break_miss_ns_each` from 20000 real `VireDebug.Break` misses (no `break.txt`).
+
+Read `(a)` from stamp wall gaps. Uniform slow rate keeps ~2s between notes with a small step delta. A single-statement stall shows a gap ≥6s with `steps=` unchanged, then a jump. `stall_bins_ge_6s` in the parser lists those gaps.
+
+Read `(b)` from `break_miss_ns_each`. Material means that number times a plausible Call count is a large slice of gen1 wall. Each user-function `Call` runs `VireDebug.Break` (`CreateDirectory`, three reparse walks, `File.Exists` on `data/break.txt`). The miss path returns false. This script does not count Calls inside gen1 (that would be a `Vire.cs` edit). Scale from 20000 timed misses.
+
+Linux cloud, one run, Release, this agent: `break_miss_calls 20000`, `break_miss_wall_s 1.385`, **`break_miss_ns_each 69234`** (69.2 µs). `probe-emitu8.vire` is 21000 user calls in 1.45s on the same VM. 21000 × 69.2 µs is 1.45s, so the emitU8 probe wall is explained by Break miss I/O even without Defender. That is material on Linux. Confirm the same `ns_each` on windows-latest via `perf-host` before treating AV as an extra desktop-only factor. If windows-latest is also tens of microseconds, discard "AV-only" and treat Break-on-every-Call as the host limiter.
+
+Read `(c)` from the script stdout: `os`, `cores`, `cpu`, `dotnet_sdk`, `DOTNET_*`, `power_plan` (`powercfg /getactivescheme` only).
+
+Windows CI baseline job is `.github/workflows/perf-host.yml` (`perf-host`, not `check.yml`). Artifact name `perf-host-windows`. Compare CouchStation stamp rates and `break_miss_ns_each` to that job.
 
 ## Next compiler lever (blocked on diagnosis-only + L2)
 
-Do not edit `src/rt*.vire` / `src/pe.vire` while L2 owns path/IAT. Emit-only `compile-native.vire` / `src/asm.vire` `emitU8`→`emitList` for in-range whole bytes is independent and would need HexOf/EmitU8 tests plus Windows equal-hash re-proof. Expected healthy-host gain is a fraction of 81s Linux / 253–362s CI, not 8×. Stop here until the handoff hello wall exists or L2 freeze SHA.
+Do not edit `src/rt*.vire` / `src/pe.vire` while L2 owns path/IAT. If `(b)` is material on windows-latest itself, the miss-path I/O in `VireDebug.Break` (called from `Machine.Call` in `Vire.cs`) is the fix location. Gate `File.Exists` behind `VIRE_DEBUGGER=1` the same way `Gate` already does. Do not land that here. Emit-only `emitU8`→`emitList` stays a later independent lever.
 
 ## How to rerun the cloud side
 
