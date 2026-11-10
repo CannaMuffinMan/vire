@@ -16,7 +16,7 @@ This does not prove that GitHub's `windows-latest` image lacks a .NET SDK. The i
 4. Native: `gen1.exe data/guest-hello.vire …` and `gen1.exe data/compile-native.vire data/clean-gen2.hex`.
 5. SHA-256 of `gen1.hex` equals SHA-256 of `clean-gen2.hex`.
 
-Pinned baseline on PR42 `3d9fc58c80629f1fd6ac11b3576831f5c869087d`: equal hash `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815`. A later equal pair may differ from that string if compiler bytes change. Equality of the two hex files still has to hold.
+Pinned baseline on PR42 `3d9fc58c80629f1fd6ac11b3576831f5c869087d`: equal hash `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` of `gen1.hex` and `gen2.hex`. A later equal pair may differ from that string if compiler bytes change. Equality of the two hex files still has to hold. The `.exe` is those hex bytes after conversion.
 
 ## What you need
 
@@ -68,7 +68,25 @@ The prove script parses the PE bytes and fails if the IAT names another DLL, a .
 
 The script writes `data/native-clean-machine.zip` and `data/native-clean-machine-pkg/MANIFEST.txt`. CI uploads them as artifacts. Do not commit `*.exe` or `*.hex`.
 
-The zip is a relocatable layout: `gen1.exe`, `gen1.hex`, `gen2.hex`, `compile-native.vire`, `src/*`, `guest-hello.vire`, `MANIFEST.txt`, env capture. A later machine still needs Windows to run the PE.
+The zip is a relocatable tree that matches how native `use` resolves. Extract it and keep that folder as the working directory:
+
+- `gen1.exe` at the root
+- `data/compile-native.vire`
+- `data/src/asm.vire`, `pe.vire`, `rt.vire`, `rt-more.vire`
+- `data/guest-hello.vire`
+- `data/gen1.hex` and `data/gen2.hex` (the equal-hash proof is those hex files)
+- `MANIFEST.txt` and `clean-env-capture.txt`
+
+Native `read` only allows a path that starts with `data/` or `site/`. `use "src/pe.vire"` from guest `data/compile-native.vire` becomes `data/src/pe.vire`. A zip that puts `compile-native.vire` next to `src/` at the root will not load.
+
+From that folder:
+
+```text
+.\gen1.exe data\guest-hello.vire data\hello.hex
+.\gen1.exe data\compile-native.vire data\gen2.hex
+```
+
+Turn hex into a PE with the PowerShell conversion in `tools/native-clean-machine.ps1`. That step is not gcc or `dotnet publish`. A later machine still needs Windows to run the PE.
 
 ## Gaps this recipe does not close
 

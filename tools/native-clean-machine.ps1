@@ -341,19 +341,24 @@ function Invoke-Prove {
     $exeHash = (Get-FileHash -Algorithm SHA256 $gen1Exe).Hash.ToLowerInvariant()
     $pkg = Join-Path $data "native-clean-machine-pkg"
     if (Test-Path $pkg) { Remove-Item -Recurse -Force $pkg }
-    New-Item -ItemType Directory -Path $pkg | Out-Null
+    $pkgData = Join-Path $pkg "data"
+    $pkgSrc = Join-Path $pkgData "src"
+    New-Item -ItemType Directory -Path $pkgSrc -Force | Out-Null
     Copy-Item $gen1Exe (Join-Path $pkg "gen1.exe")
-    Copy-Item $gen1Hex (Join-Path $pkg "gen1.hex")
-    Copy-Item $gen2Hex (Join-Path $pkg "gen2.hex")
-    Copy-Item $compiler (Join-Path $pkg "compile-native.vire")
-    Copy-Item $dataGuest (Join-Path $pkg "guest-hello.vire")
-    New-Item -ItemType Directory -Path (Join-Path $pkg "src") | Out-Null
-    Copy-Item (Join-Path $src "*") (Join-Path $pkg "src")
+    Copy-Item $gen1Hex (Join-Path $pkgData "gen1.hex")
+    Copy-Item $gen2Hex (Join-Path $pkgData "gen2.hex")
+    Copy-Item $compiler (Join-Path $pkgData "compile-native.vire")
+    Copy-Item $dataGuest (Join-Path $pkgData "guest-hello.vire")
+    Copy-Item (Join-Path $src "*") $pkgSrc
     Copy-Item $capture (Join-Path $pkg "clean-env-capture.txt")
     $manifest = @"
 source_sha=$sourceSha
 pr42_pin=3d9fc58c80629f1fd6ac11b3576831f5c869087d
-trust_chain=source -> dotnet exec vire.dll compile-native.vire (bootstrap interpreter) -> gen1.hex -> PowerShell hex-to-bytes (conversion) -> gen1.exe -> gen1.exe compile-native.vire -> gen2.hex
+layout=gen1.exe at package root; compiler guest is data/compile-native.vire; runtime sources are data/src/*.vire
+run_cwd=package root (same join as CI: use src/pe.vire from a data/ guest becomes data/src/pe.vire)
+native_read=paths must start with data/ or site/; a root compile-native.vire will not load src/
+trust_chain=source -> dotnet exec vire.dll compile-native.vire (bootstrap interpreter) -> gen1.hex -> PowerShell hex-to-bytes (conversion) -> gen1.exe -> gen1.exe data/compile-native.vire -> data/gen2.hex
+equal_hash_of=hex files, not a second hash of the .exe
 bootstrap_is_not_native=true
 single_file_dotnet_publish_is_not_native=true
 unicorn_is_not_windows_gate=true
@@ -363,14 +368,15 @@ gen1_hex_sha256=$h1
 gen2_hex_sha256=$h2
 equal=$($h1 -eq $h2)
 os_libraries=kernel32.dll ($($RequiredKernel32 -join ', '))
-caps=arena 32MB, list 100000, VIRE_BUDGET 5000000
+caps=arena 32MB VirtualAlloc, host list 100000, ProgramStepCap 5000000; host compile-native.vire uses CompilerStepCap 50000000 and ignores VIRE_BUDGET
 hex_to_exe=PowerShell conversion of compiler hex, not gcc/clang/dotnet compile
 "@
     [System.IO.File]::WriteAllText((Join-Path $pkg "MANIFEST.txt"), $manifest)
     Write-Host $manifest
     $zip = Join-Path $data "native-clean-machine.zip"
     if (Test-Path $zip) { Remove-Item -Force $zip }
-    Compress-Archive -Path (Join-Path $pkg "*") -DestinationPath $zip
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($pkg, $zip)
     Write-Host "package_zip $zip"
     Write-Host "native clean machine prove ok"
 }
