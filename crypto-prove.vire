@@ -20,104 +20,173 @@ define fillBytes with n, v
 end
 
 define showBad with tag, got
-  if (got at 0) == "bad"
-    say tag + " REJECT " + (got at 1)
+  let st be got at 0
+  if st == "bad"
+    let why be got at 1
+    say tag + " REJECT " + why
     return 0
   end
-  say tag + " FAIL expected reject got " + (got at 0)
+  say tag + " FAIL expected reject got " + st
   return 1
 end
 
 define main
   let fails be 0
   let empty be ascii_bytes with ""
-  let fails be fails + (proveLine with "FIPS empty guest", (sha256_hex with (empty at 1)), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
-  let fails be fails + (proveLine with "FIPS empty hash", (hash with ""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+  let got be sha256_hex with empty at 1
+  let nfail be proveLine with "FIPS empty guest", got, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  let fails be fails + nfail
+  let got be hash with ""
+  let nfail be proveLine with "FIPS empty hash", got, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  let fails be fails + nfail
   let abc be ascii_bytes with "abc"
-  let fails be fails + (proveLine with "FIPS abc guest", (sha256_hex with (abc at 1)), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
-  let fails be fails + (proveLine with "FIPS abc hash", (hash with "abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+  let got be sha256_hex with abc at 1
+  let nfail be proveLine with "FIPS abc guest", got, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  let fails be fails + nfail
+  let got be hash with "abc"
+  let nfail be proveLine with "FIPS abc hash", got, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  let fails be fails + nfail
   let long be ascii_bytes with "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
-  let fails be fails + (proveLine with "FIPS 448 guest", (sha256_hex with (long at 1)), "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")
+  let got be sha256_hex with long at 1
+  let nfail be proveLine with "FIPS 448 guest", got, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+  let fails be fails + nfail
   say "FIPS 1M guest skipped list cap 100000 holds at most 100000 bytes"
 
   let k1 be fillBytes with 20, 11
   let m1 be ascii_bytes with "Hi There"
-  let fails be fails + (proveLine with "RFC4231 1", (hmac_sha256_hex with k1, (m1 at 1)), "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7")
+  let got be hmac_sha256_hex with k1, m1 at 1
+  let nfail be proveLine with "RFC4231 1", got, "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+  let fails be fails + nfail
   let k2 be ascii_bytes with "Jefe"
   let m2 be ascii_bytes with "what do ya want for nothing?"
-  let fails be fails + (proveLine with "RFC4231 2", (hmac_sha256_hex with (k2 at 1), (m2 at 1)), "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843")
+  let got be hmac_sha256_hex with k2 at 1, m2 at 1
+  let nfail be proveLine with "RFC4231 2", got, "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+  let fails be fails + nfail
   let k3 be fillBytes with 20, 170
   let m3 be fillBytes with 50, 221
-  let fails be fails + (proveLine with "RFC4231 3", (hmac_sha256_hex with k3, m3), "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe")
+  let got be hmac_sha256_hex with k3, m3
+  let nfail be proveLine with "RFC4231 3", got, "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe"
+  let fails be fails + nfail
   let k4 be [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
   let m4 be fillBytes with 50, 205
-  let fails be fails + (proveLine with "RFC4231 4", (hmac_sha256_hex with k4, m4), "82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b")
+  let got be hmac_sha256_hex with k4, m4
+  let nfail be proveLine with "RFC4231 4", got, "82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b"
+  let fails be fails + nfail
   let k5 be fillBytes with 20, 12
   let m5 be ascii_bytes with "Test With Truncation"
-  let full5 be hmac_sha256_hex with k5, (m5 at 1)
-  let fails be fails + (proveLine with "RFC4231 5", (slice with full5, 0, 32), "a3b6167473100ee06e0c796c2955552b")
+  let full5 be hmac_sha256_hex with k5, m5 at 1
+  let got be slice with full5, 0, 32
+  let nfail be proveLine with "RFC4231 5", got, "a3b6167473100ee06e0c796c2955552b"
+  let fails be fails + nfail
   let k6 be fillBytes with 131, 170
   let m6 be ascii_bytes with "Test Using Larger Than Block-Size Key - Hash Key First"
-  let fails be fails + (proveLine with "RFC4231 6", (hmac_sha256_hex with k6, (m6 at 1)), "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54")
+  let got be hmac_sha256_hex with k6, m6 at 1
+  let nfail be proveLine with "RFC4231 6", got, "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
+  let fails be fails + nfail
   let m7 be ascii_bytes with "This is a test using a larger than block-size key and a larger than block-size data. The key needs to be hashed before being used by the HMAC algorithm."
-  let fails be fails + (proveLine with "RFC4231 7", (hmac_sha256_hex with k6, (m7 at 1)), "9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2")
+  let got be hmac_sha256_hex with k6, m7 at 1
+  let nfail be proveLine with "RFC4231 7", got, "9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2"
+  let fails be fails + nfail
 
-  let fails be fails + (proveLine with "RFC4648 empty", (b64url_encode with []), "")
+  let got be b64url_encode with []
+  let nfail be proveLine with "RFC4648 empty", got, ""
+  let fails be fails + nfail
   let f be ascii_bytes with "f"
-  let fails be fails + (proveLine with "RFC4648 f", (b64url_encode with (f at 1)), "Zg")
+  let got be b64url_encode with f at 1
+  let nfail be proveLine with "RFC4648 f", got, "Zg"
+  let fails be fails + nfail
   let fo be ascii_bytes with "fo"
-  let fails be fails + (proveLine with "RFC4648 fo", (b64url_encode with (fo at 1)), "Zm8")
+  let got be b64url_encode with fo at 1
+  let nfail be proveLine with "RFC4648 fo", got, "Zm8"
+  let fails be fails + nfail
   let foo be ascii_bytes with "foo"
-  let fails be fails + (proveLine with "RFC4648 foo", (b64url_encode with (foo at 1)), "Zm9v")
+  let got be b64url_encode with foo at 1
+  let nfail be proveLine with "RFC4648 foo", got, "Zm9v"
+  let fails be fails + nfail
   let foob be ascii_bytes with "foob"
-  let fails be fails + (proveLine with "RFC4648 foob", (b64url_encode with (foob at 1)), "Zm9vYg")
+  let got be b64url_encode with foob at 1
+  let nfail be proveLine with "RFC4648 foob", got, "Zm9vYg"
+  let fails be fails + nfail
   let fooba be ascii_bytes with "fooba"
-  let fails be fails + (proveLine with "RFC4648 fooba", (b64url_encode with (fooba at 1)), "Zm9vYmE")
+  let got be b64url_encode with fooba at 1
+  let nfail be proveLine with "RFC4648 fooba", got, "Zm9vYmE"
+  let fails be fails + nfail
   let foobar be ascii_bytes with "foobar"
-  let fails be fails + (proveLine with "RFC4648 foobar", (b64url_encode with (foobar at 1)), "Zm9vYmFy")
+  let got be b64url_encode with foobar at 1
+  let nfail be proveLine with "RFC4648 foobar", got, "Zm9vYmFy"
+  let fails be fails + nfail
   let dfoo be b64url_decode with "Zm9vYmFy"
-  let back be ascii_text with (dfoo at 1)
-  let fails be fails + (proveLine with "RFC4648 decode foobar", (back at 1), "foobar")
+  let back be ascii_text with dfoo at 1
+  let nfail be proveLine with "RFC4648 decode foobar", back at 1, "foobar"
+  let fails be fails + nfail
 
   let secret be ascii_bytes with "secret"
   let payload be "{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"iat\":1516239022}"
-  let signed be jwt_hs256_sign with payload, (secret at 1)
+  let signed be jwt_hs256_sign with payload, secret at 1
   let wantJwt be "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.XbPfbIHMI6arZ3Y922BhjWgQzWXcXNrz0ogtVhfEd2o"
-  let fails be fails + (proveLine with "JWT hs256 jwt.io", (signed at 1), wantJwt)
-  let verified be jwt_hs256_verify with wantJwt, (secret at 1), none
-  let fails be fails + (proveLine with "JWT hs256 verify", (verified at 1), payload)
+  let nfail be proveLine with "JWT hs256 jwt.io", signed at 1, wantJwt
+  let fails be fails + nfail
+  let verified be jwt_hs256_verify with wantJwt, secret at 1, none
+  let nfail be proveLine with "JWT hs256 verify", verified at 1, payload
+  let fails be fails + nfail
 
   let noneTok be "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxIn0.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  let fails be fails + (showBad with "ADV alg none", (jwt_hs256_verify with noneTok, (secret at 1), none))
+  let gotv be jwt_hs256_verify with noneTok, secret at 1, none
+  let nfail be showBad with "ADV alg none", gotv
+  let fails be fails + nfail
   let hs512 be "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  let fails be fails + (showBad with "ADV alg HS512", (jwt_hs256_verify with hs512, (secret at 1), none))
+  let gotv be jwt_hs256_verify with hs512, secret at 1, none
+  let nfail be showBad with "ADV alg HS512", gotv
+  let fails be fails + nfail
   let low be "eyJhbGciOiJoczI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  let fails be fails + (showBad with "ADV alg case", (jwt_hs256_verify with low, (secret at 1), none))
-  let fails be fails + (showBad with "ADV extra", (jwt_hs256_verify with (wantJwt + ".x"), (secret at 1), none))
-  let fails be fails + (showBad with "ADV missing", (jwt_hs256_verify with "a.b", (secret at 1), none))
+  let gotv be jwt_hs256_verify with low, secret at 1, none
+  let nfail be showBad with "ADV alg case", gotv
+  let fails be fails + nfail
+  let extra be wantJwt + ".x"
+  let gotv be jwt_hs256_verify with extra, secret at 1, none
+  let nfail be showBad with "ADV extra", gotv
+  let fails be fails + nfail
+  let gotv be jwt_hs256_verify with "a.b", secret at 1, none
+  let nfail be showBad with "ADV missing", gotv
+  let fails be fails + nfail
   let big be "aaa"
-  while (length with big) < 9000
+  let nbig be length with big
+  while nbig < 9000
     let big be big + "aaa"
+    let nbig be length with big
   end
-  let fails be fails + (showBad with "ADV oversized", (jwt_hs256_verify with big, (secret at 1), none))
-  let fails be fails + (showBad with "ADV b64", (jwt_hs256_verify with "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.+++", (secret at 1), none))
+  let gotv be jwt_hs256_verify with big, secret at 1, none
+  let nfail be showBad with "ADV oversized", gotv
+  let fails be fails + nfail
+  let gotv be jwt_hs256_verify with "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.+++", secret at 1, none
+  let nfail be showBad with "ADV b64", gotv
+  let fails be fails + nfail
   let shortSig be "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.Zm8"
-  let fails be fails + (showBad with "ADV siglen", (jwt_hs256_verify with shortSig, (secret at 1), none))
+  let gotv be jwt_hs256_verify with shortSig, secret at 1, none
+  let nfail be showBad with "ADV siglen", gotv
+  let fails be fails + nfail
   let tamp be "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ4In0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-  let fails be fails + (showBad with "ADV tamper", (jwt_hs256_verify with tamp, (secret at 1), none))
+  let gotv be jwt_hs256_verify with tamp, secret at 1, none
+  let nfail be showBad with "ADV tamper", gotv
+  let fails be fails + nfail
   let expPay be "{\"exp\":10}"
-  let expTok be jwt_hs256_sign with expPay, (secret at 1)
-  let fails be fails + (showBad with "ADV exp", (jwt_hs256_verify with (expTok at 1), (secret at 1), 11))
-  let fresh be jwt_hs256_verify with (expTok at 1), (secret at 1), 10
-  let fails be fails + (proveLine with "JWT exp equal", (fresh at 0), "ok")
+  let expTok be jwt_hs256_sign with expPay, secret at 1
+  let gotv be jwt_hs256_verify with expTok at 1, secret at 1, 11
+  let nfail be showBad with "ADV exp", gotv
+  let fails be fails + nfail
+  let fresh be jwt_hs256_verify with expTok at 1, secret at 1, 10
+  let nfail be proveLine with "JWT exp equal", fresh at 0, "ok"
+  let fails be fails + nfail
 
-  if not (ct_eq with [1, 2], [1, 2])
+  let same be ct_eq with [1, 2], [1, 2]
+  if not same
     say "CT eq PASS fail"
     let fails be fails + 1
   else
     say "CT eq same PASS"
   end
-  if ct_eq with [1, 2], [1, 3]
+  let diff be ct_eq with [1, 2], [1, 3]
+  if diff
     say "CT neq FAIL"
     let fails be fails + 1
   else

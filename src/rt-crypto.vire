@@ -11,11 +11,14 @@ define times2 with n
 end
 
 define times4 with n
-  return times2 with (times2 with n)
+  let v be n + n
+  return v + v
 end
 
 define times8 with n
-  return times2 with (times4 with n)
+  let v be n + n
+  let v be v + v
+  return v + v
 end
 
 define cryptoAnd16 with a, b
@@ -63,15 +66,21 @@ define cryptoNot16 with a
 end
 
 define cryptoAnd32 with a, b
-  return [(cryptoAnd16 with (a at 0), (b at 0)), (cryptoAnd16 with (a at 1), (b at 1))]
+  let hi be cryptoAnd16 with a at 0, b at 0
+  let lo be cryptoAnd16 with a at 1, b at 1
+  return [hi, lo]
 end
 
 define cryptoXor32 with a, b
-  return [(cryptoXor16 with (a at 0), (b at 0)), (cryptoXor16 with (a at 1), (b at 1))]
+  let hi be cryptoXor16 with a at 0, b at 0
+  let lo be cryptoXor16 with a at 1, b at 1
+  return [hi, lo]
 end
 
 define cryptoNot32 with a
-  return [(cryptoNot16 with (a at 0)), (cryptoNot16 with (a at 1))]
+  let hi be cryptoNot16 with a at 0
+  let lo be cryptoNot16 with a at 1
+  return [hi, lo]
 end
 
 define cryptoAdd32 with a, b
@@ -139,36 +148,57 @@ define cryptoShl32 with w, n
 end
 
 define cryptoRotr32 with w, n
-  return cryptoXor32 with (cryptoShr32 with w, n), (cryptoShl32 with w, (32 - n))
+  let a be cryptoShr32 with w, n
+  let sh be 32 - n
+  let b be cryptoShl32 with w, sh
+  return cryptoXor32 with a, b
 end
 
 define cryptoCh with e, f, g
-  return cryptoXor32 with (cryptoAnd32 with e, f), (cryptoAnd32 with (cryptoNot32 with e), g)
+  let x be cryptoAnd32 with e, f
+  let n be cryptoNot32 with e
+  let y be cryptoAnd32 with n, g
+  return cryptoXor32 with x, y
 end
 
 define cryptoMaj with a, b, c
-  let t be cryptoXor32 with (cryptoAnd32 with a, b), (cryptoAnd32 with a, c)
-  return cryptoXor32 with t, (cryptoAnd32 with b, c)
+  let ab be cryptoAnd32 with a, b
+  let ac be cryptoAnd32 with a, c
+  let t be cryptoXor32 with ab, ac
+  let bc be cryptoAnd32 with b, c
+  return cryptoXor32 with t, bc
 end
 
 define cryptoBs0 with a
-  let t be cryptoXor32 with (cryptoRotr32 with a, 2), (cryptoRotr32 with a, 13)
-  return cryptoXor32 with t, (cryptoRotr32 with a, 22)
+  let x be cryptoRotr32 with a, 2
+  let y be cryptoRotr32 with a, 13
+  let t be cryptoXor32 with x, y
+  let z be cryptoRotr32 with a, 22
+  return cryptoXor32 with t, z
 end
 
 define cryptoBs1 with e
-  let t be cryptoXor32 with (cryptoRotr32 with e, 6), (cryptoRotr32 with e, 11)
-  return cryptoXor32 with t, (cryptoRotr32 with e, 25)
+  let x be cryptoRotr32 with e, 6
+  let y be cryptoRotr32 with e, 11
+  let t be cryptoXor32 with x, y
+  let z be cryptoRotr32 with e, 25
+  return cryptoXor32 with t, z
 end
 
 define cryptoSs0 with w
-  let t be cryptoXor32 with (cryptoRotr32 with w, 7), (cryptoRotr32 with w, 18)
-  return cryptoXor32 with t, (cryptoShr32 with w, 3)
+  let x be cryptoRotr32 with w, 7
+  let y be cryptoRotr32 with w, 18
+  let t be cryptoXor32 with x, y
+  let z be cryptoShr32 with w, 3
+  return cryptoXor32 with t, z
 end
 
 define cryptoSs1 with w
-  let t be cryptoXor32 with (cryptoRotr32 with w, 17), (cryptoRotr32 with w, 19)
-  return cryptoXor32 with t, (cryptoShr32 with w, 10)
+  let x be cryptoRotr32 with w, 17
+  let y be cryptoRotr32 with w, 19
+  let t be cryptoXor32 with x, y
+  let z be cryptoShr32 with w, 10
+  return cryptoXor32 with t, z
 end
 
 define cryptoK
@@ -253,12 +283,19 @@ define cryptoIv
   return hs
 end
 
-define cryptoLoadWord with bytes, off
-  let b0 be bytes at off
-  let b1 be bytes at (off + 1)
-  let b2 be bytes at (off + 2)
-  let b3 be bytes at (off + 3)
-  return [(shl8 with b0) + b1, (shl8 with b2) + b3]
+define cryptoLoadWord with buf, off
+  let b0 be buf at off
+  let i1 be off + 1
+  let i2 be off + 2
+  let i3 be off + 3
+  let b1 be buf at i1
+  let b2 be buf at i2
+  let b3 be buf at i3
+  let hi be shl8 with b0
+  let hi be hi + b1
+  let lo be shl8 with b2
+  let lo be lo + b3
+  return [hi, lo]
 end
 
 define cryptoStoreWord with out, w
@@ -275,7 +312,8 @@ define cryptoCompress with state, block, ks
   let w be []
   let i be 0
   while i < 16
-    push with w, (cryptoLoadWord with block, (times4 with i))
+    let off be times4 with i
+    push with w, (cryptoLoadWord with block, off)
     let i be i + 1
   end
   while i < 64
@@ -296,11 +334,15 @@ define cryptoCompress with state, block, ks
   let h be cryptoCopy32 with (state at 7)
   let r be 0
   while r < 64
-    let t1 be cryptoAdd32 with h, (cryptoBs1 with e)
-    let t1 be cryptoAdd32 with t1, (cryptoCh with e, f, g)
+    let bs1 be cryptoBs1 with e
+    let t1 be cryptoAdd32 with h, bs1
+    let ch be cryptoCh with e, f, g
+    let t1 be cryptoAdd32 with t1, ch
     let t1 be cryptoAdd32 with t1, (ks at r)
     let t1 be cryptoAdd32 with t1, (w at r)
-    let t2 be cryptoAdd32 with (cryptoBs0 with a), (cryptoMaj with a, b, c)
+    let bs0 be cryptoBs0 with a
+    let maj be cryptoMaj with a, b, c
+    let t2 be cryptoAdd32 with bs0, maj
     let h be g
     let g be f
     let f be e
@@ -311,22 +353,35 @@ define cryptoCompress with state, block, ks
     let a be cryptoAdd32 with t1, t2
     let r be r + 1
   end
-  put (cryptoAdd32 with (state at 0), a) into state at 0
-  put (cryptoAdd32 with (state at 1), b) into state at 1
-  put (cryptoAdd32 with (state at 2), c) into state at 2
-  put (cryptoAdd32 with (state at 3), d) into state at 3
-  put (cryptoAdd32 with (state at 4), e) into state at 4
-  put (cryptoAdd32 with (state at 5), f) into state at 5
-  put (cryptoAdd32 with (state at 6), g) into state at 6
-  put (cryptoAdd32 with (state at 7), h) into state at 7
+  let s0 be state at 0
+  put (cryptoAdd32 with s0, a) into state at 0
+  let s1 be state at 1
+  put (cryptoAdd32 with s1, b) into state at 1
+  let s2 be state at 2
+  put (cryptoAdd32 with s2, c) into state at 2
+  let s3 be state at 3
+  put (cryptoAdd32 with s3, d) into state at 3
+  let s4 be state at 4
+  put (cryptoAdd32 with s4, e) into state at 4
+  let s5 be state at 5
+  put (cryptoAdd32 with s5, f) into state at 5
+  let s6 be state at 6
+  put (cryptoAdd32 with s6, g) into state at 6
+  let s7 be state at 7
+  put (cryptoAdd32 with s7, h) into state at 7
   return state
 end
 
-define cryptoPad with bytes
-  let n be length with bytes
-  let out be bytes + []
+define cryptoPad with buf
+  let n be length with buf
+  let out be buf + []
   push with out, 128
-  while ((length with out) % 64) != 56
+  while true
+    let nout be length with out
+    let rem be nout % 64
+    if rem == 56
+      stop
+    end
     push with out, 0
   end
   let bits be times8 with n
@@ -343,10 +398,10 @@ define cryptoPad with bytes
   return out
 end
 
-define sha256_bytes with bytes
+define sha256_bytes with buf
   let ks be cryptoK
   let state be cryptoIv
-  let padded be cryptoPad with bytes
+  let padded be cryptoPad with buf
   let i be 0
   let n be length with padded
   while i < n
@@ -363,8 +418,9 @@ define sha256_bytes with bytes
   return out
 end
 
-define sha256_hex with bytes
-  return hex with (sha256_bytes with bytes)
+define sha256_hex with buf
+  let d be sha256_bytes with buf
+  return hex with d
 end
 
 define ascii_table
@@ -393,7 +449,8 @@ define ascii_bytes with text
   let i be 0
   let n be length with text
   while i < n
-    let c be ascii_code with (text at i)
+    let ch be text at i
+    let c be ascii_code with ch
     if c < 0
       return ["bad", "non-ascii"]
     end
@@ -403,20 +460,22 @@ define ascii_bytes with text
   return ["ok", out]
 end
 
-define ascii_text with bytes
+define ascii_text with buf
   let table be ascii_table
   let out be ""
   let i be 0
-  let n be length with bytes
+  let n be length with buf
   while i < n
-    let b be bytes at i
+    let b be buf at i
     if b == 10
       let out be out + "\n"
     else if b == 13
       let out be out + "\r"
     else if b == 9
       let out be out + "\t"
-    else if (b < 32) or (b > 126)
+    else if b < 32
+      return ["bad", "non-ascii"]
+    else if b > 126
       return ["bad", "non-ascii"]
     else
       let out be out + (table at (b - 32))
@@ -457,22 +516,40 @@ define hex_digit with ch
   if ch == "9"
     return 9
   end
-  if (ch == "a") or (ch == "A")
+  if ch == "a"
     return 10
   end
-  if (ch == "b") or (ch == "B")
+  if ch == "A"
+    return 10
+  end
+  if ch == "b"
     return 11
   end
-  if (ch == "c") or (ch == "C")
+  if ch == "B"
+    return 11
+  end
+  if ch == "c"
     return 12
   end
-  if (ch == "d") or (ch == "D")
+  if ch == "C"
+    return 12
+  end
+  if ch == "d"
     return 13
   end
-  if (ch == "e") or (ch == "E")
+  if ch == "D"
+    return 13
+  end
+  if ch == "e"
     return 14
   end
-  if (ch == "f") or (ch == "F")
+  if ch == "E"
+    return 14
+  end
+  if ch == "f"
+    return 15
+  end
+  if ch == "F"
     return 15
   end
   return 0 - 1
@@ -494,12 +571,15 @@ define hex_to_bytes with raw
   let out be []
   let i be 0
   while i < n
-    let hi be hex_digit with (raw at i)
-    let lo be hex_digit with (raw at (i + 1))
+    let hi be hex_digit with raw at i
+    let i1 be i + 1
+    let lo be hex_digit with raw at i1
     if (hi < 0) or (lo < 0)
       return ["bad", "bad hex"]
     end
-    push with out, ((times16 with hi) + lo)
+    let b be times16 with hi
+    let b be b + lo
+    push with out, b
     let i be i + 2
   end
   return ["ok", out]
@@ -522,39 +602,46 @@ define hmac_sha256 with key, msg
     push with op, (cryptoXor16 with b, 92)
     let i be i + 1
   end
-  let inner be sha256_bytes with (ip + msg)
-  return sha256_bytes with (op + inner)
+  let cat be ip + msg
+  let inner be sha256_bytes with cat
+  let cat be op + inner
+  return sha256_bytes with cat
 end
 
 define hmac_sha256_hex with key, msg
-  return hex with (hmac_sha256 with key, msg)
+  let d be hmac_sha256 with key, msg
+  return hex with d
 end
 
 define b64url_table
   return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 end
 
-define b64url_encode with bytes
+define b64url_encode with buf
   let table be b64url_table
   let out be ""
-  let n be length with bytes
+  let n be length with buf
   let i be 0
   while i < n
-    let b0 be bytes at i
+    let b0 be buf at i
     let b1 be 0
     let b2 be 0
     let got be 1
-    if (i + 1) < n
-      let b1 be bytes at (i + 1)
+    let i1 be i + 1
+    let i2 be i + 2
+    if i1 < n
+      let b1 be buf at i1
       let got be 2
     end
-    if (i + 2) < n
-      let b2 be bytes at (i + 2)
+    if i2 < n
+      let b2 be buf at i2
       let got be 3
     end
     let n0 be idiv with b0, 4
-    let n1 be (times16 with (b0 % 4)) + (idiv with b1, 16)
-    let n2 be (times4 with (b1 % 16)) + (idiv with b2, 64)
+    let n1 be times16 with b0 % 4
+    let n1 be n1 + (idiv with b1, 16)
+    let n2 be times4 with b1 % 16
+    let n2 be n2 + (idiv with b2, 64)
     let n3 be b2 % 64
     let out be out + (table at n0)
     let out be out + (table at n1)
@@ -591,23 +678,33 @@ define b64url_decode with text
   let out be []
   let i be 0
   while i < n
-    let c0 be b64url_val with (text at i)
-    let c1 be b64url_val with (text at (i + 1))
+    let c0 be b64url_val with text at i
+    let i1 be i + 1
+    let c1 be b64url_val with text at i1
     let left be n - i
     let n2 be 0
     let n3 be 0
     if left > 2
-      let n2 be b64url_val with (text at (i + 2))
+      let i2 be i + 2
+      let n2 be b64url_val with text at i2
     end
     if left > 3
-      let n3 be b64url_val with (text at (i + 3))
+      let i3 be i + 3
+      let n3 be b64url_val with text at i3
     end
-    push with out, ((times4 with c0) + (idiv with c1, 16))
+    let b be times4 with c0
+    let b be b + (idiv with c1, 16)
+    push with out, b
     if left > 2
-      push with out, ((times16 with (c1 % 16)) + (idiv with n2, 4))
+      let b be times16 with c1 % 16
+      let b be b + (idiv with n2, 4)
+      push with out, b
     end
     if left > 3
-      push with out, ((times4 with (times16 with (n2 % 4))) + n3)
+      let t be times16 with n2 % 4
+      let b be times4 with t
+      let b be b + n3
+      push with out, b
     end
     let i be i + 4
   end
@@ -654,7 +751,19 @@ define jwt_skip_space with text, i
   let n be length with text
   while i < n
     let ch be text at i
-    if (ch == " ") or (ch == "\t") or (ch == "\n") or (ch == "\r")
+    if ch == " "
+      let i be i + 1
+      skip
+    end
+    if ch == "\t"
+      let i be i + 1
+      skip
+    end
+    if ch == "\n"
+      let i be i + 1
+      skip
+    end
+    if ch == "\r"
       let i be i + 1
       skip
     end
@@ -669,7 +778,8 @@ define jwt_field_string with text, key
   if found < 0
     return ["miss", ""]
   end
-  let i be jwt_skip_space with text, (found + (length with needle))
+  let after be found + (length with needle)
+  let i be jwt_skip_space with text, after
   if i >= (length with text)
     return ["bad", "truncated json"]
   end
@@ -703,7 +813,8 @@ define jwt_field_number with text, key
   if found < 0
     return ["miss", 0]
   end
-  let i be jwt_skip_space with text, (found + (length with needle))
+  let after be found + (length with needle)
+  let i be jwt_skip_space with text, after
   if i >= (length with text)
     return ["bad", 0]
   end
@@ -766,7 +877,10 @@ define jwt_split with token
   if b == 0
     return ["bad", "missing segment"]
   end
-  return ["ok", [(slice with token, 0, a), (slice with rest, 0, b), more]]
+  let h be slice with token, 0, a
+  let p be slice with rest, 0, b
+  let parts be [h, p, more]
+  return ["ok", parts]
 end
 
 define jwt_hs256_sign with payload_text, secret
@@ -776,12 +890,14 @@ define jwt_hs256_sign with payload_text, secret
     return ["bad", p at 1]
   end
   let body be b64url_encode with (p at 1)
-  let msg be ascii_bytes with (header + "." + body)
+  let signing be header + "." + body
+  let msg be ascii_bytes with signing
   if (msg at 0) != "ok"
     return ["bad", msg at 1]
   end
   let sig be hmac_sha256 with secret, (msg at 1)
-  let token be header + "." + body + "." + (b64url_encode with sig)
+  let enc be b64url_encode with sig
+  let token be signing + "." + enc
   if (length with token) > (jwt_token_cap)
     return ["bad", "token too large"]
   end
@@ -823,7 +939,8 @@ define jwt_hs256_verify with token, secret, clock
   if (alg at 1) != "HS256"
     return ["bad", "alg rejected"]
   end
-  let msg be ascii_bytes with ((segs at 0) + "." + (segs at 1))
+  let signing be (segs at 0) + "." + (segs at 1)
+  let msg be ascii_bytes with signing
   if (msg at 0) != "ok"
     return ["bad", msg at 1]
   end
