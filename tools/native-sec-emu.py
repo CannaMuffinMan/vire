@@ -31,6 +31,8 @@ NAMES = [
     "GetFileInformationByHandle",
     "SetUnhandledExceptionFilter",
     "AddVectoredExceptionHandler",
+    "SetFilePointerEx",
+    "SetEndOfFile",
 ]
 
 
@@ -277,6 +279,20 @@ class Emu:
         self.wr(UC_X86_REG_RAX, 0)
 
     def api_AddVectoredExceptionHandler(self):
+        self.wr(UC_X86_REG_RAX, 1)
+
+    def api_SetFilePointerEx(self):
+        self.wr(UC_X86_REG_RAX, 1)
+
+    def api_SetEndOfFile(self):
+        rec = self.files.get(self.rd(UC_X86_REG_RCX))
+        if rec is not None:
+            rec[b"data"] = b""
+            path = rec[b"path"]
+            if path:
+                full = os.path.join(self.cwd, path.decode("latin1"))
+                if os.path.exists(full):
+                    open(full, "wb").close()
         self.wr(UC_X86_REG_RAX, 1)
 
     def run(self):

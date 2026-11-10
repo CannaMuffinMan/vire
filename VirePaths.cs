@@ -372,14 +372,25 @@ static class VirePaths
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static int LinuxLinkCount(string path)
     {
-        LinuxStat stat;
-        if (LinuxLStat(path, out stat) != 0) return 1;
-        if (stat.Nlink > int.MaxValue) return int.MaxValue;
-        return (int)stat.Nlink;
+        ulong nlink;
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            LinuxStatArm64 stat;
+            if (LinuxLStatArm64(path, out stat) != 0) return 1;
+            nlink = stat.Nlink;
+        }
+        else
+        {
+            LinuxStatX64 stat;
+            if (LinuxLStatX64(path, out stat) != 0) return 1;
+            nlink = stat.Nlink;
+        }
+        if (nlink > (ulong)int.MaxValue) return int.MaxValue;
+        return (int)nlink;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    struct LinuxStat
+    struct LinuxStatX64
     {
         public ulong Dev;
         public ulong Ino;
@@ -403,7 +414,36 @@ static class VirePaths
         public long Unused3;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct LinuxStatArm64
+    {
+        public ulong Dev;
+        public ulong Ino;
+        public uint Mode;
+        public uint Nlink;
+        public uint Uid;
+        public uint Gid;
+        public ulong Rdev;
+        public long Pad1;
+        public long Size;
+        public int Blksize;
+        public int Pad2;
+        public long Blocks;
+        public long AtimSec;
+        public long AtimNsec;
+        public long MtimSec;
+        public long MtimNsec;
+        public long CtimSec;
+        public long CtimNsec;
+        public uint Unused1;
+        public uint Unused2;
+    }
+
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
-    static extern int LinuxLStat(string path, out LinuxStat stat);
+    static extern int LinuxLStatX64(string path, out LinuxStatX64 stat);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
+    static extern int LinuxLStatArm64(string path, out LinuxStatArm64 stat);
 }

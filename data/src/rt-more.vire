@@ -1387,7 +1387,11 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 255, 192, 233]
   emitRel with image, fixes, "path_loop"
   pin with labels, "path_ok", image
-  emitList with image, [72, 139, 77, 248, 72, 139, 1, 72, 137, 69, 240, 72, 141, 73, 8, 72, 137, 77, 232, 72, 199, 69, 224, 0, 0, 0, 0]
+  emitList with image, [72, 139, 77, 248, 72, 139, 1, 72, 137, 69, 240, 72, 141, 73, 8, 72, 137, 77, 200, 72, 139, 77, 240, 72, 255, 193]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 232, 72, 137, 193, 72, 139, 85, 200, 76, 139, 69, 240]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 232, 72, 139, 85, 240, 198, 4, 16, 0, 72, 199, 69, 224, 0, 0, 0, 0]
   pin with labels, "path_walk", image
   emitList with image, [72, 139, 69, 224, 72, 59, 69, 240, 15, 131]
   emitRel with image, fixes, "path_leaf"
@@ -1471,17 +1475,11 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "write_close_path"
   emitList with image, [131, 122, 40, 1, 15, 135]
   emitRel with image, fixes, "write_close_path"
+  emitList with image, [72, 139, 77, 216, 49, 210, 69, 49, 192, 69, 49, 201, 255, 21]
+  emitRel with image, fixes, "iat_sp"
   emitList with image, [72, 139, 77, 216, 255, 21]
-  emitRel with image, fixes, "iat_ch"
-  emitList with image, [72, 139, 77, 232, 72, 141, 73, 8, 186]
-  emitU32 with image, 1073741824
-  emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 2, 0, 0, 0, 199, 68, 36, 40]
-  emitU32 with image, 2097280
-  emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
-  emitRel with image, fixes, "iat_cf"
-  emitList with image, [72, 131, 248, 255, 15, 132]
-  emitRel with image, fixes, "write_fail"
-  emitList with image, [233]
+  emitRel with image, fixes, "iat_se"
+  emitList with image, [72, 139, 69, 216, 233]
   emitRel with image, fixes, "write_ready"
   pin with labels, "write_ready", image
   emitList with image, [72, 137, 69, 216]
@@ -1783,15 +1781,15 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "extend_list_src"
   emitList with image, [73, 131, 248, 6, 15, 133]
   emitRel with image, fixes, "extend_bad"
-  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  emitList with image, [72, 139, 85, 240, 72, 139, 2, 72, 137, 69, 192, 72, 199, 69, 232, 0, 0, 0, 0]
   emitJmpTo with image, fixes, "extend_bloop"
   pin with labels, "extend_list_src", image
-  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  emitList with image, [72, 139, 85, 240, 72, 139, 2, 72, 137, 69, 192, 72, 199, 69, 232, 0, 0, 0, 0]
   pin with labels, "extend_loop", image
-  emitList with image, [72, 139, 85, 240, 72, 139, 10, 72, 139, 69, 232, 72, 57, 200, 15, 141]
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 192, 15, 141]
   emitRel with image, fixes, "extend_done"
   emitList with image, [72, 193, 224, 4, 72, 139, 85, 240, 72, 139, 82, 16, 72, 1, 194, 76, 139, 2, 76, 139, 74, 8, 73, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "extend_slot"
+  emitRel with image, fixes, "extend_notnum"
   emitList with image, [73, 131, 249, 0, 15, 140]
   emitRel with image, fixes, "extend_neg"
   emitList with image, [73, 129, 249]
@@ -1815,7 +1813,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "extend_bloop"
   emitJmpTo with image, fixes, "extend_loop"
   pin with labels, "extend_bloop", image
-  emitList with image, [72, 139, 85, 240, 72, 139, 10, 72, 139, 69, 232, 72, 57, 200, 15, 141]
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 192, 15, 141]
   emitRel with image, fixes, "extend_done"
   emitList with image, [72, 139, 82, 16, 68, 15, 182, 12, 2, 73, 199, 192]
   emitU32 with image, 1
@@ -1826,6 +1824,8 @@ define emitMore with image, fixes, labels
   emitEpi with image
   pin with labels, "extend_bad", image
   emitFail with image, fixes, "msg_extend"
+  pin with labels, "extend_notnum", image
+  emitFail with image, fixes, "msg_extnum"
   return image
 end
 
@@ -1926,6 +1926,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_biglist", "list is too large"
   parkMsg with image, labels, "msg_push", "push needs a list"
   parkMsg with image, labels, "msg_extend", "extend needs two lists"
+  parkMsg with image, labels, "msg_extnum", "extend needs numbers in the extra list"
   parkMsg with image, labels, "msg_length", "length needs text, a list, or a map"
   parkMsg with image, labels, "msg_slice", "slice needs text or a list"
   parkMsg with image, labels, "msg_bounds", "slice bounds must be whole numbers"

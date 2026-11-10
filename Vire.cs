@@ -2836,9 +2836,10 @@ sealed class Program
     internal static object ExtendList(List<object> dest, List<object> extra, int cap, int line, int col)
     {
         if (dest == null || extra == null) throw new VireError("extend needs two lists", line, col);
-        if (extra.Count > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
-        if (extra.Count > cap - dest.Count) throw new VireError("list is too large", line, col);
-        for (int i = 0; i < extra.Count; i++) dest.Add(EmitU8Byte(extra[i], line, col));
+        int add = extra.Count;
+        if (add > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
+        if (add > cap - dest.Count) throw new VireError("list is too large", line, col);
+        for (int i = 0; i < add; i++) dest.Add(EmitU8Byte(extra[i], line, col));
         return dest;
     }
 
@@ -2861,7 +2862,7 @@ sealed class Program
         if (x >= 256)
         {
             int q = WholeDiv(x, 256, line, col);
-            x = x - (q * 256);
+            x = x - ((double)q * 256.0);
         }
         if (x < 0) x = 0;
         if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;
