@@ -395,17 +395,18 @@ function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
     [int]$rounds = 0
     $rp = $null
     try {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
+        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
+        Reset-F5Slot $slot
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            Reset-F5Slot $slot
-            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked F5 write PE" }
             $kept = [IO.File]::ReadAllText($keep)
             if (($rounds % 25) -eq 0) { Write-Host ("f5_round " + $rounds + " KEEP=" + $kept + " write_code=" + $run.Code) }
-            if ($kept -eq "HACKED") {
+            if ($kept -eq "HACKED" -or $kept.Length -eq 0) {
                 Write-Host ("f5_two_process_race vuln victim_hits=1 rounds=" + $rounds + " sec=" + $sw.Elapsed.TotalSeconds.ToString("0.000"))
                 return [int]$rounds
             }
@@ -424,16 +425,17 @@ function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
     [int]$hits = 0
     $rp = $null
     try {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
+        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
+        Reset-F5Slot $slot
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            Reset-F5Slot $slot
-            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked F5 fixed PE" }
             $kept = [IO.File]::ReadAllText($keep)
-            if ($kept -eq "HACKED") { $hits = $hits + 1 }
+            if ($kept -eq "HACKED" -or $kept.Length -eq 0) { $hits = $hits + 1 }
         }
     } finally {
         if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
@@ -537,9 +539,9 @@ function Invoke-WalkUntilHit([string]$WriteExe, [int]$TimeoutSec) {
     [int]$rounds = 0
     $rp = $null
     try {
+        Restore-WalkTree
         $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            Restore-WalkTree
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked walk-then-open write PE" }
@@ -563,9 +565,9 @@ function Invoke-WalkFixedZero([string]$WriteExe, [int]$TimeoutSec) {
     [int]$hits = 0
     $rp = $null
     try {
+        Restore-WalkTree
         $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            Restore-WalkTree
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked walk-then-open fixed PE" }

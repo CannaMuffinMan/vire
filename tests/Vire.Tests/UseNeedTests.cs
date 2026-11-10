@@ -79,6 +79,7 @@ public class UseNeedTests
     [Fact]
     public void DataFolderUseFailsIgnoringCase()
     {
+        if (!OperatingSystem.IsWindows()) return;
         DualMode.DualRun both = DualMode.RunSource(
             "use \"Data/evil.vire\"\ndefine main\n  say \"no\"\nend\n",
             new string[]
@@ -89,6 +90,21 @@ public class UseNeedTests
         Assert.NotEqual(0, both.InterpCode);
         Assert.NotEqual(0, both.CompCode);
         Assert.Contains("data and site", both.InterpErr + both.CompOut + both.CompErr);
+    }
+
+    [Fact]
+    public void LinuxDataFolderUseIsCaseSensitive()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        DualMode.DualRun both = DualMode.RunSource(
+            "use \"Data/evil.vire\"\ndefine main\n  say used_line\nend\n",
+            new string[]
+            {
+                "Data/evil.vire",
+                "define used_line\n  return \"used-line-ok\"\nend\n"
+            });
+        Assert.Equal(0, both.InterpCode);
+        Assert.Contains("used-line-ok", both.InterpOut);
     }
 
     [Fact]
