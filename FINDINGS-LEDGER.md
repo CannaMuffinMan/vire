@@ -25,7 +25,7 @@ No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `12
 | walk-then-open | yes | Unicorn + Windows Sleep-widener job `129796755075` vuln `outside_hits=1` / fixed `0` | host C# TOCTOU is a separate gate |
 | host TOCTOU | yes | `HostCheckThenOpenToctouFailBeforePassAfter`: `File.AppendAllText` after swap writes outside; `AppendAllTextInside` file-id refuses | Windows job filter on `native-windows` |
 | Linux case | yes | `LinuxWritableZoneCompareIsCaseSensitive`; `use Data/` is not `data/` | — |
-| trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused` | 7c7c8ea fail-before in emu-check |
+| trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused`; Win32 `WriteAllText` strips to `payload.bat` (fail-before) | — |
 | F8 wrap | yes | host+Unicorn `[0, 0, 1]`; compile-native `72, 185` imm64 | 7c7c8ea native wrap mismatch in emu-check |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
