@@ -6,15 +6,17 @@ using Xunit;
 public class DebugBreakTests
 {
     [Fact]
-    public void BreakStopsOnlyNamedFunctionsInsideData()
+    public void BreakStopsOnlyNamedFunctionsInsideDataWhenDebuggerOn()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-break-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         string data = Path.Combine(dir, "data");
         Directory.CreateDirectory(data);
         string outside = Path.Combine(dir, "inspect.txt");
+        string prior = Environment.GetEnvironmentVariable("VIRE_DEBUGGER");
         try
         {
+            Environment.SetEnvironmentVariable("VIRE_DEBUGGER", "1");
             Assert.False(VireDebug.Break(dir, "main", 4, "absent"));
             Assert.False(File.Exists(Path.Combine(data, "inspect.txt")));
             Assert.False(File.Exists(outside));
@@ -38,6 +40,32 @@ public class DebugBreakTests
         }
         finally
         {
+            Environment.SetEnvironmentVariable("VIRE_DEBUGGER", prior);
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void BreakDoesNotProbeBreakFileWhenDebuggerUnset()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-break-off-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        string data = Path.Combine(dir, "data");
+        Directory.CreateDirectory(data);
+        File.WriteAllText(Path.Combine(data, "break.txt"), "main\n");
+        string prior = Environment.GetEnvironmentVariable("VIRE_DEBUGGER");
+        long before = System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls);
+        try
+        {
+            Environment.SetEnvironmentVariable("VIRE_DEBUGGER", null);
+            Assert.False(VireDebug.Break(dir, "main", 9, "here"));
+            Assert.False(File.Exists(Path.Combine(data, "inspect.txt")));
+            Assert.Equal("main\n", File.ReadAllText(Path.Combine(data, "break.txt")));
+            Assert.Equal(before, System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("VIRE_DEBUGGER", prior);
             try { Directory.Delete(dir, true); } catch (IOException) { }
         }
     }
