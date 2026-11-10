@@ -6,7 +6,7 @@ import re
 import sys
 
 STEP_RE = re.compile(r"still running steps=(\d+)")
-STAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T[0-9.:+-]+)\s+.*still running steps=(\d+)")
+STAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\S+)\s+.*still running steps=(\d+)")
 TOTAL_RE = re.compile(r"total_steps=(\d+)\s+total_pending=(\d+)\s+step_batch=(\d+)(?:\s+break_probes=(\d+))?")
 SEC_RE = re.compile(r"step_(\w+)_sec\s+([0-9.]+)")
 SHA_RE = re.compile(r"gen1_sha256\s+([0-9a-f]+)")
