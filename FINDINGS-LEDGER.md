@@ -1,9 +1,9 @@
 # Vulnerability / finding evidence ledger
 
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
-Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · this push (F4/F5/F6 Windows OS recipes; drop unused `crash-rip.txt` pool bytes).
-PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft). Wrapper/chat may still say PR41; forge is **PR42**.
-No CVE IDs. **Freeze SHA = this commit after `native-selfhost-windows` reprints equal hashes** (PE bytes change from removing `crash_path`).
+Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
+PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft).
+No CVE IDs. **No freeze** until `native-windows` prints `f4_`/`f5_`/`f6_` properties **and** `native-selfhost-windows` equal hashes on the **exact head**. Prior proven freeze remains `3d9fc58`.
 
 ## Implemented vs verified
 
