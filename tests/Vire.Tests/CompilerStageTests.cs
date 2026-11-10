@@ -14,6 +14,7 @@ public class CompilerStageTests
         AssertSame(root, Path.Combine("src", "pe.vire"), Path.Combine("data", "src", "pe.vire"));
         AssertSame(root, Path.Combine("src", "rt.vire"), Path.Combine("data", "src", "rt.vire"));
         AssertSame(root, Path.Combine("src", "rt-more.vire"), Path.Combine("data", "src", "rt-more.vire"));
+        AssertSame(root, Path.Combine("src", "rt-net.vire"), Path.Combine("data", "src", "rt-net.vire"));
         string guest = Path.Combine(root, "data", "staged-use.vire");
         File.WriteAllText(guest, "use \"src/asm.vire\"\ndefine main\n  say (hexOf with [72, 300, -1])\nend\n");
         DualMode.Proc proc = DualMode.RunVire(

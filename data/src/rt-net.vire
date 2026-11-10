@@ -1,0 +1,1351 @@
+~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
+~ Loaded by compile-native.vire. L2 owns rt.vire, rt-more.vire, and pe.vire.
+~ HTTP responses are in-memory. This lane does not open files for serving.
+
+define emitIatCall with image, fixes, name
+  emitList with image, [255, 21]
+  emitRel with image, fixes, name
+  return image
+end
+
+define emitLeaRcxLab with image, fixes, name
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, name
+  return image
+end
+
+define emitLeaRdxLab with image, fixes, name
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, name
+  return image
+end
+
+define emitNetInit with image, fixes, labels
+  pin with labels, "rt_net_init", image
+  emitPro with image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "ws2_mod"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "net_init_done"
+  emitLeaRcxLab with image, fixes, "str_ws2"
+  emitList with image, [72, 131, 193, 8]
+  emitIatCall with image, fixes, "iat_ll"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "ws2_mod"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_WSAStartup"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_WSAStartup"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_socket"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_socket"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_bind"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_bind"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_listen"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_listen"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_accept"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_accept"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_recv"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_recv"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_send"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_send"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_closesocket"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_closesocket"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_setsockopt"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_setsockopt"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws2_mod"
+  emitLeaRdxLab with image, fixes, "str_getsockname"
+  emitList with image, [72, 131, 194, 8]
+  emitIatCall with image, fixes, "iat_gp"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "net_init_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "p_getsockname"
+  emitList with image, [185]
+  emitU32 with image, 512
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 248, 185]
+  emitU32 with image, 514
+  emitList with image, [72, 139, 85, 248]
+  emitIatCall with image, fixes, "p_WSAStartup"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 133, "net_init_fail"
+  pin with labels, "net_init_done", image
+  emitEpi with image
+  pin with labels, "net_init_fail", image
+  emitFail with image, fixes, "msg_net"
+  return image
+end
+
+define emitNetMkText with image, fixes, labels
+  pin with labels, "rt_net_mktext", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 141, 74, 16]
+  emitJcc with image, fixes, 130, "mktext_oom"
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 232, 72, 139, 85, 240, 72, 137, 16, 72, 141, 72, 8, 72, 139, 85, 248, 76, 139, 69, 240]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 232, 72, 139, 85, 240, 198, 68, 16, 8, 0]
+  emitEpi with image
+  pin with labels, "mktext_oom", image
+  emitFail with image, fixes, "msg_oom"
+  return image
+end
+
+define emitNetSendAll with image, fixes, labels
+  pin with labels, "rt_net_sendall", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 76, 137, 69, 232]
+  pin with labels, "send_loop", image
+  emitList with image, [72, 139, 69, 232, 72, 133, 192]
+  emitJcc with image, fixes, 132, "send_done"
+  emitList with image, [72, 139, 77, 248, 72, 139, 85, 240, 76, 139, 69, 232, 69, 49, 201]
+  emitIatCall with image, fixes, "p_send"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "send_done"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "send_done"
+  emitList with image, [72, 1, 69, 240, 72, 41, 69, 232]
+  emitJmpTo with image, fixes, "send_loop"
+  pin with labels, "send_done", image
+  emitEpi with image
+  return image
+end
+
+define emitNetSendHttp with image, fixes, labels
+  pin with labels, "rt_net_sendhttp", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 137, 85, 240, 76, 137, 69, 232]
+  emitCallTo with image, fixes, "rt_buf_new"
+  emitList with image, [72, 137, 69, 224]
+  emitLeaRdxLab with image, fixes, "txt_http11"
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitList with image, [15, 183, 85, 240]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 137, 194, 72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitList with image, [129, 125, 240, 200, 0, 0, 0]
+  emitJcc with image, fixes, 131, "sh_errph"
+  emitLeaRdxLab with image, fixes, "txt_sp_ok"
+  emitJmpTo with image, fixes, "sh_ph"
+  pin with labels, "sh_errph", image
+  emitLeaRdxLab with image, fixes, "txt_sp_err"
+  pin with labels, "sh_ph", image
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitLeaRdxLab with image, fixes, "txt_hdrs"
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitList with image, [72, 139, 85, 232, 72, 139, 2]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 137, 194, 72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitLeaRdxLab with image, fixes, "txt_hdr2"
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 69, 224]
+  emitList with image, [72, 139, 85, 232]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 137, 193]
+  emitCallTo with image, fixes, "rt_buf_finish"
+  emitList with image, [72, 139, 77, 248, 72, 141, 80, 8, 76, 139, 0]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitEpi with image
+  return image
+end
+
+define emitNetHdrEnd with image, fixes, labels
+  pin with labels, "rt_net_hdrend", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 131, 250, 4]
+  emitJcc with image, fixes, 140, "hdrend_none"
+  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "hdrend_loop", image
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 240, 72, 131, 233, 3, 72, 57, 200]
+  emitJcc with image, fixes, 131, "hdrend_none"
+  emitList with image, [72, 139, 77, 248, 139, 12, 1, 129, 249, 13, 10, 13, 10]
+  emitJcc with image, fixes, 132, "hdrend_hit"
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "hdrend_loop"
+  pin with labels, "hdrend_hit", image
+  emitList with image, [72, 139, 69, 232]
+  emitEpi with image
+  pin with labels, "hdrend_none", image
+  emitList with image, [72, 199, 192, 255, 255, 255, 255]
+  emitEpi with image
+  return image
+end
+
+define emitNetHdrUnsafe with image, fixes, labels
+  pin with labels, "rt_net_hdrunsafe", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "hu_loop", image
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 240]
+  emitJcc with image, fixes, 131, "hu_ok"
+  emitList with image, [72, 139, 77, 248, 15, 182, 4, 1, 132, 192]
+  emitJcc with image, fixes, 132, "hu_bad"
+  emitList with image, [60, 10]
+  emitJcc with image, fixes, 132, "hu_lf"
+  emitList with image, [60, 13]
+  emitJcc with image, fixes, 132, "hu_cr"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "hu_next"
+  emitList with image, [60, 32]
+  emitJcc with image, fixes, 140, "hu_bad"
+  pin with labels, "hu_next", image
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "hu_loop"
+  pin with labels, "hu_lf", image
+  emitList with image, [72, 139, 69, 232, 72, 133, 192]
+  emitJcc with image, fixes, 132, "hu_bad"
+  emitList with image, [72, 139, 77, 248, 128, 124, 1, 255, 13]
+  emitJcc with image, fixes, 133, "hu_bad"
+  emitJmpTo with image, fixes, "hu_next"
+  pin with labels, "hu_cr", image
+  emitList with image, [72, 139, 69, 232, 72, 255, 192, 72, 59, 69, 240]
+  emitJcc with image, fixes, 131, "hu_bad"
+  emitList with image, [72, 139, 77, 248, 128, 60, 1, 10]
+  emitJcc with image, fixes, 133, "hu_bad"
+  emitJmpTo with image, fixes, "hu_next"
+  pin with labels, "hu_ok", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  pin with labels, "hu_bad", image
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  return image
+end
+
+define emitNetPathOk with image, fixes, labels
+  pin with labels, "rt_net_pathok", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 139, 8, 72, 133, 201]
+  emitJcc with image, fixes, 132, "po_bad"
+  emitList with image, [128, 121, 8, 47]
+  emitJcc with image, fixes, 133, "po_bad"
+  emitList with image, [72, 199, 69, 240, 0, 0, 0, 0]
+  pin with labels, "po_loop", image
+  emitList with image, [72, 139, 69, 240, 72, 59, 1]
+  emitJcc with image, fixes, 131, "po_ok"
+  emitList with image, [72, 139, 77, 248, 15, 182, 84, 1, 8]
+  emitList with image, [128, 250, 92]
+  emitJcc with image, fixes, 132, "po_bad"
+  emitList with image, [128, 250, 0]
+  emitJcc with image, fixes, 132, "po_bad"
+  emitList with image, [128, 250, 46]
+  emitJcc with image, fixes, 133, "po_next"
+  emitList with image, [72, 139, 69, 240, 72, 255, 192, 72, 59, 1]
+  emitJcc with image, fixes, 131, "po_next"
+  emitList with image, [72, 139, 77, 248, 15, 182, 84, 1, 8, 128, 250, 46]
+  emitJcc with image, fixes, 132, "po_bad"
+  pin with labels, "po_next", image
+  emitList with image, [72, 255, 69, 240]
+  emitJmpTo with image, fixes, "po_loop"
+  pin with labels, "po_ok", image
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  pin with labels, "po_bad", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitJsonEnc with image, fixes, labels
+  pin with labels, "rt_json_enc", image
+  emitPro with image
+  emitList with image, [72, 137, 69, 248, 72, 137, 85, 240, 76, 137, 69, 232, 72, 137, 77, 224]
+  emitList with image, [76, 129, 248]
+  emitU32 with image, 32
+  emitJcc with image, fixes, 135, "je_deep"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "je_null"
+  emitList with image, [72, 131, 248, 1]
+  emitJcc with image, fixes, 132, "je_int"
+  emitList with image, [72, 131, 248, 2]
+  emitJcc with image, fixes, 132, "je_str"
+  emitList with image, [72, 131, 248, 3]
+  emitJcc with image, fixes, 132, "je_bool"
+  emitList with image, [72, 131, 248, 4]
+  emitJcc with image, fixes, 132, "je_list"
+  emitList with image, [72, 131, 248, 5]
+  emitJcc with image, fixes, 132, "je_map"
+  emitFail with image, fixes, "msg_json"
+  pin with labels, "je_null", image
+  emitLeaRdxLab with image, fixes, "txt_null"
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitEpi with image
+  pin with labels, "je_bool", image
+  emitList with image, [72, 139, 85, 240, 72, 133, 210]
+  emitJcc with image, fixes, 132, "je_false"
+  emitLeaRdxLab with image, fixes, "txt_true"
+  emitJmpTo with image, fixes, "je_boolw"
+  pin with labels, "je_false", image
+  emitLeaRdxLab with image, fixes, "txt_false"
+  pin with labels, "je_boolw", image
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitEpi with image
+  pin with labels, "je_int", image
+  emitList with image, [72, 139, 85, 240]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 137, 194, 72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitEpi with image
+  pin with labels, "je_str", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 34
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 139, 85, 240, 72, 139, 2, 72, 137, 69, 216, 72, 199, 69, 208, 0, 0, 0, 0]
+  pin with labels, "je_ch", image
+  emitList with image, [72, 139, 69, 208, 72, 59, 69, 216]
+  emitJcc with image, fixes, 131, "je_strend"
+  emitList with image, [72, 139, 85, 240, 15, 182, 84, 2, 8]
+  emitList with image, [128, 250, 34]
+  emitJcc with image, fixes, 132, "je_escq"
+  emitList with image, [128, 250, 92]
+  emitJcc with image, fixes, 132, "je_escb"
+  emitList with image, [128, 250, 10]
+  emitJcc with image, fixes, 132, "je_escn"
+  emitList with image, [128, 250, 13]
+  emitJcc with image, fixes, 132, "je_escr"
+  emitList with image, [128, 250, 9]
+  emitJcc with image, fixes, 132, "je_esct"
+  emitList with image, [128, 250, 32]
+  emitJcc with image, fixes, 140, "je_escc"
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_escq", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 34
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_escb", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_escn", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 110
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_escr", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 114
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_esct", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 116
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_escc", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 92
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 117
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 48
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [186]
+  emitU32 with image, 48
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [15, 182, 85, 240]
+  emitList with image, [72, 139, 85, 240, 72, 139, 69, 208, 15, 182, 84, 2, 8, 137, 208, 193, 232, 4, 131, 224, 15, 4, 48, 137, 194]
+  emitList with image, [60, 57]
+  emitJcc with image, fixes, 134, "je_hx1"
+  emitList with image, [4, 39]
+  pin with labels, "je_hx1", image
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 139, 85, 240, 72, 139, 69, 208, 15, 182, 84, 2, 8, 131, 226, 15, 128, 194, 48, 128, 250, 57]
+  emitJcc with image, fixes, 134, "je_hx2"
+  emitList with image, [128, 194, 39]
+  pin with labels, "je_hx2", image
+  emitList with image, [72, 139, 77, 224]
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_ch"
+  pin with labels, "je_strend", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 34
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitEpi with image
+  pin with labels, "je_list", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 91
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 139, 85, 240, 72, 139, 10, 72, 137, 77, 216, 72, 199, 69, 208, 0, 0, 0, 0]
+  pin with labels, "je_li", image
+  emitList with image, [72, 139, 69, 208, 72, 59, 69, 216]
+  emitJcc with image, fixes, 131, "je_le"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "je_lit"
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 44
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224]
+  pin with labels, "je_lit", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 82, 16, 72, 139, 69, 208, 72, 193, 224, 4, 72, 1, 194, 72, 139, 2, 76, 139, 82, 8, 72, 139, 77, 224, 76, 139, 69, 232, 73, 255, 192]
+  emitCallTo with image, fixes, "rt_json_enc"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_li"
+  pin with labels, "je_le", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 93
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitEpi with image
+  pin with labels, "je_map", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 123
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 139, 85, 240, 72, 139, 10, 72, 137, 77, 216, 72, 199, 69, 208, 0, 0, 0, 0]
+  pin with labels, "je_mi", image
+  emitList with image, [72, 139, 69, 208, 72, 59, 69, 216]
+  emitJcc with image, fixes, 131, "je_me"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "je_mit"
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 44
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224]
+  pin with labels, "je_mit", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 69, 208, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 50, 72, 131, 254, 2]
+  emitJcc with image, fixes, 133, "je_badkey"
+  emitList with image, [72, 139, 82, 8, 184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 77, 224, 76, 139, 69, 232, 73, 255, 192]
+  emitCallTo with image, fixes, "rt_json_enc"
+  emitList with image, [72, 137, 69, 224, 186]
+  emitU32 with image, 58
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 224, 72, 139, 85, 240, 72, 139, 69, 208, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 66, 16, 76, 139, 66, 24]
+  emitList with image, [72, 139, 77, 224, 76, 139, 69, 232, 73, 255, 192]
+  emitCallTo with image, fixes, "rt_json_enc"
+  emitList with image, [72, 137, 69, 224, 72, 255, 69, 208]
+  emitJmpTo with image, fixes, "je_mi"
+  pin with labels, "je_me", image
+  emitList with image, [72, 139, 77, 224, 186]
+  emitU32 with image, 125
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitEpi with image
+  pin with labels, "je_badkey", image
+  emitFail with image, fixes, "msg_json"
+  pin with labels, "je_deep", image
+  emitFail with image, fixes, "msg_json"
+  return image
+end
+
+define emitJson with image, fixes, labels
+  pin with labels, "rt_json", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 137, 69, 248, 72, 137, 85, 240]
+  emitCallTo with image, fixes, "rt_buf_new"
+  emitList with image, [72, 137, 193, 72, 139, 69, 248, 72, 139, 85, 240, 65, 184]
+  emitU32 with image, 0
+  emitCallTo with image, fixes, "rt_json_enc"
+  emitList with image, [72, 137, 193]
+  emitCallTo with image, fixes, "rt_buf_finish"
+  emitList with image, [72, 137, 194]
+  emitPushTag with image, 2
+  emitEpi with image
+  return image
+end
+
+define emitJsonSkip with image, fixes, labels
+  pin with labels, "rt_json_skip", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248]
+  pin with labels, "js_loop", image
+  emitList with image, [72, 139, 1, 72, 59, 65, 8]
+  emitJcc with image, fixes, 131, "js_done"
+  emitList with image, [72, 139, 17, 15, 182, 2, 60, 32]
+  emitJcc with image, fixes, 132, "js_adv"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "js_adv"
+  emitList with image, [60, 10]
+  emitJcc with image, fixes, 132, "js_adv"
+  emitList with image, [60, 13]
+  emitJcc with image, fixes, 132, "js_adv"
+  emitJmpTo with image, fixes, "js_done"
+  pin with labels, "js_adv", image
+  emitList with image, [72, 255, 1]
+  emitJmpTo with image, fixes, "js_loop"
+  pin with labels, "js_done", image
+  emitEpi with image
+  return image
+end
+
+define emitJsonVal with image, fixes, labels
+  pin with labels, "rt_json_val", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 32
+  emitJcc with image, fixes, 135, "jv_bad"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 17, 128, 250, 110]
+  emitJcc with image, fixes, 132, "jv_null"
+  emitList with image, [128, 250, 116]
+  emitJcc with image, fixes, 132, "jv_true"
+  emitList with image, [128, 250, 102]
+  emitJcc with image, fixes, 132, "jv_false"
+  emitList with image, [128, 250, 34]
+  emitJcc with image, fixes, 132, "jv_str"
+  emitList with image, [128, 250, 91]
+  emitJcc with image, fixes, 132, "jv_arr"
+  emitList with image, [128, 250, 123]
+  emitJcc with image, fixes, 132, "jv_obj"
+  emitList with image, [128, 250, 45]
+  emitJcc with image, fixes, 132, "jv_num"
+  emitList with image, [128, 250, 48]
+  emitJcc with image, fixes, 140, "jv_bad"
+  emitList with image, [128, 250, 57]
+  emitJcc with image, fixes, 135, "jv_bad"
+  pin with labels, "jv_num", image
+  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0, 72, 199, 69, 224, 0, 0, 0, 0, 72, 139, 69, 248, 15, 182, 8, 128, 249, 45]
+  emitJcc with image, fixes, 133, "jv_nd"
+  emitList with image, [72, 199, 69, 224, 1, 0, 0, 0, 72, 255, 0]
+  pin with labels, "jv_nd", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_nbad"
+  emitList with image, [15, 182, 8, 128, 233, 48, 128, 249, 9]
+  emitJcc with image, fixes, 135, "jv_nbad"
+  pin with labels, "jv_nl", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_nend"
+  emitList with image, [15, 182, 8, 128, 233, 48, 128, 249, 9]
+  emitJcc with image, fixes, 135, "jv_nend"
+  emitList with image, [72, 139, 85, 232, 72, 105, 210, 10, 0, 0, 0, 72, 1, 202, 72, 137, 85, 232, 72, 139, 69, 248, 72, 255, 0]
+  emitJmpTo with image, fixes, "jv_nl"
+  pin with labels, "jv_nend", image
+  emitList with image, [72, 139, 85, 232, 131, 125, 224, 0]
+  emitJcc with image, fixes, 132, "jv_npos"
+  emitList with image, [72, 247, 218]
+  pin with labels, "jv_npos", image
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "jv_nbad", image
+  emitJmpTo with image, fixes, "jv_bad"
+  pin with labels, "jv_null", image
+  emitLeaRdxLab with image, fixes, "txt_null"
+  emitList with image, [72, 139, 77, 248]
+  emitCallTo with image, fixes, "rt_json_kw"
+  emitCallTo with image, fixes, "rt_push_none"
+  emitEpi with image
+  pin with labels, "jv_true", image
+  emitLeaRdxLab with image, fixes, "txt_true"
+  emitList with image, [72, 139, 77, 248]
+  emitCallTo with image, fixes, "rt_json_kw"
+  emitList with image, [185]
+  emitU32 with image, 1
+  emitCallTo with image, fixes, "rt_push_bool"
+  emitEpi with image
+  pin with labels, "jv_false", image
+  emitLeaRdxLab with image, fixes, "txt_false"
+  emitList with image, [72, 139, 77, 248]
+  emitCallTo with image, fixes, "rt_json_kw"
+  emitList with image, [185]
+  emitU32 with image, 0
+  emitCallTo with image, fixes, "rt_push_bool"
+  emitEpi with image
+  pin with labels, "jv_str", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0]
+  emitCallTo with image, fixes, "rt_buf_new"
+  emitList with image, [72, 137, 69, 232]
+  pin with labels, "jv_sc", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 17, 128, 250, 34]
+  emitJcc with image, fixes, 132, "jv_se"
+  emitList with image, [128, 250, 92]
+  emitJcc with image, fixes, 132, "jv_sx"
+  emitList with image, [128, 250, 32]
+  emitJcc with image, fixes, 140, "jv_bad"
+  emitList with image, [72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 232, 72, 139, 69, 248, 72, 255, 0]
+  emitJmpTo with image, fixes, "jv_sc"
+  pin with labels, "jv_sx", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 17, 128, 250, 34]
+  emitJcc with image, fixes, 132, "jv_sxx"
+  emitList with image, [128, 250, 92]
+  emitJcc with image, fixes, 132, "jv_sxx"
+  emitList with image, [128, 250, 110]
+  emitJcc with image, fixes, 132, "jv_sn"
+  emitList with image, [128, 250, 114]
+  emitJcc with image, fixes, 132, "jv_sr"
+  emitList with image, [128, 250, 116]
+  emitJcc with image, fixes, 132, "jv_st"
+  emitJmpTo with image, fixes, "jv_bad"
+  pin with labels, "jv_sn", image
+  emitList with image, [186]
+  emitU32 with image, 10
+  emitJmpTo with image, fixes, "jv_sp"
+  pin with labels, "jv_sr", image
+  emitList with image, [186]
+  emitU32 with image, 13
+  emitJmpTo with image, fixes, "jv_sp"
+  pin with labels, "jv_st", image
+  emitList with image, [186]
+  emitU32 with image, 9
+  emitJmpTo with image, fixes, "jv_sp"
+  pin with labels, "jv_sxx", image
+  pin with labels, "jv_sp", image
+  emitList with image, [72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_buf_byte"
+  emitList with image, [72, 137, 69, 232, 72, 139, 69, 248, 72, 255, 0]
+  emitJmpTo with image, fixes, "jv_sc"
+  pin with labels, "jv_se", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0, 72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_buf_finish"
+  emitList with image, [72, 137, 194]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "jv_arr", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0]
+  emitCallTo with image, fixes, "rt_list_new"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 8, 128, 249, 93]
+  emitJcc with image, fixes, 132, "jv_ae"
+  pin with labels, "jv_ai", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 85, 240, 72, 255, 194]
+  emitCallTo with image, fixes, "rt_json_val"
+  emitCallTo with image, fixes, "rt_push"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 8, 128, 249, 44]
+  emitJcc with image, fixes, 133, "jv_ac"
+  emitList with image, [72, 255, 0]
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitJmpTo with image, fixes, "jv_ai"
+  pin with labels, "jv_ac", image
+  emitList with image, [128, 249, 93]
+  emitJcc with image, fixes, 133, "jv_bad"
+  pin with labels, "jv_ae", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0]
+  emitEpi with image
+  pin with labels, "jv_obj", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0]
+  emitCallTo with image, fixes, "rt_map_new"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 8, 128, 249, 125]
+  emitJcc with image, fixes, 132, "jv_oe"
+  pin with labels, "jv_oi", image
+  emitList with image, [15, 182, 8, 128, 249, 34]
+  emitJcc with image, fixes, 133, "jv_bad"
+  emitList with image, [72, 139, 77, 248, 72, 139, 85, 240, 72, 255, 194]
+  emitCallTo with image, fixes, "rt_json_val"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 8, 128, 249, 58]
+  emitJcc with image, fixes, 133, "jv_bad"
+  emitList with image, [72, 255, 0]
+  emitList with image, [72, 139, 77, 248, 72, 139, 85, 240, 72, 255, 194]
+  emitCallTo with image, fixes, "rt_json_val"
+  emitCallTo with image, fixes, "rt_map_put"
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 131, "jv_bad"
+  emitList with image, [15, 182, 8, 128, 249, 44]
+  emitJcc with image, fixes, 133, "jv_oc"
+  emitList with image, [72, 255, 0]
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitJmpTo with image, fixes, "jv_oi"
+  pin with labels, "jv_oc", image
+  emitList with image, [128, 249, 125]
+  emitJcc with image, fixes, 133, "jv_bad"
+  pin with labels, "jv_oe", image
+  emitList with image, [72, 139, 69, 248, 72, 255, 0]
+  emitEpi with image
+  pin with labels, "jv_bad", image
+  emitFail with image, fixes, "msg_json"
+  return image
+end
+
+define emitJsonKw with image, fixes, labels
+  pin with labels, "rt_json_kw", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 85, 240, 72, 3, 10, 72, 59, 64, 8]
+  emitJcc with image, fixes, 135, "kw_bad"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 85, 240, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_memeq"
+  emitList with image, [132, 192]
+  emitJcc with image, fixes, 132, "kw_bad"
+  emitList with image, [72, 139, 85, 240, 72, 139, 2, 72, 139, 69, 248, 72, 1, 16]
+  emitEpi with image
+  pin with labels, "kw_bad", image
+  emitFail with image, fixes, "msg_json"
+  return image
+end
+
+define emitJsonParse with image, fixes, labels
+  pin with labels, "rt_parse", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 2]
+  emitJcc with image, fixes, 133, "jp_bad"
+  emitList with image, [72, 137, 85, 240, 185]
+  emitU32 with image, 16
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 248, 72, 139, 85, 240, 72, 141, 74, 8, 72, 137, 8, 72, 139, 10, 72, 1, 200, 72, 137, 65, 8]
+  emitList with image, [72, 139, 77, 248, 186]
+  emitU32 with image, 0
+  emitCallTo with image, fixes, "rt_json_val"
+  emitList with image, [72, 139, 77, 248]
+  emitCallTo with image, fixes, "rt_json_skip"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 59, 64, 8]
+  emitJcc with image, fixes, 133, "jp_bad"
+  emitEpi with image
+  pin with labels, "jp_bad", image
+  emitFail with image, fixes, "msg_json"
+  return image
+end
+
+define emitNetClient with image, fixes, labels, has_route
+  pin with labels, "rt_net_client", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 240]
+  emitList with image, [185]
+  emitU32 with image, 128
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 248, 72, 139, 85, 240, 72, 137, 16]
+  emitList with image, [199, 69, 232, 136, 19, 0, 0]
+  emitList with image, [72, 139, 77, 240, 186, 255, 255, 0, 0, 65, 184]
+  emitU32 with image, 4102
+  emitList with image, [76, 141, 77, 232, 65, 185]
+  emitU32 with image, 4
+  emitIatCall with image, fixes, "p_setsockopt"
+  emitIatCall with image, fixes, "iat_gt"
+  emitList with image, [72, 139, 77, 248, 137, 65, 32]
+  emitList with image, [185]
+  emitU32 with image, 82048
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 8, 72, 199, 65, 16, 0, 0, 0, 0]
+  pin with labels, "cl_hdr", image
+  emitIatCall with image, fixes, "iat_gt"
+  emitList with image, [72, 139, 77, 248, 43, 65, 32, 61]
+  emitU32 with image, 5000
+  emitJcc with image, fixes, 135, "cl_408"
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 16, 72, 61]
+  emitU32 with image, 16384
+  emitJcc with image, fixes, 131, "cl_431"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 80, 8, 72, 3, 80, 16, 65, 184]
+  emitU32 with image, 16384
+  emitList with image, [76, 43, 64, 16, 69, 49, 201]
+  emitIatCall with image, fixes, "p_recv"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "cl_408"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_408"
+  emitList with image, [72, 139, 77, 248, 72, 1, 65, 16]
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 139, 80, 16]
+  emitCallTo with image, fixes, "rt_net_hdrend"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "cl_hdr"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 24]
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 139, 80, 24]
+  emitCallTo with image, fixes, "rt_net_hdrunsafe"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_400"
+  emitList with image, [72, 139, 77, 248, 72, 199, 65, 80, 0, 0, 0, 0]
+  pin with labels, "cl_rl", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 80, 72, 59, 65, 24]
+  emitJcc with image, fixes, 131, "cl_400"
+  emitList with image, [72, 139, 81, 8, 15, 182, 4, 2, 60, 13]
+  emitJcc with image, fixes, 132, "cl_rl_end"
+  emitList with image, [72, 255, 65, 80]
+  emitJmpTo with image, fixes, "cl_rl"
+  pin with labels, "cl_rl_end", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 80, 72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 199, 65, 88, 0, 0, 0, 0]
+  pin with labels, "cl_sp1", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 88, 72, 59, 65, 80]
+  emitJcc with image, fixes, 131, "cl_400"
+  emitList with image, [72, 139, 81, 8, 15, 182, 4, 2, 60, 32]
+  emitJcc with image, fixes, 132, "cl_gotm"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 255, 65, 88]
+  emitJmpTo with image, fixes, "cl_sp1"
+  pin with labels, "cl_gotm", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 88, 72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 139, 80, 88]
+  emitCallTo with image, fixes, "rt_net_mktext"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 40]
+  emitList with image, [72, 139, 65, 88, 72, 255, 192, 72, 137, 65, 96]
+  pin with labels, "cl_sp2", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 96, 72, 59, 65, 80]
+  emitJcc with image, fixes, 131, "cl_400"
+  emitList with image, [72, 139, 81, 8, 15, 182, 4, 2, 60, 32]
+  emitJcc with image, fixes, 132, "cl_gotp"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 255, 65, 96]
+  emitJmpTo with image, fixes, "cl_sp2"
+  pin with labels, "cl_gotp", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 85, 96, 72, 43, 85, 88, 72, 255, 202]
+  emitList with image, [72, 133, 210]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 88, 72, 255, 193]
+  emitCallTo with image, fixes, "rt_net_mktext"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 48]
+  emitList with image, [72, 137, 193]
+  emitCallTo with image, fixes, "rt_net_pathok"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 96, 72, 255, 193]
+  emitList with image, [72, 139, 69, 248, 72, 139, 80, 80, 72, 43, 80, 96, 72, 255, 202]
+  emitList with image, [72, 133, 210]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitCallTo with image, fixes, "rt_net_mktext"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 56]
+  emitList with image, [72, 139, 77, 40]
+  emitLeaRdxLab with image, fixes, "txt_GET"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_mok"
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 40]
+  emitLeaRdxLab with image, fixes, "txt_POST"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_mok"
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 40]
+  emitLeaRdxLab with image, fixes, "txt_HEAD"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_mok"
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 40]
+  emitLeaRdxLab with image, fixes, "txt_PUT"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_400"
+  pin with labels, "cl_mok", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 56]
+  emitLeaRdxLab with image, fixes, "txt_http11v"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_verok"
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 56]
+  emitLeaRdxLab with image, fixes, "txt_http10v"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_400"
+  pin with labels, "cl_verok", image
+  emitLeaRdxLab with image, fixes, "txt_empty"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 64]
+  emitList with image, [72, 199, 65, 72, 255, 255, 255, 255, 72, 199, 65, 104, 0, 0, 0, 0]
+  emitList with image, [72, 139, 65, 80, 72, 131, 192, 2, 72, 137, 65, 80, 72, 137, 65, 88]
+  pin with labels, "cl_hd", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 80, 72, 59, 65, 24]
+  emitJcc with image, fixes, 131, "cl_hddone"
+  emitList with image, [72, 139, 81, 8, 15, 182, 4, 2, 60, 13]
+  emitJcc with image, fixes, 132, "cl_hline"
+  emitList with image, [72, 255, 65, 80]
+  emitJmpTo with image, fixes, "cl_hd"
+  pin with labels, "cl_hline", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 80, 72, 43, 65, 88]
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_hddone"
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 88]
+  emitLeaRdxLab with image, fixes, "txt_clen"
+  emitCallTo with image, fixes, "rt_net_prefixci"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_notecl"
+  emitList with image, [72, 139, 77, 248, 72, 131, 121, 72, 255]
+  emitJcc with image, fixes, 133, "cl_400"
+  emitJmpTo with image, fixes, "cl_readcl"
+  pin with labels, "cl_notecl", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 88]
+  emitLeaRdxLab with image, fixes, "txt_te"
+  emitCallTo with image, fixes, "rt_net_prefixci"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 133, "cl_501"
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 88]
+  emitLeaRdxLab with image, fixes, "txt_host"
+  emitCallTo with image, fixes, "rt_net_prefixci"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_hdnext"
+  emitList with image, [72, 139, 77, 248, 72, 199, 65, 104, 1, 0, 0, 0]
+  pin with labels, "cl_hdnext", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 80, 72, 131, 192, 2, 72, 137, 65, 88, 72, 137, 65, 80]
+  emitJmpTo with image, fixes, "cl_hd"
+  pin with labels, "cl_readcl", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 88]
+  emitList with image, [72, 139, 69, 248, 72, 139, 80, 80, 72, 43, 80, 88]
+  emitCallTo with image, fixes, "rt_net_clval"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "cl_400"
+  emitList with image, [72, 61]
+  emitU32 with image, 65536
+  emitJcc with image, fixes, 135, "cl_413"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 72]
+  emitJmpTo with image, fixes, "cl_hdnext"
+  pin with labels, "cl_hddone", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 77, 56]
+  emitLeaRdxLab with image, fixes, "txt_http11v"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_body"
+  emitList with image, [72, 139, 77, 248, 72, 131, 121, 104, 0]
+  emitJcc with image, fixes, 132, "cl_400"
+  pin with labels, "cl_body", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 72, 72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "cl_nobody"
+  emitList with image, [72, 139, 77, 248, 72, 139, 65, 24, 72, 131, 192, 4, 72, 3, 65, 72]
+  emitList with image, [72, 139, 77, 248, 72, 59, 65, 16]
+  emitJcc with image, fixes, 134, "cl_gotbody"
+  pin with labels, "cl_more", image
+  emitIatCall with image, fixes, "iat_gt"
+  emitList with image, [72, 139, 77, 248, 43, 65, 32, 61]
+  emitU32 with image, 10000
+  emitJcc with image, fixes, 135, "cl_408"
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 72, 139, 80, 8, 72, 3, 80, 16]
+  emitList with image, [72, 139, 64, 24, 72, 131, 192, 4, 72, 3, 64, 72, 72, 43, 64, 16, 73, 137, 192, 69, 49, 201]
+  emitIatCall with image, fixes, "p_recv"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "cl_408"
+  emitList with image, [72, 133, 192]
+  emitJcc with image, fixes, 132, "cl_408"
+  emitList with image, [72, 139, 77, 248, 72, 1, 65, 16]
+  emitList with image, [72, 139, 65, 24, 72, 131, 192, 4, 72, 3, 65, 72, 72, 59, 65, 16]
+  emitJcc with image, fixes, 135, "cl_more"
+  pin with labels, "cl_gotbody", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 72, 8, 72, 3, 72, 24, 72, 131, 193, 4, 72, 139, 80, 72]
+  emitCallTo with image, fixes, "rt_net_mktext"
+  emitList with image, [72, 139, 77, 248, 72, 137, 65, 64]
+  pin with labels, "cl_nobody", image
+  if has_route
+    emitCallTo with image, fixes, "rt_save_frame"
+    emitList with image, [72, 139, 77, 248, 72, 139, 81, 40]
+    emitPushTag with image, 2
+    emitList with image, [72, 139, 77, 248, 72, 139, 81, 48]
+    emitPushTag with image, 2
+    emitList with image, [72, 139, 77, 248, 72, 139, 81, 64]
+    emitPushTag with image, 2
+    emitCallTo with image, fixes, "fn_route"
+    emitCallTo with image, fixes, "rt_restore_frame"
+    emitPop1 with image
+    emitList with image, [72, 131, 248, 2]
+    emitJcc with image, fixes, 132, "cl_bodytxt"
+    emitCallTo with image, fixes, "rt_to_text"
+    pin with labels, "cl_bodytxt", image
+    emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+    emitU32 with image, 200
+    emitCallTo with image, fixes, "rt_net_sendhttp"
+    emitEpi with image
+  end
+  if not has_route
+    emitLeaRdxLab with image, fixes, "txt_err404"
+    emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+    emitU32 with image, 404
+    emitCallTo with image, fixes, "rt_net_sendhttp"
+    emitEpi with image
+  end
+  pin with labels, "cl_400", image
+  emitLeaRdxLab with image, fixes, "txt_err400"
+  emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+  emitU32 with image, 400
+  emitCallTo with image, fixes, "rt_net_sendhttp"
+  emitEpi with image
+  pin with labels, "cl_408", image
+  emitLeaRdxLab with image, fixes, "txt_err408"
+  emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+  emitU32 with image, 408
+  emitCallTo with image, fixes, "rt_net_sendhttp"
+  emitEpi with image
+  pin with labels, "cl_413", image
+  emitLeaRdxLab with image, fixes, "txt_err413"
+  emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+  emitU32 with image, 413
+  emitCallTo with image, fixes, "rt_net_sendhttp"
+  emitEpi with image
+  pin with labels, "cl_431", image
+  emitLeaRdxLab with image, fixes, "txt_err431"
+  emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+  emitU32 with image, 431
+  emitCallTo with image, fixes, "rt_net_sendhttp"
+  emitEpi with image
+  pin with labels, "cl_501", image
+  emitLeaRdxLab with image, fixes, "txt_err501"
+  emitList with image, [76, 137, 194, 72, 139, 77, 248, 72, 139, 9, 186]
+  emitU32 with image, 501
+  emitCallTo with image, fixes, "rt_net_sendhttp"
+  emitEpi with image
+  return image
+end
+
+define emitNetPrefixCi with image, fixes, labels
+  pin with labels, "rt_net_prefixci", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
+  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "px_loop", image
+  emitList with image, [72, 139, 69, 232, 72, 139, 85, 240, 72, 59, 2]
+  emitJcc with image, fixes, 131, "px_colon"
+  emitList with image, [72, 139, 77, 248, 15, 182, 20, 1]
+  emitList with image, [72, 139, 77, 240, 15, 182, 76, 1, 8]
+  emitList with image, [128, 250, 65]
+  emitJcc with image, fixes, 140, "px_d"
+  emitList with image, [128, 250, 90]
+  emitJcc with image, fixes, 143, "px_d"
+  emitList with image, [128, 194, 32]
+  pin with labels, "px_d", image
+  emitList with image, [128, 249, 65]
+  emitJcc with image, fixes, 140, "px_c"
+  emitList with image, [128, 249, 90]
+  emitJcc with image, fixes, 143, "px_c"
+  emitList with image, [128, 193, 32]
+  pin with labels, "px_c", image
+  emitList with image, [56, 202]
+  emitJcc with image, fixes, 133, "px_no"
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "px_loop"
+  pin with labels, "px_colon", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 69, 232, 128, 60, 1, 58]
+  emitJcc with image, fixes, 133, "px_no"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  pin with labels, "px_no", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitNetClVal with image, fixes, labels
+  pin with labels, "rt_net_clval", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "cv_colon", image
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 240]
+  emitJcc with image, fixes, 131, "cv_bad"
+  emitList with image, [72, 139, 77, 248, 15, 182, 4, 1, 60, 58]
+  emitJcc with image, fixes, 132, "cv_after"
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "cv_colon"
+  pin with labels, "cv_after", image
+  emitList with image, [72, 255, 69, 232]
+  pin with labels, "cv_sp", image
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 240]
+  emitJcc with image, fixes, 131, "cv_bad"
+  emitList with image, [72, 139, 77, 248, 15, 182, 4, 1, 60, 32]
+  emitJcc with image, fixes, 132, "cv_sk"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "cv_sk"
+  emitJmpTo with image, fixes, "cv_num"
+  pin with labels, "cv_sk", image
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "cv_sp"
+  pin with labels, "cv_num", image
+  emitList with image, [72, 199, 69, 224, 0, 0, 0, 0, 72, 199, 69, 216, 0, 0, 0, 0]
+  pin with labels, "cv_d", image
+  emitList with image, [72, 139, 69, 232, 72, 59, 69, 240]
+  emitJcc with image, fixes, 131, "cv_end"
+  emitList with image, [72, 139, 77, 248, 15, 182, 4, 1, 44, 48, 60, 10]
+  emitJcc with image, fixes, 131, "cv_bad"
+  emitList with image, [72, 139, 85, 224, 72, 105, 210, 10, 0, 0, 0, 72, 1, 194, 72, 137, 85, 224, 72, 255, 69, 216, 72, 255, 69, 232]
+  emitJmpTo with image, fixes, "cv_d"
+  pin with labels, "cv_end", image
+  emitList with image, [72, 139, 69, 216, 72, 133, 192]
+  emitJcc with image, fixes, 132, "cv_bad"
+  emitList with image, [72, 139, 69, 224]
+  emitEpi with image
+  pin with labels, "cv_bad", image
+  emitList with image, [72, 199, 192, 255, 255, 255, 255]
+  emitEpi with image
+  return image
+end
+
+define emitNetListenCore with image, fixes, labels, has_route
+  pin with labels, "rt_listen", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1]
+  emitJcc with image, fixes, 133, "listen_bad_port"
+  emitList with image, [72, 137, 85, 248]
+  if not has_route
+    emitFail with image, fixes, "msg_need_route"
+  end
+  emitList with image, [72, 133, 210]
+  emitJcc with image, fixes, 132, "listen_port_ok"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 1024
+  emitJcc with image, fixes, 140, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 65535
+  emitJcc with image, fixes, 143, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 7099
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 8778
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 7071
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 7072
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 7093
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 17841
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 17843
+  emitJcc with image, fixes, 132, "listen_bad_port"
+  pin with labels, "listen_port_ok", image
+  emitCallTo with image, fixes, "rt_net_init"
+  emitList with image, [185]
+  emitU32 with image, 2
+  emitList with image, [186]
+  emitU32 with image, 1
+  emitList with image, [65, 184]
+  emitU32 with image, 6
+  emitIatCall with image, fixes, "p_socket"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "listen_fail"
+  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 199, 69, 208, 0, 0, 0, 0, 72, 199, 69, 216, 0, 0, 0, 0]
+  emitList with image, [198, 69, 208, 2]
+  emitList with image, [139, 69, 248, 102, 134, 224, 102, 137, 69, 210]
+  emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
+  emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
+  emitU32 with image, 16
+  emitIatCall with image, fixes, "p_bind"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 133, "listen_fail"
+  emitList with image, [72, 139, 77, 240, 186]
+  emitU32 with image, 8
+  emitIatCall with image, fixes, "p_listen"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 133, "listen_fail"
+  emitList with image, [72, 199, 69, 200, 16, 0, 0, 0]
+  emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 76, 141, 69, 200]
+  emitIatCall with image, fixes, "p_getsockname"
+  emitList with image, [15, 183, 69, 210, 102, 134, 224, 137, 69, 248]
+  emitList with image, [72, 139, 85, 248]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 137, 69, 192]
+  emitLeaRcxLab with image, fixes, "txt_listen"
+  emitList with image, [72, 139, 85, 192]
+  emitCallTo with image, fixes, "rt_text_cat"
+  emitList with image, [72, 137, 194]
+  emitPushTag with image, 2
+  emitCallTo with image, fixes, "rt_say"
+  pin with labels, "listen_loop", image
+  emitList with image, [72, 139, 77, 240, 49, 210, 69, 49, 192]
+  emitIatCall with image, fixes, "p_accept"
+  emitList with image, [72, 131, 248, 255]
+  emitJcc with image, fixes, 132, "listen_loop"
+  emitList with image, [72, 137, 69, 184, 72, 137, 193]
+  emitCallTo with image, fixes, "rt_net_client"
+  emitList with image, [72, 139, 77, 184]
+  emitIatCall with image, fixes, "p_closesocket"
+  emitJmpTo with image, fixes, "listen_loop"
+  pin with labels, "listen_bad_port", image
+  emitFail with image, fixes, "msg_port"
+  pin with labels, "listen_fail", image
+  emitFail with image, fixes, "msg_net"
+  return image
+end
+
+define parkNet with image, labels
+  parkMsg with image, labels, "str_ws2", "ws2_32.dll"
+  parkMsg with image, labels, "str_WSAStartup", "WSAStartup"
+  parkMsg with image, labels, "str_socket", "socket"
+  parkMsg with image, labels, "str_bind", "bind"
+  parkMsg with image, labels, "str_listen", "listen"
+  parkMsg with image, labels, "str_accept", "accept"
+  parkMsg with image, labels, "str_recv", "recv"
+  parkMsg with image, labels, "str_send", "send"
+  parkMsg with image, labels, "str_closesocket", "closesocket"
+  parkMsg with image, labels, "str_setsockopt", "setsockopt"
+  parkMsg with image, labels, "str_getsockname", "getsockname"
+  parkMsg with image, labels, "txt_listen", "listening on 127.0.0.1:"
+  parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
+  parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
+  parkMsg with image, labels, "txt_sp_err", " Error\r\n"
+  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json; charset=utf-8\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
+  parkMsg with image, labels, "txt_GET", "GET"
+  parkMsg with image, labels, "txt_POST", "POST"
+  parkMsg with image, labels, "txt_HEAD", "HEAD"
+  parkMsg with image, labels, "txt_PUT", "PUT"
+  parkMsg with image, labels, "txt_http11v", "HTTP/1.1"
+  parkMsg with image, labels, "txt_http10v", "HTTP/1.0"
+  parkMsg with image, labels, "txt_empty", ""
+  parkMsg with image, labels, "txt_clen", "content-length"
+  parkMsg with image, labels, "txt_te", "transfer-encoding"
+  parkMsg with image, labels, "txt_host", "host"
+  parkMsg with image, labels, "txt_null", "null"
+  parkMsg with image, labels, "txt_true", "true"
+  parkMsg with image, labels, "txt_false", "false"
+  parkMsg with image, labels, "txt_err400", "{\"error\":\"bad request\"}"
+  parkMsg with image, labels, "txt_err404", "{\"error\":\"not found\"}"
+  parkMsg with image, labels, "txt_err408", "{\"error\":\"timeout\"}"
+  parkMsg with image, labels, "txt_err413", "{\"error\":\"body too large\"}"
+  parkMsg with image, labels, "txt_err431", "{\"error\":\"headers too large\"}"
+  parkMsg with image, labels, "txt_err501", "{\"error\":\"not implemented\"}"
+  parkMsg with image, labels, "msg_net", "network setup failed"
+  parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
+  parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
+  parkMsg with image, labels, "msg_json", "json is not valid"
+  pin with labels, "ws2_mod", image
+  emitU64 with image, 0
+  pin with labels, "p_WSAStartup", image
+  emitU64 with image, 0
+  pin with labels, "p_socket", image
+  emitU64 with image, 0
+  pin with labels, "p_bind", image
+  emitU64 with image, 0
+  pin with labels, "p_listen", image
+  emitU64 with image, 0
+  pin with labels, "p_accept", image
+  emitU64 with image, 0
+  pin with labels, "p_recv", image
+  emitU64 with image, 0
+  pin with labels, "p_send", image
+  emitU64 with image, 0
+  pin with labels, "p_closesocket", image
+  emitU64 with image, 0
+  pin with labels, "p_setsockopt", image
+  emitU64 with image, 0
+  pin with labels, "p_getsockname", image
+  emitU64 with image, 0
+  return image
+end
+
+define emitNetRuntime with image, fixes, labels, has_route
+  emitNetInit with image, fixes, labels
+  emitNetMkText with image, fixes, labels
+  emitNetSendAll with image, fixes, labels
+  emitNetSendHttp with image, fixes, labels
+  emitNetHdrEnd with image, fixes, labels
+  emitNetHdrUnsafe with image, fixes, labels
+  emitNetPathOk with image, fixes, labels
+  emitNetPrefixCi with image, fixes, labels
+  emitNetClVal with image, fixes, labels
+  emitJsonSkip with image, fixes, labels
+  emitJsonKw with image, fixes, labels
+  emitJsonEnc with image, fixes, labels
+  emitJson with image, fixes, labels
+  emitJsonVal with image, fixes, labels
+  emitJsonParse with image, fixes, labels
+  emitNetClient with image, fixes, labels, has_route
+  emitNetListenCore with image, fixes, labels, has_route
+  return image
+end

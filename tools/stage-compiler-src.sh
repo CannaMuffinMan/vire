@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/data/src"
 cp "$ROOT/compile-native.vire" "$ROOT/data/compile-native.vire"
-cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/data/src/"
+cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/src/rt-net.vire" "$ROOT/data/src/"
 python3 - <<PY
 import hashlib, os
 root = "$ROOT"
@@ -13,6 +13,7 @@ pairs = [
     ("src/pe.vire", "data/src/pe.vire"),
     ("src/rt.vire", "data/src/rt.vire"),
     ("src/rt-more.vire", "data/src/rt-more.vire"),
+    ("src/rt-net.vire", "data/src/rt-net.vire"),
 ]
 for a, b in pairs:
     ha = hashlib.sha256(open(os.path.join(root, a), "rb").read()).hexdigest()

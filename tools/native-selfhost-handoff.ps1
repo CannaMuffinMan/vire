@@ -86,13 +86,15 @@ Copy-Item (Join-Path $Root "src/asm.vire") (Join-Path $Src "asm.vire") -Force
 Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
 Copy-Item (Join-Path $Root "guest-hello.vire") (Join-Path $Data "guest-hello.vire") -Force
 $pairs = @(
     @("compile-native.vire", "data/compile-native.vire"),
     @("src/asm.vire", "data/src/asm.vire"),
     @("src/pe.vire", "data/src/pe.vire"),
     @("src/rt.vire", "data/src/rt.vire"),
-    @("src/rt-more.vire", "data/src/rt-more.vire")
+    @("src/rt-more.vire", "data/src/rt-more.vire"),
+    @("src/rt-net.vire", "data/src/rt-net.vire")
 )
 foreach ($pair in $pairs) {
     $ha = (Get-FileHash -Algorithm SHA256 (Join-Path $Root $pair[0])).Hash

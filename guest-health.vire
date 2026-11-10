@@ -1,0 +1,12 @@
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return json with {"ok": true}
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

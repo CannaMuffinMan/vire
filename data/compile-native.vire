@@ -1,6 +1,7 @@
 ~ Compile let, if, calls, and read into a native Windows executable.
 
 use "src/pe.vire"
+use "src/rt-net.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -1182,7 +1183,7 @@ define builtinArity with nm
   if nm == "args"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "json" or nm == "parse" or nm == "listen"
     return 1
   end
   if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
@@ -1653,10 +1654,17 @@ define main
   let opened be openImage
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
+  let hasRoute be false
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
+    if ((funcs at i) at "name") == "route"
+      if ((funcs at i) at "nparams") == 3
+        let hasRoute be true
+      end
+    end
     let i be i + 1
   end
+  put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute) into gen at "image"
   if gen at "bad"
     say gen at "why"
     say "compile failed"
@@ -1664,6 +1672,7 @@ define main
   end
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
+  put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")
