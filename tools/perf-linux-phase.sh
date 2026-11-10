@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Linux cloud phase walls for L3. Does not raise VIRE_BUDGET. External timer.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -42,7 +41,6 @@ run hexof dotnet exec "$DLL" probe-hexof.vire
 run hexbuiltin dotnet exec "$DLL" probe-hex-builtin.vire
 run emitu8 dotnet exec "$DLL" probe-emitu8.vire
 run emitlist dotnet exec "$DLL" probe-emitlist.vire
-# probe-build-exe.vire needs labels.frame_base after full emitRuntime; fails on this SHA (L2 rt).
 run buildexe dotnet exec "$DLL" probe-build-exe.vire || true
 mkdir -p data/src
 cp -f guest-hello.vire data/guest-hello.vire

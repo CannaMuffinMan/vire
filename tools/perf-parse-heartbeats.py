@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Parse vire still-running heartbeats from a CI or local log.
-
-GitHub Actions stamps redirected stdout at process end, so log timestamps
-are not wall time. Heartbeats themselves fire every 2s of TickCount64.
-This script treats consecutive still-running lines as 2s bins.
-
-Usage:
-  python3 tools/perf-parse-heartbeats.py /tmp/ci-logs/7c7c8ea-native-selfhost.log
-"""
 from __future__ import annotations
 
 import re
@@ -46,8 +37,6 @@ def main(path: str) -> int:
                 sha = m.group(1)
 
     gen1_beats = steps
-    # hello compile emits a few beats then gen1 many. Split at the first total_steps
-    # by using all beats after the first total if two groups exist.
     print("file", path)
     print("host_lines", len(host))
     for h in host[:12]:
@@ -58,7 +47,6 @@ def main(path: str) -> int:
     print("heartbeat_count", len(gen1_beats))
     if not gen1_beats:
         return 1
-    # If hello+gen1 concatenated, keep the longest increasing run (gen1).
     runs = []
     cur = [gen1_beats[0]]
     for s in gen1_beats[1:]:

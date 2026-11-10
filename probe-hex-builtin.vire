@@ -1,5 +1,3 @@
-~ Builtin hex of 18944 in-range bytes. Same size as probe-hexof.vire.
-
 define main
   let buf be []
   let i be 0

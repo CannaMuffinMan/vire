@@ -1,5 +1,3 @@
-# Exact local GrokBuild handoff. Parent posts this. Do not run from a cloud Linux agent.
-# Isolated checkout of 3d9fc58c80629f1fd6ac11b3576831f5c869087d. Caps unchanged.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
