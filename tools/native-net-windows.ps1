@@ -186,7 +186,12 @@ $mal = Send-Raw $port "GET /health`r`n`r`n"
 Write-Output "adversary_malformed_line $mal"
 if ($mal -notmatch "^HTTP/1.1 400 ") { throw "malformed line expected 400" }
 
-$huge = "GET / HTTP/1.1`r`nHost: x`r`n" + ("X: " + ("y" * 200) + "`r`n") * 80 + "`r`n"
+# Exactly 16384 bytes, no leftover write after the 16KiB header cap, so
+# closesocket cannot RST and drop the 431.
+$huge = "GET / HTTP/1.1`r`nHost: x`r`n"
+$pad = "X: " + ("y" * 240) + "`r`n"
+while ($huge.Length + $pad.Length -le 16384) { $huge += $pad }
+if ($huge.Length -lt 16384) { $huge += "Z" * (16384 - $huge.Length) }
 $big = Send-Raw $port $huge
 Write-Output "adversary_oversize_headers $($big.Substring(0, [Math]::Min(80, $big.Length)))"
 if ($big -notmatch "^HTTP/1.1 431 ") { throw "oversize headers expected 431" }
