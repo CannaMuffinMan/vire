@@ -52,3 +52,7 @@ Time each `dotnet exec` with an external timer. Compare hello `.hex` SHA to `c82
 ## Remaining
 
 `openImage` / runtime emit, `buildExe` byte copy, leftover `emitU8` call sites, lexer on huge guests. Host bulk-append builtin is still later. Native PE run and gen1/gen2 fixed-point unproven. Native sandbox parent-symlink and frame overlap stay merge blockers on other PRs.
+
+## Host `VireDebug.Break` skip unless `VIRE_DEBUGGER=1`
+
+Each user-function `Call` used to run `VireDebug.Break`, which created `data/`, walked reparse points, and called `File.Exists` on `data/break.txt`. CI job `129755174034` on SHA `2304852` charged `total_steps=164117` with `break_probes=1619992` and `phase_gen1host_sec 304.117`. After the skip, job `129759130623` on SHA `b1de7a3` kept the same step count and printed `break_probes=0` with `phase_gen1host_sec 8.426`. Caps and Defender are unchanged. Named-function stops still run when `VIRE_DEBUGGER=1`.
