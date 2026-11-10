@@ -3,7 +3,7 @@
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
 Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
 PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft).
-No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Host TOCTOU, Linux Ordinal zones, trailing dots, F8 wrap, F13 offset-240, ARM hardlink filter, and this audit/ledger pass-after still need the follow-up head. Caps/sandbox/Defender unchanged. Draft only.
+No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Follow-up `607624e` job `42810881895` Linux `test` + ARM + `native-windows` `129811692427` (`host_toctou_fixed`, `native_trailing_dot refused`, F4/F5/F6/walk) passed; `selfhost` emu-check failed until unicorn/`fetch-depth` on this head. Caps/sandbox/Defender unchanged. Draft only.
 
 ## Implemented vs verified
 

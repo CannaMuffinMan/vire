@@ -55,8 +55,8 @@ Host check-then-open: `RefuseReparse` then `File.*` by path lost a `renameat2` s
 
 ## Verification
 
-- Windows `native-windows` job `129796755075` (`5b39c9a`): F4/F5/F6/walk recipe ok. `native-selfhost-windows` job `129796754998`: gen1=gen2 `7fad880322a59feaa9542f51557939bdd5eb7b65070ea8f1c37e50f6509be9cb`.
-- `tools/native-sec-emu-check.sh` is on the Linux `selfhost` job: wrap `[0, 0, 1]`, trailing-dot refuse, walk-open-race fail-before `7c7c8ea` / pass-after HEAD.
+- Windows `native-windows` job `129796755075` (`5b39c9a`) and `129811692427` (`607624e`): F4/F5/F6/walk recipe ok; host TOCTOU + trailing-dot on the same job. `native-selfhost-windows` job `129796754998`: gen1=gen2 `7fad880322a59feaa9542f51557939bdd5eb7b65070ea8f1c37e50f6509be9cb`.
+- `tools/native-sec-emu-check.sh` is on the Linux `selfhost` job (pip unicorn + `fetch-depth: 0`): wrap `[0, 0, 1]`, trailing-dot refuse, walk-open-race fail-before `7c7c8ea` / pass-after HEAD.
 - Caps 32MB / list 100000 / 5M, sandbox, and Defender are unchanged. PR 42 stays draft.
 
 ## Gates

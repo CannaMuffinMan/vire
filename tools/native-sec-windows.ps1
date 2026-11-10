@@ -123,6 +123,17 @@ Set-Content -Path (Join-Path $hostDir "outside\note.txt") -Value "OUTSIDE-KEEP" 
 Set-Content -Path (Join-Path $hostDir "append.vire") -Value "define main`n  append with `"data/note.txt`", `"PWN`"`nend`n"
 $dataHost = Join-Path $hostDir "data"
 $outHost = Join-Path $hostDir "outside"
+$checkedPath = [IO.Path]::GetFullPath((Join-Path $dataHost "note.txt"))
+Rename-Item -LiteralPath $dataHost -NewName "data.real"
+cmd /c mklink /J "$dataHost" "$outHost" | Out-Null
+[IO.File]::AppendAllText($checkedPath, "PWN-BEFORE")
+$beforeTxt = [IO.File]::ReadAllText($checkedPath)
+Write-Host ("host_toctou_fail_before outside=" + $beforeTxt)
+if (-not $beforeTxt.Contains("PWN-BEFORE")) { throw "host TOCTOU fail-before: File.AppendAllText after junction did not follow the swap" }
+cmd /c rmdir "$dataHost" | Out-Null
+Rename-Item -LiteralPath (Join-Path $hostDir "data.real") -NewName "data"
+Set-Content -Path (Join-Path $hostDir "data\note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
+Set-Content -Path (Join-Path $hostDir "outside\note.txt") -Value "OUTSIDE-KEEP" -NoNewline
 Rename-Item -LiteralPath $dataHost -NewName "data.real"
 cmd /c mklink /J "$dataHost" "$outHost" | Out-Null
 $code = Invoke-Vire -TimeoutSec 30 (Join-Path $hostDir "append.vire")
@@ -374,6 +385,21 @@ if (-not (Test-Path -LiteralPath (Join-Path $VulnTree "compile-native.vire"))) {
     throw "VulnTree is not a directory with compile-native.vire: $VulnTree"
 }
 Write-Host "f456_vuln_tree $VulnTree"
+
+# Trailing-dot fail-before: 7c7c8ea PE writes payload.bat because Windows strips the dot.
+New-Item -ItemType Directory -Force -Path (Join-Path $VulnTree "data") | Out-Null
+Copy-Item -LiteralPath (Join-Path $Work "dotbat.vire") -Destination (Join-Path $VulnTree "data/dotbat.vire") -Force
+Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/dotbat.vire", "data/dotbat-vuln.hex")
+Convert-HexFileToExe (Join-Path $VulnTree "data/dotbat-vuln.hex") (Join-Path $Work "dotbat-vuln.exe")
+$dotBeforeDir = Join-Path $Work "dotbat-vuln-run"
+New-Item -ItemType Directory -Force -Path (Join-Path $dotBeforeDir "data") | Out-Null
+$dotVuln = Invoke-NativeExe -ExePath (Join-Path $Work "dotbat-vuln.exe") -WorkingDirectory $dotBeforeDir
+if (-not $dotVuln.Blocked) {
+    $createdBat = Test-Path (Join-Path $dotBeforeDir "data\payload.bat")
+    $createdDot = Test-Path (Join-Path $dotBeforeDir "data\payload.bat.")
+    Write-Host ("native_trailing_dot_fail_before bat=" + $createdBat + " dotted=" + $createdDot + " code=" + $dotVuln.Code)
+    if (-not $createdBat -and -not $createdDot) { throw "trailing-dot fail-before: 7c7c8ea PE did not create payload.bat" }
+}
 
 # 4. F4: intern section named; RW mutation vs RX AV. Same cell via let p.
 New-Item -ItemType Directory -Force -Path (Join-Path $Work "data\f4") | Out-Null

@@ -177,6 +177,9 @@ public class CopilotFindingsTests
         Assert.Contains("HardLinkCannotRewriteDepsLock", yml);
         Assert.Contains("HostCheckThenOpenToctouFailBeforePassAfter", yml);
         Assert.Contains("native-sec-emu-check.sh", yml);
+        Assert.Contains("fetch-depth: 0", yml);
+        string emu = File.ReadAllText(Path.Combine(root, "tools", "native-sec-emu-check.sh"));
+        Assert.Contains("pip install --user -q unicorn", emu);
         string plantedRoot = Path.Combine(root, "data", "arena-plant-" + Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(Path.Combine(plantedRoot, "src"));
         Directory.CreateDirectory(Path.Combine(plantedRoot, "tools"));
