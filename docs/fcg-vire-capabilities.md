@@ -8,19 +8,20 @@ Facts from this checkout at `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867` unless a 
 | --- | --- | --- | --- |
 | C# host | Parses VIR, runs builtins, `listen` | `Vire.cs`, `VireListen.cs`, `VireNet.cs` | No. Host is .NET. |
 | Native gen1==gen2 | Windows x64 PE self-compile claimed on this branch | `compile-native.vire`, `src/rt.vire`, `src/rt-more.vire`, `src/pe.vire`, `NATIVE-COMPILER.md` | Yes for compute and files. No for FCG HTTP until sockets exist in the PE. |
-| Native HTTP | Draft PR 47 | PR head `b650932307ffce7efe887c6cac67098e7f406822`, files include `src/rt-net.vire`, `guest-health.vire`, `tests/Vire.Tests/NativeNetTests.cs` | Not proven. Not on `native-compiler`. |
+| Native HTTP | Draft PR 47 | This run measured PR head `42ef1a5ce1be815d1b91f097f837885cceeba4ad`. Earlier notes also named `b650932307ffce7efe887c6cac67098e7f406822` and `f65740d200663dc99f503995e12b035781182b39`. Files on that branch include `src/rt-net.vire`, `guest-health.vire`, `tests/Vire.Tests/NativeNetTests.cs`. Those files are absent from this checkout. | Not proven. Not on `native-compiler`. |
 
 ## Builtin map
 
 | Need | Interpreter today | Native PE today | Notes |
 | --- | --- | --- | --- |
-| HTTP listen | Yes. `listen` in `Vire.cs` line 719, body in `VireListen.cs`. Loopback default. `VIRE_BIND=public` needs `FCG_API_TOKEN` length at least 16. | No on this branch. `systems/net.vire` is an in-memory map with no sockets. | C# `TcpListener` is not a VIR PE. |
-| HTTP/1.1 parse | Yes. Tests in `tests/Vire.Tests/ListenTests.cs` and `ListenSecurityTests.cs`. `GET /health` returns 200 without token. | PR 47 only. | Chunked encoding refused in the C# host. |
-| TLS | No. `SECURITY.md` says there is no TLS server. | No. | Product FCG also uses `http.createServer` only. TLS is at the edge. |
-| JSON | Yes. `json` and `parse` in `Vire.cs`. Kit `deps/jsonkit/lib.vire`. | Partial. Compiler uses `json` in `compiler.vire`. Guest JSON over HTTP is PR 47. | 1 MB parse cap in the interpreter. |
+| HTTP listen | Yes. `listen` in `Vire.cs` line 719, body in `VireListen.cs`. Loopback default. `VIRE_BIND=public` needs `FCG_API_TOKEN` length at least 16. `GET /health` skips `X-FCG-Token`. | No on this branch. `src/pe.vire` `openImage` imports `kernel32.dll` only. `systems/net.vire` is an in-memory map with no sockets. `builtinArity` in `compile-native.vire` has no `listen`. | C# `TcpListener` is not a VIR PE. |
+| HTTP/1.1 parse | Yes. Tests in `tests/Vire.Tests/ListenTests.cs` and `ListenSecurityTests.cs`. `GET /health` returns 200 without token. Host `api/fcgcpa.vire` returns `{"ok":true,"service":"fcgcpa","payments":false}` for `/health`. | PR 47 only. `guest-health.vire` on that branch was described as `{"ok": true}` on port 18080. Re-read the PR head before coding. | Chunked encoding refused in the C# host. Native-net CI was not a finished curl proof when first mapped. |
+| TLS | No. `SECURITY.md` says there is no TLS server. Host `fetch`/`post` use .NET TLS in `VireNet.cs`. | No. | Product FCG also uses `http.createServer` only. TLS is at the edge. |
+| JSON | Yes. `json` and `parse` in `Vire.cs`. Kit `deps/jsonkit/lib.vire` calls those host builtins. 1 MB parse cap. | No on this branch. `builtinArity` at `compile-native.vire` lines 1222 through 1235 lists `hash` and files, not `json` or `parse`. `compiler.vire` `json` runs on the host compiler, not in a guest PE. PR 47 claims guest `json`/`parse`. Unproven here. | A native health clone that returns JSON needs PR 47 or a new emitter. |
 | File IO | Yes. `read`, `write`, `append`, `copy`, `erase`, `files`, `folders` sandboxed to `data` and `site`. | Yes. `emitMore` file ops in `src/rt-more.vire`. | Product Prisma is not files. |
-| SHA-256 | Yes. `hash` calls `VireSeal.HashText`. | Yes. `emitSha` in `src/rt-more.vire`. | Not HMAC-SHA256. Not bcrypt. |
+| SHA-256 | Yes. `hash` calls `VireSeal.HashText`. | Yes. `emitSha` in `src/rt-more.vire`. First IV word `0x6a09e667`. Guest result is 64 hex characters. | Not HMAC-SHA256. Not bcrypt. Native guest numbers are whole numbers. A decimal point is `that number is not ready`. |
 | HMAC / JWT | No symbol in this tree. | No. | Product uses `jsonwebtoken` and cookie `authToken`. |
+| AES-GCM `seal` | Yes. `VireSeal.cs` AES-256-GCM. | No. Not in `builtinArity`. | Not TLS. |
 | Postgres wire | No. | No. | |
 | Redis RESP | No. | No. | Product `ioredis`. |
 | WebSocket | No. | No. | |

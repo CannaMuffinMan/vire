@@ -57,7 +57,7 @@ Unit files for these cases live under `api/` tests and are not re-listed here be
 | --- | --- | --- |
 | Interpreter HTTP | Yes | `VireListen.cs` |
 | Native HTTP | No on this branch | PR 47 `src/rt-net.vire` |
-| JSON | Interpreter yes, native guest HTTP JSON unproven | `Vire.cs`, `deps/jsonkit/lib.vire` |
+| JSON | Interpreter yes. Native guest `json`/`parse` absent from `builtinArity` on this branch. | `Vire.cs`, `deps/jsonkit/lib.vire`, `compile-native.vire` |
 | Postgres | No | |
 | Redis | No | |
 | JWT HMAC | No | |

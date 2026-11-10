@@ -10,7 +10,7 @@ This map does not authorize implementation. Native listen, TLS, HTTP, JSON, file
 
 ## What this agent could and could not read
 
-This agent confirmed Vire at commit `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867` on branch `native-compiler`. This agent confirmed draft PR 47 at head `b650932307ffce7efe887c6cac67098e7f406822`. That PR is not merged and is not proven.
+This agent confirmed Vire at commit `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867` on branch `native-compiler`. Native PE IAT on that commit is `kernel32.dll` only. Native guests have no `json`, `parse`, or `listen` in `builtinArity`. Draft PR 47 head measured later in this run is `42ef1a5ce1be815d1b91f097f837885cceeba4ad`. That PR is not merged and is not proven.
 
 This agent ran `gh api repos/CannaMuffinMan/fcgcpa-prod/commits/main` as GitHub user `cursor` on 2026-11-10 and received HTTP 404. `gh repo list CannaMuffinMan` returned only public `vire`. The GitHub MCP namespace was in error. This run did not clone `fcgcpa-prod`.
 
@@ -44,7 +44,7 @@ FCG product paths, ports, and tests below are cited from the attached inventory 
 
 ## Friday 2026-11-13 verdict
 
-The whole FCG stack as native Vire PE by Friday Eastern is not feasible. Measured product source is on the order of 230000 lines of TypeScript, JavaScript, and Go across more than 20 trees. Native Vire on this branch has file IO, SHA-256 `hash`, JSON `json`/`parse`, and interpreter `listen`. It has no native PE sockets on `native-compiler`. It has no Postgres wire, no Redis RESP, no WebSocket, no JWT HMAC, and no in-process TLS. PR 47 adds a gated `ws2_32` HTTP/1.1 plus JSON lane and is unproven. Compiling Next 16, Prisma, Stripe, and ten OAuth clients as VIR in the remaining days is not a real plan.
+The whole FCG stack as native Vire PE by Friday Eastern is not feasible. Measured product source is on the order of 230000 lines of TypeScript, JavaScript, and Go across more than 20 trees. Native Vire on this branch has file IO, SHA-256 `hash`, lists, maps, and text. Interpreter `listen`, `json`, and `parse` exist only on the C# host. There are no native PE sockets on `native-compiler`. There is no native JSON, Postgres wire, Redis RESP, WebSocket, JWT HMAC, or in-process TLS. PR 47 adds a gated `ws2_32` HTTP/1.1 plus JSON lane and is unproven. Compiling Next 16, Prisma, Stripe, and ten OAuth clients as VIR in the remaining days is not a real plan.
 
 The honest Friday ceiling is a native `/health` guest after PR 47 is proven, plus this specification. Anything larger is a later program.
 
@@ -61,7 +61,7 @@ The honest Friday ceiling is a native `/health` guest after PR 47 is proven, plu
 Ranked by what blocks FCG first.
 
 1. Native PE TCP listen and HTTP/1.1. Interpreter only in `VireListen.cs`. Native candidate is unmerged PR 47.
-2. Postgres wire protocol and a Prisma-class schema layer. 68 models live in `api/prisma/schema.prisma` per the inventory.
+2. Native `json` and `parse`. Present on the C# host only on this branch. Prisma-class Postgres is a further gap. 68 models live in `api/prisma/schema.prisma` per the inventory.
 3. Redis RESP plus process timers that today run inside the Node API.
 4. WebSocket RFC6455. Product has `Ws.Server` on `/ws/kick` only.
-5. JWT HMAC, cookie `authToken`, CSRF, WebAuthn, SIWE, and TLS at the edge or in-process. Native PE IAT on this branch has no crypto beyond SHA-256 `hash` in `src/rt-more.vire` `emitSha`. Interpreter `seal` is in `Vire.cs` and is not native TLS.
+5. JWT HMAC, cookie `authToken`, CSRF, WebAuthn, SIWE, and TLS at the edge or in-process. Native PE IAT on this branch has no crypto beyond SHA-256 `hash` in `src/rt-more.vire` `emitSha`. Host `seal` is AES-256-GCM in `VireSeal.cs` and is not native TLS.

@@ -61,7 +61,7 @@ Each live lane runs on its own cloud VM at the PR head. Drive through `control-c
 
 ## Prove native HTTP health (FCG-P1)
 
-**Depends on.** Proven native sockets. Draft PR 47 at `b650932307ffce7efe887c6cac67098e7f406822` is the candidate and is not proven.
+**Depends on.** Proven native sockets. Draft PR 47 head measured in this run is `42ef1a5ce1be815d1b91f097f837885cceeba4ad`. It is the candidate and is not proven.
 
 **Files.**
 
