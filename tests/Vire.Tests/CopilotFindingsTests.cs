@@ -86,6 +86,8 @@ public class CopilotFindingsTests
         Assert.Contains("0/0 is a failed gate", ps1);
         Assert.Contains("is not int:", ps1);
         Assert.Contains("return [int]$hits", ps1);
+        Assert.Contains("Reset-F5Slot", ps1);
+        Assert.Contains("f5-slot.txt", ps1);
         Assert.Contains("walk-then-open TOCTOU", ps1);
         Assert.Contains("GetFinalPathNameByHandle", ps1);
         Assert.Contains("f_walk_then_open", ps1);
