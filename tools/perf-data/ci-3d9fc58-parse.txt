@@ -1,0 +1,33 @@
+file /tmp/ci-logs/3d9fc58-native-selfhost.log
+host_lines 9
+host DOTNET_ROOT: C:\Program Files\dotnet
+host DOTNET_ROOT: C:\Program Files\dotnet
+host os Microsoft Windows 10.0.26100
+host cores 4
+host cpu AMD EPYC 7763 64-Core Processor
+host dotnet_sdk 10.0.403
+host DOTNET_TieredCompilation=unset(default on)
+host DOTNET_TieredPGO=unset
+host DOTNET_ReadyToRun=unset
+step_sec {'hello_host': 7.072, 'hello_run': 0.015, 'gen1_host': 361.93, 'gen1_hello': 0.02, 'gen1_hello_run': 0.014, 'gen2_native': 0.278}
+gen1_sha256 48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815
+totals [(3122, 199855, 64), (170656, 10922039, 64)]
+heartbeat_count 183
+longest_run_beats 180 first 1157 last 169685
+bin_s 2.0
+delta_min 289 delta_median 1014.0 delta_max 1457
+rate_min_steps_s 144.5 rate_median_steps_s 507.0 rate_max_steps_s 728.5
+gen1_host_wall_s 361.93
+gen1_host_total_steps 170656
+gen1_host_mean_steps_s 471.51659160611166
+local_timeout_compare_25363_at_420s 60.38809523809524
+implied_local_finish_s_at_60ps 2825.987462051019
+slowest_2s_bins index,delta,from_step
+136 289 117476
+135 312 117164
+126 374 113487
+130 380 115173
+134 388 116776
+133 399 116377
+131 404 115553
+127 419 113861

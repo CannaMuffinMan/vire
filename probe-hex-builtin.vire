@@ -1,0 +1,12 @@
+~ Builtin hex of 18944 in-range bytes. Same size as probe-hexof.vire.
+
+define main
+  let buf be []
+  let i be 0
+  while i < 18944
+    push with buf, 72
+    let i be i + 1
+  end
+  let hex be hex with buf
+  say length with hex
+end
