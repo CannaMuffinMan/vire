@@ -61,11 +61,13 @@ def main(path: str) -> int:
     deltas = [run[i] - run[i - 1] for i in range(1, len(run))]
     if not deltas:
         return 0
-    assumed_s = 2.0
-    rates = [d / assumed_s for d in deltas]
+    heartbeat_ms = 2000
+    heartbeat_s = heartbeat_ms / 1000.0
+    rates = [d / heartbeat_s for d in deltas]
     rates.sort()
-    print("bin_s", assumed_s)
-    print("delta_min", min(deltas), "delta_median", rates[len(rates) // 2] * assumed_s, "delta_max", max(deltas))
+    print("heartbeat_ms", heartbeat_ms)
+    print("bin_s", heartbeat_s)
+    print("delta_min", min(deltas), "delta_median", rates[len(rates) // 2] * heartbeat_s, "delta_max", max(deltas))
     print("rate_min_steps_s", min(rates), "rate_median_steps_s", rates[len(rates) // 2], "rate_max_steps_s", max(rates))
     if "gen1_host" in secs and totals:
         wall = secs["gen1_host"]

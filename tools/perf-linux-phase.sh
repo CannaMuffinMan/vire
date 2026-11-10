@@ -41,7 +41,6 @@ run hexof dotnet exec "$DLL" probe-hexof.vire
 run hexbuiltin dotnet exec "$DLL" probe-hex-builtin.vire
 run emitu8 dotnet exec "$DLL" probe-emitu8.vire
 run emitlist dotnet exec "$DLL" probe-emitlist.vire
-run buildexe dotnet exec "$DLL" probe-build-exe.vire || true
 mkdir -p data/src
 cp -f guest-hello.vire data/guest-hello.vire
 run hello dotnet exec "$DLL" compile-native.vire data/guest-hello.vire data/guest-hello.hex
