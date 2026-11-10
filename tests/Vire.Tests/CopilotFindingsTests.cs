@@ -119,7 +119,9 @@ public class CopilotFindingsTests
                 1,
                 1);
             Assert.Equal(want[i], Convert.ToInt32(got[0]));
+            Console.WriteLine("f8_host_pass_after " + nums[i] + " -> " + Convert.ToInt32(got[0]));
         }
+        Console.WriteLine("f8_host_pass_after list=[0, 0, 1]");
         string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
         Assert.Contains("emitOp with gen, [72, 185]", native);
         Assert.Contains("emitU64 with (gen at \"image\"), (expr at 1)", native);
@@ -205,7 +207,9 @@ public class CopilotFindingsTests
             info.ArgumentList.Add(Path.Combine(root, "tools", "native-arena-check.sh"));
             System.Diagnostics.Process proc = System.Diagnostics.Process.Start(info);
             proc.WaitForExit(30000);
+            Console.WriteLine("f13_fail_before planted_240_exit=" + proc.ExitCode);
             Assert.NotEqual(0, proc.ExitCode);
+            Console.WriteLine("f13_pass_after check_forbids_240_33554432");
         }
         finally
         {
