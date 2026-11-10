@@ -2,17 +2,17 @@
 
 ## Why this file exists
 
-Canna's Grok Build run of `tools/native-selfhost-handoff.ps1` on immutable `7c7c8ea` hit `gen1_host` TIMEOUT 420s at charged `steps=25363`. Hello PE compiled and ran. No gen1/gen2 hashes. CI on the same SHA and on PR42 `3d9fc58` finishes `gen1_host` with about 164k–171k charged steps in 253–362s. Caps stay 32MB / list 100000 / 5e6 / 420s. This note is diagnosis and probes. It is not a timeout bump and not an L2 runtime edit.
+Canna's Grok Build run of `tools/native-selfhost-handoff.ps1` on immutable `7c7c8ea` hit `gen1_host` TIMEOUT 420s at charged `steps=25363`. Hello PE compiled and ran. No gen1/gen2 hashes. CI on the same SHA and on PR42 `3d9fc58` finishes `gen1_host` with about 164k–171k charged steps in 253–362s. Ordinary programs keep 32MB / list 100000 / `VIRE_BUDGET` at most 5e6. `compile-native.vire` is an `IsCompilerProgram` entry. It uses `CompilerStepCap` 50e6 and list cap 1e6, and it ignores `VIRE_BUDGET`. The 420s wall on `gen1_host` is PowerShell, not that step cap. This note is diagnosis and probes. It is not a timeout bump and not an L2 runtime edit.
 
 ## Verdict
 
-Measured. The compile is the same job CI finishes. Local died at about 15% of charged steps (`25363 / 170656`). Mean local rate is `25363 / 420 = 60.4` charged steps/s. CI `7c7c8ea` job `129546287069` is `164117 / 252.666 = 649.5` steps/s. CI `3d9fc58` job `129677996797` is `170656 / 361.930 = 471.5` steps/s. This Linux cloud agent (Release, `VIRE_BUDGET=5000000`) compiled the same guest to `data/gen1.hex` SHA-256 `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` in **81.543s** with `total_steps=170059` (**2085** steps/s). That SHA matches the Windows PR42 proof hash. The limiter on a healthy host is interpreter CPU (user time), not the builtin `hex` write and not a stuck phase that CI skips. Local 60 steps/s is slower than this SHA's **slowest** CI 2s bin (144.5 steps/s on `3d9fc58`, 308 on `7c7c8ea`). That is a host-rate gap of about **8–11× vs CI mean**, not a missing 5e6 budget.
+Measured. The compile is the same job CI finishes. Local died at about 15% of charged steps (`25363 / 170656`). Mean local rate is `25363 / 420 = 60.4` charged steps/s. CI `7c7c8ea` job `129546287069` is `164117 / 252.666 = 649.5` steps/s. CI `3d9fc58` job `129677996797` is `170656 / 361.930 = 471.5` steps/s. This Linux cloud agent (Release, `VIRE_BUDGET=5000000`) compiled the same guest to `data/gen1.hex` SHA-256 `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` in **81.543s** with `total_steps=170059` (**2085** steps/s). That SHA matches the Windows PR42 proof hash. The limiter on a healthy host is interpreter CPU (user time), not the builtin `hex` write and not a stuck phase that CI skips. Local 60 steps/s is slower than this SHA's **slowest** CI 2s bin (144.5 steps/s on `3d9fc58`, 308 on `7c7c8ea`). That is a host-rate gap of about **8–11× vs CI mean**, not a missing compiler step budget (50e6).
 
 At 60.4 steps/s the remaining ~145k steps would need about **38 more minutes** (`170656 / 60.4 ≈ 2826s` total). Raising 420s would wait, not fix. Do not raise it.
 
 ## What the numbers count
 
-`vire: still running steps=N` is `budget.Steps`. Each increment is 64 interpreter `Step` calls (`Budget.StepBatch`). `total_steps` is the final N. Heartbeats fire every 2s of `TickCount64` while `compilerProgress` is on (`Vire.cs` `Step`). `tools/native-selfhost-handoff.ps1` redirects stdout/stderr until exit, so **GitHub log timestamps on heartbeats are flush time, not phase time**. Consecutive heartbeats are still 2s bins. Parser: `python3 tools/perf-parse-heartbeats.py LOG`.
+`vire: still running steps=N` is `budget.Steps`. Each increment is 64 interpreter `Step` calls (`Budget.StepBatch`). `total_steps` is the final N. Heartbeats fire every 2s of `TickCount64` while `compilerProgress` is on (`Vire.cs` `Step`). `tools/native-selfhost-handoff.ps1` redirects stdout/stderr until exit, so **GitHub log timestamps on heartbeats are flush time, not phase time**. Consecutive heartbeats are still 2s bins. Parser: `python3 tools/perf-parse-heartbeats.py LOG` or `python3 tools/perf-parse-heartbeats.py LOG 25363 420`. A 420s kill in `native-selfhost-handoff.ps1` throws before it prints `data/handoff-gen1_host.err.txt`, so a local timeout log on CI would lose heartbeats. `tools/perf-handoff-windows.ps1` prints that stderr on timeout.
 
 `gen1_host` is `dotnet exec vire.dll compile-native.vire data/compile-native.vire data/gen1.hex`. `compile-native.vire` writes with builtin `hex`, not Vire `hexOf`. Optimizing `hexOf` does not move this job. Linux probe: `probe-hex-builtin.vire` 0.085s vs `probe-hexof.vire` 1.42s for 18944 bytes.
 
@@ -54,7 +54,7 @@ Charged-step rate tracks one core of the C# interpreter. `emitU8` is still a per
 
 ## Ruled out
 
-- **Need a higher step cap.** CI finishes at 164k–171k, under 5e6.
+- **Need a higher step cap.** CI finishes at 164k–171k charged steps. `compile-native.vire` already has a 50e6 compiler cap. Probes still use `VIRE_BUDGET` 5e6 and list 100000, so they cannot emit a gen1-sized list.
 - **Need a longer 420s on CI-class hardware.** CI wall 253–362s.
 - **Hung in hexOf.** gen1 calls `hex with exe`.
 - **PR42 runtime/IAT as the local timeout.** Same timeout reported on `7c7c8ea`. Linux `3d9fc58` hex equals Windows proof hash.

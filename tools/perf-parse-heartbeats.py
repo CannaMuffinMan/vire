@@ -85,8 +85,13 @@ def main(path: str) -> int:
         print("gen1_host_wall_s", wall)
         print("gen1_host_total_steps", charged)
         print("gen1_host_mean_steps_s", charged / wall if wall else None)
-        print("local_timeout_compare_25363_at_420s", 25363 / 420.0)
-        print("implied_local_finish_s_at_60ps", charged / (25363 / 420.0))
+    if len(sys.argv) >= 4:
+        local_steps = int(sys.argv[2])
+        local_sec = float(sys.argv[3])
+        print("local_timeout_steps", local_steps, "local_timeout_s", local_sec)
+        print("local_mean_steps_s", local_steps / local_sec)
+        if "gen1_host" in secs and totals:
+            print("implied_local_finish_s", totals[-1][0] / (local_steps / local_sec))
     slow = sorted(enumerate(deltas), key=lambda x: x[1])[:8]
     print("slowest_2s_bins index,delta,from_step")
     for i, d in slow:
@@ -95,7 +100,7 @@ def main(path: str) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("usage: perf-parse-heartbeats.py LOG", file=sys.stderr)
+    if len(sys.argv) not in (2, 4):
+        print("usage: perf-parse-heartbeats.py LOG [LOCAL_STEPS LOCAL_SEC]", file=sys.stderr)
         sys.exit(2)
     sys.exit(main(sys.argv[1]))

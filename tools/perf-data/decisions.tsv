@@ -3,3 +3,4 @@ ts	phase	decision	why	evidence	result
 2026-11-10T09:40:00Z	ci	parse jobs 129546287069 and 129677996797	authoritative walls and total_steps	tools/perf-data/ci-*-parse.txt	7c7c8ea 252.666s 164117 steps; 3d9fc58 361.930s 170656 steps
 2026-11-10T09:36:00Z	cloud	Linux Release gen1 equals PR42 hash in 81.543s	prove same work finishes here	tools/perf-data/linux-cloud-gen1-parse.txt data/gen1.hex sha 48f12268	170059 steps 2085/s
 2026-11-10T09:45:00Z	rca	do not raise 420s or edit rt/pe	local 60.4 steps/s is below CI min 2s bin	COMPILE-PERF.md	handoff tools/perf-handoff-windows.ps1
+2026-11-10T09:40:57Z	followup	fix handoff path and compiler cap wording	explorer found guest-hello root path and VIRE_BUDGET does not cap gen1	tools/perf-handoff-windows.ps1 Vire.cs IsCompilerProgram	handoff copies data/guest-hello.vire
