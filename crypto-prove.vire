@@ -18,14 +18,6 @@ define showBad with tag, got
   return 1
 end
 
-define millionA
-  let a be "a"
-  while (length with a) < 1000000
-    let a be a + a
-  end
-  return slice with a, 0, 1000000
-end
-
 define main
   let fails be 0
   let empty be ascii_bytes with ""
@@ -36,8 +28,6 @@ define main
   let fails be fails + (proveLine with "FIPS abc hash", (hash with "abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
   let long be ascii_bytes with "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
   let fails be fails + (proveLine with "FIPS 448 guest", (sha256_hex with (long at 1)), "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")
-  let million be millionA
-  let fails be fails + (proveLine with "FIPS 1M hash", (hash with million), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0")
   say "FIPS 1M guest skipped list cap 100000 holds at most 100000 bytes"
 
   let k1 be hex_to_bytes with "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"

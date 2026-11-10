@@ -27,6 +27,18 @@ Write-Output "crypto_host_exit $code"
 if ($code -ne 0) { throw "host crypto-prove exit $code" }
 if ("$hostOut" -notmatch "CRYPTO PROVE pass") { throw "host crypto-prove missing pass" }
 
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$mbOut = & dotnet exec $VireDll crypto-mb.vire
+$mbCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $mbOut
+Write-Output "sha256_1mb_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "sha256_1mb_exit $mbCode"
+if ($mbCode -ne 0) { throw "crypto-mb exit $mbCode" }
+if ("$mbOut" -notmatch "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0") {
+    throw "crypto-mb missing FIPS 1M digest"
+}
+
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $lib = Get-Content -Raw (Join-Path $Root "src/rt-crypto.vire")
