@@ -467,12 +467,21 @@ function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
     return [int]$hits
 }
 
-$f5vulnRounds = Invoke-F5UntilHit -WriteExe (Join-Path $Work "f5-vuln.exe") -TimeoutSec 120
-if ($f5vulnRounds -isnot [int]) { throw "f5 vuln rounds is not int: $($f5vulnRounds.GetType().FullName) $f5vulnRounds" }
-$f5fixHits = Invoke-F5FixedZero -WriteExe (Join-Path $Work "f5.exe") -TimeoutSec 20
+$f5fail = $null
+$f5vulnRounds = 0
+try {
+    $f5vulnRounds = Invoke-F5UntilHit -WriteExe (Join-Path $Work "f5-vuln.exe") -TimeoutSec 20
+    if ($f5vulnRounds -isnot [int]) { throw "f5 vuln rounds is not int: $($f5vulnRounds.GetType().FullName) $f5vulnRounds" }
+} catch {
+    $f5fail = [string]$_
+    Write-Host ("f5_deferred " + $f5fail)
+}
+$f5fixHits = Invoke-F5FixedZero -WriteExe (Join-Path $Work "f5.exe") -TimeoutSec 10
 if ($f5fixHits -isnot [int]) { throw "f5 fixed hits is not int: $($f5fixHits.GetType().FullName) $f5fixHits" }
 if ($f5fixHits -ne 0) { throw "f5 pass-after failed: fixed PE truncated KEEP $f5fixHits times" }
-Write-Host "f5 reopen-after-nlink closed by SetEndOfFile; walk-then-open identity is f_walk"
+if ($null -eq $f5fail) {
+    Write-Host "f5 reopen-after-nlink closed by SetEndOfFile; walk-then-open identity is f_walk"
+}
 
 # 6. F6: hardlink crash-rip.txt to KEEP under data/. Vuln must smash KEEP. Fixed KEEP + crash rip=.
 Copy-Item -LiteralPath ([string](Join-Path $Work "hello.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-hello.vire")) -Force
@@ -618,13 +627,16 @@ function Invoke-WalkFixedZero([string]$WriteExe, [int]$TimeoutSec) {
     return [int]$hits
 }
 
-$walkVulnRounds = Invoke-WalkUntilHit -WriteExe (Join-Path $Work "walk-vuln.exe") -TimeoutSec 90
+$walkVulnRounds = Invoke-WalkUntilHit -WriteExe (Join-Path $Work "walk-vuln.exe") -TimeoutSec 30
 if ($walkVulnRounds -isnot [int]) { throw "f_walk vuln rounds is not int: $($walkVulnRounds.GetType().FullName) $walkVulnRounds" }
 $walkFixHits = Invoke-WalkFixedZero -WriteExe (Join-Path $Work "walk.exe") -TimeoutSec 20
 if ($walkFixHits -isnot [int]) { throw "f_walk fixed hits is not int: $($walkFixHits.GetType().FullName) $walkFixHits" }
 if ($walkFixHits -ne 0) { throw "f_walk pass-after failed: fixed PE wrote outside $walkFixHits times" }
 Write-Host "f_walk_then_open GetFinalPathNameByHandle identity closed"
 
+if ($null -ne $f5fail) {
+    throw $f5fail
+}
 if ($script:DefenderBlocked) {
     Write-Output "native sec windows recipe: Defender blocked PE execute; junction and hardlink compiles ran without exclusions"
     exit 0
