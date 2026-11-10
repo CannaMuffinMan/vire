@@ -1714,6 +1714,7 @@ define main
     halt with 1
   end
   let hits be guestNeeds with funcs
+  say "needs-ok"
   let opened be openImage
   if hits at "net"
     let opened be openNetImage
@@ -1730,6 +1731,7 @@ define main
     end
     let i be i + 1
   end
+  say "emitted"
   if gen at "bad"
     say gen at "why"
     say "compile failed"
