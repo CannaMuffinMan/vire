@@ -1673,6 +1673,7 @@ define emitFunc with gen, funcs, func
 end
 
 define main
+  say "compile-native start"
   let files be args
   if (length with files) < 2
     say "usage: compile-native source.vire out.hex"

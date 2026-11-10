@@ -135,6 +135,14 @@ $r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 1800 -FilePath "dotnet" -Argum
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen1_host missing compiled" }
 Convert-HexToExe $gen1Hex $gen1Exe
+Write-Output ("gen1_exe_bytes " + (Get-Item $gen1Exe).Length)
+try { Unblock-File -Path $gen1Exe } catch { }
+Start-Sleep -Seconds 2
+try {
+    Invoke-Bounded -Name "gen1_probe" -TimeoutSec 15 -FilePath $gen1Exe -ArgumentList @()
+} catch {
+    Write-Output ("gen1_probe_err " + $_.Exception.Message)
+}
 Write-Output "step_gen1_host ok"
 
 $gen1HelloHex = Join-Path $Data "gen1-hello.hex"
