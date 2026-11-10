@@ -56,6 +56,11 @@ def main(path: str) -> int:
     print("totals", totals)
     print("heartbeat_count", len(gen1_beats))
     if not gen1_beats:
+        if totals:
+            print("no_heartbeats fast_finish")
+            if totals[-1][3] is not None:
+                print("break_probes", totals[-1][3])
+            return 0
         return 1
     pairs = list(zip(stamps, gen1_beats))
     runs = []

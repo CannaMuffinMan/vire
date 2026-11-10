@@ -102,7 +102,9 @@ Read `(a)` from stamp wall gaps. Uniform slow rate keeps ~2s between notes with 
 
 Read `(b)` from `break_miss_ns_each`. Material means that number times a plausible Call count is a large slice of gen1 wall. Each user-function `Call` runs `VireDebug.Break` (`CreateDirectory`, three reparse walks, `File.Exists` on `data/break.txt`). The miss path returns false. This script does not count Calls inside gen1 (that would be a `Vire.cs` edit). Scale from 20000 timed misses.
 
-Linux cloud, one run, Release, this agent: `break_miss_calls 20000`, `break_miss_wall_s 1.385`, **`break_miss_ns_each 69234`** (69.2 µs). `probe-emitu8.vire` is 21000 user calls in 1.45s on the same VM. 21000 × 69.2 µs is 1.45s, so the emitU8 probe wall is explained by Break miss I/O even without Defender. That is material on Linux. Confirm the same `ns_each` on windows-latest via `perf-host` before treating AV as an extra desktop-only factor. If windows-latest is also tens of microseconds, discard "AV-only" and treat Break-on-every-Call as the host limiter.
+Linux cloud, one run, Release, this agent: `break_miss_calls 20000`, `break_miss_wall_s 1.385`, **`break_miss_ns_each 69234`** (69.2 µs). `probe-emitu8.vire` is 21000 user calls in 1.45s on the same VM. 21000 × 69.2 µs is 1.45s, so the emitU8 probe wall is explained by Break miss I/O even without Defender.
+
+windows-latest `perf-host` run `42794245768` job `129755174034` SHA `2304852` (before skip): gen1 **304.117s**, `total_steps=164117`, **539.6 steps/s**, **`break_probes=1619992`**, miss **678.9 µs** each, `stall_bins_ge_6s` 0. Product 1.62e6 × 679 µs is 1100s (microbench overstates in-process). The skip commit then cut gen1 to **8.426s** at the same 164117 steps (**19477 steps/s**, `break_probes=0`) on run `42795382020` job `129759130623` SHA `b1de7a3`. Hello 7.052s → 0.543s. That is 97% of CI gen1 wall. The 60 vs 470 gap is the same probe list under a slower `File.Exists`.
 
 Read `(c)` from the script stdout: `os`, `cores`, `cpu`, `dotnet_sdk`, `DOTNET_*`, `power_plan` (`powercfg /getactivescheme` only).
 
