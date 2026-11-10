@@ -87,6 +87,12 @@ Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
+foreach ($blob in @(
+    "rt-net-blob.hex", "rt-net-pins.hex", "rt-net-fixes.hex",
+    "rt-net-json-blob.hex", "rt-net-json-pins.hex", "rt-net-json-fixes.hex"
+)) {
+    Copy-Item (Join-Path $Root "src/$blob") (Join-Path $Src $blob) -Force
+}
 Copy-Item (Join-Path $Root "guest-hello.vire") (Join-Path $Data "guest-hello.vire") -Force
 $pairs = @(
     @("compile-native.vire", "data/compile-native.vire"),
@@ -94,7 +100,13 @@ $pairs = @(
     @("src/pe.vire", "data/src/pe.vire"),
     @("src/rt.vire", "data/src/rt.vire"),
     @("src/rt-more.vire", "data/src/rt-more.vire"),
-    @("src/rt-net.vire", "data/src/rt-net.vire")
+    @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/rt-net-blob.hex", "data/src/rt-net-blob.hex"),
+    @("src/rt-net-pins.hex", "data/src/rt-net-pins.hex"),
+    @("src/rt-net-fixes.hex", "data/src/rt-net-fixes.hex"),
+    @("src/rt-net-json-blob.hex", "data/src/rt-net-json-blob.hex"),
+    @("src/rt-net-json-pins.hex", "data/src/rt-net-json-pins.hex"),
+    @("src/rt-net-json-fixes.hex", "data/src/rt-net-json-fixes.hex")
 )
 foreach ($pair in $pairs) {
     $ha = (Get-FileHash -Algorithm SHA256 (Join-Path $Root $pair[0])).Hash
