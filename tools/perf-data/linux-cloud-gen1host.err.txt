@@ -1,0 +1,48 @@
+vire: starting compile-native.vire
+vire: loading compile-native.vire
+vire: loading pe.vire
+vire: loading asm.vire
+vire: loading rt.vire
+vire: loading rt-more.vire
+vire: loaded, running main
+vire: still running steps=4238
+vire: still running steps=9705
+vire: still running steps=13029
+vire: still running steps=16063
+vire: still running steps=20097
+vire: still running steps=24570
+vire: still running steps=29748
+vire: still running steps=32744
+vire: still running steps=35356
+vire: still running steps=40405
+vire: still running steps=45915
+vire: still running steps=51059
+vire: still running steps=56496
+vire: still running steps=61362
+vire: still running steps=64062
+vire: still running steps=66742
+vire: still running steps=69436
+vire: still running steps=72156
+vire: still running steps=74744
+vire: still running steps=77238
+vire: still running steps=80330
+vire: still running steps=83598
+vire: still running steps=87434
+vire: still running steps=91906
+vire: still running steps=96468
+vire: still running steps=100980
+vire: still running steps=105496
+vire: still running steps=110093
+vire: still running steps=113275
+vire: still running steps=115537
+vire: still running steps=117785
+vire: still running steps=123654
+vire: still running steps=129956
+vire: still running steps=136286
+vire: still running steps=142406
+vire: still running steps=147675
+vire: still running steps=152571
+vire: still running steps=157281
+vire: still running steps=161810
+vire: still running steps=166563
+vire: total_steps=170059 total_pending=10883789 step_batch=64

@@ -1,0 +1,33 @@
+file /tmp/ci-logs/7c7c8ea-native-selfhost.log
+host_lines 9
+host DOTNET_ROOT: C:\Program Files\dotnet
+host DOTNET_ROOT: C:\Program Files\dotnet
+host os Microsoft Windows 10.0.26100
+host cores 4
+host cpu INTEL(R) XEON(R) PLATINUM 8573C
+host dotnet_sdk 10.0.403
+host DOTNET_TieredCompilation=unset(default on)
+host DOTNET_TieredPGO=unset
+host DOTNET_ReadyToRun=unset
+step_sec {'hello_host': 5.619, 'hello_run': 0.015, 'gen1_host': 252.666, 'gen1_hello': 0.023, 'gen1_hello_run': 0.017, 'gen2_native': 0.282}
+gen1_sha256 e5d05d00073800b2fc7710f8538925de086ad6f92c5ba7b363a82f4d7a01e728
+totals [(3117, 199498, 64), (164117, 10503503, 64)]
+heartbeat_count 128
+longest_run_beats 126 first 1454 last 163751
+bin_s 2.0
+delta_min 616 delta_median 1346.0 delta_max 1873
+rate_min_steps_s 308.0 rate_median_steps_s 673.0 rate_max_steps_s 936.5
+gen1_host_wall_s 252.666
+gen1_host_total_steps 164117
+gen1_host_mean_steps_s 649.5412916656772
+local_timeout_compare_25363_at_420s 60.38809523809524
+implied_local_finish_s_at_60ps 2717.704530221188
+slowest_2s_bins index,delta,from_step
+88 616 108742
+87 619 108123
+89 620 109358
+90 621 109978
+85 652 106809
+91 654 110599
+86 662 107461
+84 674 106135

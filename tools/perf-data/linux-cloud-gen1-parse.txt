@@ -1,0 +1,19 @@
+file /tmp/perf-gen1host.err
+host_lines 0
+step_sec {}
+gen1_sha256 None
+totals [(170059, 10883789, 64)]
+heartbeat_count 40
+longest_run_beats 40 first 4238 last 166563
+bin_s 2.0
+delta_min 2248 delta_median 4512.0 delta_max 6330
+rate_min_steps_s 1124.0 rate_median_steps_s 2256.0 rate_max_steps_s 3165.0
+slowest_2s_bins index,delta,from_step
+29 2248 115537
+28 2262 113275
+18 2494 74744
+17 2588 72156
+7 2612 32744
+14 2680 64062
+15 2694 66742
+13 2700 61362

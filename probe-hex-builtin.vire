@@ -1,0 +1,12 @@
+define main
+  let n be 18944
+  let buf be []
+  let i be 0
+  while i < n
+    push with buf, 72
+    let i be i + 1
+  end
+  let hex be hex with buf
+  say n
+  say length with hex
+end

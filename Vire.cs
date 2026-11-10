@@ -3307,7 +3307,7 @@ sealed class Program
             machine.UseArgs(extra);
             machine.Run();
             if (IsCompilerProgram(program))
-                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch);
+                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch + " break_probes=" + System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls));
             return 0;
         }
         catch (HaltSignal halt)
