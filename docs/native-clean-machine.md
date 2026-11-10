@@ -6,7 +6,7 @@ Use this recipe after an already-built `gen1.exe` exists. It is not a way to ski
 
 `gen1.exe` is a Windows x64 PE emitted by the native compiler sources. After bootstrap, that PE compiles `guest-hello.vire` and rebuilds `compile-native.vire` without launching `dotnet`, `gcc`, `clang`, MinGW, or Java. Equal SHA-256 of `gen1.hex` and `gen2.hex` is the full compiler fixed point, not a hello-only check.
 
-This does not prove that GitHub's `windows-latest` image lacks a .NET SDK. The image still has one. The prove job does not run `setup-dotnet`, then it captures a private environment whose PATH cannot resolve those tools, inspects the PE import table, and watches child processes.
+This does not prove that GitHub's `windows-latest` image lacks a .NET SDK. The image still has one, and it also has Strawberry `gcc`. The prove job does not run `setup-dotnet`. Isolate PATH is only `System32`, `Windows`, and PowerShell. The script inspects the PE import table and watches child processes.
 
 ## Trust chain
 

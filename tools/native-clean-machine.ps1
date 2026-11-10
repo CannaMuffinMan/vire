@@ -22,7 +22,8 @@ $BannedPathNeedles = @(
     "\LLVM\",
     "\Java\",
     "\jdk",
-    "\Microsoft.NET"
+    "\Microsoft.NET",
+    "\Strawberry"
 )
 function Get-RequiredKernel32 {
     $pe = Join-Path $Root "src/pe.vire"
@@ -137,23 +138,13 @@ function Assert-Gen1Imports([string]$ExePath) {
 }
 
 function Get-IsolatedPath {
-    $keep = @()
-    foreach ($part in ($env:Path -split ";")) {
-        if ([string]::IsNullOrWhiteSpace($part)) { continue }
-        $hit = $false
-        foreach ($needle in $BannedPathNeedles) {
-            if ($part -like "*$needle*") { $hit = $true; break }
-        }
-        if (-not $hit) { $keep += $part }
-    }
-    $must = @(
+    $keep = @(
         "$env:WINDIR\System32",
         "$env:WINDIR",
         "$env:WINDIR\System32\WindowsPowerShell\v1.0"
     )
-    foreach ($m in $must) {
-        if ($keep -notcontains $m) { $keep += $m }
-    }
+    $pwsh7 = "C:\Program Files\PowerShell\7"
+    if (Test-Path $pwsh7) { $keep += $pwsh7 }
     return ($keep -join ";")
 }
 
@@ -181,8 +172,50 @@ function Write-EnvCapture([string]$OutFile, [string]$IsolatedPath) {
     Get-Content $OutFile | ForEach-Object { Write-Host $_ }
 }
 
-function Get-ProcessKids([int]$ParentId) {
-    Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction Stop
+function Add-CleanLaunch([int]$ProcId, [int]$Parent, [string]$Image, $State) {
+    if ($State.Parent.ContainsKey($ProcId)) { return }
+    $State.Parent[$ProcId] = $Parent
+    $State.Image[$ProcId] = $Image
+    if (-not $State.Kids.ContainsKey($Parent)) {
+        $State.Kids[$Parent] = [System.Collections.Generic.List[int]]::new()
+    }
+    $State.Kids[$Parent].Add($ProcId)
+    $walk = $ProcId
+    $linked = $false
+    for ($guard = 0; $guard -lt 64; $guard++) {
+        if ($State.Watched.Contains($walk)) { $linked = $true; break }
+        if (-not $State.Parent.ContainsKey($walk)) { break }
+        $next = [int]$State.Parent[$walk]
+        if ($next -eq $walk) { break }
+        $walk = $next
+    }
+    if (-not $linked) { return }
+    $stack = [System.Collections.Generic.Stack[int]]::new()
+    $stack.Push($ProcId)
+    while ($stack.Count -gt 0) {
+        $id = $stack.Pop()
+        if (-not $State.Watched.Contains($id)) {
+            [void]$State.Watched.Add($id)
+            $leaf = [System.IO.Path]::GetFileNameWithoutExtension([string]$State.Image[$id]).ToLowerInvariant()
+            if ($BannedExeNames -contains $leaf) {
+                $State.Hits.Add("$($State.Image[$id]) pid=$id parent=$($State.Parent[$id])")
+            }
+        }
+        if ($State.Kids.ContainsKey($id)) {
+            foreach ($kid in @($State.Kids[$id])) {
+                if (-not $State.Watched.Contains([int]$kid)) { $stack.Push([int]$kid) }
+            }
+        }
+    }
+}
+
+function Receive-CleanLaunches($Queue, $State) {
+    $item = $null
+    while ($Queue.TryDequeue([ref]$item)) {
+        $parts = ([string]$item).Split([char[]]@([char]"|"), 3)
+        if ($parts.Length -lt 3) { continue }
+        Add-CleanLaunch ([int]$parts[0]) ([int]$parts[1]) $parts[2] $State
+    }
 }
 
 function Invoke-Isolated {
@@ -218,37 +251,65 @@ function Invoke-Isolated {
     }
     $psi.Environment.Clear()
     foreach ($k in $EnvTable.Keys) { $psi.Environment[$k] = [string]$EnvTable[$k] }
+    if (-not $psi.Environment["SystemRoot"]) { throw "$Name environment is missing SystemRoot" }
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $psi
+    $sid = "vireclean" + [guid]::NewGuid().ToString("N")
+    $queue = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
+    Import-Module CimCmdlets -ErrorAction Stop
+    Register-CimIndicationEvent -ClassName Win32_ProcessStartTrace -SourceIdentifier $sid -MessageData $queue -Action {
+        $ne = $Event.SourceEventArgs.NewEvent
+        $Event.MessageData.Enqueue("$($ne.ProcessID)|$($ne.ParentProcessID)|$($ne.ProcessName)")
+    } | Out-Null
+    $stdoutTask = $null
+    $stderrTask = $null
+    try {
     [void]$p.Start()
-    $stdin = $p.StandardInput
-    $stdin.Close()
-    $kidsBad = @()
-    $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSec)
+    $stdoutTask = $p.StandardOutput.ReadToEndAsync()
+    $stderrTask = $p.StandardError.ReadToEndAsync()
+    try { $p.StandardInput.Close() } catch { }
+    $state = @{
+        Watched = [System.Collections.Generic.HashSet[int]]::new()
+        Parent = @{}
+        Image = @{}
+        Kids = @{}
+        Hits = [System.Collections.Generic.List[string]]::new()
+    }
+    [void]$state.Watched.Add($p.Id)
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
     while (-not $p.HasExited) {
-        if ([datetime]::UtcNow -gt $deadline) {
+        if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
             try { $p.Kill($true) } catch { }
             throw "$Name timed out after ${TimeoutSec}s"
         }
-        foreach ($kid in (Get-ProcessKids $p.Id)) {
-            $kl = [System.IO.Path]::GetFileNameWithoutExtension([string]$kid.Name).ToLowerInvariant()
-            if ($BannedExeNames -contains $kl) {
-                $kidsBad += "$($kid.Name) $($kid.CommandLine)"
-            }
+        Receive-CleanLaunches $queue $state
+        if ($state.Hits.Count -gt 0) {
+            try { $p.Kill($true) } catch { }
+            throw "$Name launched banned child: $($state.Hits -join '; ')"
         }
-        Start-Sleep -Milliseconds 50
+        [void]$p.WaitForExit(200)
     }
-    $stdout = $p.StandardOutput.ReadToEnd()
-    $stderr = $p.StandardError.ReadToEnd()
+    $drainUntil = [datetime]::UtcNow.AddSeconds(2)
+    while ([datetime]::UtcNow -lt $drainUntil) {
+        Receive-CleanLaunches $queue $state
+        if ($state.Hits.Count -gt 0) { break }
+        Start-Sleep -Milliseconds 100
+    }
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
     [System.IO.File]::WriteAllText($outFile, $stdout)
     [System.IO.File]::WriteAllText($errFile, $stderr)
     Write-Host ("step_" + $Name + "_exit " + $p.ExitCode)
     Write-Host ("step_" + $Name + "_file " + $FilePath)
     if ($stderr) { Write-Host $stderr.TrimEnd() }
     if ($stdout) { Write-Host $stdout.TrimEnd() }
-    if ($kidsBad.Count -gt 0) { throw "$Name launched banned child: $($kidsBad -join '; ')" }
+    if ($state.Hits.Count -gt 0) { throw "$Name launched banned child: $($state.Hits -join '; ')" }
     if ($p.ExitCode -ne 0) { throw "$Name exit $($p.ExitCode)" }
     return @{ StdOut = $stdout; StdErr = $stderr }
+    } finally {
+        Unregister-Event -SourceIdentifier $sid -ErrorAction SilentlyContinue
+        Get-Job -Name $sid -ErrorAction SilentlyContinue | Remove-Job -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-Bootstrap {
@@ -341,6 +402,7 @@ function Invoke-Prove {
     }
     Write-Host "phase_native ok"
 
+    Write-Host "phase_package start"
     $sourceSha = "unknown"
     try { $sourceSha = (git -C $Root rev-parse HEAD).Trim() } catch { }
     $exeHash = (Get-FileHash -Algorithm SHA256 $gen1Exe).Hash.ToLowerInvariant()
@@ -383,6 +445,7 @@ hex_to_exe=PowerShell conversion of compiler hex, not gcc/clang/dotnet compile
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::CreateFromDirectory($pkg, $zip)
     Write-Host "package_zip $zip"
+    Write-Host "phase_package ok"
     Write-Host "native clean machine prove ok"
 }
 
