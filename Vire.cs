@@ -661,7 +661,7 @@ sealed class Machine
         {
             string path = SafePath(args[0], line, col);
             string text;
-            try { text = File.ReadAllText(path); }
+            try { text = VirePaths.ReadAllTextInside(path, root, line, col); }
             catch (IOException) { throw new VireError("could not read that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not read that file", line, col); }
             if (text.Length > MaxText) throw new VireError("file is too large", line, col);
@@ -1079,7 +1079,7 @@ sealed class Machine
             VirePaths.RefuseProgram(path, line, col);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
-            try { VireFiles.AppendAllText(path, text); }
+            try { VirePaths.AppendAllTextInside(path, text, root, line, col); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
             return text;
@@ -2858,25 +2858,25 @@ sealed class Program
         else throw new VireError("extend needs numbers in the extra list", line, col);
         double x;
         if (!AsReal(n, out x)) throw new VireError("extend needs numbers in the extra list", line, col);
-        if (x < 0) x += 256;
-        if (x >= 256)
+        if (x != Math.Floor(x)) throw new VireError("extend needs numbers in the extra list", line, col);
+        if (x < 0)
         {
-            int q = WholeDiv(x, 256, line, col);
-            x = x - ((double)q * 256.0);
+            x += 256;
+            if (x < 0) return 0;
+            if (x < 256) return (int)x;
         }
-        if (x < 0) x = 0;
-        if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;
-        return x;
+        long bits = (long)x;
+        return (int)(bits & 255);
     }
 
-    internal static int WholeDiv(object left, object right, int line, int col)
+    internal static object WholeDiv(object left, object right, int line, int col)
     {
         double num;
         double den;
         if (!AsReal(left, out num) || !AsReal(right, out den)) throw new VireError("idiv needs numbers", line, col);
         if (den == 0 || num < 0) return 0;
         double quote = Math.Floor(num / den);
-        if (quote > int.MaxValue) return int.MaxValue;
+        if (quote > int.MaxValue || quote < int.MinValue) return quote;
         return (int)quote;
     }
 
@@ -2953,7 +2953,7 @@ sealed class Program
         try
         {
         string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
+        if (!full.StartsWith(folderFull, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
         VirePaths.RefuseReparse(full, folder, 1);
         if (CompilerProgress != 0) CompilerNote("loading " + Path.GetFileName(full));
@@ -2961,7 +2961,7 @@ sealed class Program
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
         string text;
-        try { text = File.ReadAllText(full); }
+        try { text = VirePaths.ReadProgramText(full, folder, 1, 1); }
         catch (IOException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
         catch (UnauthorizedAccessException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
         return LoadText(full, text, folder, seen, loaded);
@@ -2988,7 +2988,7 @@ sealed class Program
             string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
             VirePaths.RefuseFileReparse(next, folder, 1, 1);
             string body;
-            try { body = File.ReadAllText(next); }
+            try { body = VirePaths.ReadProgramText(next, folder, 1, 1); }
             catch (IOException) { throw new VireError("could not read lib.vire", 1); }
             catch (UnauthorizedAccessException) { throw new VireError("could not read lib.vire", 1); }
             if (!VirePaths.LockHexEqual(VireSeal.HashText(body), locked))

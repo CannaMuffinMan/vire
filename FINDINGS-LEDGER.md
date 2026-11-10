@@ -3,25 +3,26 @@
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
 Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
 PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft).
-No CVE IDs. **No freeze** until `native-windows` prints `f4_`/`f5_`/`f6_` properties **and** `native-selfhost-windows` equal hashes on the **exact head**. Prior proven freeze remains `3d9fc58`.
+No CVE IDs. **No freeze** until `native-windows` prints `f4_`/`f5_`/`f6_`/`f_walk_then_open` properties **and** `native-selfhost-windows` equal hashes on the **exact head**. Prior proven freeze remains `3d9fc58`. Do not call F5/path closed until walk-then-open fail-before/pass-after lands on that head. F5 harness: `Invoke-F5FixedZero` returns a single `[int]`; `$hits++` / `WaitForExit` bools must not enter the success stream (PR44 job 129758476518).
 
 ## Implemented vs verified
 
 | ID | Implemented | Verified (property, not crash-only) | Still open |
 |---|---|---|---|
 | F1 | yes | 7c7c8ea TIMEOUT 3s vs after `[1, 2, 1, 2]` exit 0 | — |
-| F2 | yes | linux-x64 + **ARM64 F2 filter pass** (`42770835327`) | full ARM suite unrun |
+| F2 | yes | linux-x64 + ARM F2; ARM filter now also `HardLinkCannotRewriteDepsLock` | full ARM suite unrun |
 | F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
-| F4 | yes | Unicorn + Windows `f4_double_read` (this push) | intern may sit in RW `.data`; property is copy-before-NUL |
-| F5 | yes | Unicorn nlink; Windows hardlink; **two-process race recipe** (this push) | vuln race may miss in 40 rounds — log says so |
-| F6 | yes | emit no `iat_cf`; **crash PE after VEH** (this push) | — |
+| F4 | yes | Unicorn + Windows `f4_double_read` / intern section | intern may sit in RW `.data`; property is copy-before-NUL |
+| F5 | yes | Unicorn nlink; Windows hardlink; **until-hit then fixed==0** | walk-then-open is a separate gate (`f_walk`) |
+| F6 | yes | emit no `iat_cf`; **crash PE after VEH** + `mklink /H` KEEP | — |
 | F7 | yes | `42770835327` printed `files stay inside the program folder` | — |
-| F8 | yes | before `[4294967296]`; after `[0]` | — |
+| F8 | yes | `and 255` on host; `mov rcx,imm64` in compile-native; host+Unicorn `[0, 0, 1]` for 2^31 / 2^39 / 2^31+1 | — |
 | F9 | yes | PackZipSigned gone | — |
 | F10 | yes | host clang fallback gone | — |
 | F11 | yes + bytes reload | Windows `3d9fc58` gen1 hello 0 / gen2 0 / equal `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` jobs `129677976694` `129677996797` | re-prove after this PE-byte change |
 | F12 | yes | Unicorn EXIT 1 numbers message | — |
-| F13 | yes | 7c7c8ea arena-check 1; after ok | — |
+| F13 | yes | forbids 32MB at PE 224 **and** 240; planted 240 write must fail; CI `native-arena-check.sh` | — |
+| walk-then-open | yes | Unicorn GFA-then-swap writes outside on 7c7c8ea, refused after GetFinalPathName; Windows junction swap until-hit | not closed until exact-head Windows job |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
 
@@ -31,17 +32,17 @@ F1 guest `let a be [1, 2]` / `extend with a, a`:
 - before: `TIMEOUT` (3s, never printed the list)
 - after: exit 0 `[1, 2, 1, 2]`
 
-F8 guest `extend with [], [2147483648]`:
-- before: exit 0 `[4294967296]`
-- after: exit 0 `[0]`
+F8 guest `extend with [], [2147483648, 549755813888, 2147483649]`:
+- before (WholeDiv clamp / one subtract): `[256]` / `[256]`/`[257]` class results, native `mov rcx,imm32` disagreed
+- after: host and Unicorn `[0, 0, 1]`
 
 F3 `compile-native.vire data/list-expr.vire` with `[1 + 2]`:
 - before: exit 1 `that expression is not ready`
 - after: compile exit 0; Unicorn STDOUT `3`
 
 F13 `bash tools/native-arena-check.sh`:
-- before: exit 1
-- after: `native arena check ok`
+- before: exit 1 (and a planted `poke32 … 240, 33554432` used to pass)
+- after: `native arena check ok`; planted 240 write fails; `check.yml` runs the script
 
 F12 Unicorn `extend with [], ["x"]` on 0d1a320: EXIT 1 `extend needs numbers in the extra list`
 
@@ -123,7 +124,15 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Fix: `SetFilePointerEx`+`SetEndOfFile` on the validated handle.
 - Fail-before: 7c7c8ea write PE vs racer hardlinking `data/f5-slot.txt` onto `data/f5-keep.txt` (40 rounds). Hit count logged; 0 hits ≠ proof of safety on 7c7c8ea (CREATE_ALWAYS still in that tree).
 - Pass-after: this SHA write PE **must** leave `KEEP` (0 victim hits).
-- Residual: race window is short; hardlink nlink==2 refuse is separately proven.
+- Residual: reopen-after-nlink is the handle truncate. Walk-then-open (GFA then CreateFile with no directory handle) is **not** this fix.
+
+## Walk-then-open TOCTOU (Adversary 4 at 3d9fc58)
+
+- Status: **emit + Unicorn this push**; Windows junction-swap recipe this push; **not frozen**
+- Exposure: after `GetFileAttributesA` on `data` and `data/note.txt`, rename `data`→`data.real` and point `data` at `outside/`. `CreateFileA('data/note.txt')` wrote outside `hacked`; real stayed `SECRET-KEEP-ME-LONG`. Static parent reparse still refused.
+- Fix: `rt_bind_path` opens `.` with `FILE_FLAG_BACKUP_SEMANTICS`, `GetFinalPathNameByHandleA` on cwd and the opened file; remainder must be `/data/` or `/site/` (fail closed).
+- Fail-before: 7c7c8ea write PE in Unicorn `walk-open-race` and Windows `walk-vuln.exe` until first outside hit.
+- Pass-after: this SHA write PE refuses; outside stays `SECRET-KEEP-ME-LONG`.
 
 ## F6 crash log hardlink truncate
 
@@ -147,7 +156,7 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Status: **fixed**
 - Exposure: extra `2147483648` should wrap to byte 0; `int` multiply overflowed.
 - Fix: `(double)q * 256.0`.
-- Proof: `F8_EmitU8WrapsAboveInt32Max`.
+- Proof: `F8_EmitU8WrapsToAnd255` plus Unicorn wrap guest `[0, 0, 1]`.
 - Residual: none for this wrap.
 
 ## F9 JDK-only APK plaintext manifest

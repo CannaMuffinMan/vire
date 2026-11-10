@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 static class VirePaths
 {
@@ -122,14 +124,21 @@ static class VirePaths
         return false;
     }
 
+    static StringComparison FolderComparison()
+    {
+        if (OperatingSystem.IsLinux()) return StringComparison.Ordinal;
+        return StringComparison.OrdinalIgnoreCase;
+    }
+
     public static bool InFolder(string folder, string path)
     {
         string fullFolder = Path.GetFullPath(folder);
         string fullPath = Path.GetFullPath(path);
         string prefix = fullFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
-        return string.Equals(fullPath, fullFolder, StringComparison.OrdinalIgnoreCase) ||
-            fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        StringComparison cmp = FolderComparison();
+        return string.Equals(fullPath, fullFolder, cmp) ||
+            fullPath.StartsWith(prefix, cmp);
     }
 
     public static bool UnderWritableZone(string root, string path)
@@ -150,8 +159,8 @@ static class VirePaths
         if (string.IsNullOrEmpty(folder)) folder = Directory.GetCurrentDirectory();
         string leaf = Path.GetFileName(folder);
         if (leaf != null &&
-            (string.Equals(leaf, "data", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(leaf, "site", StringComparison.OrdinalIgnoreCase)))
+            (string.Equals(leaf, "data", FolderComparison()) ||
+             string.Equals(leaf, "site", FolderComparison())))
         {
             string parent = Path.GetDirectoryName(folder);
             if (!string.IsNullOrEmpty(parent)) folder = parent;
@@ -189,6 +198,77 @@ static class VirePaths
         if (!UnderWritableZone(root, full))
             throw new VireError("files stay in data or site", line, column);
         return full;
+    }
+
+    public static string ReadAllTextInside(string path, string root, int line, int column)
+    {
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read);
+        ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
+        using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+        return reader.ReadToEnd();
+    }
+
+    public static void AppendAllTextInside(string path, string text, string root, int line, int column)
+    {
+        string parent = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+        using FileStream fs = OpenFile(path, FileMode.Append, FileAccess.Write);
+        ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
+        using StreamWriter writer = new StreamWriter(fs, leaveOpen: false);
+        writer.Write(text);
+        writer.Flush();
+    }
+
+    public static string ReadProgramText(string path, string folder, int line, int column)
+    {
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read);
+        ConfirmOpenedUnder(fs.SafeFileHandle, folder, line, column);
+        using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+        return reader.ReadToEnd();
+    }
+
+    static FileStream OpenFile(string path, FileMode mode, FileAccess access)
+    {
+        return new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
+    }
+
+    static void ConfirmOpenedWritable(SafeFileHandle handle, string root, int line, int column)
+    {
+        string final = FinalPathOf(handle, line, column);
+        if (!UnderWritableZone(root, final))
+            throw new VireError("files stay inside the program folder", line, column);
+    }
+
+    static void ConfirmOpenedUnder(SafeFileHandle handle, string root, int line, int column)
+    {
+        string final = FinalPathOf(handle, line, column);
+        if (!InFolder(root, final))
+            throw new VireError("files stay inside the program folder", line, column);
+    }
+
+    static string FinalPathOf(SafeFileHandle handle, int line, int column)
+    {
+        if (handle == null || handle.IsInvalid)
+            throw new VireError("files stay inside the program folder", line, column);
+        if (OperatingSystem.IsWindows())
+        {
+            StringBuilder buf = new StringBuilder(1024);
+            uint n = GetFinalPathNameByHandleW(handle, buf, (uint)buf.Capacity, 0);
+            if (n == 0 || n >= buf.Capacity)
+                throw new VireError("files stay inside the program folder", line, column);
+            string raw = buf.ToString();
+            if (raw.StartsWith(@"\\?\", StringComparison.Ordinal)) raw = raw.Substring(4);
+            return Path.GetFullPath(raw);
+        }
+        if (OperatingSystem.IsLinux())
+        {
+            int fd = handle.DangerousGetHandle().ToInt32();
+            FileSystemInfo target = File.ResolveLinkTarget("/proc/self/fd/" + fd, true);
+            if (target == null)
+                throw new VireError("files stay inside the program folder", line, column);
+            return Path.GetFullPath(target.FullName);
+        }
+        return Path.GetFullPath(".");
     }
 
     public static string ProgramFile(string root, string rel, int line)
@@ -368,6 +448,9 @@ static class VirePaths
 
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder filePath, uint cchFilePath, uint flags);
 
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static int LinuxLinkCount(string path)

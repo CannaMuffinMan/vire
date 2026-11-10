@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="${NATIVE_ARENA_ROOT:-$ROOT}"
 cd "$ROOT"
 rt="$ROOT/src/rt.vire"
 more="$ROOT/src/rt-more.vire"
@@ -11,6 +12,7 @@ grep -q 'emitU32 with image, 33554432' "$more"
 grep -q 'poke32 with head, 224, 1048576' "$pe"
 grep -q 'poke32 with head, 240, 1048576' "$pe"
 ! grep -q 'poke32 with head, 224, 33554432' "$pe"
+! grep -q 'poke32 with head, 240, 33554432' "$pe"
 grep -q 'pin with labels, "intern_tab", image' "$rt"
 grep -q 'pin with labels, "heap_cell", image' "$rt"
 grep -q 'emitRel with image, fixes, "heap_cell"' "$more"

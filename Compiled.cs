@@ -594,7 +594,7 @@ sealed class CompiledMachine
         {
             try
             {
-                string text = File.ReadAllText(Safe(args[0], line, col));
+                string text = VirePaths.ReadAllTextInside(Safe(args[0], line, col), root, line, col);
                 if (text.Length > MaxText) throw new VireError("file is too large", line, col);
                 return text;
             }
@@ -745,7 +745,7 @@ sealed class CompiledMachine
             VirePaths.RefuseProgram(path, line, col);
             string text = Show(args[1]);
             if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
-            try { VireFiles.AppendAllText(path, text); }
+            try { VirePaths.AppendAllTextInside(path, text, root, line, col); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
             return text;

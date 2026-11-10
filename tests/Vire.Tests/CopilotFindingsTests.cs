@@ -81,8 +81,16 @@ public class CopilotFindingsTests
     {
         string ps1 = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-sec-windows.ps1"));
         Assert.Contains("f4_double_read", ps1);
+        Assert.Contains("f4_intern_section", ps1);
         Assert.Contains("f5_two_process_race", ps1);
+        Assert.Contains("0/0 is a failed gate", ps1);
+        Assert.Contains("is not int:", ps1);
+        Assert.Contains("return [int]$hits", ps1);
+        Assert.Contains("walk-then-open TOCTOU", ps1);
+        Assert.Contains("GetFinalPathNameByHandle", ps1);
+        Assert.Contains("f_walk_then_open", ps1);
         Assert.Contains("f6_crash_pe", ps1);
+        Assert.Contains("mklink /H", ps1);
         Assert.Contains("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", ps1);
         Assert.Contains("do not let that become the function output", ps1);
     }
@@ -96,15 +104,24 @@ public class CopilotFindingsTests
     }
 
     [Fact]
-    public void F8_EmitU8WrapsAboveInt32Max()
+    public void F8_EmitU8WrapsToAnd255()
     {
-        List<object> got = (List<object>)Program.ExtendList(
-            new List<object>(),
-            new List<object> { 2147483648.0 },
-            100000,
-            1,
-            1);
-        Assert.Equal(0, Convert.ToInt32(got[0]));
+        object[] nums = { 2147483648.0, 549755813888.0, 2147483649.0 };
+        int[] want = { 0, 0, 1 };
+        for (int i = 0; i < nums.Length; i++)
+        {
+            List<object> got = (List<object>)Program.ExtendList(
+                new List<object>(),
+                new List<object> { nums[i] },
+                100000,
+                1,
+                1);
+            Assert.Equal(want[i], Convert.ToInt32(got[0]));
+        }
+        string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
+        Assert.Contains("emitOp with gen, [72, 185]", native);
+        Assert.Contains("emitU64 with (gen at \"image\"), (expr at 1)", native);
+        Assert.DoesNotContain("emitOp with gen, [72, 199, 193]", native);
     }
 
     [Fact]
@@ -147,8 +164,45 @@ public class CopilotFindingsTests
     [Fact]
     public void F13_ArenaCheckUsesOneMegHeaderReserves()
     {
-        string sh = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-arena-check.sh"));
+        string root = DualMode.FindRoot();
+        string sh = File.ReadAllText(Path.Combine(root, "tools", "native-arena-check.sh"));
         Assert.Contains("poke32 with head, 224, 1048576", sh);
+        Assert.Contains("poke32 with head, 240, 1048576", sh);
         Assert.Contains("! grep -q 'poke32 with head, 224, 33554432'", sh);
+        Assert.Contains("! grep -q 'poke32 with head, 240, 33554432'", sh);
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        Assert.Contains("native-arena-check.sh", yml);
+        Assert.Contains("HardLinkCannotRewriteDepsLock", yml);
+        string plantedRoot = Path.Combine(root, "data", "arena-plant-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(plantedRoot, "src"));
+        Directory.CreateDirectory(Path.Combine(plantedRoot, "tools"));
+        File.Copy(Path.Combine(root, "src", "rt.vire"), Path.Combine(plantedRoot, "src", "rt.vire"));
+        File.Copy(Path.Combine(root, "src", "rt-more.vire"), Path.Combine(plantedRoot, "src", "rt-more.vire"));
+        File.Copy(Path.Combine(root, "compile-native.vire"), Path.Combine(plantedRoot, "compile-native.vire"));
+        File.Copy(Path.Combine(root, "tools", "native-arena-check.sh"), Path.Combine(plantedRoot, "tools", "native-arena-check.sh"));
+        string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        Assert.DoesNotContain("poke32 with head, 240, 33554432", pe);
+        File.WriteAllText(Path.Combine(plantedRoot, "src", "pe.vire"),
+            pe.Replace("poke32 with head, 240, 1048576", "poke32 with head, 240, 33554432"));
+        try
+        {
+            System.Diagnostics.ProcessStartInfo info = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "bash",
+                WorkingDirectory = plantedRoot,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            info.Environment["NATIVE_ARENA_ROOT"] = plantedRoot;
+            info.ArgumentList.Add(Path.Combine(root, "tools", "native-arena-check.sh"));
+            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(info);
+            proc.WaitForExit(30000);
+            Assert.NotEqual(0, proc.ExitCode);
+        }
+        finally
+        {
+            try { Directory.Delete(plantedRoot, true); } catch (IOException) { }
+        }
     }
 }
