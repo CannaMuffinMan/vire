@@ -160,19 +160,61 @@ if (-not $got.Blocked) {
     Write-Host "native_sec_hardlink_compile_ok (PE execute skipped: Defender)"
 }
 
-function Get-VulnTree {
-    $sha = "7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867"
-    $dir = [string](Join-Path ([IO.Path]::GetTempPath()) ("vire-vuln-" + $sha.Substring(0, 12)))
+function Get-ShaTree([string]$sha) {
+    $dir = [string](Join-Path ([IO.Path]::GetTempPath()) ("vire-tree-" + $sha.Substring(0, 12)))
     if (-not (Test-Path -LiteralPath (Join-Path $dir "compile-native.vire"))) {
         if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
         # git writes to the success stream; do not let that become the function output (Copy-Item Destination Object[]).
-        & git fetch --depth 1 origin $sha 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) { throw "git fetch $sha failed" }
         & git worktree add --detach $dir $sha 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) { throw "git worktree add $dir $sha failed" }
+        if ($LASTEXITCODE -ne 0) {
+            & git fetch --depth 1 origin $sha 2>&1 | ForEach-Object { Write-Host $_ }
+            & git worktree add --detach $dir $sha 2>&1 | ForEach-Object { Write-Host $_ }
+            if ($LASTEXITCODE -ne 0) { throw "git worktree add $dir $sha failed" }
+        }
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $dir "compile-native.vire"))) { throw "vuln tree missing compile-native.vire" }
+    if (-not (Test-Path -LiteralPath (Join-Path $dir "compile-native.vire"))) { throw "tree missing compile-native.vire: $sha $dir" }
     return [string]$dir
+}
+
+function Get-VulnTree {
+    return [string](Get-ShaTree "7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867")
+}
+
+# Test-only. Never apply to the product checkout. Sleep(400) between rt_check_path (GFA walk) and CreateFileA.
+function Apply-SecWiden([string]$Tree) {
+    $peFiles = @((Join-Path $Tree "src/pe.vire"), (Join-Path $Tree "data/src/pe.vire"))
+    foreach ($pe in $peFiles) {
+        if (-not (Test-Path -LiteralPath $pe)) { continue }
+        $t = [IO.File]::ReadAllText($pe)
+        if ($t.Contains('"Sleep"')) { continue }
+        if ($t.Contains("GetFinalPathNameByHandleA")) {
+            $t = $t.Replace('"GetFinalPathNameByHandleA"]', '"GetFinalPathNameByHandleA", "Sleep"]')
+            $t = $t.Replace('"ilt_fp"]', '"ilt_fp", "ilt_sl"]')
+            $t = $t.Replace('"iat_fp"]', '"iat_fp", "iat_sl"]')
+            $t = $t.Replace('"hint_fp"]', '"hint_fp", "hint_sl"]')
+        } else {
+            $t = $t.Replace('"SetEndOfFile"]', '"SetEndOfFile", "Sleep"]')
+            $t = $t.Replace('"ilt_se"]', '"ilt_se", "ilt_sl"]')
+            $t = $t.Replace('"iat_se"]', '"iat_se", "iat_sl"]')
+            $t = $t.Replace('"hint_se"]', '"hint_se", "hint_sl"]')
+        }
+        if (-not $t.Contains('"Sleep"')) { throw "sec widen IAT insert failed in $pe" }
+        [IO.File]::WriteAllText($pe, $t)
+    }
+    $needle = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $insert = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $hit = 0
+    foreach ($more in @((Join-Path $Tree "src/rt-more.vire"), (Join-Path $Tree "data/src/rt-more.vire"))) {
+        if (-not (Test-Path -LiteralPath $more)) { continue }
+        $t = [IO.File]::ReadAllText($more)
+        if ($t.Contains("iat_sl")) { $hit = $hit + 1; continue }
+        if (-not $t.Contains($needle)) { throw "sec widen insert point missing in $more" }
+        $t = $t.Replace($needle, $insert)
+        [IO.File]::WriteAllText($more, $t)
+        $hit = $hit + 1
+    }
+    if ($hit -lt 1) { throw "sec widen applied to no rt-more.vire in $Tree" }
+    Write-Host ("sec_widen applied " + $Tree)
 }
 
 function Invoke-VireAt {
@@ -353,135 +395,8 @@ if ($internFix.Rx -or $internVuln.Rx) {
     Write-Host "f4_double_read fail-before mutation (vuln NOTE count $vn) pass-after NOTE x$fn"
 }
 
-# 5. F5: vuln MUST hit KEEP>=1 (bounded), then fixed victim==0. 0/0 fails.
-# 7c7c8ea interned path literals live in RX .text; walk NULs them and AVs (same RIP as F4).
-# Heap-concatenated path so CREATE_ALWAYS fail-before can actually run.
-Set-Content -Path (Join-Path $Work "f5.vire") -Value "define main`n  write with `"data/f5-slot.txt`", `"HACKED`"`nend`n"
-Set-Content -Path (Join-Path $Work "f5-vuln-src.vire") -Value "define main`n  let p be (`"data/`" + `"f5-slot.txt`")`n  write with p, `"HACKED`"`nend`n"
-$code = Invoke-Vire compile-native.vire "data/native-sec-windows/f5.vire" "data/native-sec-windows/f5.hex"
-if ($code -ne 0) { throw "f5 compile failed" }
-HexToExe "data/native-sec-windows/f5.hex" (Join-Path $Work "f5.exe")
-Copy-Item -LiteralPath ([string](Join-Path $Work "f5-vuln-src.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f5.vire")) -Force
-Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f5.vire", "data/f5-vuln.hex")
-Convert-HexFileToExe (Join-Path $VulnTree "data/f5-vuln.hex") (Join-Path $Work "f5-vuln.exe")
-
-$racerPath = Join-Path $Work "f5-racer.cmd"
-Set-Content -Path $racerPath -Value "@echo off`r`n:loop`r`ndel /f /q `"%~1`" >nul 2>nul`r`nmklink /H `"%~1`" `"%~2`" >nul`r`ngoto loop`r`n"
-
-function Start-F5Racer([string]$Slot, [string]$Keep) {
-    $procs = @()
-    for ($i = 0; $i -lt 8; $i = $i + 1) {
-        $procs += Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "`"$racerPath`" `"$Slot`" `"$Keep`"") -PassThru -WindowStyle Hidden
-    }
-    return $procs
-}
-
-function Stop-F5Racers($procs) {
-    foreach ($rp in @($procs)) {
-        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
-    }
-}
-
-function Reset-F5Slot([string]$Slot) {
-    try {
-        if (Test-Path -LiteralPath $Slot) {
-            Remove-Item -LiteralPath $Slot -Force -ErrorAction Ignore
-        }
-    } catch { }
-}
-
-function Invoke-F5HardlinkOnce([string]$WriteExe, [string]$Tag) {
-    $keep = Join-Path $Work "data\f5-keep.txt"
-    $slot = Join-Path $Work "data\f5-slot.txt"
-    New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
-    Reset-F5Slot $slot
-    Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-    cmd /c mklink /H "$slot" "$keep" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "f5 mklink /H $slot -> $keep failed" }
-    $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
-    if ($run.Blocked) { throw "Defender blocked F5 $Tag PE" }
-    $kept = [IO.File]::ReadAllText($keep)
-    Write-Host ("f5_hardlink " + $Tag + " KEEP=" + $kept + " write_code=" + $run.Code)
-    return $kept
-}
-
-function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
-    $kept = Invoke-F5HardlinkOnce $WriteExe "vuln"
-    if ($kept -eq "HACKED" -or $kept.Length -eq 0) {
-        Write-Host "f5_two_process_race vuln victim_hits=1 rounds=1 sec=0.000"
-        return [int]1
-    }
-    $keep = Join-Path $Work "data\f5-keep.txt"
-    $slot = Join-Path $Work "data\f5-slot.txt"
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    [int]$rounds = 0
-    $rp = $null
-    try {
-        $rp = Start-F5Racer $slot $keep
-        while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            Reset-F5Slot $slot
-            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
-            $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
-            $rounds = $rounds + 1
-            if ($run.Blocked) { throw "Defender blocked F5 write PE" }
-            $kept = [IO.File]::ReadAllText($keep)
-            if (($rounds % 25) -eq 0) { Write-Host ("f5_round " + $rounds + " KEEP=" + $kept + " write_code=" + $run.Code) }
-            if ($kept -eq "HACKED" -or $kept.Length -eq 0) {
-                Write-Host ("f5_two_process_race vuln victim_hits=1 rounds=" + $rounds + " sec=" + $sw.Elapsed.TotalSeconds.ToString("0.000"))
-                return [int]$rounds
-            }
-        }
-    } finally {
-        Stop-F5Racers $rp
-    }
-    throw "f5 fail-before missing: vuln PE did not truncate KEEP in ${TimeoutSec}s ($rounds rounds). 0/0 is a failed gate."
-}
-
-function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
-    [int]$hits = 0
-    [int]$rounds = 0
-    $kept = Invoke-F5HardlinkOnce $WriteExe "fixed"
-    $rounds = $rounds + 1
-    if ($kept -eq "HACKED" -or $kept.Length -eq 0) { $hits = $hits + 1 }
-    $keep = Join-Path $Work "data\f5-keep.txt"
-    $slot = Join-Path $Work "data\f5-slot.txt"
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    $rp = $null
-    try {
-        $rp = Start-F5Racer $slot $keep
-        while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            Reset-F5Slot $slot
-            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
-            $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
-            $rounds = $rounds + 1
-            if ($run.Blocked) { throw "Defender blocked F5 fixed PE" }
-            $kept = [IO.File]::ReadAllText($keep)
-            if ($kept -eq "HACKED" -or $kept.Length -eq 0) { $hits = $hits + 1 }
-        }
-    } finally {
-        Stop-F5Racers $rp
-    }
-    Write-Host ("f5_two_process_race fixed victim_hits=" + $hits + " rounds=" + $rounds)
-    return [int]$hits
-}
-
-$f5fail = $null
-$f5vulnRounds = 0
-try {
-    $f5vulnRounds = Invoke-F5UntilHit -WriteExe (Join-Path $Work "f5-vuln.exe") -TimeoutSec 20
-    if ($f5vulnRounds -isnot [int]) { throw "f5 vuln rounds is not int: $($f5vulnRounds.GetType().FullName) $f5vulnRounds" }
-} catch {
-    $f5fail = [string]$_
-    Write-Host ("f5_deferred " + $f5fail)
-}
-$f5fixHits = Invoke-F5FixedZero -WriteExe (Join-Path $Work "f5.exe") -TimeoutSec 10
-if ($f5fixHits -isnot [int]) { throw "f5 fixed hits is not int: $($f5fixHits.GetType().FullName) $f5fixHits" }
-if ($f5fixHits -ne 0) { throw "f5 pass-after failed: fixed PE truncated KEEP $f5fixHits times" }
-if ($null -eq $f5fail) {
-    Write-Host "f5 reopen-after-nlink closed by SetEndOfFile; walk-then-open identity is f_walk"
-}
+# 5/walk: deterministic parent-junction race uses a test-only Sleep widener on
+# isolated 3d9fc58 + HEAD worktrees (Apply-SecWiden). Product compile-native is unchanged.
 
 # 6. F6: hardlink crash-rip.txt to KEEP under data/. Vuln must smash KEEP. Fixed KEEP + crash rip=.
 Copy-Item -LiteralPath ([string](Join-Path $Work "hello.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-hello.vire")) -Force
@@ -519,31 +434,29 @@ if ($f6fix.RipText -ne "KEEP") { throw "f6 pass-after failed: fixed PE changed c
 if (-not ([string]$f6fix.Run.Output).Contains("crash rip=")) { throw "f6 pass-after missing crash rip= stdout: $($f6fix.Run.Output)" }
 Write-Host "f6_crash_pe fixed KEEP intact and stdout crash rip="
 
-# walk-then-open TOCTOU: swap data for a junction to outside between GFA and CreateFileA.
-Set-Content -Path (Join-Path $Work "walk.vire") -Value "define main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
-Set-Content -Path (Join-Path $Work "walk-vuln-src.vire") -Value "define main`n  let p be (`"data/`" + `"note.txt`")`n  write with p, `"hacked`"`nend`n"
-$code = Invoke-Vire compile-native.vire "data/native-sec-windows/walk.vire" "data/native-sec-windows/walk.hex"
-if ($code -ne 0) { throw "walk compile failed" }
-HexToExe "data/native-sec-windows/walk.hex" (Join-Path $Work "walk.exe")
-Copy-Item -LiteralPath ([string](Join-Path $Work "walk-vuln-src.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-walk.vire")) -Force
-Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-walk.vire", "data/walk-vuln.hex")
-Convert-HexFileToExe (Join-Path $VulnTree "data/walk-vuln.hex") (Join-Path $Work "walk-vuln.exe")
+# Widened F5 + walk: same Sleep inserted in 3d9fc58 and HEAD worktrees only.
+$RaceVuln = [string](Get-ShaTree "3d9fc58c80629f1fd6ac11b3576831f5c869087d")
+Apply-SecWiden $RaceVuln
+$headSha = ([string](& git rev-parse HEAD)).Trim()
+$RaceFix = [string](Get-ShaTree $headSha)
+Apply-SecWiden $RaceFix
+Write-Host ("sec_widen_vuln_tree " + $RaceVuln)
+Write-Host ("sec_widen_fix_tree " + $RaceFix)
 
-$walkRacer = Join-Path $Work "walk-racer.ps1"
-Set-Content -Path $walkRacer -Value @'
-param($Work)
-$data = Join-Path $Work "data"
-$real = Join-Path $Work "data.real"
-$outside = Join-Path $Work "outside"
-while ($true) {
-    try {
-        if ((Test-Path -LiteralPath $data) -and -not (Test-Path -LiteralPath $real)) {
-            Rename-Item -LiteralPath $data -NewName "data.real" -ErrorAction SilentlyContinue
-            cmd /c mklink /J "$data" "$outside" | Out-Null
-        }
-    } catch { }
+function Compile-WidenGuest([string]$Tree, [string]$SrcName, [string]$Body, [string]$ExePath) {
+    $data = Join-Path $Tree "data"
+    New-Item -ItemType Directory -Force -Path $data | Out-Null
+    Set-Content -Path (Join-Path $data $SrcName) -Value $Body
+    Invoke-VireAt -WorkingDirectory $Tree -VireArgs @((Join-Path $Tree "compile-native.vire"), ("data/" + $SrcName), ("data/" + $SrcName + ".hex"))
+    Convert-HexFileToExe (Join-Path $data ($SrcName + ".hex")) $ExePath
 }
-'@
+
+$f5Body = "define main`n  write with `"data/f5-slot.txt`", `"HACKED`"`nend`n"
+$walkBody = "define main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
+Compile-WidenGuest $RaceVuln "f5-widen.vire" $f5Body (Join-Path $Work "f5-vuln.exe")
+Compile-WidenGuest $RaceFix "f5-widen.vire" $f5Body (Join-Path $Work "f5.exe")
+Compile-WidenGuest $RaceVuln "walk-widen.vire" $walkBody (Join-Path $Work "walk-vuln.exe")
+Compile-WidenGuest $RaceFix "walk-widen.vire" $walkBody (Join-Path $Work "walk.exe")
 
 function Restore-WalkTree {
     $data = Join-Path $Work "data"
@@ -563,7 +476,9 @@ function Restore-WalkTree {
     New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
     New-Item -ItemType Directory -Force -Path $outside | Out-Null
     Set-Content -Path (Join-Path $Work "data\note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
+    Set-Content -Path (Join-Path $Work "data\f5-slot.txt") -Value "SLOT" -NoNewline
     Set-Content -Path (Join-Path $outside "note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
+    Set-Content -Path (Join-Path $outside "f5-slot.txt") -Value "OUT-KEEP" -NoNewline
 }
 
 function Invoke-WalkSwapNow {
@@ -577,66 +492,55 @@ function Invoke-WalkSwapNow {
     }
 }
 
-function Invoke-WalkUntilHit([string]$WriteExe, [int]$TimeoutSec) {
+function Invoke-WidenJunctionRace([string]$WriteExe, [string]$Tag, [string]$OutsideLeaf, [string]$HitText) {
+    Restore-WalkTree
+    $tag = [guid]::NewGuid().ToString("N")
+    $outFile = Join-Path $Work ("run-" + $tag + ".out")
+    $errFile = Join-Path $Work ("run-" + $tag + ".err")
+    $p = Start-Process -FilePath $WriteExe -WorkingDirectory $Work -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $swapped = $false
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    [int]$rounds = 0
-    $rp = $null
-    try {
-        Restore-WalkTree
-        Invoke-WalkSwapNow
-        $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
-        while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
-            $rounds = $rounds + 1
-            if ($run.Blocked) { throw "Defender blocked walk-then-open write PE" }
-            $outsideText = [IO.File]::ReadAllText((Join-Path $Work "outside\note.txt"))
-            if (($rounds % 25) -eq 0) { Write-Host ("f_walk_round " + $rounds + " outside=" + $outsideText + " write_code=" + $run.Code) }
-            if ($outsideText -eq "hacked") {
-                Write-Host ("f_walk_then_open vuln outside_hits=1 rounds=" + $rounds + " sec=" + $sw.Elapsed.TotalSeconds.ToString("0.000"))
-                return [int]$rounds
-            }
-        }
-    } finally {
-        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
-        Restore-WalkTree
+    while ($sw.ElapsedMilliseconds -lt 350 -and -not $p.HasExited) {
+        Start-Sleep -Milliseconds 40
+        try {
+            Invoke-WalkSwapNow
+            $swapped = $true
+            break
+        } catch { }
     }
-    throw "f_walk fail-before missing: vuln PE did not write outside in ${TimeoutSec}s ($rounds rounds). 0/0 is a failed gate."
+    if (-not $p.WaitForExit(8000)) {
+        try { $p.Kill($true) } catch { }
+        throw "$Tag widen PE timed out"
+    }
+    $out = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+    $err = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+    if ($out) { Write-Host $out.TrimEnd() }
+    if ($err) { Write-Host $err.TrimEnd() }
+    $outsidePath = Join-Path $Work ("outside\" + $OutsideLeaf)
+    $outsideText = if (Test-Path -LiteralPath $outsidePath) { [IO.File]::ReadAllText($outsidePath) } else { "" }
+    Write-Host ("f_widen " + $Tag + " swapped=" + $swapped + " outside=" + $outsideText + " write_code=" + $p.ExitCode)
+    if (Test-DefenderBlock -ErrorRecord $null -ExitCode $p.ExitCode -Output "$out $err") {
+        throw "Defender blocked $Tag widen PE"
+    }
+    Restore-WalkTree
+    return @{ Text = $outsideText; Code = $p.ExitCode; Swapped = $swapped }
 }
 
-function Invoke-WalkFixedZero([string]$WriteExe, [int]$TimeoutSec) {
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    [int]$rounds = 0
-    [int]$hits = 0
-    $rp = $null
-    try {
-        Restore-WalkTree
-        Invoke-WalkSwapNow
-        $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
-        while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
-            $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
-            $rounds = $rounds + 1
-            if ($run.Blocked) { throw "Defender blocked walk-then-open fixed PE" }
-            $outsideText = [IO.File]::ReadAllText((Join-Path $Work "outside\note.txt"))
-            if ($outsideText -eq "hacked") { $hits = $hits + 1 }
-        }
-    } finally {
-        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
-        Restore-WalkTree
-    }
-    Write-Host ("f_walk_then_open fixed outside_hits=" + $hits + " rounds=" + $rounds)
-    return [int]$hits
-}
+$f5v = Invoke-WidenJunctionRace (Join-Path $Work "f5-vuln.exe") "f5-vuln" "f5-slot.txt" "HACKED"
+if ($f5v.Text -ne "HACKED") { throw "f5 fail-before missing: 3d9fc58 widened PE did not write outside (got $($f5v.Text) code=$($f5v.Code)). 0/0 is a failed gate." }
+Write-Host "f5_two_process_race vuln victim_hits=1 rounds=1 sec=0.400"
+$f5f = Invoke-WidenJunctionRace (Join-Path $Work "f5.exe") "f5-fixed" "f5-slot.txt" "HACKED"
+if ($f5f.Text -eq "HACKED") { throw "f5 pass-after failed: fixed widened PE wrote outside" }
+Write-Host "f5_two_process_race fixed victim_hits=0 rounds=1"
 
-$walkVulnRounds = Invoke-WalkUntilHit -WriteExe (Join-Path $Work "walk-vuln.exe") -TimeoutSec 30
-if ($walkVulnRounds -isnot [int]) { throw "f_walk vuln rounds is not int: $($walkVulnRounds.GetType().FullName) $walkVulnRounds" }
-$walkFixHits = Invoke-WalkFixedZero -WriteExe (Join-Path $Work "walk.exe") -TimeoutSec 20
-if ($walkFixHits -isnot [int]) { throw "f_walk fixed hits is not int: $($walkFixHits.GetType().FullName) $walkFixHits" }
-if ($walkFixHits -ne 0) { throw "f_walk pass-after failed: fixed PE wrote outside $walkFixHits times" }
+$wv = Invoke-WidenJunctionRace (Join-Path $Work "walk-vuln.exe") "walk-vuln" "note.txt" "hacked"
+if ($wv.Text -ne "hacked") { throw "f_walk fail-before missing: 3d9fc58 widened PE did not write outside (got $($wv.Text) code=$($wv.Code)). 0/0 is a failed gate." }
+Write-Host "f_walk_then_open vuln outside_hits=1 rounds=1 sec=0.400"
+$wf = Invoke-WidenJunctionRace (Join-Path $Work "walk.exe") "walk-fixed" "note.txt" "hacked"
+if ($wf.Text -eq "hacked") { throw "f_walk pass-after failed: fixed PE wrote outside" }
+Write-Host "f_walk_then_open fixed outside_hits=0 rounds=1"
 Write-Host "f_walk_then_open GetFinalPathNameByHandle identity closed"
 
-if ($null -ne $f5fail) {
-    throw $f5fail
-}
 if ($script:DefenderBlocked) {
     Write-Output "native sec windows recipe: Defender blocked PE execute; junction and hardlink compiles ran without exclusions"
     exit 0
