@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
 static class VirePaths
@@ -202,7 +203,7 @@ static class VirePaths
 
     public static string ReadAllTextInside(string path, string root, int line, int column)
     {
-        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read);
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read, root, line, column);
         ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
         using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
         return reader.ReadToEnd();
@@ -212,7 +213,7 @@ static class VirePaths
     {
         string parent = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
-        using FileStream fs = OpenFile(path, FileMode.Append, FileAccess.Write);
+        using FileStream fs = OpenFile(path, FileMode.Append, FileAccess.Write, root, line, column);
         ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
         using StreamWriter writer = new StreamWriter(fs, leaveOpen: false);
         writer.Write(text);
@@ -221,15 +222,32 @@ static class VirePaths
 
     public static string ReadProgramText(string path, string folder, int line, int column)
     {
-        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read);
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read, folder, line, column);
         ConfirmOpenedUnder(fs.SafeFileHandle, folder, line, column);
         using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
         return reader.ReadToEnd();
     }
 
-    static FileStream OpenFile(string path, FileMode mode, FileAccess access)
+    static FileStream OpenFile(string path, FileMode mode, FileAccess access, string root, int line, int column)
     {
-        return new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
+        ulong dev = 0;
+        ulong ino = 0;
+        bool existed = false;
+        if (OperatingSystem.IsLinux())
+            existed = TryLinuxPathId(path, out dev, out ino);
+        string widen = Environment.GetEnvironmentVariable("VIRE_TEST_TOCTOU_MS");
+        int widenMs;
+        if (int.TryParse(widen, out widenMs) && widenMs > 0 && widenMs < 2000)
+            Thread.Sleep(widenMs);
+        FileStream fs = new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
+        if (OperatingSystem.IsLinux() && existed)
+        {
+            ulong d2;
+            ulong i2;
+            if (!TryLinuxFdId(fs.SafeFileHandle, out d2, out i2) || d2 != dev || i2 != ino)
+                throw new VireError("files stay inside the program folder", line, column);
+        }
+        return fs;
     }
 
     static void ConfirmOpenedWritable(SafeFileHandle handle, string root, int line, int column)
@@ -453,6 +471,53 @@ static class VirePaths
     static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder filePath, uint cchFilePath, uint flags);
 
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static bool TryLinuxPathId(string path, out ulong dev, out ulong ino)
+    {
+        dev = 0;
+        ino = 0;
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            LinuxStatArm64 stat;
+            if (LinuxLStatArm64(path, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+        else
+        {
+            LinuxStatX64 stat;
+            if (LinuxLStatX64(path, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static bool TryLinuxFdId(SafeFileHandle handle, out ulong dev, out ulong ino)
+    {
+        dev = 0;
+        ino = 0;
+        int fd = handle.DangerousGetHandle().ToInt32();
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            LinuxStatArm64 stat;
+            if (LinuxFStatArm64(fd, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+        else
+        {
+            LinuxStatX64 stat;
+            if (LinuxFStatX64(fd, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static int LinuxLinkCount(string path)
     {
         ulong nlink;
@@ -529,4 +594,12 @@ static class VirePaths
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
     static extern int LinuxLStatArm64(string path, out LinuxStatArm64 stat);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
+    static extern int LinuxFStatX64(int fd, out LinuxStatX64 stat);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
+    static extern int LinuxFStatArm64(int fd, out LinuxStatArm64 stat);
 }

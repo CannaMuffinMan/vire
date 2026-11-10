@@ -140,6 +140,25 @@ vuln_dir=$(mktemp -d)
 git cat-file -e "$vuln_sha^{commit}"
 git archive "$vuln_sha" compile-native.vire src data/src data/compile-native.vire | tar -C "$vuln_dir" -xf -
 if [[ -f $vuln_dir/compile-native.vire ]]; then
+  mkdir -p "$vuln_dir/data"
+  cp "$work/wrap.vire" "$vuln_dir/data/wrap.vire"
+  (cd "$vuln_dir" && dotnet exec "$root/$dll" compile-native.vire data/wrap.vire data/wrap-vuln.hex)
+  wrap_v=$(emu "$vuln_dir/data/wrap-vuln.hex" "$work" plain)
+  echo "$wrap_v"
+  echo "$wrap_v" | grep -F -q '[0, 0, 1]' && { echo 'F8 fail-before expected wrap mismatch'; exit 1; }
+  echo F8_fail_before_native_not_001
+  cp "$work/dotbat.vire" "$vuln_dir/data/dotbat.vire"
+  (cd "$vuln_dir" && dotnet exec "$root/$dll" compile-native.vire data/dotbat.vire data/dotbat-vuln.hex)
+  rm -f "$work/data/payload.bat" "$work/data/payload.bat."
+  dotbat_v=$(emu "$vuln_dir/data/dotbat-vuln.hex" "$work" plain)
+  echo "$dotbat_v"
+  if [[ -e $work/data/payload.bat || -e $work/data/payload.bat. ]]; then
+    echo trailing_dot_fail_before_created
+  else
+    echo trailing_dot_fail_before_emu_may_not_strip
+  fi
+  rm -f "$work/data/payload.bat" "$work/data/payload.bat."
+
   rm -rf "$work/data" "$work/data.real" "$work/outside"
   mkdir -p "$work/data" "$work/outside" "$vuln_dir/data"
   printf 'SECRET-KEEP-ME-LONG' > "$work/data/note.txt"

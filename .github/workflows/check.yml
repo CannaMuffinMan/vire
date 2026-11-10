@@ -52,6 +52,7 @@ jobs:
       - run: dotnet build vire.csproj -c Release
       - run: bash tools/selfhost-check.sh
       - run: bash tools/native-arena-check.sh
+      - run: bash tools/native-sec-emu-check.sh
   selfhost-windows:
     runs-on: windows-latest
     steps:
@@ -70,6 +71,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
       - run: pwsh -File tools/native-hello-handoff.ps1
+      - run: dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter "FullyQualifiedName~HostCheckThenOpenToctouFailBeforePassAfter"
       - run: pwsh -File tools/native-sec-windows.ps1
       - run: pwsh -File tools/native-smoke.ps1
   native-selfhost-windows:

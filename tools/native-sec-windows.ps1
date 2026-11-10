@@ -114,6 +114,40 @@ if (-not $helloRun.Blocked) {
     if ($helloRun.Code -ne 0 -or ([string]$helloRun.Output).Trim() -ne "hello from vire") { throw "hello exe failed: $($helloRun.Output)" }
 }
 
+# Host C# check-then-open TOCTOU (interpreter, not PE). Fail-before: DataOrSite then File.AppendAllText.
+$hostDir = Join-Path $Work "host-toctou"
+New-Item -ItemType Directory -Force -Path (Join-Path $hostDir "data") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $hostDir "outside") | Out-Null
+Set-Content -Path (Join-Path $hostDir "data\note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
+Set-Content -Path (Join-Path $hostDir "outside\note.txt") -Value "OUTSIDE-KEEP" -NoNewline
+Set-Content -Path (Join-Path $hostDir "append.vire") -Value "define main`n  append with `"data/note.txt`", `"PWN`"`nend`n"
+$dataHost = Join-Path $hostDir "data"
+$outHost = Join-Path $hostDir "outside"
+Rename-Item -LiteralPath $dataHost -NewName "data.real"
+cmd /c mklink /J "$dataHost" "$outHost" | Out-Null
+$code = Invoke-Vire -TimeoutSec 30 (Join-Path $hostDir "append.vire")
+if (Test-Path (Join-Path $outHost "note.txt")) {
+    $hostOutside = [IO.File]::ReadAllText((Join-Path $outHost "note.txt"))
+} else { $hostOutside = "" }
+Write-Host ("host_toctou_fixed outside=" + $hostOutside + " code=" + $code)
+if ($hostOutside.Contains("PWN")) { throw "host TOCTOU pass-after failed: interpreter wrote outside" }
+cmd /c rmdir "$dataHost" | Out-Null
+if (Test-Path (Join-Path $hostDir "data.real")) { Rename-Item -LiteralPath (Join-Path $hostDir "data.real") -NewName "data" }
+
+# Trailing dot/space native refuse on the product PE.
+Set-Content -Path (Join-Path $Work "dotbat.vire") -Value "define main`n  write with `"data/payload.bat.`", `"pwn`"`nend`n"
+$code = Invoke-Vire compile-native.vire "data/native-sec-windows/dotbat.vire" "data/native-sec-windows/dotbat.hex"
+if ($code -ne 0) { throw "dotbat compile failed" }
+HexToExe "data/native-sec-windows/dotbat.hex" (Join-Path $Work "dotbat.exe")
+New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
+$dotRun = Invoke-NativeExe -ExePath (Join-Path $Work "dotbat.exe") -WorkingDirectory $Work
+if (-not $dotRun.Blocked) {
+    if ($dotRun.Code -eq 0) { throw "trailing-dot write PE must fail closed" }
+    if (Test-Path (Join-Path $Work "data\payload.bat")) { throw "trailing dot created payload.bat" }
+    if (Test-Path (Join-Path $Work "data\payload.bat.")) { throw "trailing dot created payload.bat." }
+    Write-Host "native_trailing_dot refused"
+}
+
 # 2. Parent directory junction. Compile always; execute only if Defender allows.
 $outside = Join-Path $Work "outside"
 New-Item -ItemType Directory -Path $outside | Out-Null

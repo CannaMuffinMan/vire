@@ -175,6 +175,8 @@ public class CopilotFindingsTests
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.Contains("native-arena-check.sh", yml);
         Assert.Contains("HardLinkCannotRewriteDepsLock", yml);
+        Assert.Contains("HostCheckThenOpenToctouFailBeforePassAfter", yml);
+        Assert.Contains("native-sec-emu-check.sh", yml);
         string plantedRoot = Path.Combine(root, "data", "arena-plant-" + Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(Path.Combine(plantedRoot, "src"));
         Directory.CreateDirectory(Path.Combine(plantedRoot, "tools"));
