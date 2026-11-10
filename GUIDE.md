@@ -2,7 +2,9 @@
 
 This is the manual for Vire. A person or a coding agent can follow it from a blank folder to a working program.
 
-Vire is one language. Source files use the extension `.vire`. The runner is built with `dotnet build` (or a published `vire` / `vire.exe` from CI artifacts). Definitions, data, packages, and windows are all written in Vire.
+Vire is one language. Source files use the extension `.vire`. The runner most people use is built with `dotnet build` (or a published `vire` / `vire.exe` from CI artifacts). That runner is the interpreter. Definitions, data, packages, and windows are all written in Vire.
+
+The native compiler is separate. It is a Windows x64 PE (`gen1.exe`) produced from `compile-native.vire`. Bootstrap still needs .NET. After `gen1.exe` exists, hello and a full compiler rebuild use that PE. Follow [docs/native-clean-machine.md](docs/native-clean-machine.md). Do not call a published single-file `vire.exe` native. Do not call Unicorn a Windows run.
 
 ## 1. What a program is
 
@@ -330,10 +332,10 @@ A compiled program is a `VC2` file: magic `VIRE-VC2`, version 2, a random 12-byt
 - Keep paths relative. Do not invent `..` or drive letters.
 - Do not ask Vire to write an executable or a script. That is refused.
 - Prefer the window operations for an application. Write browser files into `site/` and open them with `listen` or a static server.
-- After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples.
+- After changing `Vire.cs`, rebuild with `dotnet build -c Release` (section 2) before running samples. After changing `compile-native.vire` or `src/*.vire`, rebuild gen1 with the bootstrap in [NATIVE-COMPILER.md](NATIVE-COMPILER.md), then prove with [docs/native-clean-machine.md](docs/native-clean-machine.md).
 
 ## 16. Limits
 
 Vire is a general-purpose language for programs, files, packages, windows, and a local site. It does not ship a public package index, a phone store, or device-driver tooling. File and package access stays in the program folder so a sample cannot wander across the disk.
 
-Build commands use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`.
+Interpreter and tests use the .NET 10 SDK: `dotnet build -c Release`, `dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release`, `dotnet run -c Release -- tests.vire`. The Windows desktop runner is `dotnet build windows/vire.windows.csproj -c Release`. Native PE bootstrap and prove commands are in [SELFHOST.md](SELFHOST.md).
