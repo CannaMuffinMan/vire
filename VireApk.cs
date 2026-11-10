@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Text;
 
 static class VireApk
@@ -22,8 +21,10 @@ static class VireApk
         string javaHome = FindJavaHome();
         string java = FirstExisting(Path.Combine(javaHome, "bin", "java.exe"), Path.Combine(javaHome, "bin", "java"));
         string androidJar = FindAndroidJar();
-        if (aapt == null || zipalign == null || !File.Exists(apksignerJar) || androidJar == null)
-            return PackZipSigned(root, javaHome, line, col);
+        if (aapt == null) throw new VireError("aapt is not installed", line, col);
+        if (zipalign == null) throw new VireError("zipalign is not installed", line, col);
+        if (!File.Exists(apksignerJar)) throw new VireError("apksigner is not installed", line, col);
+        if (androidJar == null) throw new VireError("android.jar is not installed", line, col);
         if (java == null) throw new VireError("java is not installed", line, col);
         string data = Path.Combine(root, "data");
         Directory.CreateDirectory(data);
@@ -156,46 +157,6 @@ static class VireApk
         line = line.Trim();
         if (line.Length > 180) line = line.Substring(0, 180);
         return line;
-    }
-
-    static string PackZipSigned(string root, string javaHome, int line, int col)
-    {
-        string java = FirstExisting(Path.Combine(javaHome, "bin", "java.exe"), Path.Combine(javaHome, "bin", "java"));
-        string jarsigner = FirstExisting(Path.Combine(javaHome, "bin", "jarsigner.exe"), Path.Combine(javaHome, "bin", "jarsigner"));
-        if (java == null) throw new VireError("java is not installed", line, col);
-        if (jarsigner == null) throw new VireError("jarsigner is not installed", line, col);
-        string data = Path.Combine(root, "data");
-        Directory.CreateDirectory(data);
-        string output = Path.Combine(data, "app.apk");
-        string work = Path.Combine(Path.GetTempPath(), "vire-apk-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(work);
-        try
-        {
-            using (FileStream stream = File.Create(output))
-            using (ZipArchive zip = new ZipArchive(stream, ZipArchiveMode.Create))
-            {
-                ZipArchiveEntry entry = zip.CreateEntry("AndroidManifest.xml", CompressionLevel.Optimal);
-                using (StreamWriter writer = new StreamWriter(entry.Open(), new UTF8Encoding(false)))
-                    writer.Write(ManifestText());
-            }
-            string keystore = Path.Combine(data, "debug.keystore");
-            EnsureDebugKeystore(keystore, work, line, col);
-            RunTool(jarsigner, new string[]
-            {
-                "-keystore", keystore,
-                "-storepass", DebugStorePass,
-                "-keypass", DebugStorePass,
-                output,
-                DebugAlias
-            }, work, line, col, true);
-            if (!File.Exists(output) || new FileInfo(output).Length < 8)
-                throw new VireError("aapt did not write data/app.apk", line, col);
-            return "data/app.apk";
-        }
-        finally
-        {
-            try { Directory.Delete(work, true); } catch (Exception) { }
-        }
     }
 
     static string FindBuildTools()

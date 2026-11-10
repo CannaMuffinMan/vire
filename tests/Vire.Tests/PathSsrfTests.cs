@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Xunit;
@@ -223,10 +225,209 @@ public class PathSsrfTests
             }
             else return;
             if (!File.Exists(link)) return;
+            File.WriteAllText(link, "hacked-os");
+            Console.WriteLine("hardlink_fail_before lock=" + File.ReadAllText(lockFile));
+            Assert.Equal("hacked-os", File.ReadAllText(lockFile));
+            File.WriteAllText(lockFile, "original-lock");
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
                 "define main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.Equal("original-lock", File.ReadAllText(lockFile));
+            Console.WriteLine("hardlink_pass_after lock=" + File.ReadAllText(lockFile));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void LinuxWritableZoneCompareIsCaseSensitive()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string dir = Path.Combine(Path.GetTempPath(), "vire-case-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        Directory.CreateDirectory(Path.Combine(dir, "Data"));
+        try
+        {
+            string folded = Path.Combine(dir, "Data", "note.txt");
+            File.WriteAllText(folded, "OUTSIDE-KEEP");
+            string dataPrefix = Path.GetFullPath(Path.Combine(dir, "data")).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            Assert.True(Path.GetFullPath(folded).StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase), "fail-before: IgnoreCase would treat Data as data");
+            Console.WriteLine("linux_zone_fail_before IgnoreCase_Data_is_data=true");
+            Assert.False(VirePaths.UnderWritableZone(dir, folded));
+            Assert.False(VirePaths.InFolder(Path.Combine(dir, "data"), folded));
+            File.WriteAllText(Path.Combine(dir, "plant.vire"),
+                "define main\n  write with \"Data/note.txt\", \"PWN\"\nend\n");
+            Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
+            Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(folded));
+            Console.WriteLine("linux_zone_pass_after Data_note_kept=OUTSIDE-KEEP");
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void HostCheckThenOpenToctouFailBeforePassAfter()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-host-toctou-" + Guid.NewGuid().ToString("n"));
+        string data = Path.Combine(dir, "data");
+        string outside = Path.Combine(Path.GetTempPath(), "vire-host-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(data);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+        File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
+        File.WriteAllText(Path.Combine(outside, "marker-outside-only"), "X");
+        int line = 1;
+        string rel = "data/note.txt";
+        try
+        {
+            string checkedPath = VirePaths.DataOrSite(dir, rel, line);
+            Thread.Sleep(20);
+            SwapWritableParent(dir, data, outside);
+            File.AppendAllText(checkedPath, "PWN");
+            Assert.True(
+                File.Exists(Path.Combine(Path.GetDirectoryName(checkedPath), "marker-outside-only")),
+                "fail-before must follow the swapped parent");
+            Assert.Contains("PWN", File.ReadAllText(checkedPath));
+            Console.WriteLine("host_toctou_linux_fail_before outside_has_PWN=true");
+            RestoreWritableParent(dir, data, outside);
+            File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+            File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
+            File.WriteAllText(Path.Combine(outside, "marker-outside-only"), "X");
+            Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", "80");
+            try
+            {
+                Thread racer = new Thread(() =>
+                {
+                    Thread.Sleep(20);
+                    try { SwapWritableParent(dir, data, outside); } catch { }
+                });
+                racer.IsBackground = true;
+                racer.Start();
+                try
+                {
+                    VirePaths.AppendAllTextInside(Path.Combine(dir, "data", "note.txt"), "PWN", dir, line, 1);
+                }
+                catch (VireError) { }
+                racer.Join(2000);
+                string marked = File.Exists(Path.Combine(data, "marker-outside-only"))
+                    ? Path.Combine(data, "note.txt")
+                    : Path.Combine(outside, "note.txt");
+                if (File.Exists(Path.Combine(Path.GetDirectoryName(marked), "marker-outside-only")) &&
+                    File.Exists(marked))
+                    Assert.DoesNotContain("PWN", File.ReadAllText(marked));
+                Console.WriteLine("host_toctou_linux_pass_after outside_has_PWN=false");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", null);
+            }
+        }
+        finally
+        {
+            try { RestoreWritableParent(dir, data, outside); } catch { }
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+            try { Directory.Delete(outside, true); } catch (IOException) { }
+        }
+    }
+
+    static void SwapWritableParent(string root, string data, string outside)
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            int nr = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? 276 : 316;
+            int st = LinuxSyscall.RenameAt2(-100, data, -100, outside, 2);
+            if (st != 0)
+            {
+                string real = data + ".real";
+                if (Directory.Exists(data) && !Directory.Exists(real))
+                {
+                    Directory.Move(data, real);
+                    Directory.CreateSymbolicLink(data, outside);
+                }
+            }
+            return;
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            string real = data + ".real";
+            if (Directory.Exists(data) && !Directory.Exists(real))
+            {
+                Directory.Move(data, real);
+                ProcessStartInfo info = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c mklink /J \"" + data + "\" \"" + outside + "\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+                p.WaitForExit(5000);
+            }
+        }
+    }
+
+    static void RestoreWritableParent(string root, string data, string outside)
+    {
+        if (OperatingSystem.IsLinux() && File.Exists(Path.Combine(data, "marker-outside-only")))
+            LinuxSyscall.RenameAt2(-100, data, -100, outside, 2);
+        string real = data + ".real";
+        if (OperatingSystem.IsWindows() && Directory.Exists(data))
+        {
+            FileSystemInfo item = new DirectoryInfo(data);
+            if ((item.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                ProcessStartInfo info = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c rmdir \"" + data + "\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+                p.WaitForExit(5000);
+            }
+        }
+        if (OperatingSystem.IsLinux() && Directory.Exists(data) && (new DirectoryInfo(data).Attributes & FileAttributes.ReparsePoint) != 0)
+            Directory.Delete(data);
+        if (Directory.Exists(real) && !Directory.Exists(data))
+            Directory.Move(real, data);
+        Directory.CreateDirectory(data);
+        Directory.CreateDirectory(outside);
+        if (!File.Exists(Path.Combine(data, "note.txt")))
+            File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+    }
+
+    [Fact]
+    public void HostReadAppendRefuseDirectorySwap()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-host-swap-" + Guid.NewGuid().ToString("n"));
+        string data = Path.Combine(dir, "data");
+        string outside = Path.Combine(dir, "outside");
+        Directory.CreateDirectory(data);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+        File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
+        File.WriteAllText(Path.Combine(dir, "append.vire"),
+            "define main\n  append with \"data/note.txt\", \"PWN\"\nend\n");
+        File.WriteAllText(Path.Combine(dir, "read.vire"),
+            "define main\n  say (read with \"data/note.txt\")\nend\n");
+        try
+        {
+            Assert.Equal(0, Program.Execute(new string[] { Path.Combine(dir, "append.vire") }));
+            Assert.Contains("PWN", File.ReadAllText(Path.Combine(data, "note.txt")));
+            Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(Path.Combine(outside, "note.txt")));
+            if (OperatingSystem.IsLinux())
+            {
+                Directory.Move(data, data + ".real");
+                Directory.CreateSymbolicLink(data, outside);
+                Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "append.vire") }));
+                Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(Path.Combine(outside, "note.txt")));
+                Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "read.vire") }));
+            }
         }
         finally
         {
@@ -633,6 +834,18 @@ public class PathSsrfTests
         {
             try { Directory.Delete(dir, true); } catch (IOException) { }
             try { File.Delete(outside); } catch (IOException) { }
+        }
+    }
+
+    static class LinuxSyscall
+    {
+        [DllImport("libc.so.6", EntryPoint = "syscall", SetLastError = true)]
+        public static extern int RenameAt2Call(long n, int olddirfd, string oldpath, int newdirfd, string newpath, uint flags);
+
+        public static int RenameAt2(int olddirfd, string oldpath, int newdirfd, string newpath, uint flags)
+        {
+            long nr = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? 276 : 316;
+            return RenameAt2Call(nr, olddirfd, oldpath, newdirfd, newpath, flags);
         }
     }
 

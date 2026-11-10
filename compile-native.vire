@@ -382,54 +382,13 @@ define parseAtom with state, func
       bump with state
       return ["list", items]
     end
-    if (form with state) == "num" or (form with state) == "-"
-      let n be 0
-      if (form with state) == "-"
-        bump with state
-        if (form with state) != "num"
-          return markBad with state, "that expression is not ready"
-        end
-        let n be 0 - (valueOf with state)
-        bump with state
+    push with items, (parseExpr with state, func)
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "]"
+        stop
       end
-      if (form with state) == "num"
-        let n be valueOf with state
-        bump with state
-      end
-      push with items, n
-      while (form with state) == ","
-        bump with state
-        if (form with state) == "]"
-          stop
-        end
-        if (form with state) != "num" and (form with state) != "-"
-          return markBad with state, "that expression is not ready"
-        end
-        let n be 0
-        if (form with state) == "-"
-          bump with state
-          if (form with state) != "num"
-            return markBad with state, "that expression is not ready"
-          end
-          let n be 0 - (valueOf with state)
-          bump with state
-        end
-        if (form with state) == "num"
-          let n be valueOf with state
-          bump with state
-        end
-        push with items, n
-      end
-    end
-    if (form with state) != "num" and (length with items) == 0
       push with items, (parseExpr with state, func)
-      while (form with state) == ","
-        bump with state
-        if (form with state) == "]"
-          stop
-        end
-        push with items, (parseExpr with state, func)
-      end
     end
     if (form with state) != "]"
       return markBad with state, "that expression is not ready"
@@ -1274,8 +1233,8 @@ define emitExpr with gen, funcs, func, expr
   end
   let k be expr at 0
   if k == "num"
-    emitOp with gen, [72, 199, 193]
-    put (emitU32 with (gen at "image"), (expr at 1)) into gen at "image"
+    emitOp with gen, [72, 185]
+    put (emitU64 with (gen at "image"), (expr at 1)) into gen at "image"
     emitCall with gen, "rt_push_int"
     return true
   end
@@ -1475,8 +1434,8 @@ define emitExpr with gen, funcs, func, expr
       try
         emitExpr with gen, funcs, func, (items at i)
       miss unused
-        emitOp with gen, [72, 199, 193]
-        put (emitU32 with (gen at "image"), (items at i)) into gen at "image"
+        emitOp with gen, [72, 185]
+        put (emitU64 with (gen at "image"), (items at i)) into gen at "image"
         emitCall with gen, "rt_push_int"
       end
       emitCall with gen, "rt_push"
