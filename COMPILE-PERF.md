@@ -12,7 +12,7 @@ At 60.4 steps/s the remaining ~145k steps would need about **38 more minutes** (
 
 ## What the numbers count
 
-`vire: still running steps=N` is `budget.Steps`. Each increment is 64 interpreter `Step` calls (`Budget.StepBatch`). `total_steps` is the final N. Heartbeats fire every 2s of `TickCount64` while `compilerProgress` is on (`Vire.cs` `Step`). `tools/native-selfhost-handoff.ps1` redirects stdout/stderr until exit, so **GitHub log timestamps on heartbeats are flush time, not phase time**. Consecutive heartbeats are still 2s bins. Parser: `python3 tools/perf-parse-heartbeats.py LOG` or `python3 tools/perf-parse-heartbeats.py LOG 25363 420`. A 420s kill in `native-selfhost-handoff.ps1` throws before it prints `data/handoff-gen1_host.err.txt`, so a local timeout log on CI would lose heartbeats. `tools/perf-handoff-windows.ps1` prints that stderr on timeout.
+`vire: still running steps=N` is `budget.Steps`. Each increment is 64 interpreter `Step` calls (`Budget.StepBatch`). `total_steps` is written only after `main` returns, so a kill has no `total_steps` line. Heartbeats run on those batch boundaries when `TickCount64` has moved at least 2000 ms (`compilerProgress`). There is no timer thread. A long builtin or callee leaves the last printed N unchanged until the next 64th statement starts. `25363 / 420` is the mean charged rate across the whole process only if batch boundaries kept arriving until `Kill`. A stall after the last note would freeze 25363 while the 420s clock still runs. The throw text has no `steps=` value. That 25363 came from stderr (`data/handoff-gen1_host.err.txt` or a console), not from the timeout sentence. On Windows the child writes stderr write-through into that file during the run. The parent dumps the file only after a clean exit. A CI timeout therefore loses the beats. Parser: `python3 tools/perf-parse-heartbeats.py LOG` or `python3 tools/perf-parse-heartbeats.py LOG 25363 420`. `tools/perf-handoff-windows.ps1` prints the stderr file on timeout.
 
 `gen1_host` is `dotnet exec vire.dll compile-native.vire data/compile-native.vire data/gen1.hex`. `compile-native.vire` writes with builtin `hex`, not Vire `hexOf`. Optimizing `hexOf` does not move this job. Linux probe: `probe-hex-builtin.vire` 0.085s vs `probe-hexof.vire` 1.42s for 18944 bytes.
 
@@ -70,9 +70,10 @@ This agent did not run on Grok Build. Operator facts only: hello passed, 420s, 2
 - Defender/realtime scan of `bin/Release` and `data/`
 - `DOTNET_TieredCompilation=0` or debugger attached
 - core parking, VM oversubscribe, thermal throttle
-- last 20 `still running` lines with real wall times (stderr file, not a redirected flush)
+- last 20 `still running` lines from `data/handoff-gen1_host.err.txt`, to see whether N kept rising until 420s or froze after one note
+- `VireDebug.Break` still probes `data/break.txt` on every user-function call when `VIRE_DEBUGGER` is unset. Unmeasured. Not shown as the 8× gap.
 
-If local hello is ~30s (older CouchStation note in `LOCAL-CLI-HANDOFF.md`) vs CI 6s, the same 5–10× factor predicts gen1 timeout. If local hello is CI-like (~6s) and gen1 still crawls, that would be a new, compile-size-only bug. We do not have that hello wall.
+If local hello is ~30s (older CouchStation note in `LOCAL-CLI-HANDOFF.md`) vs CI 6s, the same 5–10× factor predicts gen1 timeout. If local hello is CI-like (~6s) and gen1 still crawls, that would be a new, compile-size-only bug. We do not have that hello wall. The CI gen1 means are 649.5 and 471.5 charged steps/s, not a round 470 from this tree.
 
 ## Safe Windows handoff (parent posts, this agent does not)
 
