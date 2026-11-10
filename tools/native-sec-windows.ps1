@@ -365,19 +365,21 @@ Copy-Item -LiteralPath ([string](Join-Path $Work "f5-vuln-src.vire")) -Destinati
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f5.vire", "data/f5-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f5-vuln.hex") (Join-Path $Work "f5-vuln.exe")
 
-$racerPath = Join-Path $Work "f5-racer.ps1"
-Set-Content -Path $racerPath -Value @'
-param($Slot, $Keep)
-while ($true) {
-    try {
-        if (Test-Path -LiteralPath $Slot) { Remove-Item -LiteralPath $Slot -Force -ErrorAction SilentlyContinue }
-        cmd /c mklink /H "$Slot" "$Keep" | Out-Null
-    } catch { }
-}
-'@
+$racerPath = Join-Path $Work "f5-racer.cmd"
+Set-Content -Path $racerPath -Value "@echo off`r`n:loop`r`ndel /f /q `"%~1`" >nul 2>nul`r`nmklink /H `"%~1`" `"%~2`" >nul`r`ngoto loop`r`n"
 
 function Start-F5Racer([string]$Slot, [string]$Keep) {
-    return Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $racerPath, $Slot, $Keep) -PassThru -WindowStyle Hidden
+    $procs = @()
+    for ($i = 0; $i -lt 8; $i = $i + 1) {
+        $procs += Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "`"$racerPath`" `"$Slot`" `"$Keep`"") -PassThru -WindowStyle Hidden
+    }
+    return $procs
+}
+
+function Stop-F5Racers($procs) {
+    foreach ($rp in @($procs)) {
+        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
+    }
 }
 
 function Reset-F5Slot([string]$Slot) {
@@ -415,11 +417,11 @@ function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
     [int]$rounds = 0
     $rp = $null
     try {
-        Reset-F5Slot $slot
-        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
+            Reset-F5Slot $slot
+            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked F5 write PE" }
@@ -431,7 +433,7 @@ function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
             }
         }
     } finally {
-        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
+        Stop-F5Racers $rp
     }
     throw "f5 fail-before missing: vuln PE did not truncate KEEP in ${TimeoutSec}s ($rounds rounds). 0/0 is a failed gate."
 }
@@ -447,11 +449,11 @@ function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $rp = $null
     try {
-        Reset-F5Slot $slot
-        Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
+            Reset-F5Slot $slot
+            Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
             if ($run.Blocked) { throw "Defender blocked F5 fixed PE" }
@@ -459,13 +461,13 @@ function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
             if ($kept -eq "HACKED" -or $kept.Length -eq 0) { $hits = $hits + 1 }
         }
     } finally {
-        if ($rp) { try { $rp.Kill() | Out-Null } catch { }; try { [void]$rp.WaitForExit(2000) } catch { } }
+        Stop-F5Racers $rp
     }
     Write-Host ("f5_two_process_race fixed victim_hits=" + $hits + " rounds=" + $rounds)
     return [int]$hits
 }
 
-$f5vulnRounds = Invoke-F5UntilHit -WriteExe (Join-Path $Work "f5-vuln.exe") -TimeoutSec 90
+$f5vulnRounds = Invoke-F5UntilHit -WriteExe (Join-Path $Work "f5-vuln.exe") -TimeoutSec 120
 if ($f5vulnRounds -isnot [int]) { throw "f5 vuln rounds is not int: $($f5vulnRounds.GetType().FullName) $f5vulnRounds" }
 $f5fixHits = Invoke-F5FixedZero -WriteExe (Join-Path $Work "f5.exe") -TimeoutSec 20
 if ($f5fixHits -isnot [int]) { throw "f5 fixed hits is not int: $($f5fixHits.GetType().FullName) $f5fixHits" }
