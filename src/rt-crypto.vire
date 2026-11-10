@@ -1,5 +1,7 @@
-define cryptoCopy32 with w
-  return [w at 0, w at 1]
+define cryptoCopy32_into with dst, src
+  put (src at 0) into dst at 0
+  put (src at 1) into dst at 1
+  return dst
 end
 
 define cryptoWord with hi, lo
@@ -71,25 +73,31 @@ define cryptoNot16 with a
   return 65535 - a
 end
 
-define cryptoAnd32 with a, b
+define cryptoAnd32_into with dst, a, b
   let hi be cryptoAnd16 with a at 0, b at 0
   let lo be cryptoAnd16 with a at 1, b at 1
-  return [hi, lo]
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
 end
 
-define cryptoXor32 with a, b
+define cryptoXor32_into with dst, a, b
   let hi be cryptoXor16 with a at 0, b at 0
   let lo be cryptoXor16 with a at 1, b at 1
-  return [hi, lo]
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
 end
 
-define cryptoNot32 with a
+define cryptoNot32_into with dst, a
   let hi be cryptoNot16 with a at 0
   let lo be cryptoNot16 with a at 1
-  return [hi, lo]
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
 end
 
-define cryptoAdd32 with a, b
+define cryptoAdd32_into with dst, a, b
   let lo be (a at 1) + (b at 1)
   let c be 0
   if lo >= 65536
@@ -100,20 +108,24 @@ define cryptoAdd32 with a, b
   if hi >= 65536
     let hi be hi - 65536
   end
-  return [hi, lo]
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
 end
 
-define cryptoShr1 with w
+define cryptoShr1_into with w
   let hi be w at 0
   let lo be w at 1
   let lo2 be idiv with lo, 2
   if (hi % 2) == 1
     let lo2 be lo2 + 32768
   end
-  return [(idiv with hi, 2), lo2]
+  put (idiv with hi, 2) into w at 0
+  put lo2 into w at 1
+  return w
 end
 
-define cryptoShl1 with w
+define cryptoShl1_into with w
   let hi be w at 0
   let lo be w at 1
   let hi2 be hi + hi
@@ -130,81 +142,92 @@ define cryptoShl1 with w
   if lo2 >= 65536
     let lo2 be lo2 - 65536
   end
-  return [hi2, lo2]
+  put hi2 into w at 0
+  put lo2 into w at 1
+  return w
 end
 
-define cryptoShr32 with w, n
-  let v be cryptoCopy32 with w
+define cryptoShr32_into with w, n
   let i be 0
   while i < n
-    let v be cryptoShr1 with v
+    cryptoShr1_into with w
     let i be i + 1
   end
-  return v
+  return w
 end
 
-define cryptoShl32 with w, n
-  let v be cryptoCopy32 with w
+define cryptoShl32_into with w, n
   let i be 0
   while i < n
-    let v be cryptoShl1 with v
+    cryptoShl1_into with w
     let i be i + 1
   end
-  return v
+  return w
 end
 
-define cryptoRotr32 with w, n
-  let a be cryptoShr32 with w, n
+define cryptoRotr32_into with dst, src, n, tmp
+  cryptoCopy32_into with dst, src
+  cryptoCopy32_into with tmp, src
+  cryptoShr32_into with dst, n
   let sh be 32 - n
-  let b be cryptoShl32 with w, sh
-  return cryptoXor32 with a, b
+  cryptoShl32_into with tmp, sh
+  cryptoXor32_into with dst, dst, tmp
+  return dst
 end
 
-define cryptoCh with e, f, g
-  let x be cryptoAnd32 with e, f
-  let n be cryptoNot32 with e
-  let y be cryptoAnd32 with n, g
-  return cryptoXor32 with x, y
+define cryptoCh_into with dst, e, f, g, tmp
+  cryptoAnd32_into with dst, e, f
+  cryptoNot32_into with tmp, e
+  cryptoAnd32_into with tmp, tmp, g
+  cryptoXor32_into with dst, dst, tmp
+  return dst
 end
 
-define cryptoMaj with a, b, c
-  let ab be cryptoAnd32 with a, b
-  let ac be cryptoAnd32 with a, c
-  let t be cryptoXor32 with ab, ac
-  let bc be cryptoAnd32 with b, c
-  return cryptoXor32 with t, bc
+define cryptoMaj_into with dst, a, b, c, tmp
+  cryptoAnd32_into with dst, a, b
+  cryptoAnd32_into with tmp, a, c
+  cryptoXor32_into with dst, dst, tmp
+  cryptoAnd32_into with tmp, b, c
+  cryptoXor32_into with dst, dst, tmp
+  return dst
 end
 
-define cryptoBs0 with a
-  let x be cryptoRotr32 with a, 2
-  let y be cryptoRotr32 with a, 13
-  let t be cryptoXor32 with x, y
-  let z be cryptoRotr32 with a, 22
-  return cryptoXor32 with t, z
+define cryptoBs0_into with dst, a, tmp, tmp2
+  cryptoRotr32_into with dst, a, 2, tmp
+  cryptoRotr32_into with tmp2, a, 13, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  cryptoRotr32_into with tmp2, a, 22, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  return dst
 end
 
-define cryptoBs1 with e
-  let x be cryptoRotr32 with e, 6
-  let y be cryptoRotr32 with e, 11
-  let t be cryptoXor32 with x, y
-  let z be cryptoRotr32 with e, 25
-  return cryptoXor32 with t, z
+define cryptoBs1_into with dst, e, tmp, tmp2
+  cryptoRotr32_into with dst, e, 6, tmp
+  cryptoRotr32_into with tmp2, e, 11, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  cryptoRotr32_into with tmp2, e, 25, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  return dst
 end
 
-define cryptoSs0 with w
-  let x be cryptoRotr32 with w, 7
-  let y be cryptoRotr32 with w, 18
-  let t be cryptoXor32 with x, y
-  let z be cryptoShr32 with w, 3
-  return cryptoXor32 with t, z
+define cryptoSs0_into with dst, w, tmp, tmp2
+  cryptoRotr32_into with dst, w, 7, tmp
+  cryptoRotr32_into with tmp2, w, 18, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  cryptoCopy32_into with tmp2, w
+  cryptoShr32_into with tmp2, 3
+  cryptoXor32_into with dst, dst, tmp2
+  return dst
 end
 
-define cryptoSs1 with w
-  let x be cryptoRotr32 with w, 17
-  let y be cryptoRotr32 with w, 19
-  let t be cryptoXor32 with x, y
-  let z be cryptoShr32 with w, 10
-  return cryptoXor32 with t, z
+define cryptoSs1_into with dst, w, tmp, tmp2
+  cryptoRotr32_into with dst, w, 17, tmp
+  cryptoRotr32_into with tmp2, w, 19, tmp
+  cryptoXor32_into with dst, dst, tmp2
+  cryptoCopy32_into with tmp2, w
+  cryptoShr32_into with tmp2, 10
+  cryptoXor32_into with dst, dst, tmp2
+  return dst
 end
 
 define cryptoK
@@ -289,7 +312,7 @@ define cryptoIv
   return hs
 end
 
-define cryptoLoadWord with buf, off
+define cryptoLoadWord_into with dst, buf, off
   let b0 be buf at off
   let i1 be off + 1
   let i2 be off + 2
@@ -301,7 +324,9 @@ define cryptoLoadWord with buf, off
   let hi be hi + b1
   let lo be times256 with b2
   let lo be lo + b3
-  return [hi, lo]
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
 end
 
 define cryptoStoreWord with out, w
@@ -317,64 +342,79 @@ end
 define cryptoCompress with state, block, ks
   let w be []
   let i be 0
+  while i < 64
+    push with w, (cryptoWord with 0, 0)
+    let i be i + 1
+  end
+  let s0 be cryptoWord with 0, 0
+  let s1 be cryptoWord with 0, 0
+  let t1 be cryptoWord with 0, 0
+  let t2 be cryptoWord with 0, 0
+  let tmp be cryptoWord with 0, 0
+  let tmp2 be cryptoWord with 0, 0
+  let i be 0
   while i < 16
     let off be times4 with i
-    push with w, (cryptoLoadWord with block, off)
+    cryptoLoadWord_into with (w at i), block, off
     let i be i + 1
   end
   while i < 64
-    let s0 be cryptoSs0 with (w at (i - 15))
-    let s1 be cryptoSs1 with (w at (i - 2))
-    let t be cryptoAdd32 with (w at (i - 16)), s0
-    let t be cryptoAdd32 with t, (w at (i - 7))
-    push with w, (cryptoAdd32 with t, s1)
+    let i15 be i - 15
+    let i2 be i - 2
+    let i16 be i - 16
+    let i7 be i - 7
+    cryptoSs0_into with s0, (w at i15), tmp, tmp2
+    cryptoSs1_into with s1, (w at i2), tmp, tmp2
+    cryptoAdd32_into with t1, (w at i16), s0
+    cryptoAdd32_into with t1, t1, (w at i7)
+    cryptoAdd32_into with (w at i), t1, s1
     let i be i + 1
   end
-  let a be cryptoCopy32 with (state at 0)
-  let b be cryptoCopy32 with (state at 1)
-  let c be cryptoCopy32 with (state at 2)
-  let d be cryptoCopy32 with (state at 3)
-  let e be cryptoCopy32 with (state at 4)
-  let f be cryptoCopy32 with (state at 5)
-  let g be cryptoCopy32 with (state at 6)
-  let h be cryptoCopy32 with (state at 7)
+  let a be cryptoWord with 0, 0
+  let b be cryptoWord with 0, 0
+  let c be cryptoWord with 0, 0
+  let d be cryptoWord with 0, 0
+  let e be cryptoWord with 0, 0
+  let f be cryptoWord with 0, 0
+  let g be cryptoWord with 0, 0
+  let h be cryptoWord with 0, 0
+  cryptoCopy32_into with a, (state at 0)
+  cryptoCopy32_into with b, (state at 1)
+  cryptoCopy32_into with c, (state at 2)
+  cryptoCopy32_into with d, (state at 3)
+  cryptoCopy32_into with e, (state at 4)
+  cryptoCopy32_into with f, (state at 5)
+  cryptoCopy32_into with g, (state at 6)
+  cryptoCopy32_into with h, (state at 7)
   let r be 0
   while r < 64
-    let bs1 be cryptoBs1 with e
-    let t1 be cryptoAdd32 with h, bs1
-    let ch be cryptoCh with e, f, g
-    let t1 be cryptoAdd32 with t1, ch
-    let t1 be cryptoAdd32 with t1, (ks at r)
-    let t1 be cryptoAdd32 with t1, (w at r)
-    let bs0 be cryptoBs0 with a
-    let maj be cryptoMaj with a, b, c
-    let t2 be cryptoAdd32 with bs0, maj
-    let h be g
-    let g be f
-    let f be e
-    let e be cryptoAdd32 with d, t1
-    let d be c
-    let c be b
-    let b be a
-    let a be cryptoAdd32 with t1, t2
+    cryptoBs1_into with s0, e, tmp, tmp2
+    cryptoAdd32_into with t1, h, s0
+    cryptoCh_into with s1, e, f, g, tmp
+    cryptoAdd32_into with t1, t1, s1
+    cryptoAdd32_into with t1, t1, (ks at r)
+    cryptoAdd32_into with t1, t1, (w at r)
+    cryptoBs0_into with s0, a, tmp, tmp2
+    cryptoMaj_into with s1, a, b, c, tmp
+    cryptoAdd32_into with t2, s0, s1
+    cryptoCopy32_into with h, g
+    cryptoCopy32_into with g, f
+    cryptoCopy32_into with f, e
+    cryptoAdd32_into with e, d, t1
+    cryptoCopy32_into with d, c
+    cryptoCopy32_into with c, b
+    cryptoCopy32_into with b, a
+    cryptoAdd32_into with a, t1, t2
     let r be r + 1
   end
-  let s0 be state at 0
-  put (cryptoAdd32 with s0, a) into state at 0
-  let s1 be state at 1
-  put (cryptoAdd32 with s1, b) into state at 1
-  let s2 be state at 2
-  put (cryptoAdd32 with s2, c) into state at 2
-  let s3 be state at 3
-  put (cryptoAdd32 with s3, d) into state at 3
-  let s4 be state at 4
-  put (cryptoAdd32 with s4, e) into state at 4
-  let s5 be state at 5
-  put (cryptoAdd32 with s5, f) into state at 5
-  let s6 be state at 6
-  put (cryptoAdd32 with s6, g) into state at 6
-  let s7 be state at 7
-  put (cryptoAdd32 with s7, h) into state at 7
+  cryptoAdd32_into with (state at 0), (state at 0), a
+  cryptoAdd32_into with (state at 1), (state at 1), b
+  cryptoAdd32_into with (state at 2), (state at 2), c
+  cryptoAdd32_into with (state at 3), (state at 3), d
+  cryptoAdd32_into with (state at 4), (state at 4), e
+  cryptoAdd32_into with (state at 5), (state at 5), f
+  cryptoAdd32_into with (state at 6), (state at 6), g
+  cryptoAdd32_into with (state at 7), (state at 7), h
   return state
 end
 
