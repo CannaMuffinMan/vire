@@ -1264,8 +1264,8 @@ define emitExpr with gen, funcs, func, expr
   end
   let k be expr at 0
   if k == "num"
-    emitOp with gen, [72, 199, 193]
-    put (emitU32 with (gen at "image"), (expr at 1)) into gen at "image"
+    emitOp with gen, [72, 185]
+    put (emitU64 with (gen at "image"), (expr at 1)) into gen at "image"
     emitCall with gen, "rt_push_int"
     return true
   end
@@ -1469,8 +1469,8 @@ define emitExpr with gen, funcs, func, expr
       try
         emitExpr with gen, funcs, func, (items at i)
       miss unused
-        emitOp with gen, [72, 199, 193]
-        put (emitU32 with (gen at "image"), (items at i)) into gen at "image"
+        emitOp with gen, [72, 185]
+        put (emitU64 with (gen at "image"), (items at i)) into gen at "image"
         emitCall with gen, "rt_push_int"
       end
       emitCall with gen, "rt_push"

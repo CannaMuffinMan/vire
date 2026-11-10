@@ -146,10 +146,10 @@ define openImage
   let image be bytes
   let labels be {}
   let fixes be []
-  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile"]
-  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se"]
-  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se"]
-  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se"]
+  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetFinalPathNameByHandleA"]
+  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_fp"]
+  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp"]
+  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_fp"]
   let i be 0
   while i < (length with names)
     pin with labels, (ilts at i), image

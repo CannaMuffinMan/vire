@@ -32,7 +32,7 @@ Unbounded `rt_save_frame`. **Fixed** at 64 frames (512 bytes from `frame_base`).
 
 ### F4. Native hardlinks
 
-`GetFileInformationByHandle` `nlink` at offset 40. Write opens `OPEN_EXISTING` first. Unicorn `nlink2` refused and left `SECRET`. Then `CREATE_ALWAYS` only after a clean nlink check so a normal file still truncates. Windows hardlink execute **blocked** (same recipe).
+`GetFileInformationByHandle` `nlink` at offset 40. Write opens `OPEN_EXISTING` first. Unicorn `nlink2` refused and left `SECRET`. Truncation is `SetFilePointerEx` plus `SetEndOfFile` on that same handle. There is no `CREATE_ALWAYS` after the nlink check.
 
 ### F5. Path index and length clobbered (this review)
 
@@ -40,7 +40,7 @@ Unbounded `rt_save_frame`. **Fixed** at 64 frames (512 bytes from `frame_base`).
 
 ### F6. `CREATE_ALWAYS` truncated before nlink (this review)
 
-Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. **Fixed** by `OPEN_EXISTING` inspect, refuse without truncate, `CREATE_ALWAYS` only after nlink==1.
+Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. **Fixed** by `OPEN_EXISTING` inspect, refuse without truncate, then `SetEndOfFile` on the validated handle. Write emit does not use `CREATE_ALWAYS`.
 
 ## Overlap (do not concatenate drafts)
 
@@ -68,7 +68,7 @@ CI `test` 8 failures on this PR match base Linux Windows-only foreign/Android/AP
 - `/poteto-mode`: smallest fail-closed emit fixes after proven probes.
 - `/setup-pstack`: **blocked** (interactive).
 - `/interrogate`: two Grok adversaries, not four (Opus weekly cap). Findings F5 and F6 survived reruns and were fixed. Remaining "emu follows leaf symlink" was an emu `stat` vs `lstat` bug and was fixed in the stub.
-- `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; hello still prints.
+- `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; write uses SetEndOfFile; hello still prints.
 
 ## Caps
 

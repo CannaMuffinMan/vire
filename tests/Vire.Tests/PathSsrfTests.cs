@@ -235,6 +235,64 @@ public class PathSsrfTests
     }
 
     [Fact]
+    public void LinuxWritableZoneCompareIsCaseSensitive()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string dir = Path.Combine(Path.GetTempPath(), "vire-case-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        Directory.CreateDirectory(Path.Combine(dir, "Data"));
+        try
+        {
+            string folded = Path.Combine(dir, "Data", "note.txt");
+            File.WriteAllText(folded, "OUTSIDE-KEEP");
+            Assert.False(VirePaths.UnderWritableZone(dir, folded));
+            Assert.False(VirePaths.InFolder(Path.Combine(dir, "data"), folded));
+            File.WriteAllText(Path.Combine(dir, "plant.vire"),
+                "define main\n  write with \"Data/note.txt\", \"PWN\"\nend\n");
+            Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
+            Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(folded));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void HostReadAppendRefuseDirectorySwap()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-host-swap-" + Guid.NewGuid().ToString("n"));
+        string data = Path.Combine(dir, "data");
+        string outside = Path.Combine(dir, "outside");
+        Directory.CreateDirectory(data);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+        File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
+        File.WriteAllText(Path.Combine(dir, "append.vire"),
+            "define main\n  append with \"data/note.txt\", \"PWN\"\nend\n");
+        File.WriteAllText(Path.Combine(dir, "read.vire"),
+            "define main\n  say (read with \"data/note.txt\")\nend\n");
+        try
+        {
+            Assert.Equal(0, Program.Execute(new string[] { Path.Combine(dir, "append.vire") }));
+            Assert.Contains("PWN", File.ReadAllText(Path.Combine(data, "note.txt")));
+            Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(Path.Combine(outside, "note.txt")));
+            if (OperatingSystem.IsLinux())
+            {
+                Directory.Move(data, data + ".real");
+                Directory.CreateSymbolicLink(data, outside);
+                Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "append.vire") }));
+                Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(Path.Combine(outside, "note.txt")));
+                Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "read.vire") }));
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void RunAndUseRefuseWritableZonesAndPlantedPrograms()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-c4-" + Guid.NewGuid().ToString("n"));

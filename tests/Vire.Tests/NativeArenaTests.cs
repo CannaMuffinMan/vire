@@ -18,6 +18,7 @@ public class NativeArenaTests
         Assert.Contains("poke32 with head, 224, 1048576", pe);
         Assert.Contains("poke32 with head, 240, 1048576", pe);
         Assert.DoesNotContain("poke32 with head, 224, " + ArenaBytes, pe);
+        Assert.DoesNotContain("poke32 with head, 240, " + ArenaBytes, pe);
         Assert.DoesNotContain("268435456", rt);
         Assert.DoesNotContain("268435456", more);
         Assert.DoesNotContain("268435456", pe);

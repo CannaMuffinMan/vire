@@ -25,11 +25,13 @@ public class NativePathSafetyTests
         Assert.Contains("AddVectoredExceptionHandler", pe);
         Assert.Contains("SetFilePointerEx", pe);
         Assert.Contains("SetEndOfFile", pe);
+        Assert.Contains("GetFinalPathNameByHandleA", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
         Assert.Contains("iat_ue", pe);
         Assert.Contains("iat_sp", pe);
         Assert.Contains("iat_se", pe);
+        Assert.Contains("iat_fp", pe);
     }
 
     [Fact]
@@ -62,6 +64,11 @@ public class NativePathSafetyTests
         Assert.Contains("rt_memcpy", more);
         Assert.Contains("iat_fi", rt);
         Assert.Contains("iat_fi", more);
+        Assert.Contains("rt_bind_path", more);
+        Assert.Contains("iat_fp", more);
+        Assert.Contains("rt_bind_path", rt);
+        Assert.Contains("path_space", more);
+        Assert.Contains("read_space", rt);
     }
 
     [Fact]
