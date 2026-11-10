@@ -206,11 +206,11 @@ function Apply-SecWiden([string]$Tree) {
     $hit = 0
     foreach ($more in @((Join-Path $Tree "src/rt-more.vire"), (Join-Path $Tree "data/src/rt-more.vire"))) {
         if (-not (Test-Path -LiteralPath $more)) { continue }
-        $t = [IO.File]::ReadAllText($more)
+        $t = [IO.File]::ReadAllText($more).Replace("`r`n", "`n")
         if ($t.Contains("iat_sl")) { $hit = $hit + 1; continue }
         if (-not $t.Contains($needle)) { throw "sec widen insert point missing in $more" }
         $t = $t.Replace($needle, $insert)
-        [IO.File]::WriteAllText($more, $t)
+        [IO.File]::WriteAllText($more, $t.Replace("`n", "`r`n"))
         $hit = $hit + 1
     }
     if ($hit -lt 1) { throw "sec widen applied to no rt-more.vire in $Tree" }
