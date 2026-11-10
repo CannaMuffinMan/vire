@@ -1,0 +1,47 @@
+name: native-clean-machine
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - name: bootstrap gen1 with .NET interpreter
+        run: pwsh -File tools/native-clean-machine.ps1 -Phase bootstrap
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-gen1-bootstrap
+          path: |
+            data/gen1.exe
+            data/gen1.hex
+            data/compile-native.vire
+            data/src/**
+            data/guest-hello.vire
+  prove:
+    needs: bootstrap
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: native-gen1-bootstrap
+          path: .
+      - name: prove gen1 without calling foreign compilers
+        run: pwsh -File tools/native-clean-machine.ps1 -Phase prove
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-clean-machine-package
+          path: |
+            data/native-clean-machine.zip
+            data/native-clean-machine-pkg/MANIFEST.txt
+            data/clean-env-capture.txt
+            data/clean-gen1_hello.out.txt
+            data/clean-gen2_native.out.txt
+            data/clean-gen1_hello_run.out.txt
