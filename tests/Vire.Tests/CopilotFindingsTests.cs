@@ -84,12 +84,11 @@ public class CopilotFindingsTests
         Assert.Contains("f4_intern_section", ps1);
         Assert.Contains("f5_two_process_race", ps1);
         Assert.Contains("0/0 is a failed gate", ps1);
-        Assert.Contains("is not int:", ps1);
-        Assert.Contains("return [int]$hits", ps1);
-        Assert.Contains("Reset-F5Slot", ps1);
-        Assert.Contains("Invoke-F5HardlinkOnce", ps1);
+        Assert.Contains("Apply-SecWiden", ps1);
+        Assert.Contains("iat_sl", ps1);
+        Assert.Contains("3d9fc58", ps1);
         Assert.Contains("f5-slot.txt", ps1);
-        Assert.Contains("walk-then-open TOCTOU", ps1);
+        Assert.Contains("Invoke-WidenJunctionRace", ps1);
         Assert.Contains("GetFinalPathNameByHandle", ps1);
         Assert.Contains("f_walk_then_open", ps1);
         Assert.Contains("f6_crash_pe", ps1);

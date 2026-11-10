@@ -32,6 +32,8 @@ public class NativePathSafetyTests
         Assert.Contains("iat_sp", pe);
         Assert.Contains("iat_se", pe);
         Assert.Contains("iat_fp", pe);
+        Assert.DoesNotContain("\"Sleep\"", pe);
+        Assert.DoesNotContain("iat_sl", pe);
     }
 
     [Fact]
@@ -101,5 +103,29 @@ public class NativePathSafetyTests
         int runtime = src.LastIndexOf("parkRuntime with (gen at \"image\")", StringComparison.Ordinal);
         int counters = src.LastIndexOf("parkCounters with (gen at \"image\")", StringComparison.Ordinal);
         Assert.True(runtime >= 0 && counters > runtime);
+    }
+
+    [Fact]
+    public void ProductPeOmitsSleepWidenerAndIatSl()
+    {
+        string root = Root();
+        string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
+        Assert.DoesNotContain("\"Sleep\"", pe);
+        Assert.DoesNotContain("iat_sl", pe);
+        Assert.DoesNotContain("iat_sl", more);
+        Assert.DoesNotContain("Sleep", native);
+        string dataPe = Path.Combine(root, "data", "src", "pe.vire");
+        if (File.Exists(dataPe))
+        {
+            string dpe = File.ReadAllText(dataPe);
+            Assert.DoesNotContain("\"Sleep\"", dpe);
+            Assert.DoesNotContain("iat_sl", dpe);
+        }
+        string ps1 = File.ReadAllText(Path.Combine(root, "tools", "native-sec-windows.ps1"));
+        Assert.Contains("Test-only", ps1);
+        Assert.Contains("Never apply to the product checkout", ps1);
+        Assert.Contains("Apply-SecWiden", ps1);
     }
 }
