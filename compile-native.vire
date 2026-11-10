@@ -1675,12 +1675,15 @@ end
 define main
   say "compile-native start"
   let files be args
+  say ("nfiles " + (text with (length with files)))
   if (length with files) < 2
     say "usage: compile-native source.vire out.hex"
     say "compile failed"
     halt with 1
   end
+  say (files at 0)
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
+  say "loaded"
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
