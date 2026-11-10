@@ -52,6 +52,8 @@ Child CPU on the three hex/emit microprobes was mostly user time (`ru_utime` 2.6
 
 Charged-step rate tracks one core of the C# interpreter. `emitU8` is still a per-byte Vire call plus `push`. `emitList`/`extend` is ~12× faster for the same 21000 bytes on this VM. `openImage`/`emitRuntime` is ~0.8s here, a few percent of gen1. Builtin `hex` is ~0.09s. Guest parse of `compile-native.vire` is inside gen1's 170k steps, not the hello-sized 3k. Cutting `hexOf` cannot double gen1. Replacing leftover `emitU8` sites with `emitList` can move a slice of the 81s Linux job. It cannot close an 8× host gap to 60 steps/s.
 
+The same five files are handled three times. C# `Load` parses `src/` with no `total_steps`. Vire `tokenize` parses `data/src/` inside the step counter. `emitFunc` then lowers every guest list literal. Executed `emitRuntime` uses builtin `extend` (no step per payload byte). `peChecksum` is a Vire `while` over the PE, two bytes per pass. Linux `data/gen1.hex` is 861184 hex characters, so the PE is 430592 bytes and checksum is about 215296 while-passes (on the order of 20k charged steps at 6 statements per pass / 64). That is not the 170k-step job. `File.Exists` inside `VireDebug.Break` is C# on every user `Call`. It adds wall time and adds no charged steps. The 69 µs miss path sits in that bucket.
+
 ## Ruled out
 
 - **Need a higher step cap.** CI finishes at 164k–171k charged steps. `compile-native.vire` already has a 50e6 compiler cap. Probes still use `VIRE_BUDGET` 5e6 and list 100000, so they cannot emit a gen1-sized list.
@@ -71,7 +73,7 @@ This agent did not run on Grok Build. Operator facts only: hello passed, 420s, 2
 - `DOTNET_TieredCompilation=0` or debugger attached
 - core parking, VM oversubscribe, thermal throttle
 - last 20 `still running` lines from `data/handoff-gen1_host.err.txt`, to see whether N kept rising until 420s or froze after one note
-- `VireDebug.Break` still probes `data/break.txt` on every user-function call when `VIRE_DEBUGGER` is unset. Unmeasured. Not shown as the 8× gap.
+- CouchStation `break_miss_ns_each` versus windows-latest `perf-host` (Linux is already 69 µs per miss)
 
 If local hello is ~30s (older CouchStation note in `LOCAL-CLI-HANDOFF.md`) vs CI 6s, the same 5–10× factor predicts gen1 timeout. If local hello is CI-like (~6s) and gen1 still crawls, that would be a new, compile-size-only bug. We do not have that hello wall. The CI gen1 means are 649.5 and 471.5 charged steps/s, not a round 470 from this tree.
 
