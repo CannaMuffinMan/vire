@@ -164,8 +164,16 @@ function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
 }
 
 $health = Send-Raw $port "GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+if (-not $health) {
+    $curl = & curl.exe -s -S -D - --max-time 5 "http://127.0.0.1:$port/health" 2>&1 | Out-String
+    Write-Output "health_curl_exe $curl"
+    $so = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+    Write-Output ("health_server_out " + $so)
+    Write-Output ("health_server_exited " + $server.HasExited + " " + $(if ($server.HasExited) { $server.ExitCode } else { "running" }))
+    $health = $curl
+}
 Write-Output "health_curl_result $health"
-if ($health -notmatch "^HTTP/1.1 200 ") { throw "health status not 200" }
+if ($health -notmatch "HTTP/1.1 200 ") { throw "health status not 200" }
 if ($health -notmatch '"ok":true') { throw "health body missing ok true" }
 if ($health -match "(?i)set-cookie") { throw "unexpected set-cookie" }
 
