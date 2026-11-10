@@ -297,7 +297,7 @@ public class PathSsrfTests
             File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
             File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
             File.WriteAllText(Path.Combine(outside, "marker-outside-only"), "X");
-            Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", "80");
+            VirePaths.TestToctouDelayMs = 80;
             try
             {
                 Thread racer = new Thread(() =>
@@ -323,7 +323,7 @@ public class PathSsrfTests
             }
             finally
             {
-                Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", null);
+                VirePaths.TestToctouDelayMs = 0;
             }
         }
         finally
@@ -331,6 +331,32 @@ public class PathSsrfTests
             try { RestoreWritableParent(dir, data, outside); } catch { }
             try { Directory.Delete(dir, true); } catch (IOException) { }
             try { Directory.Delete(outside, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void ProductOpenFileIgnoresToctouEnv()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-toctou-env-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        File.WriteAllText(Path.Combine(dir, "data", "note.txt"), "SECRET");
+        string previous = Environment.GetEnvironmentVariable("VIRE_TEST_TOCTOU_MS");
+        int saved = VirePaths.TestToctouDelayMs;
+        try
+        {
+            Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", "400");
+            VirePaths.TestToctouDelayMs = 0;
+            var sw = Stopwatch.StartNew();
+            VirePaths.AppendAllTextInside(Path.Combine(dir, "data", "note.txt"), "x", dir, 1, 1);
+            sw.Stop();
+            Console.WriteLine("toctou_env_pass_after ms=" + sw.ElapsedMilliseconds);
+            Assert.True(sw.ElapsedMilliseconds < 200, "product OpenFile slept on VIRE_TEST_TOCTOU_MS");
+        }
+        finally
+        {
+            VirePaths.TestToctouDelayMs = saved;
+            Environment.SetEnvironmentVariable("VIRE_TEST_TOCTOU_MS", previous);
+            try { Directory.Delete(dir, true); } catch (IOException) { }
         }
     }
 

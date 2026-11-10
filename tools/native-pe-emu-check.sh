@@ -14,7 +14,7 @@ rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
 cp "$ROOT/tests/native/intern-chars.vire" "$WORKDIR/intern-chars.vire"
 cp "$ROOT/tests/native/hello-stage.vire" "$WORKDIR/hello-stage.vire"
-"${VIRE[@]}" compile-native.vire data/native-pe-emu/intern-chars.vire data/native-pe-emu/intern-chars.hex
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/intern-chars.vire data/native-pe-emu/intern-chars.hex
 out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/intern-chars.hex")"
 echo "$out"
 echo "$out" | grep -q 'EXIT 0'
@@ -24,7 +24,7 @@ printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -
 printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -d '\r' > "$WORKDIR/got.txt"
 printf 'A\nb\n9\nAb9\n' > "$WORKDIR/want.txt"
 cmp -s "$WORKDIR/got.txt" "$WORKDIR/want.txt"
-"${VIRE[@]}" compile-native.vire data/native-pe-emu/hello-stage.vire data/native-pe-emu/hello-stage.hex
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/hello-stage.vire data/native-pe-emu/hello-stage.hex
 out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/hello-stage.hex")"
 echo "$out"
 echo "$out" | grep -q 'EXIT 0'

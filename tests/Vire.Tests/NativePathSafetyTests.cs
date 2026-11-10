@@ -128,7 +128,8 @@ public class NativePathSafetyTests
         Assert.Contains("Never apply to the product checkout", ps1);
         Assert.Contains("Apply-SecWiden", ps1);
         string paths = File.ReadAllText(Path.Combine(root, "VirePaths.cs"));
-        Assert.Contains("VIRE_TEST_TOCTOU_MS", paths);
+        Assert.DoesNotContain("VIRE_TEST_TOCTOU_MS", paths);
+        Assert.Contains("TestToctouDelayMs", paths);
         Assert.Contains("TryLinuxFdId", paths);
         Assert.Contains("TryLinuxPathId", paths);
     }

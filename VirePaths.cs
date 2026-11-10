@@ -228,6 +228,9 @@ static class VirePaths
         return reader.ReadToEnd();
     }
 
+    // Tests set this. Product OpenFile does not read process environment.
+    internal static int TestToctouDelayMs;
+
     static FileStream OpenFile(string path, FileMode mode, FileAccess access, string root, int line, int column)
     {
         ulong dev = 0;
@@ -235,9 +238,8 @@ static class VirePaths
         bool existed = false;
         if (OperatingSystem.IsLinux())
             existed = TryLinuxPathId(path, out dev, out ino);
-        string widen = Environment.GetEnvironmentVariable("VIRE_TEST_TOCTOU_MS");
-        int widenMs;
-        if (int.TryParse(widen, out widenMs) && widenMs > 0 && widenMs < 2000)
+        int widenMs = TestToctouDelayMs;
+        if (widenMs > 0 && widenMs < 2000)
             Thread.Sleep(widenMs);
         FileStream fs = new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
         if (OperatingSystem.IsLinux() && existed)

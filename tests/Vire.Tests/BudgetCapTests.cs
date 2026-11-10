@@ -128,10 +128,75 @@ public class BudgetCapTests
         {
             File.WriteAllText(Path.Combine(dir, "compile-native.vire"), "define main\n  while true\n  end\nend\n");
             Assert.Equal(1000000, Program.BudgetFor(Path.Combine(dir, "compile-native.vire")));
+            Assert.Equal(Program.CompilerStepCap, Program.BudgetFor(Path.Combine(dir, "compile-native.vire"), true));
         }
         finally
         {
             try { Directory.Delete(dir, true); } catch (IOException) { }
         }
+    }
+
+    [Fact]
+    public void GuestNamedCompilerVireDoesNotGetCompilerCap()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vire-compiler-claim-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        string previous = Environment.GetEnvironmentVariable("VIRE_BUDGET");
+        try
+        {
+            string body = "define main\n  let n be 0\n  while n < 100\n    let n be n + 1\n  end\n  say \"emitU8\"\nend\n";
+            File.WriteAllText(Path.Combine(dir, "hello.vire"), body);
+            File.WriteAllText(Path.Combine(dir, "compiler.vire"), body);
+            Environment.SetEnvironmentVariable("VIRE_BUDGET", "10");
+            string cwd = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(dir);
+            try
+            {
+                int hello = Program.Execute(new string[] { "hello.vire" });
+                int guest = Program.Execute(new string[] { "compiler.vire" });
+                int flagged = Program.Execute(new string[] { "--compiler", "compiler.vire" });
+                Console.WriteLine("compiler_claim_pass_after hello=" + hello + " guest=" + guest + " flagged=" + flagged);
+                Assert.Equal(1, hello);
+                Assert.Equal(1, guest);
+                Assert.Equal(1, flagged);
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(cwd);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("VIRE_BUDGET", previous);
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void FrozenHeadIsCompilerProgramSniffsFilename()
+    {
+        string root = DualMode.FindRoot();
+        var info = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("show");
+        info.ArgumentList.Add("dee819a7f0a256c70faa042b048fb4f8e542ab44:Vire.cs");
+        System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+        string old = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(15000);
+        string now = File.ReadAllText(Path.Combine(root, "Vire.cs"));
+        Assert.DoesNotContain("static bool IsCompilerProgram", now);
+        Assert.Contains("\"--compiler\"", now);
+        if (p.ExitCode == 0 && old.Length > 0)
+        {
+            Assert.Contains("static bool IsCompilerProgram", old);
+            Assert.Contains("text.Contains(\"emitU8\")", old);
+            Console.WriteLine("compiler_claim_fail_before dee819a IsCompilerProgram=true");
+        }
+        Console.WriteLine("compiler_claim_pass_after --compiler host flag");
     }
 }
