@@ -84,6 +84,7 @@ public class CopilotFindingsTests
         Assert.Contains("f5_two_process_race", ps1);
         Assert.Contains("f6_crash_pe", ps1);
         Assert.Contains("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", ps1);
+        Assert.Contains("do not let that become the function output", ps1);
     }
 
     [Fact]

@@ -162,14 +162,17 @@ if (-not $got.Blocked) {
 
 function Get-VulnTree {
     $sha = "7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867"
-    $dir = Join-Path ([IO.Path]::GetTempPath()) ("vire-vuln-" + $sha.Substring(0, 12))
-    if (-not (Test-Path (Join-Path $dir "compile-native.vire"))) {
-        if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
-        git fetch --depth 1 origin $sha
-        git worktree add --detach $dir $sha
+    $dir = [string](Join-Path ([IO.Path]::GetTempPath()) ("vire-vuln-" + $sha.Substring(0, 12)))
+    if (-not (Test-Path -LiteralPath (Join-Path $dir "compile-native.vire"))) {
+        if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+        # git writes to the success stream; do not let that become the function output (Copy-Item Destination Object[]).
+        & git fetch --depth 1 origin $sha 2>&1 | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) { throw "git fetch $sha failed" }
+        & git worktree add --detach $dir $sha 2>&1 | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) { throw "git worktree add $dir $sha failed" }
     }
-    if (-not (Test-Path (Join-Path $dir "compile-native.vire"))) { throw "vuln tree missing compile-native.vire" }
-    return $dir
+    if (-not (Test-Path -LiteralPath (Join-Path $dir "compile-native.vire"))) { throw "vuln tree missing compile-native.vire" }
+    return [string]$dir
 }
 
 function Invoke-VireAt {
@@ -251,7 +254,10 @@ function Set-CrashEntry([string]$SrcExe, [string]$DstExe) {
     [IO.File]::WriteAllBytes($DstExe, $pe)
 }
 
-$VulnTree = Get-VulnTree
+$VulnTree = [string](Get-VulnTree)
+if (-not (Test-Path -LiteralPath (Join-Path $VulnTree "compile-native.vire"))) {
+    throw "VulnTree is not a directory with compile-native.vire: $VulnTree"
+}
 Write-Host "f456_vuln_tree $VulnTree"
 
 # 4. F4 double read of the same interned path (property: second read still works).
@@ -261,8 +267,9 @@ Set-Content -Path (Join-Path $Work "f4.vire") -Value "define main`n  say (read w
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/f4.vire" "data/native-sec-windows/f4.hex"
 if ($code -ne 0) { throw "f4 compile failed" }
 HexToExe "data/native-sec-windows/f4.hex" (Join-Path $Work "f4.exe")
-Copy-Item (Join-Path $Work "f4.vire") (Join-Path $VulnTree "data/native-sec-windows-f4.vire") -Force
-New-Item -ItemType Directory -Force -Path (Join-Path $VulnTree "data") | Out-Null
+$vulnData = [string](Join-Path $VulnTree "data")
+New-Item -ItemType Directory -Force -Path $vulnData | Out-Null
+Copy-Item -LiteralPath ([string](Join-Path $Work "f4.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f4.vire")) -Force
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f4.vire", "data/f4-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f4-vuln.hex") (Join-Path $Work "f4-vuln.exe")
 
@@ -299,7 +306,7 @@ Set-Content -Path (Join-Path $Work "f5.vire") -Value "define main`n  write with 
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/f5.vire" "data/native-sec-windows/f5.hex"
 if ($code -ne 0) { throw "f5 compile failed" }
 HexToExe "data/native-sec-windows/f5.hex" (Join-Path $Work "f5.exe")
-Copy-Item (Join-Path $Work "f5.vire") (Join-Path $VulnTree "data/native-sec-windows-f5.vire") -Force
+Copy-Item -LiteralPath ([string](Join-Path $Work "f5.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f5.vire")) -Force
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f5.vire", "data/f5-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f5-vuln.hex") (Join-Path $Work "f5-vuln.exe")
 
@@ -366,7 +373,7 @@ function Invoke-F6Crash([string]$HelloExe, [string]$Tag) {
     return @{ Run = $run; RipFile = $rip }
 }
 
-Copy-Item (Join-Path $Work "hello.vire") (Join-Path $VulnTree "data/native-sec-windows-hello.vire") -Force
+Copy-Item -LiteralPath ([string](Join-Path $Work "hello.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-hello.vire")) -Force
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-hello.vire", "data/hello-vuln.hex") -TimeoutSec 180
 Convert-HexFileToExe (Join-Path $VulnTree "data/hello-vuln.hex") (Join-Path $Work "hello-vuln.exe")
 
