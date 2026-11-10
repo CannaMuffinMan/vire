@@ -138,7 +138,11 @@ while ((Get-Date) -lt $deadline) {
     }
     Start-Sleep -Milliseconds 100
 }
-if (-not $port) { throw "did not print listening port" }
+if (-not $port) {
+    $so = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+    Write-Output ("health_server_out " + $so)
+    throw "did not print listening port"
+}
 if ($port -lt 1024) { throw "bound port $port" }
 Write-Output "health_listen 127.0.0.1:$port"
 
