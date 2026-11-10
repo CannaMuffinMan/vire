@@ -6,6 +6,18 @@ define cryptoWord with hi, lo
   return [hi, lo]
 end
 
+define times2 with n
+  return n + n
+end
+
+define times4 with n
+  return times2 with (times2 with n)
+end
+
+define times8 with n
+  return times2 with (times4 with n)
+end
+
 define cryptoAnd16 with a, b
   let r be 0
   let p be 1
@@ -246,7 +258,7 @@ define cryptoLoadWord with bytes, off
   let b1 be bytes at (off + 1)
   let b2 be bytes at (off + 2)
   let b3 be bytes at (off + 3)
-  return [(b0 * 256) + b1, (b2 * 256) + b3]
+  return [(shl8 with b0) + b1, (shl8 with b2) + b3]
 end
 
 define cryptoStoreWord with out, w
@@ -263,7 +275,7 @@ define cryptoCompress with state, block, ks
   let w be []
   let i be 0
   while i < 16
-    push with w, (cryptoLoadWord with block, (i * 4))
+    push with w, (cryptoLoadWord with block, (times4 with i))
     let i be i + 1
   end
   while i < 64
@@ -317,7 +329,7 @@ define cryptoPad with bytes
   while ((length with out) % 64) != 56
     push with out, 0
   end
-  let bits be n * 8
+  let bits be times8 with n
   push with out, 0
   push with out, 0
   push with out, 0
@@ -541,8 +553,8 @@ define b64url_encode with bytes
       let got be 3
     end
     let n0 be idiv with b0, 4
-    let n1 be ((b0 % 4) * 16) + (idiv with b1, 16)
-    let n2 be ((b1 % 16) * 4) + (idiv with b2, 64)
+    let n1 be (times16 with (b0 % 4)) + (idiv with b1, 16)
+    let n2 be (times4 with (b1 % 16)) + (idiv with b2, 64)
     let n3 be b2 % 64
     let out be out + (table at n0)
     let out be out + (table at n1)
@@ -590,12 +602,12 @@ define b64url_decode with text
     if left > 3
       let n3 be b64url_val with (text at (i + 3))
     end
-    push with out, ((c0 * 4) + (idiv with c1, 16))
+    push with out, ((times4 with c0) + (idiv with c1, 16))
     if left > 2
-      push with out, (((c1 % 16) * 16) + (idiv with n2, 4))
+      push with out, ((times16 with (c1 % 16)) + (idiv with n2, 4))
     end
     if left > 3
-      push with out, (((n2 % 4) * 64) + n3)
+      push with out, ((times4 with (times16 with (n2 % 4))) + n3)
     end
     let i be i + 4
   end
@@ -724,7 +736,11 @@ define jwt_field_number with text, key
   if (length with raw) == 0
     return ["bad", 0]
   end
-  return ["ok", (sign * (number with raw))]
+  let expn be number with raw
+  if sign < 0
+    let expn be 0 - expn
+  end
+  return ["ok", expn]
 end
 
 define jwt_split with token
