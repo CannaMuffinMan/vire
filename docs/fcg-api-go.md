@@ -5,8 +5,9 @@ Inventory SHA `5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4`. This agent did not re-
 ## Source paths
 
 - `api-go/` README still says non-deployed. No `api-go/railway.toml`.
-- `api-go/internal/httpx/native.go`. Exact GET list that is native in Go. Payments proxy unless `GO_NATIVE_PAYMENTS` / `GO_NATIVE_BILLING`, default off.
-- Reserved closed paths return 503 `node_retired` instead of proxy. `/api/profile/theme`, `/api/profile/entitlements`, `GET /api/auth/owner/complete`, `POST /api/auth/email/register`.
+- `api-go/internal/httpx/native.go`. The inventory names this file as the native GET list and does not paste the paths. This token did not open it. Count of native GETs from this run is zero. Do not invent handlers.
+- Payments proxy unless `GO_NATIVE_PAYMENTS` / `GO_NATIVE_BILLING`, default off.
+- Reserved closed paths return 503 `node_retired` instead of proxy. Inventory names `/api/profile/theme`, `/api/profile/entitlements`, `GET /api/auth/owner/complete`, and `POST /api/auth/email/register`. It gives an HTTP method for the last two only. That 503 string is not the `fcgbc-go` mine 503, and it is not Vire `api/fcgcpa.vire` `chain invalid`.
 - Listen default `:8080`. Default `NODE_API_URL` `http://127.0.0.1:3001`. Node default listen is 4001. Those defaults do not match.
 - Upgrade `/ws/kick` forwards to Node.
 

@@ -9,7 +9,8 @@ Inventory SHA `5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4`. This agent did not re-
 | `landing-go/` | 13 / 3583 | Landing strangler |
 | `cpa-go/` | 13 / 1610 | CPA strangler |
 | `edge-go/` | 4 / 918 | Reverse proxy. rpc host to service `fcgbc` port 3001. Admin host to `fcgbc-copy` 8080. Railway service names, not a testnet dump. |
-| `worker-go/` | 3 / 98 | Job names only. `main.go` exits. Job bodies are a source gap. |
+| `worker-go/` | 3 / 98 | Job names only. `main.go` exits. The inventory does not record the job name strings. Do not invent them. |
+| `landing-go`, `cpa-go`, `fcgbds-go`, `fcgbds-dashboard-go`, `fcgbds-middleware`, `rpc-portal-go`, `dev-portal-go`, `worker-go` listen ports | unknown | Absent from the inventory. Re-read after clone. |
 | `loadtest/`, `tools/load-test/`, `scripts/` | harness | Localhost only. `127.0.0.1`. Ports 7099 and 8778 forbidden. |
 
 ## Behavior to preserve
