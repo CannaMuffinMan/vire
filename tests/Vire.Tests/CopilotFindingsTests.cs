@@ -73,6 +73,17 @@ public class CopilotFindingsTests
         Assert.DoesNotContain("crash_path", slice);
         Assert.DoesNotContain("iat_cf", slice);
         Assert.Contains("iat_gs", slice);
+        Assert.DoesNotContain("crash-rip.txt", rt);
+    }
+
+    [Fact]
+    public void F4_F5_F6_WindowsOsRecipesArePresent()
+    {
+        string ps1 = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-sec-windows.ps1"));
+        Assert.Contains("f4_double_read", ps1);
+        Assert.Contains("f5_two_process_race", ps1);
+        Assert.Contains("f6_crash_pe", ps1);
+        Assert.Contains("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", ps1);
     }
 
     [Fact]

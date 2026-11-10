@@ -665,8 +665,6 @@ define parkRuntime with image, labels
   let image be emitU64 with image, 0
   pin with labels, "crash_rip_msg", image
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 114, 105, 112, 61]
-  pin with labels, "crash_path", image
-  let image be emitList with image, [99, 114, 97, 115, 104, 45, 114, 105, 112, 46, 116, 120, 116, 0]
   pin with labels, "crash_hex", image
   let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   pin with labels, "intern_tab", image
