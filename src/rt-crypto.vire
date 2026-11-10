@@ -415,8 +415,63 @@ define ascii_text with bytes
 end
 
 define hex_digit with ch
-  let digits be "0123456789abcdef"
-  return find with digits, ch
+  if ch == "0"
+    return 0
+  end
+  if ch == "1"
+    return 1
+  end
+  if ch == "2"
+    return 2
+  end
+  if ch == "3"
+    return 3
+  end
+  if ch == "4"
+    return 4
+  end
+  if ch == "5"
+    return 5
+  end
+  if ch == "6"
+    return 6
+  end
+  if ch == "7"
+    return 7
+  end
+  if ch == "8"
+    return 8
+  end
+  if ch == "9"
+    return 9
+  end
+  if (ch == "a") or (ch == "A")
+    return 10
+  end
+  if (ch == "b") or (ch == "B")
+    return 11
+  end
+  if (ch == "c") or (ch == "C")
+    return 12
+  end
+  if (ch == "d") or (ch == "D")
+    return 13
+  end
+  if (ch == "e") or (ch == "E")
+    return 14
+  end
+  if (ch == "f") or (ch == "F")
+    return 15
+  end
+  return 0 - 1
+end
+
+define times16 with n
+  let v be n + n
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  return v
 end
 
 define hex_to_bytes with raw
@@ -427,12 +482,12 @@ define hex_to_bytes with raw
   let out be []
   let i be 0
   while i < n
-    let hi be hex_digit with (lower with (raw at i))
-    let lo be hex_digit with (lower with (raw at (i + 1)))
+    let hi be hex_digit with (raw at i)
+    let lo be hex_digit with (raw at (i + 1))
     if (hi < 0) or (lo < 0)
       return ["bad", "bad hex"]
     end
-    push with out, ((hi * 16) + lo)
+    push with out, ((times16 with hi) + lo)
     let i be i + 2
   end
   return ["ok", out]
