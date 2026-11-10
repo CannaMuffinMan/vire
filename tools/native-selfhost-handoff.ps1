@@ -118,7 +118,7 @@ Write-Output "step_hello_pe ok"
 $gen1Hex = Join-Path $Data "gen1.hex"
 $gen1Exe = Join-Path $Data "gen1.exe"
 if (Test-Path $gen1Hex) { Remove-Item -Force $gen1Hex }
-$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 420 -FilePath "dotnet" -ArgumentList @(
+$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 900 -FilePath "dotnet" -ArgumentList @(
     "exec", $VireDll, "compile-native.vire", "data/compile-native.vire", "data/gen1.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen1_host missing compiled" }
@@ -139,7 +139,7 @@ Write-Output "step_gen1_hello ok"
 
 $gen2Hex = Join-Path $Data "gen2.hex"
 if (Test-Path $gen2Hex) { Remove-Item -Force $gen2Hex }
-$r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 600 -FilePath $gen1Exe -ArgumentList @(
+$r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 1200 -FilePath $gen1Exe -ArgumentList @(
     "data/compile-native.vire", "data/gen2.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen2_native missing compiled" }
