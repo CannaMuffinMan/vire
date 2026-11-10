@@ -34,18 +34,134 @@ define cryptoAnd16 with a, b
   let p be 1
   let x be a
   let y be b
-  let i be 0
-  while i < 16
-    let xb be x % 2
-    let yb be y % 2
-    if (xb == 1) and (yb == 1)
-      let r be r + p
-    end
-    let x be idiv with x, 2
-    let y be idiv with y, 2
-    let p be p + p
-    let i be i + 1
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
   end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if (xb == 1) and (yb == 1)
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
   return r
 end
 
@@ -54,18 +170,134 @@ define cryptoXor16 with a, b
   let p be 1
   let x be a
   let y be b
-  let i be 0
-  while i < 16
-    let xb be x % 2
-    let yb be y % 2
-    if xb != yb
-      let r be r + p
-    end
-    let x be idiv with x, 2
-    let y be idiv with y, 2
-    let p be p + p
-    let i be i + 1
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
   end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
   return r
 end
 
@@ -148,19 +380,201 @@ define cryptoShl1_into with w
 end
 
 define cryptoShr32_into with w, n
-  let i be 0
-  while i < n
+  if n > 0
     cryptoShr1_into with w
-    let i be i + 1
+  end
+  if n > 1
+    cryptoShr1_into with w
+  end
+  if n > 2
+    cryptoShr1_into with w
+  end
+  if n > 3
+    cryptoShr1_into with w
+  end
+  if n > 4
+    cryptoShr1_into with w
+  end
+  if n > 5
+    cryptoShr1_into with w
+  end
+  if n > 6
+    cryptoShr1_into with w
+  end
+  if n > 7
+    cryptoShr1_into with w
+  end
+  if n > 8
+    cryptoShr1_into with w
+  end
+  if n > 9
+    cryptoShr1_into with w
+  end
+  if n > 10
+    cryptoShr1_into with w
+  end
+  if n > 11
+    cryptoShr1_into with w
+  end
+  if n > 12
+    cryptoShr1_into with w
+  end
+  if n > 13
+    cryptoShr1_into with w
+  end
+  if n > 14
+    cryptoShr1_into with w
+  end
+  if n > 15
+    cryptoShr1_into with w
+  end
+  if n > 16
+    cryptoShr1_into with w
+  end
+  if n > 17
+    cryptoShr1_into with w
+  end
+  if n > 18
+    cryptoShr1_into with w
+  end
+  if n > 19
+    cryptoShr1_into with w
+  end
+  if n > 20
+    cryptoShr1_into with w
+  end
+  if n > 21
+    cryptoShr1_into with w
+  end
+  if n > 22
+    cryptoShr1_into with w
+  end
+  if n > 23
+    cryptoShr1_into with w
+  end
+  if n > 24
+    cryptoShr1_into with w
+  end
+  if n > 25
+    cryptoShr1_into with w
+  end
+  if n > 26
+    cryptoShr1_into with w
+  end
+  if n > 27
+    cryptoShr1_into with w
+  end
+  if n > 28
+    cryptoShr1_into with w
+  end
+  if n > 29
+    cryptoShr1_into with w
+  end
+  if n > 30
+    cryptoShr1_into with w
+  end
+  if n > 31
+    cryptoShr1_into with w
   end
   return w
 end
 
 define cryptoShl32_into with w, n
-  let i be 0
-  while i < n
+  if n > 0
     cryptoShl1_into with w
-    let i be i + 1
+  end
+  if n > 1
+    cryptoShl1_into with w
+  end
+  if n > 2
+    cryptoShl1_into with w
+  end
+  if n > 3
+    cryptoShl1_into with w
+  end
+  if n > 4
+    cryptoShl1_into with w
+  end
+  if n > 5
+    cryptoShl1_into with w
+  end
+  if n > 6
+    cryptoShl1_into with w
+  end
+  if n > 7
+    cryptoShl1_into with w
+  end
+  if n > 8
+    cryptoShl1_into with w
+  end
+  if n > 9
+    cryptoShl1_into with w
+  end
+  if n > 10
+    cryptoShl1_into with w
+  end
+  if n > 11
+    cryptoShl1_into with w
+  end
+  if n > 12
+    cryptoShl1_into with w
+  end
+  if n > 13
+    cryptoShl1_into with w
+  end
+  if n > 14
+    cryptoShl1_into with w
+  end
+  if n > 15
+    cryptoShl1_into with w
+  end
+  if n > 16
+    cryptoShl1_into with w
+  end
+  if n > 17
+    cryptoShl1_into with w
+  end
+  if n > 18
+    cryptoShl1_into with w
+  end
+  if n > 19
+    cryptoShl1_into with w
+  end
+  if n > 20
+    cryptoShl1_into with w
+  end
+  if n > 21
+    cryptoShl1_into with w
+  end
+  if n > 22
+    cryptoShl1_into with w
+  end
+  if n > 23
+    cryptoShl1_into with w
+  end
+  if n > 24
+    cryptoShl1_into with w
+  end
+  if n > 25
+    cryptoShl1_into with w
+  end
+  if n > 26
+    cryptoShl1_into with w
+  end
+  if n > 27
+    cryptoShl1_into with w
+  end
+  if n > 28
+    cryptoShl1_into with w
+  end
+  if n > 29
+    cryptoShl1_into with w
+  end
+  if n > 30
+    cryptoShl1_into with w
+  end
+  if n > 31
+    cryptoShl1_into with w
   end
   return w
 end
