@@ -1,6 +1,3 @@
-# Clean-machine native use of an already-built gen1.exe.
-# Bootstrap (.NET interpreter emit) is a different phase. This script must not call
-# dotnet/gcc/clang/mingw/java to compile guests or rebuild the compiler.
 param(
     [ValidateSet("bootstrap", "prove", "all")]
     [string]$Phase = "prove",
