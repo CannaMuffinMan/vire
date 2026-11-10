@@ -14,6 +14,7 @@ public class PerfBreakMissCostTests
         try
         {
             Assert.False(VireDebug.Break(dir, "main", 1, "warmup"));
+            long before = System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls);
             Stopwatch sw = Stopwatch.StartNew();
             int hits = 0;
             for (int i = 0; i < n; i++)
@@ -22,6 +23,7 @@ public class PerfBreakMissCostTests
             }
             sw.Stop();
             Assert.Equal(0, hits);
+            Assert.Equal(before + n, System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls));
             Assert.False(File.Exists(Path.Combine(dir, "data", "break.txt")));
             double nsEach = sw.Elapsed.TotalNanoseconds / n;
             Console.WriteLine("break_miss_calls " + n);

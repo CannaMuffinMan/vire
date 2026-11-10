@@ -7,7 +7,7 @@ import sys
 
 STEP_RE = re.compile(r"still running steps=(\d+)")
 STAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T[0-9.:+-]+)\s+.*still running steps=(\d+)")
-TOTAL_RE = re.compile(r"total_steps=(\d+)\s+total_pending=(\d+)\s+step_batch=(\d+)")
+TOTAL_RE = re.compile(r"total_steps=(\d+)\s+total_pending=(\d+)\s+step_batch=(\d+)(?:\s+break_probes=(\d+))?")
 SEC_RE = re.compile(r"step_(\w+)_sec\s+([0-9.]+)")
 SHA_RE = re.compile(r"gen1_sha256\s+([0-9a-f]+)")
 HOST_RE = re.compile(r"^(os |framework |cores |cpu |dotnet_sdk |DOTNET_)")
@@ -37,7 +37,8 @@ def main(path: str) -> int:
                 steps.append(int(m.group(1)))
             m = TOTAL_RE.search(text)
             if m:
-                totals.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                probes = int(m.group(4)) if m.group(4) else None
+                totals.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), probes))
             m = SEC_RE.search(text)
             if m:
                 secs[m.group(1)] = float(m.group(2))
@@ -107,6 +108,8 @@ def main(path: str) -> int:
         print("gen1_host_wall_s", wall)
         print("gen1_host_total_steps", charged)
         print("gen1_host_mean_steps_s", charged / wall if wall else None)
+        if totals[-1][3] is not None:
+            print("break_probes", totals[-1][3])
     if len(sys.argv) >= 4:
         local_steps = int(sys.argv[2])
         local_sec = float(sys.argv[3])

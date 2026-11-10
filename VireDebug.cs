@@ -17,8 +17,11 @@ static class VireDebug
         public bool StepNext;
     }
 
+    public static long ProbeCalls;
+
     public static bool Break(string root, string name, int line, string detail)
     {
+        System.Threading.Interlocked.Increment(ref ProbeCalls);
         if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(name)) return false;
         try
         {
