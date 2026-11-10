@@ -153,7 +153,7 @@ function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
     $client.Connect("127.0.0.1", $Port)
     $stream = $client.GetStream()
     $bytes = [System.Text.Encoding]::ASCII.GetBytes($Payload)
-    $stream.Write($bytes, 0, $bytes.Length)
+    try { $stream.Write($bytes, 0, $bytes.Length) } catch { $client.Close(); return "" }
     $buf = New-Object byte[] 8192
     $n = 0
     try { $n = $stream.Read($buf, 0, $buf.Length) } catch { $n = 0 }
