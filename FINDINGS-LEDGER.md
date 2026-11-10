@@ -3,7 +3,7 @@
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
 Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
 PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft).
-No CVE IDs. **No freeze** until `native-windows` prints `f4_`/`f5_`/`f6_`/`f_walk_then_open` properties **and** `native-selfhost-windows` equal hashes on the **exact head**. Prior proven freeze remains `3d9fc58`. Do not call F5/path closed until walk-then-open fail-before/pass-after lands on that head. F5 harness: `Invoke-F5FixedZero` returns a single `[int]`; `$hits++` / `WaitForExit` bools must not enter the success stream (PR44 job 129758476518).
+No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Host TOCTOU, Linux Ordinal zones, trailing dots, F8 wrap, F13 offset-240, ARM hardlink filter, and this audit/ledger pass-after still need the follow-up head. Caps/sandbox/Defender unchanged. Draft only.
 
 ## Implemented vs verified
 
@@ -22,7 +22,11 @@ No CVE IDs. **No freeze** until `native-windows` prints `f4_`/`f5_`/`f6_`/`f_wal
 | F11 | yes + bytes reload | Windows `3d9fc58` gen1 hello 0 / gen2 0 / equal `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` jobs `129677976694` `129677996797` | re-prove after this PE-byte change |
 | F12 | yes | Unicorn EXIT 1 numbers message | — |
 | F13 | yes | forbids 32MB at PE 224 **and** 240; planted 240 write must fail; CI `native-arena-check.sh` | — |
-| walk-then-open | yes | Unicorn GFA-then-swap writes outside on 7c7c8ea, refused after GetFinalPathName; Windows junction swap until-hit | not closed until exact-head Windows job |
+| walk-then-open | yes | Unicorn + Windows Sleep-widener job `129796755075` vuln `outside_hits=1` / fixed `0` | host C# TOCTOU is a separate gate |
+| host TOCTOU | yes | `HostCheckThenOpenToctouFailBeforePassAfter`: `File.AppendAllText` after swap writes outside; `AppendAllTextInside` file-id refuses | Windows job filter on `native-windows` |
+| Linux case | yes | `LinuxWritableZoneCompareIsCaseSensitive`; `use Data/` is not `data/` | — |
+| trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused` | 7c7c8ea fail-before in emu-check |
+| F8 wrap | yes | host+Unicorn `[0, 0, 1]`; compile-native `72, 185` imm64 | 7c7c8ea native wrap mismatch in emu-check |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
 
