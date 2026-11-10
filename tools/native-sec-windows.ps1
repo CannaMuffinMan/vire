@@ -354,11 +354,14 @@ if ($internFix.Rx -or $internVuln.Rx) {
 }
 
 # 5. F5: vuln MUST hit KEEP>=1 (bounded), then fixed victim==0. 0/0 fails.
+# 7c7c8ea interned path literals live in RX .text; walk NULs them and AVs (same RIP as F4).
+# Heap-concatenated path so CREATE_ALWAYS fail-before can actually run.
 Set-Content -Path (Join-Path $Work "f5.vire") -Value "define main`n  write with `"data/f5-slot.txt`", `"HACKED`"`nend`n"
+Set-Content -Path (Join-Path $Work "f5-vuln-src.vire") -Value "define main`n  let p be (`"data/`" + `"f5-slot.txt`")`n  write with p, `"HACKED`"`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/f5.vire" "data/native-sec-windows/f5.hex"
 if ($code -ne 0) { throw "f5 compile failed" }
 HexToExe "data/native-sec-windows/f5.hex" (Join-Path $Work "f5.exe")
-Copy-Item -LiteralPath ([string](Join-Path $Work "f5.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f5.vire")) -Force
+Copy-Item -LiteralPath ([string](Join-Path $Work "f5-vuln-src.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f5.vire")) -Force
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f5.vire", "data/f5-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f5-vuln.hex") (Join-Path $Work "f5-vuln.exe")
 
@@ -377,6 +380,14 @@ function Start-F5Racer([string]$Slot, [string]$Keep) {
     return Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-File", $racerPath, $Slot, $Keep) -PassThru -WindowStyle Hidden
 }
 
+function Reset-F5Slot([string]$Slot) {
+    try {
+        if (Test-Path -LiteralPath $Slot) {
+            Remove-Item -LiteralPath $Slot -Force -ErrorAction Ignore
+        }
+    } catch { }
+}
+
 function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
     $keep = Join-Path $Work "data\f5-keep.txt"
     $slot = Join-Path $Work "data\f5-slot.txt"
@@ -387,7 +398,7 @@ function Invoke-F5UntilHit([string]$WriteExe, [int]$TimeoutSec) {
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            if (Test-Path $slot) { Remove-Item -Force $slot -ErrorAction SilentlyContinue }
+            Reset-F5Slot $slot
             Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
@@ -416,7 +427,7 @@ function Invoke-F5FixedZero([string]$WriteExe, [int]$TimeoutSec) {
         $rp = Start-F5Racer $slot $keep
         while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
             Set-Content -Path $keep -Value "KEEP" -NoNewline | Out-Null
-            if (Test-Path $slot) { Remove-Item -Force $slot -ErrorAction SilentlyContinue }
+            Reset-F5Slot $slot
             Set-Content -Path $slot -Value "SLOT" -NoNewline | Out-Null
             $run = Invoke-NativeExe -ExePath $WriteExe -WorkingDirectory $Work
             $rounds = $rounds + 1
@@ -476,10 +487,11 @@ Write-Host "f6_crash_pe fixed KEEP intact and stdout crash rip="
 
 # walk-then-open TOCTOU: swap data for a junction to outside between GFA and CreateFileA.
 Set-Content -Path (Join-Path $Work "walk.vire") -Value "define main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
+Set-Content -Path (Join-Path $Work "walk-vuln-src.vire") -Value "define main`n  let p be (`"data/`" + `"note.txt`")`n  write with p, `"hacked`"`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/walk.vire" "data/native-sec-windows/walk.hex"
 if ($code -ne 0) { throw "walk compile failed" }
 HexToExe "data/native-sec-windows/walk.hex" (Join-Path $Work "walk.exe")
-Copy-Item -LiteralPath ([string](Join-Path $Work "walk.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-walk.vire")) -Force
+Copy-Item -LiteralPath ([string](Join-Path $Work "walk-vuln-src.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-walk.vire")) -Force
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-walk.vire", "data/walk-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/walk-vuln.hex") (Join-Path $Work "walk-vuln.exe")
 
