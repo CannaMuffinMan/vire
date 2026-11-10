@@ -1616,6 +1616,9 @@ define walkNode with node, hit
       return true
     end
     let head be node at 0
+    if head == "text" or head == "num" or head == "name" or head == "bool" or head == "none"
+      return true
+    end
     if head == "call"
       let nm be node at 1
       if nm == "listen"
@@ -1627,8 +1630,12 @@ define walkNode with node, hit
       if nm == "parse"
         put true into hit at "json"
       end
+      if n > 2
+        walkNode with (node at 2), hit
+      end
+      return true
     end
-    if head == "call" or head == "let" or head == "say" or head == "return" or head == "if" or head == "while" or head == "for" or head == "try" or head == "put" or head == "list" or head == "map" or head == "not" or head == "neg" or head == "and" or head == "or" or head == "at" or head == "num" or head == "text" or head == "bool" or head == "none" or head == "name" or head == "==" or head == "!=" or head == "<" or head == ">" or head == "<=" or head == ">=" or head == "+" or head == "-" or head == "*" or head == "/" or head == "%"
+    if head == "let" or head == "say" or head == "return" or head == "if" or head == "while" or head == "for" or head == "try" or head == "put" or head == "list" or head == "map" or head == "not" or head == "neg" or head == "and" or head == "or" or head == "at" or head == "==" or head == "!=" or head == "<" or head == ">" or head == "<=" or head == ">=" or head == "+" or head == "-" or head == "*" or head == "/" or head == "%"
       let i be 1
       while i < n
         walkNode with (node at i), hit
@@ -1636,10 +1643,17 @@ define walkNode with node, hit
       end
       return true
     end
-    let i be 0
-    while i < n
-      walkNode with (node at i), hit
-      let i be i + 1
+    try
+      let inner be head at 0
+      if inner == "call" or inner == "let" or inner == "say" or inner == "return" or inner == "if" or inner == "while" or inner == "for" or inner == "try" or inner == "put" or inner == "stop" or inner == "skip"
+        let i be 0
+        while i < n
+          walkNode with (node at i), hit
+          let i be i + 1
+        end
+      end
+    miss
+      return true
     end
   miss
     return true
@@ -1673,17 +1687,13 @@ define emitFunc with gen, funcs, func
 end
 
 define main
-  say "compile-native start"
   let files be args
-  say ("nfiles " + (text with (length with files)))
   if (length with files) < 2
     say "usage: compile-native source.vire out.hex"
     say "compile failed"
     halt with 1
   end
-  say (files at 0)
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
-  say "loaded"
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
