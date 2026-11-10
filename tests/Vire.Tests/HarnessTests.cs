@@ -84,9 +84,11 @@ public class HarnessTests
         string ps = File.ReadAllText(Path.Combine(root, "tools", "selfhost-check.ps1"));
         Assert.Contains("payload-write", sh);
         Assert.Contains("cmp -s", sh);
+        Assert.Contains("--compiler compiler.vire", sh);
         Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", sh);
         Assert.Contains("payload-write", ps);
         Assert.Contains("Compare-Object", ps);
+        Assert.Contains("--compiler", ps);
         Assert.Contains("run data/stage1.vc data/compiler.vire data/stage2.vc", ps);
     }
 
@@ -129,6 +131,7 @@ public class HarnessTests
         Assert.Contains("WaitForExit", self);
         Assert.Contains("gen1_sha256", self);
         Assert.Contains("compile-native.vire", self);
+        Assert.Contains("--compiler", self);
         Assert.DoesNotContain("Apply-SecWiden", self);
         Assert.DoesNotContain("iat_sl", self);
         Assert.DoesNotContain("python -c", self);

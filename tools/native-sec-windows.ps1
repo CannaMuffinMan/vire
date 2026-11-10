@@ -24,7 +24,15 @@ function Invoke-Vire {
     $errFile = Join-Path $work "err.txt"
     $inFile = Join-Path $work "in.txt"
     Set-Content -Path $inFile -Value "" -NoNewline
-    $argList = @("exec", $VireDll) + $VireArgs
+    $hostArgs = $VireArgs
+    $leaf = [IO.Path]::GetFileName($VireArgs[0])
+    $savedBudget = $env:VIRE_BUDGET
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+        $hostArgs = @("--compiler") + $VireArgs
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    }
+    $argList = @("exec", $VireDll) + $hostArgs
+    try {
     $p = Start-Process -FilePath "dotnet" -ArgumentList $argList -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         try { $p.Kill($true) } catch { }
@@ -36,6 +44,9 @@ function Invoke-Vire {
     if ($err) { $err.TrimEnd() | Write-Host }
     if ($null -eq $p.ExitCode) { return 0 }
     return [int]$p.ExitCode
+    } finally {
+        if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
+    }
 }
 function HexToExe($hexRel, $exePath) {
     $hex = [System.IO.File]::ReadAllText((Join-Path $Root $hexRel)).Trim()
@@ -268,7 +279,15 @@ function Invoke-VireAt {
     $errFile = "$outFile.err"
     $inFile = "$outFile.in"
     Set-Content -Path $inFile -Value "" -NoNewline
-    $argList = @("exec", $VireDll) + $VireArgs
+    $hostArgs = $VireArgs
+    $leaf = [IO.Path]::GetFileName($VireArgs[0])
+    $savedBudget = $env:VIRE_BUDGET
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+        $hostArgs = @("--compiler") + $VireArgs
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    }
+    $argList = @("exec", $VireDll) + $hostArgs
+    try {
     $p = Start-Process -FilePath "dotnet" -ArgumentList $argList -WorkingDirectory $WorkingDirectory -NoNewWindow -PassThru -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         try { $p.Kill($true) } catch { }
@@ -279,6 +298,9 @@ function Invoke-VireAt {
     if ($out) { $out.TrimEnd() | Write-Host }
     if ($err) { $err.TrimEnd() | Write-Host }
     if ($p.ExitCode -ne 0) { throw "vire exit $($p.ExitCode) in $WorkingDirectory : $out $err" }
+    } finally {
+        if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
+    }
 }
 
 function Convert-HexFileToExe([string]$HexPath, [string]$ExePath) {
