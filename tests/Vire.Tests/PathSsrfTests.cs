@@ -225,10 +225,15 @@ public class PathSsrfTests
             }
             else return;
             if (!File.Exists(link)) return;
+            File.WriteAllText(link, "hacked-os");
+            Console.WriteLine("hardlink_fail_before lock=" + File.ReadAllText(lockFile));
+            Assert.Equal("hacked-os", File.ReadAllText(lockFile));
+            File.WriteAllText(lockFile, "original-lock");
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
                 "define main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.Equal("original-lock", File.ReadAllText(lockFile));
+            Console.WriteLine("hardlink_pass_after lock=" + File.ReadAllText(lockFile));
         }
         finally
         {
@@ -249,12 +254,14 @@ public class PathSsrfTests
             File.WriteAllText(folded, "OUTSIDE-KEEP");
             string dataPrefix = Path.GetFullPath(Path.Combine(dir, "data")).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             Assert.True(Path.GetFullPath(folded).StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase), "fail-before: IgnoreCase would treat Data as data");
+            Console.WriteLine("linux_zone_fail_before IgnoreCase_Data_is_data=true");
             Assert.False(VirePaths.UnderWritableZone(dir, folded));
             Assert.False(VirePaths.InFolder(Path.Combine(dir, "data"), folded));
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
                 "define main\n  write with \"Data/note.txt\", \"PWN\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(folded));
+            Console.WriteLine("linux_zone_pass_after Data_note_kept=OUTSIDE-KEEP");
         }
         finally
         {
@@ -285,6 +292,7 @@ public class PathSsrfTests
                 File.Exists(Path.Combine(Path.GetDirectoryName(checkedPath), "marker-outside-only")),
                 "fail-before must follow the swapped parent");
             Assert.Contains("PWN", File.ReadAllText(checkedPath));
+            Console.WriteLine("host_toctou_linux_fail_before outside_has_PWN=true");
             RestoreWritableParent(dir, data, outside);
             File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
             File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
@@ -311,6 +319,7 @@ public class PathSsrfTests
                 if (File.Exists(Path.Combine(Path.GetDirectoryName(marked), "marker-outside-only")) &&
                     File.Exists(marked))
                     Assert.DoesNotContain("PWN", File.ReadAllText(marked));
+                Console.WriteLine("host_toctou_linux_pass_after outside_has_PWN=false");
             }
             finally
             {
