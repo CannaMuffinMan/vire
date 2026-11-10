@@ -145,6 +145,8 @@ if (-not $port) {
 }
 if ($port -lt 1024) { throw "bound port $port" }
 Write-Output "health_listen 127.0.0.1:$port"
+Start-Sleep -Milliseconds 400
+if ($server.HasExited) { throw "health server exited $($server.ExitCode) after listen" }
 
 function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
     $client = New-Object System.Net.Sockets.TcpClient
@@ -153,7 +155,7 @@ function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
     $client.Connect("127.0.0.1", $Port)
     $stream = $client.GetStream()
     $bytes = [System.Text.Encoding]::ASCII.GetBytes($Payload)
-    try { $stream.Write($bytes, 0, $bytes.Length) } catch { $client.Close(); return "" }
+    $stream.Write($bytes, 0, $bytes.Length)
     $buf = New-Object byte[] 8192
     $n = 0
     try { $n = $stream.Read($buf, 0, $buf.Length) } catch { $n = 0 }
