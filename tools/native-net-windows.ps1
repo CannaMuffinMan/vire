@@ -129,7 +129,13 @@ while ((Get-Date) -lt $deadline) {
             break
         }
     }
-    if ($server.HasExited) { throw "health server exited $($server.ExitCode) early" }
+    if ($server.HasExited) {
+        $so = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+        $se = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+        Write-Output ("health_server_out " + $so)
+        Write-Output ("health_server_err " + $se)
+        throw "health server exited $($server.ExitCode) early"
+    }
     Start-Sleep -Milliseconds 100
 }
 if (-not $port) { throw "did not print listening port" }
