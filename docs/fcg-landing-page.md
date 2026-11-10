@@ -5,7 +5,7 @@ Inventory SHA `5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4`. This agent did not re-
 ## Source paths
 
 - `landing-page/` Next.js 16.3.6, React 19, Tailwind 4, ethers, WebAuthn browser, pusher-js, pg.
-- App router under `landing-page/src/app/`. Named routes include join, legal, subscription, bot-defense-system, mscb, waitlist-admin, whitepaper.
+- App router under `landing-page/src/app/`. The inventory names join, legal, subscription, bot-defense-system, mscb, waitlist-admin, and whitepaper, and says other routes were listed in that earlier run. That seven-name list is not complete. Re-list `src/app` after the private repo is readable.
 - Shopify widget `landing-page/src/components/ShopifyBuy.tsx`.
 - Next routes `landing-page/src/app/api/shopify/config/route.ts`, `collection/route.ts`, `admin-collection/route.ts`.
 - Tests in `landing-page/package.json` `test`. CI `.github/workflows/landing-node.yml` runs a cookie test plus `npm run build` on Node 24.
