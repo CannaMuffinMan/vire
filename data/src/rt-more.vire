@@ -1815,7 +1815,7 @@ define emitMore with image, fixes, labels
   pin with labels, "extend_bloop", image
   emitList with image, [72, 139, 69, 232, 72, 59, 69, 192, 15, 141]
   emitRel with image, fixes, "extend_done"
-  emitList with image, [72, 139, 82, 16, 68, 15, 182, 12, 2, 73, 199, 192]
+  emitList with image, [72, 139, 85, 240, 72, 139, 82, 16, 68, 15, 182, 12, 2, 73, 199, 192]
   emitU32 with image, 1
   emitJmpTo with image, fixes, "extend_slot"
   pin with labels, "extend_done", image

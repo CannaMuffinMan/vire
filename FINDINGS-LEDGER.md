@@ -1,27 +1,27 @@
 # Vulnerability / finding evidence ledger
 
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
-Fixed SHA (this branch): `0d1a32071b247f267b299d40f9ff353f951362cc`
-PR: https://github.com/CannaMuffinMan/vire/pull/42
-No CVE IDs assigned. Implemented ≠ OS-verified.
+Evidence commits: `0d1a320` (first fixes) · `b7ee393` (ledger; Windows gen1-hello **ACCESS_VIOLATION**) · this push (F11 bytes-pointer reload).
+PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft). Wrapper/chat may still say PR41; forge is **PR42**.
+No CVE IDs assigned. Implemented ≠ OS-verified. Not merge-ready until Windows gen1==gen2 hashes print and `native-selfhost-windows` is a real (non continue-on-error) pass.
 
 ## Implemented vs verified
 
-| ID | Implemented on 0d1a320 | Verified how | Not verified |
+| ID | Implemented | Verified (property, not crash-only) | Still open |
 |---|---|---|---|
-| F1 | yes | fail-before 7c7c8ea TIMEOUT 3s; after `[1, 2, 1, 2]` exit 0 | — |
-| F2 | yes (x64+arm64 structs) | linux-x64 ordinary file loads | **linux-arm64 CI does not exist** |
-| F3 | yes | before `that expression is not ready` exit 1; after Unicorn stdout `3` | — |
-| F4 | yes | Unicorn hello/read FAULTS []; copy in emit | real Windows RX `.text` fault vs copy |
-| F5 | yes (SetEndOfFile, no CREATE_ALWAYS) | Unicorn nlink2 disp=3 only; nlink1 write file=`ok` | **two-process Windows replace race** |
-| F6 | yes | crash_filter has no iat_cf | crash PE on Windows not separately logged |
-| F7 | yes (require sandbox text) | recipe on 7c7c8ea CI `native sec windows recipe ok` without logging the message | **PR42 Windows log pending; 7c7c8ea did not prove message** |
+| F1 | yes | 7c7c8ea TIMEOUT 3s vs after `[1, 2, 1, 2]` exit 0 | — |
+| F2 | yes | linux-x64 ordinary file loads | **linux-arm64 job added this push; not green yet** |
+| F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
+| F4 | yes | Unicorn FAULTS [] + path copy emit | Windows RX `.text` vs copy not isolated |
+| F5 | yes | Unicorn nlink2 refuse, nlink1 write `ok`; Windows hardlink recipe exists | **two-process replace race unrun** |
+| F6 | yes | crash_filter no `iat_cf` | dedicated crash PE log on Windows |
+| F7 | yes | recipe requires sandbox text; stdout now echoed | **Windows log of the exact string still pending this push** |
 | F8 | yes | before `[4294967296]`; after `[0]` | — |
 | F9 | yes | PackZipSigned gone | — |
 | F10 | yes | host clang fallback gone | — |
-| F11 | yes | emit snapshot | native `extend a,a` PE not emu-run |
+| F11 | yes + bytes reload | Unicorn gen1 hello hex **equals** host hello; emu run `hello from stage` EXIT 0 | **Windows gen1 hello run + gen1==gen2 hashes pending this push** |
 | F12 | yes | Unicorn EXIT 1 numbers message | — |
-| F13 | yes | 7c7c8ea arena-check exit 1; 0d1a320 ok | — |
+| F13 | yes | 7c7c8ea arena-check 1; after ok | — |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
 
@@ -56,12 +56,31 @@ GitHub 7c7c8ea and PR42 `selfhost` / `selfhost-windows` **pass**. Sandbox not we
 
 7c7c8ea run `42730292404`:
 - native-windows: hello compile exit 0; `native sec windows recipe ok`; smoke `PASS hello`
-- native-selfhost-windows (continue-on-error:true): gen1 hello exit 0 `hello from stage`; gen2 exit 0; **gen1_sha256=gen2_sha256=`e5d05d00073800b2fc7710f8538925de086ad6f92c5ba7b363a82f4d7a01e728`**
-PR42 `0d1a320` native-windows **pass** (59s); native-selfhost-windows **still pending** at ledger write. Final SHA gen1/gen2 hashes **not yet captured** for 0d1a320 (IAT/crash/path/write emit will change the PE hash vs e5d05d00; equality gen1==gen2 is the gate).
+- native-selfhost-windows (`continue-on-error: true`): gen1 hello exit 0 `hello from stage`; gen2 exit 0; **gen1_sha256=gen2_sha256=`e5d05d00073800b2fc7710f8538925de086ad6f92c5ba7b363a82f4d7a01e728`**
 
-## pstack
+PR42 `b7ee393` run `42768841182` (21 checks named success; **rollup is not proof**):
+- native-windows: `hello_host_compile_exit 0`; Junction/Hardlink created; `native sec windows recipe ok`; smoke PASS hello. Recipe did **not** print `files stay inside the program folder` because native stdout was not echoed (fixed this push).
+- native-selfhost-windows: `step_hello_pe ok`; `gen1_host` exit 0; **`gen1_hello` compile exit 0**; **`gen1_hello_run` exit `-1073741819` `crash_access_violation`**. No `gen1_sha256` / `gen2_sha256`. Job green only because `continue-on-error: true`.
 
-Skills live on unmerged `origin/tooling/pstack-skills` (PR28 draft), path `.cursor/skills/{poteto-mode,interrogate,blast-radius}/SKILL.md`. **Not present on native-compiler / this PR.** Full 4-adversary interrogate arena not executed. Blast-radius local runs: nlink1 write still truncates to `ok`; nlink2 still refuses.
+That AV is a **regression of the F11 snapshot**: `extend_bloop` compared the snapshotted count but kept `rdx` as the destination object, so `extend` of a **bytes** extra (compile-native `emitList`) copied garbage after the first byte. 7c7c8ea reloaded `[rbp-16]` every bytes iteration; gen1 hello ran. This push restores `mov rdx, [rbp-16]` before `[rdx+16]`.
+
+Linux Unicorn after the reload (host gen1.hex compiling `data/guest-hello.vire`):
+- EXIT 0 `compiled`
+- `sha256(data/guest-hello.hex) == sha256(data/emu-gen1-hello.hex) == 4e2e7d8d6362c94d6f907c24ac4a8ee647be9cfb9e22de1005e23d6e86b8b9dc`
+- emu of that PE: EXIT 0 STDOUT `hello from stage` FAULTS []
+
+Windows gen1 **run** exit 0, gen2 **build** exit 0, and equal SHA-256 are **unverified on OS** until the next `native-selfhost-windows` job (now without continue-on-error).
+
+## pstack / interrogate / blast-radius
+
+Vendored skills are on unmerged `origin/tooling/pstack-skills` (PR28 draft): `.cursor/skills/{poteto-mode,interrogate,blast-radius}/SKILL.md`. They are **not** on `native-compiler` / PR42 worktree. Inspected via `git show origin/tooling/pstack-skills:...`. Did not copy/install that tree into this PR.
+
+- **interrogate**: requires arena Phase A/B with four `generalPurpose` adversaries and Phase F reruns. **Not executed.** Blocker: skills + multi-model arena not on this branch/runtime.
+- **blast-radius**: safety fact for the AV was “F11 snapshot still walks the extra bytes object.” Proven by Unicorn fail-mode (b7ee393 gen1-hello AV on Windows; after reload, gen1 hello hex matches host and runs). nlink1 write still `ok`; nlink2 still refuses (`native-sec-emu-check.sh` ok). Caps 32MB / list 100000 / 5M, sandbox, Defender untouched.
+
+## Standalone vs bootstrap
+
+Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `vire` / `vire.exe`). No gcc/clang/Java required to interpret or to emit native Windows x64 PE. Android APK/`.so` need NDK/aapt and **fail closed** without them (F9/F10). Native PE still needs a Windows loader (or Unicorn stub) to execute; this Linux VM cannot run the PE on a real kernel32.
 
 ## F1 interpreter self-extend (DoS / cap bypass)
 
@@ -114,11 +133,11 @@ Skills live on unmerged `origin/tooling/pstack-skills` (PR28 draft), path `.curs
 
 ## F7 junction test accepts any nonzero exit
 
-- Status: **fixed** (recipe; Windows execute still blocked here)
+- Status: **fixed** (recipe)
 - Exposure: crash exit 1 without sandbox text counted as pass.
-- Fix: require `files stay inside the program folder`.
-- Proof: `F7_WindowsJunctionRecipeRequiresSandboxText`.
-- Residual: Couchy local Windows handoff; not run from this agent.
+- Fix: require `files stay inside the program folder`; echo native stdout so CI logs the string.
+- Proof: `F7_WindowsJunctionRecipeRequiresSandboxText`. b7ee393 Windows job reached `recipe ok` without printing the text.
+- Residual: next `native-windows` log must contain the sandbox sentence.
 
 ## F8 `q * 256` int overflow
 
@@ -146,11 +165,11 @@ Skills live on unmerged `origin/tooling/pstack-skills` (PR28 draft), path `.curs
 
 ## F11 native self-extend
 
-- Status: **fixed**
-- Exposure: live length reload on `extend with a, a`.
-- Fix: snapshot source length in `[rbp-64]`.
-- Proof: `F11_NativeExtendSnapshotsSourceLength`.
-- Residual: Unicorn self-extend guest optional; interpreter F1 covers host.
+- Status: **fixed, then regression found, then reload restored**
+- Exposure: live length on `extend with a, a`; first snapshot patch dropped `mov rdx,[rbp-16]` on the bytes loop, so compile-native `extend` of byte buffers emitted corrupt PE (Windows `gen1_hello_run` ACCESS_VIOLATION, property = wrong code bytes not a sandbox crash).
+- Fix: snapshot `[rbp-64]` **and** reload extra pointer each bytes iteration (same as 7c7c8ea).
+- Proof: `F11_NativeExtendSnapshotsSourceLength` asserts both sequences; Unicorn gen1 hello hash equals host and runs `hello from stage`.
+- Residual: Windows OS gen1/gen2 hashes after this push.
 
 ## F12 native extend nonnumeric extra
 

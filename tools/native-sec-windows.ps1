@@ -89,6 +89,7 @@ function Invoke-NativeExe {
             $script:DefenderBlocked = $true
             return @{ Blocked = $true; Output = $out; Code = $code }
         }
+        if ($out) { Write-Host $out.TrimEnd() }
         if ($err) { Write-Host $err.TrimEnd() }
         return @{ Blocked = $false; Output = $out; Code = $code }
     }

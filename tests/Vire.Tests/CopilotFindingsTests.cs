@@ -117,6 +117,10 @@ public class CopilotFindingsTests
         string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
         Assert.Contains("72, 139, 85, 240, 72, 139, 2, 72, 137, 69, 192", more);
         Assert.Contains("72, 139, 69, 232, 72, 59, 69, 192, 15, 141", more);
+        int bloop = more.IndexOf("pin with labels, \"extend_bloop\"", StringComparison.Ordinal);
+        Assert.True(bloop >= 0);
+        string bslice = more.Substring(bloop, 420);
+        Assert.Contains("72, 139, 85, 240, 72, 139, 82, 16, 68, 15, 182, 12, 2", bslice);
     }
 
     [Fact]
