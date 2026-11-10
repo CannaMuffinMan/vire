@@ -1,8 +1,9 @@
-~ Pure-compute crypto for host and gen1 PE. No extra imports.
-~ SHA-256 words are [hi16, lo16] so every limb fits a signed 32-bit immediate.
-
 define cryptoCopy32 with w
   return [w at 0, w at 1]
+end
+
+define cryptoWord with hi, lo
+  return [hi, lo]
 end
 
 define cryptoAnd16 with a, b
@@ -160,83 +161,83 @@ end
 
 define cryptoK
   let ks be []
-  push with ks, [17034, 12184]
-  push with ks, [28983, 17553]
-  push with ks, [46528, 64463]
-  push with ks, [59829, 56229]
-  push with ks, [14678, 49755]
-  push with ks, [23025, 4593]
-  push with ks, [37439, 33444]
-  push with ks, [43804, 24277]
-  push with ks, [55303, 43672]
-  push with ks, [4739, 23297]
-  push with ks, [9265, 34238]
-  push with ks, [21772, 32195]
-  push with ks, [29374, 23924]
-  push with ks, [32990, 45566]
-  push with ks, [39900, 1703]
-  push with ks, [49563, 61812]
-  push with ks, [58523, 27073]
-  push with ks, [61374, 18310]
-  push with ks, [4033, 40390]
-  push with ks, [9228, 41420]
-  push with ks, [11753, 11375]
-  push with ks, [19060, 33962]
-  push with ks, [23728, 43484]
-  push with ks, [30457, 35034]
-  push with ks, [38974, 20818]
-  push with ks, [43057, 50797]
-  push with ks, [45059, 10184]
-  push with ks, [48985, 32711]
-  push with ks, [50912, 3059]
-  push with ks, [54695, 37191]
-  push with ks, [1738, 25425]
-  push with ks, [5161, 10599]
-  push with ks, [10167, 2693]
-  push with ks, [11803, 8504]
-  push with ks, [19756, 28156]
-  push with ks, [21304, 3347]
-  push with ks, [25866, 29524]
-  push with ks, [30314, 2747]
-  push with ks, [33218, 51502]
-  push with ks, [37490, 11397]
-  push with ks, [41663, 59553]
-  push with ks, [43034, 26187]
-  push with ks, [49739, 35696]
-  push with ks, [51052, 20899]
-  push with ks, [53650, 59417]
-  push with ks, [54937, 1572]
-  push with ks, [62478, 13701]
-  push with ks, [4202, 41072]
-  push with ks, [6564, 49430]
-  push with ks, [7735, 27656]
-  push with ks, [10056, 30540]
-  push with ks, [13488, 48309]
-  push with ks, [14620, 3251]
-  push with ks, [20184, 43594]
-  push with ks, [23452, 51791]
-  push with ks, [26670, 28659]
-  push with ks, [29839, 33518]
-  push with ks, [30885, 25455]
-  push with ks, [33992, 30740]
-  push with ks, [36039, 520]
-  push with ks, [37054, 65530]
-  push with ks, [42064, 27883]
-  push with ks, [48889, 41975]
-  push with ks, [50801, 30962]
+  push with ks, (cryptoWord with 17034, 12184)
+  push with ks, (cryptoWord with 28983, 17553)
+  push with ks, (cryptoWord with 46528, 64463)
+  push with ks, (cryptoWord with 59829, 56229)
+  push with ks, (cryptoWord with 14678, 49755)
+  push with ks, (cryptoWord with 23025, 4593)
+  push with ks, (cryptoWord with 37439, 33444)
+  push with ks, (cryptoWord with 43804, 24277)
+  push with ks, (cryptoWord with 55303, 43672)
+  push with ks, (cryptoWord with 4739, 23297)
+  push with ks, (cryptoWord with 9265, 34238)
+  push with ks, (cryptoWord with 21772, 32195)
+  push with ks, (cryptoWord with 29374, 23924)
+  push with ks, (cryptoWord with 32990, 45566)
+  push with ks, (cryptoWord with 39900, 1703)
+  push with ks, (cryptoWord with 49563, 61812)
+  push with ks, (cryptoWord with 58523, 27073)
+  push with ks, (cryptoWord with 61374, 18310)
+  push with ks, (cryptoWord with 4033, 40390)
+  push with ks, (cryptoWord with 9228, 41420)
+  push with ks, (cryptoWord with 11753, 11375)
+  push with ks, (cryptoWord with 19060, 33962)
+  push with ks, (cryptoWord with 23728, 43484)
+  push with ks, (cryptoWord with 30457, 35034)
+  push with ks, (cryptoWord with 38974, 20818)
+  push with ks, (cryptoWord with 43057, 50797)
+  push with ks, (cryptoWord with 45059, 10184)
+  push with ks, (cryptoWord with 48985, 32711)
+  push with ks, (cryptoWord with 50912, 3059)
+  push with ks, (cryptoWord with 54695, 37191)
+  push with ks, (cryptoWord with 1738, 25425)
+  push with ks, (cryptoWord with 5161, 10599)
+  push with ks, (cryptoWord with 10167, 2693)
+  push with ks, (cryptoWord with 11803, 8504)
+  push with ks, (cryptoWord with 19756, 28156)
+  push with ks, (cryptoWord with 21304, 3347)
+  push with ks, (cryptoWord with 25866, 29524)
+  push with ks, (cryptoWord with 30314, 2747)
+  push with ks, (cryptoWord with 33218, 51502)
+  push with ks, (cryptoWord with 37490, 11397)
+  push with ks, (cryptoWord with 41663, 59553)
+  push with ks, (cryptoWord with 43034, 26187)
+  push with ks, (cryptoWord with 49739, 35696)
+  push with ks, (cryptoWord with 51052, 20899)
+  push with ks, (cryptoWord with 53650, 59417)
+  push with ks, (cryptoWord with 54937, 1572)
+  push with ks, (cryptoWord with 62478, 13701)
+  push with ks, (cryptoWord with 4202, 41072)
+  push with ks, (cryptoWord with 6564, 49430)
+  push with ks, (cryptoWord with 7735, 27656)
+  push with ks, (cryptoWord with 10056, 30540)
+  push with ks, (cryptoWord with 13488, 48309)
+  push with ks, (cryptoWord with 14620, 3251)
+  push with ks, (cryptoWord with 20184, 43594)
+  push with ks, (cryptoWord with 23452, 51791)
+  push with ks, (cryptoWord with 26670, 28659)
+  push with ks, (cryptoWord with 29839, 33518)
+  push with ks, (cryptoWord with 30885, 25455)
+  push with ks, (cryptoWord with 33992, 30740)
+  push with ks, (cryptoWord with 36039, 520)
+  push with ks, (cryptoWord with 37054, 65530)
+  push with ks, (cryptoWord with 42064, 27883)
+  push with ks, (cryptoWord with 48889, 41975)
+  push with ks, (cryptoWord with 50801, 30962)
   return ks
 end
 
 define cryptoIv
   let hs be []
-  push with hs, [27145, 58983]
-  push with hs, [47975, 44677]
-  push with hs, [15470, 62322]
-  push with hs, [42319, 62778]
-  push with hs, [20750, 21119]
-  push with hs, [39685, 26764]
-  push with hs, [8067, 55723]
-  push with hs, [23520, 52505]
+  push with hs, (cryptoWord with 27145, 58983)
+  push with hs, (cryptoWord with 47975, 44677)
+  push with hs, (cryptoWord with 15470, 62322)
+  push with hs, (cryptoWord with 42319, 62778)
+  push with hs, (cryptoWord with 20750, 21119)
+  push with hs, (cryptoWord with 39685, 26764)
+  push with hs, (cryptoWord with 8067, 55723)
+  push with hs, (cryptoWord with 23520, 52505)
   return hs
 end
 

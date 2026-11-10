@@ -1,4 +1,3 @@
-# Host interpreter KATs plus gen1 PE of the same program on Windows.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
