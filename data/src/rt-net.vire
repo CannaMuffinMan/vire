@@ -58,14 +58,14 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
   let base be length with image
   let names be netNames
   if need_net
-    let image be emitHex with image, (read with "data/src/rt-net-blob.hex")
-    applyPackedPins with labels, base, (read with "data/src/rt-net-pins.hex"), names
-    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.hex"), names
+    let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
+    applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
+    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
     return image
   end
-  let image be emitHex with image, (read with "data/src/rt-net-json-blob.hex")
-  applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.hex"), names
-  applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.hex"), names
+  let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
+  applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
+  applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.txt"), names
   return image
 end
 
