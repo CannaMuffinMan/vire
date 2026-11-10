@@ -1,25 +1,25 @@
 # Vulnerability / finding evidence ledger
 
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
-Evidence commits: `0d1a320` (first fixes) · `b7ee393` (ledger; Windows gen1-hello **ACCESS_VIOLATION**) · this push (F11 bytes-pointer reload).
+Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · this push (F4/F5/F6 Windows OS recipes; drop unused `crash-rip.txt` pool bytes).
 PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft). Wrapper/chat may still say PR41; forge is **PR42**.
-No CVE IDs assigned. Implemented ≠ OS-verified. Not merge-ready until Windows gen1==gen2 hashes print and `native-selfhost-windows` is a real (non continue-on-error) pass.
+No CVE IDs. **Freeze SHA = this commit after `native-selfhost-windows` reprints equal hashes** (PE bytes change from removing `crash_path`).
 
 ## Implemented vs verified
 
 | ID | Implemented | Verified (property, not crash-only) | Still open |
 |---|---|---|---|
 | F1 | yes | 7c7c8ea TIMEOUT 3s vs after `[1, 2, 1, 2]` exit 0 | — |
-| F2 | yes | linux-x64 ordinary file loads | **linux-arm64 job added this push; not green yet** |
+| F2 | yes | linux-x64 + **ARM64 F2 filter pass** (`42770835327`) | full ARM suite unrun |
 | F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
-| F4 | yes | Unicorn FAULTS [] + path copy emit | Windows RX `.text` vs copy not isolated |
-| F5 | yes | Unicorn nlink2 refuse, nlink1 write `ok`; Windows hardlink recipe exists | **two-process replace race unrun** |
-| F6 | yes | crash_filter no `iat_cf` | dedicated crash PE log on Windows |
-| F7 | yes | recipe requires sandbox text; stdout now echoed | **Windows log of the exact string still pending this push** |
+| F4 | yes | Unicorn + Windows `f4_double_read` (this push) | intern may sit in RW `.data`; property is copy-before-NUL |
+| F5 | yes | Unicorn nlink; Windows hardlink; **two-process race recipe** (this push) | vuln race may miss in 40 rounds — log says so |
+| F6 | yes | emit no `iat_cf`; **crash PE after VEH** (this push) | — |
+| F7 | yes | `42770835327` printed `files stay inside the program folder` | — |
 | F8 | yes | before `[4294967296]`; after `[0]` | — |
 | F9 | yes | PackZipSigned gone | — |
 | F10 | yes | host clang fallback gone | — |
-| F11 | yes + bytes reload | Unicorn gen1 hello hex **equals** host hello; emu run `hello from stage` EXIT 0 | **Windows gen1 hello run + gen1==gen2 hashes pending this push** |
+| F11 | yes + bytes reload | Windows `3d9fc58` gen1 hello 0 / gen2 0 / equal `48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815` jobs `129677976694` `129677996797` | re-prove after this PE-byte change |
 | F12 | yes | Unicorn EXIT 1 numbers message | — |
 | F13 | yes | 7c7c8ea arena-check 1; after ok | — |
 
@@ -69,7 +69,7 @@ Linux Unicorn after the reload (host gen1.hex compiling `data/guest-hello.vire`)
 - `sha256(data/guest-hello.hex) == sha256(data/emu-gen1-hello.hex) == 4e2e7d8d6362c94d6f907c24ac4a8ee647be9cfb9e22de1005e23d6e86b8b9dc`
 - emu of that PE: EXIT 0 STDOUT `hello from stage` FAULTS []
 
-Windows gen1 **run** exit 0, gen2 **build** exit 0, and equal SHA-256 are **unverified on OS** until the next `native-selfhost-windows` job (now without continue-on-error).
+`3d9fc58` jobs `129677976694` / `129677996797`: gen1 hello compile/run **0**, gen2 **0**, **gen1_sha256=gen2_sha256=`48f12268ace6f0e5ebb58f07bff090ec91bc78058342515cf56368e2e768f815`**. `native-windows` printed `files stay inside the program folder`. This F4/F5/F6 push changes `src/rt.vire` pool bytes — **equal-hash must reprint**.
 
 ## pstack / interrogate / blast-radius
 
@@ -96,8 +96,8 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Status: **fixed** (ARM64 unexecuted here)
 - Exposure: x86-64 `st_nlink` at offset 16 as `ulong`; aarch64 `st_mode`+`st_nlink` overlap, ordinary files look like >Int32.MaxValue links.
 - Fix: `LinuxStatX64` vs `LinuxStatArm64` selected by `ProcessArchitecture`.
-- Proof: `F2_LinuxOrdinaryFileLinkCountIsOne` on linux-x64 (this VM). linux-arm64 **not run**.
-- Residual: needs a linux-arm64 job; no such runner in this environment.
+- Proof: `F2_LinuxOrdinaryFileLinkCountIsOne` linux-x64; GitHub `ubuntu-24.04-arm` job Passed 1 on `3d9fc58`.
+- Residual: that job is the F2 filter only, not the full suite.
 
 ## F3 numeric-list fast path
 
@@ -107,29 +107,32 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Proof: `F3_CompileNativeKeepsListExpressions` plus compile-native guest `[1 + 2]` (see PR commands).
 - Residual: none for parsing.
 
-## F4 path walk writes RX strings
+## F4 path walk writes interned strings
 
-- Status: **fixed**
-- Exposure: `mov [rcx+rax], 0` mutated interned/pool path bytes in `.text`.
+- Status: **fixed**; Windows OS recipe this push
+- Exposure: in-place `mov [rcx+rax], 0` on interned path (Copilot: `.text` RX; guest pool may be `.data` RW). Second `read` of the same literal can fail if the slash was NULled.
 - Fix: `rt_alloc`+`rt_memcpy` scratch copy, then walk.
-- Proof: Unicorn `native-sec-emu-check.sh` hello/read; `F4_PathWalkCopiesBeforeNul`.
-- Residual: Unicorn is stubbed kernel32, not Windows OS proof.
+- Fail-before: 7c7c8ea PE of `f4.vire` (worktree, isolated `data/f4/note.txt`).
+- Pass-after: this SHA PE prints `NOTE` twice (`f4_double_read`).
+- Residual: if vuln PE also prints twice, intern is RW and first read still “works”; copy remains required.
 
 ## F5 reopen-after-nlink TOCTOU
 
-- Status: **fixed** (logic; OS race not live-tested)
+- Status: **fixed**; Windows two-process recipe this push
 - Exposure: CloseHandle then CREATE_ALWAYS on the path after nlink==1.
-- Fix: `SetFilePointerEx`+`SetEndOfFile` on the validated handle; no second open.
-- Proof: source no longer emits CREATE_ALWAYS (2) on `write_have`; emu nlink2 still refuses without CREATE_ALWAYS.
-- Residual: real Windows replacement race not executed (no user PC).
+- Fix: `SetFilePointerEx`+`SetEndOfFile` on the validated handle.
+- Fail-before: 7c7c8ea write PE vs racer hardlinking `data/f5-slot.txt` onto `data/f5-keep.txt` (40 rounds). Hit count logged; 0 hits ≠ proof of safety on 7c7c8ea (CREATE_ALWAYS still in that tree).
+- Pass-after: this SHA write PE **must** leave `KEEP` (0 victim hits).
+- Residual: race window is short; hardlink nlink==2 refuse is separately proven.
 
 ## F6 crash log hardlink truncate
 
-- Status: **fixed**
-- Exposure: `crash-rip.txt` CREATE_ALWAYS in cwd, no sandbox.
-- Fix: crash RIP only to stdout via `GetStdHandle`/`WriteFile`.
-- Proof: `F6_CrashFilterDoesNotCreateCrashRipFile`.
-- Residual: stdout still receives crash hex (intended).
+- Status: **fixed**; Windows crash PE this push
+- Exposure: `crash-rip.txt` CREATE_ALWAYS in cwd.
+- Fix: RIP only to stdout; unused `crash-rip.txt` pool bytes removed.
+- Fail-before: 7c7c8ea hello PE, patch `call fn_main` after VEH to `xor rax,rax; mov rax,[rax]`.
+- Pass-after: this SHA same patch → stdout `crash rip=`, **no** `crash-rip.txt`.
+- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code.
 
 ## F7 junction test accepts any nonzero exit
 
