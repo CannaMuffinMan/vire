@@ -264,48 +264,48 @@ function Invoke-Isolated {
     $stdoutTask = $null
     $stderrTask = $null
     try {
-    [void]$p.Start()
-    $stdoutTask = $p.StandardOutput.ReadToEndAsync()
-    $stderrTask = $p.StandardError.ReadToEndAsync()
-    try { $p.StandardInput.Close() } catch { }
-    $state = @{
-        Watched = [System.Collections.Generic.HashSet[int]]::new()
-        Parent = @{}
-        Image = @{}
-        Kids = @{}
-        Hits = [System.Collections.Generic.List[string]]::new()
-    }
-    [void]$state.Watched.Add($p.Id)
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    while (-not $p.HasExited) {
-        if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
-            try { $p.Kill($true) } catch { }
-            throw "$Name timed out after ${TimeoutSec}s"
+        [void]$p.Start()
+        $stdoutTask = $p.StandardOutput.ReadToEndAsync()
+        $stderrTask = $p.StandardError.ReadToEndAsync()
+        try { $p.StandardInput.Close() } catch { }
+        $state = @{
+            Watched = [System.Collections.Generic.HashSet[int]]::new()
+            Parent = @{}
+            Image = @{}
+            Kids = @{}
+            Hits = [System.Collections.Generic.List[string]]::new()
         }
-        Receive-CleanLaunches $queue $state
-        if ($state.Hits.Count -gt 0) {
-            try { $p.Kill($true) } catch { }
-            throw "$Name launched banned child: $($state.Hits -join '; ')"
+        [void]$state.Watched.Add($p.Id)
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        while (-not $p.HasExited) {
+            if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
+                try { $p.Kill($true) } catch { }
+                throw "$Name timed out after ${TimeoutSec}s"
+            }
+            Receive-CleanLaunches $queue $state
+            if ($state.Hits.Count -gt 0) {
+                try { $p.Kill($true) } catch { }
+                throw "$Name launched banned child: $($state.Hits -join '; ')"
+            }
+            [void]$p.WaitForExit(200)
         }
-        [void]$p.WaitForExit(200)
-    }
-    $drainUntil = [datetime]::UtcNow.AddSeconds(2)
-    while ([datetime]::UtcNow -lt $drainUntil) {
-        Receive-CleanLaunches $queue $state
-        if ($state.Hits.Count -gt 0) { break }
-        Start-Sleep -Milliseconds 100
-    }
-    $stdout = $stdoutTask.GetAwaiter().GetResult()
-    $stderr = $stderrTask.GetAwaiter().GetResult()
-    [System.IO.File]::WriteAllText($outFile, $stdout)
-    [System.IO.File]::WriteAllText($errFile, $stderr)
-    Write-Host ("step_" + $Name + "_exit " + $p.ExitCode)
-    Write-Host ("step_" + $Name + "_file " + $FilePath)
-    if ($stderr) { Write-Host $stderr.TrimEnd() }
-    if ($stdout) { Write-Host $stdout.TrimEnd() }
-    if ($state.Hits.Count -gt 0) { throw "$Name launched banned child: $($state.Hits -join '; ')" }
-    if ($p.ExitCode -ne 0) { throw "$Name exit $($p.ExitCode)" }
-    return @{ StdOut = $stdout; StdErr = $stderr }
+        $drainUntil = [datetime]::UtcNow.AddSeconds(2)
+        while ([datetime]::UtcNow -lt $drainUntil) {
+            Receive-CleanLaunches $queue $state
+            if ($state.Hits.Count -gt 0) { break }
+            Start-Sleep -Milliseconds 100
+        }
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        [System.IO.File]::WriteAllText($outFile, $stdout)
+        [System.IO.File]::WriteAllText($errFile, $stderr)
+        Write-Host ("step_" + $Name + "_exit " + $p.ExitCode)
+        Write-Host ("step_" + $Name + "_file " + $FilePath)
+        if ($stderr) { Write-Host $stderr.TrimEnd() }
+        if ($stdout) { Write-Host $stdout.TrimEnd() }
+        if ($state.Hits.Count -gt 0) { throw "$Name launched banned child: $($state.Hits -join '; ')" }
+        if ($p.ExitCode -ne 0) { throw "$Name exit $($p.ExitCode)" }
+        return @{ StdOut = $stdout; StdErr = $stderr }
     } finally {
         Unregister-Event -SourceIdentifier $sid -ErrorAction SilentlyContinue
         Get-Job -Name $sid -ErrorAction SilentlyContinue | Remove-Job -Force -ErrorAction SilentlyContinue
