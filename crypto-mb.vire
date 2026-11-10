@@ -1,0 +1,12 @@
+define millionA
+  let a be "a"
+  while (length with a) < 1000000
+    let a be a + a
+  end
+  return slice with a, 0, 1000000
+end
+
+define main
+  let million be millionA
+  say hash with million
+end

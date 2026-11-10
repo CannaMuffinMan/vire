@@ -1,0 +1,6 @@
+use "src/rt-crypto.vire"
+
+define main
+  let abc be ascii_bytes with "abc"
+  say sha256_hex with (abc at 1)
+end
