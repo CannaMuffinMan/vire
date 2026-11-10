@@ -168,7 +168,9 @@ if (-not $health) {
     $curl = & curl.exe -s -S -D - --max-time 5 "http://127.0.0.1:$port/health" 2>&1 | Out-String
     Write-Output "health_curl_exe $curl"
     $so = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
+    $se = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
     Write-Output ("health_server_out " + $so)
+    Write-Output ("health_server_err " + $se)
     Write-Output ("health_server_exited " + $server.HasExited + " " + $(if ($server.HasExited) { $server.ExitCode } else { "running" }))
     foreach ($ripFile in @((Join-Path $Root "crash-rip.txt"), (Join-Path $Data "crash-rip.txt"), (Join-Path $Root "data/crash-rip.txt"))) {
         if (Test-Path $ripFile) { Write-Output ("crash_rip_file " + $ripFile + " " + ((Get-Content -Raw $ripFile) -replace '\s+', ' ')) }
