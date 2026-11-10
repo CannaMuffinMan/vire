@@ -170,6 +170,9 @@ if (-not $health) {
     $so = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
     Write-Output ("health_server_out " + $so)
     Write-Output ("health_server_exited " + $server.HasExited + " " + $(if ($server.HasExited) { $server.ExitCode } else { "running" }))
+    foreach ($ripFile in @((Join-Path $Root "crash-rip.txt"), (Join-Path $Data "crash-rip.txt"), (Join-Path $Root "data/crash-rip.txt"))) {
+        if (Test-Path $ripFile) { Write-Output ("crash_rip_file " + $ripFile + " " + ((Get-Content -Raw $ripFile) -replace '\s+', ' ')) }
+    }
     $health = $curl
 }
 Write-Output "health_curl_result $health"
