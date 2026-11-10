@@ -21,6 +21,7 @@ static class VireDebug
 
     public static bool Break(string root, string name, int line, string detail)
     {
+        if (Environment.GetEnvironmentVariable("VIRE_DEBUGGER") != "1") return false;
         System.Threading.Interlocked.Increment(ref ProbeCalls);
         if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(name)) return false;
         try
