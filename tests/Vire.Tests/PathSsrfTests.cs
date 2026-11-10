@@ -247,6 +247,8 @@ public class PathSsrfTests
         {
             string folded = Path.Combine(dir, "Data", "note.txt");
             File.WriteAllText(folded, "OUTSIDE-KEEP");
+            string dataPrefix = Path.GetFullPath(Path.Combine(dir, "data")).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            Assert.True(Path.GetFullPath(folded).StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase), "fail-before: IgnoreCase would treat Data as data");
             Assert.False(VirePaths.UnderWritableZone(dir, folded));
             Assert.False(VirePaths.InFolder(Path.Combine(dir, "data"), folded));
             File.WriteAllText(Path.Combine(dir, "plant.vire"),

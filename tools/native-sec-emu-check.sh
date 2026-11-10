@@ -11,6 +11,7 @@ fi
 work=data/sec-emu
 rm -rf "$work"
 mkdir -p "$work/data"
+python3 -m pip install --user -q unicorn
 python3 - <<'PY' > /dev/null
 import unicorn
 PY
