@@ -24,12 +24,17 @@ $BannedPathNeedles = @(
     "\jdk",
     "\Microsoft.NET"
 )
-$RequiredKernel32 = @(
-    "GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA",
-    "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA",
-    "GetFileInformationByHandle", "SetUnhandledExceptionFilter",
-    "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile"
-)
+function Get-RequiredKernel32 {
+    $pe = Join-Path $Root "src/pe.vire"
+    $text = [System.IO.File]::ReadAllText($pe)
+    if ($text -notmatch 'let names be \[([^\]]+)\]') {
+        throw "src/pe.vire has no let names be list"
+    }
+    $names = [regex]::Matches($Matches[1], '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+    if ($names.Count -lt 1) { throw "src/pe.vire names list is empty" }
+    return @($names)
+}
+$RequiredKernel32 = Get-RequiredKernel32
 
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -177,7 +182,7 @@ function Write-EnvCapture([string]$OutFile, [string]$IsolatedPath) {
 }
 
 function Get-ProcessKids([int]$ParentId) {
-    Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction SilentlyContinue
+    Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId" -ErrorAction Stop
 }
 
 function Invoke-Isolated {
