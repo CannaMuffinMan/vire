@@ -104,8 +104,10 @@ Write-Output "step_stage ok"
 $helloHex = Join-Path $Data "guest-hello.hex"
 $helloExe = Join-Path $Data "guest-hello.exe"
 if (Test-Path $helloHex) { Remove-Item -Force $helloHex }
+$savedBudget = $env:VIRE_BUDGET
+Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 $r = Invoke-Bounded -Name "hello_host" -TimeoutSec 120 -FilePath "dotnet" -ArgumentList @(
-    "exec", $VireDll, "compile-native.vire", "data/guest-hello.vire", "data/guest-hello.hex"
+    "exec", $VireDll, "--compiler", "compile-native.vire", "data/guest-hello.vire", "data/guest-hello.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "hello_host missing compiled" }
 Convert-HexToExe $helloHex $helloExe
@@ -117,8 +119,9 @@ $gen1Hex = Join-Path $Data "gen1.hex"
 $gen1Exe = Join-Path $Data "gen1.exe"
 if (Test-Path $gen1Hex) { Remove-Item -Force $gen1Hex }
 $r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 420 -FilePath "dotnet" -ArgumentList @(
-    "exec", $VireDll, "compile-native.vire", "data/compile-native.vire", "data/gen1.hex"
+    "exec", $VireDll, "--compiler", "compile-native.vire", "data/compile-native.vire", "data/gen1.hex"
 )
+if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
 if ($r.StdOut -notmatch "compiled") { throw "gen1_host missing compiled" }
 Convert-HexToExe $gen1Hex $gen1Exe
 Write-Output "step_gen1_host ok"

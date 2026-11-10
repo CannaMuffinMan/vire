@@ -27,7 +27,7 @@ printf 'SECRET' > "$work/data/note.txt"
 
 compile() {
   local src=$1 hex=$2
-  dotnet exec "$dll" compile-native.vire "$src" "$hex"
+  VIRE_BUDGET= dotnet exec "$dll" --compiler compile-native.vire "$src" "$hex"
 }
 
 compile "$work/hello.vire" "$work/hello.hex"
@@ -143,13 +143,13 @@ git archive "$vuln_sha" compile-native.vire src data/src data/compile-native.vir
 if [[ -f $vuln_dir/compile-native.vire ]]; then
   mkdir -p "$vuln_dir/data"
   cp "$work/wrap.vire" "$vuln_dir/data/wrap.vire"
-  (cd "$vuln_dir" && dotnet exec "$root/$dll" compile-native.vire data/wrap.vire data/wrap-vuln.hex)
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/wrap.vire data/wrap-vuln.hex)
   wrap_v=$(emu "$vuln_dir/data/wrap-vuln.hex" "$work" plain)
   echo "$wrap_v"
   echo "$wrap_v" | grep -F -q '[0, 0, 1]' && { echo 'F8 fail-before expected wrap mismatch'; exit 1; }
   echo F8_fail_before_native_not_001
   cp "$work/dotbat.vire" "$vuln_dir/data/dotbat.vire"
-  (cd "$vuln_dir" && dotnet exec "$root/$dll" compile-native.vire data/dotbat.vire data/dotbat-vuln.hex)
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/dotbat.vire data/dotbat-vuln.hex)
   rm -f "$work/data/payload.bat" "$work/data/payload.bat."
   dotbat_v=$(emu "$vuln_dir/data/dotbat-vuln.hex" "$work" plain)
   echo "$dotbat_v"
@@ -165,7 +165,7 @@ if [[ -f $vuln_dir/compile-native.vire ]]; then
   printf 'SECRET-KEEP-ME-LONG' > "$work/data/note.txt"
   printf 'SECRET-KEEP-ME-LONG' > "$work/outside/note.txt"
   cp "$work/write.vire" "$vuln_dir/data/write.vire"
-  (cd "$vuln_dir" && dotnet exec "$root/$dll" compile-native.vire data/write.vire data/write-vuln.hex)
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/write.vire data/write-vuln.hex)
   cp "$vuln_dir/data/write-vuln.hex" "$work/write-vuln.hex"
   race_v=$(emu "$work/write-vuln.hex" "$work" walk-open-race)
   echo "$race_v"

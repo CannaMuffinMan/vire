@@ -3023,21 +3023,25 @@ sealed class Program
 
     public static int BudgetFor(string program)
     {
-        if (IsCompilerProgram(program)) return CompilerStepCap;
-        return BudgetOf(File.ReadAllText(program));
+        return BudgetFor(program, false);
     }
 
-    static bool IsCompilerProgram(string program)
+    public static int BudgetFor(string program, bool hostCompiler)
     {
-        string name = Path.GetFileName(program);
-        if (!name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-            && !name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
-            return false;
-        string text;
-        try { text = File.ReadAllText(program); }
-        catch (IOException) { return false; }
-        catch (UnauthorizedAccessException) { return false; }
-        return text.Contains("define main") && (text.Contains("emitU8") || text.Contains("compileUnit"));
+        if (hostCompiler)
+        {
+            int budget = CompilerStepCap;
+            string chosen = Environment.GetEnvironmentVariable("VIRE_BUDGET");
+            if (!string.IsNullOrWhiteSpace(chosen))
+            {
+                int value;
+                if (!int.TryParse(chosen.Trim(), out value) || value < 1 || value > ProgramStepCap)
+                    throw new VireError("VIRE_BUDGET must be from 1 to 5000000", 1);
+                if (value < budget) budget = value;
+            }
+            return budget;
+        }
+        return BudgetOf(File.ReadAllText(program));
     }
 
     public static bool HeaderTokenMatches(string head, string expected)
@@ -3158,41 +3162,45 @@ sealed class Program
         Console.Error.Flush();
     }
 
-    static bool CompilerArg(string[] args)
+    static bool HasHostCompilerFlag(string[] args)
     {
-        if (args == null || args.Length < 1) return false;
-        int i = 0;
-        if (args[0] == "--key-file" && args.Length >= 2) i = 2;
-        if (i >= args.Length) return false;
-        string name = Path.GetFileName(args[i]);
-        return name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase);
+        if (args == null) return false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--compiler") return true;
+        }
+        return false;
+    }
+
+    static string[] StripHostCompiler(string[] args)
+    {
+        if (args == null || args.Length == 0) return args;
+        List<string> rest = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--compiler") continue;
+            rest.Add(args[i]);
+        }
+        return rest.ToArray();
     }
 
     internal static int Execute(string[] args)
     {
-        if (CompilerArg(args))
+        bool hostCompiler = HasHostCompilerFlag(args);
+        args = StripHostCompiler(args);
+        if (hostCompiler)
         {
             CompilerProgress = 1;
             try { Console.SetIn(TextReader.Null); }
             catch (IOException) { }
-            string shown = args[0];
-            for (int n = 0; n < args.Length; n++)
-            {
-                if (Path.GetFileName(args[n]).Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-                    || Path.GetFileName(args[n]).Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
-                {
-                    shown = args[n];
-                    break;
-                }
-            }
+            string shown = args.Length > 0 ? args[0] : "--compiler";
             CompilerNote("starting " + Path.GetFileName(shown));
         }
         int code = 0;
         Exception failure = null;
         Thread thread = new Thread(delegate ()
         {
-            try { code = ExecuteBody(args); }
+            try { code = ExecuteBody(args, hostCompiler); }
             catch (Exception ex) { failure = ex; }
         }, 64 * 1024 * 1024);
         thread.IsBackground = true;
@@ -3228,7 +3236,7 @@ sealed class Program
         return 1;
     }
 
-    static int ExecuteBody(string[] args)
+    static int ExecuteBody(string[] args, bool hostCompiler)
     {
         if (args.Length < 1)
         {
@@ -3292,13 +3300,13 @@ sealed class Program
             }
             string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
-            int budget = BudgetFor(program);
+            int budget = BudgetFor(program, hostCompiler);
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseSource(program);
             machine.UseBudget(budget);
-            if (IsCompilerProgram(program))
+            if (hostCompiler)
             {
                 machine.UseCompilerLimits();
                 CompilerNote("loaded, running main");
@@ -3307,7 +3315,7 @@ sealed class Program
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);
             machine.Run();
-            if (IsCompilerProgram(program))
+            if (hostCompiler)
                 CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch);
             return 0;
         }

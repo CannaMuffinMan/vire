@@ -2,8 +2,8 @@
 
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
 Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
-PR: https://github.com/CannaMuffinMan/vire/pull/42 (draft).
-No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Follow-up `607624e` job `42810881895` Linux `test` + ARM + `native-windows` `129811692427` (`host_toctou_fixed`, `native_trailing_dot refused`, F4/F5/F6/walk) passed; `selfhost` emu-check failed until unicorn/`fetch-depth` on this head. Caps/sandbox/Defender unchanged. Draft only.
+PR42 frozen review head: `dee819a7f0a256c70faa042b048fb4f8e542ab44`. L1 residuals (compiler-mode claim, product `VIRE_TEST_TOCTOU_MS`) ship on a stacked draft, not PR42.
+No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Caps/sandbox/Defender unchanged. Draft only.
 
 ## Implemented vs verified
 
@@ -27,6 +27,8 @@ No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `12
 | Linux case | yes | `LinuxWritableZoneCompareIsCaseSensitive`; `use Data/` is not `data/` | — |
 | trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused`; Win32 `WriteAllText` strips to `payload.bat` (fail-before) | — |
 | F8 wrap | yes | host+Unicorn `[0, 0, 1]`; compile-native `72, 185` imm64 | 7c7c8ea native wrap mismatch in emu-check |
+| compiler-mode claim | yes | guest `compiler.vire` + `emitU8` + `VIRE_BUDGET=10` no longer gets 50M; `--compiler` host flag; env only lowers | stacked PR |
+| product TOCTOU env | yes | `VIRE_TEST_TOCTOU_MS` removed from product `OpenFile`; tests use `TestToctouDelayMs` | stacked PR |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
 

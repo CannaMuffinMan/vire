@@ -38,7 +38,10 @@ function Invoke-Vire {
 }
 
 Write-Output "stage 1: interpreter compiles compiler.vire"
-Invoke-Vire compiler.vire data/compiler.vire data/stage1.vc
+$savedBudget = $env:VIRE_BUDGET
+Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+Invoke-Vire --compiler compiler.vire data/compiler.vire data/stage1.vc
+if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
 Write-Output "stage 2: stage1.vc compiles compiler.vire"
 Invoke-Vire run data/stage1.vc data/compiler.vire data/stage2.vc
 Write-Output "stage 3: stage2.vc compiles compiler.vire"

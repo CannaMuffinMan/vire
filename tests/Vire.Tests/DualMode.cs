@@ -97,6 +97,8 @@ static class DualMode
         info.FileName = dotnet;
         StringBuilder argv = new StringBuilder();
         argv.Append("exec \"").Append(dll).Append("\"");
+        bool hostCompiler = args.Length > 0 && IsHostCompilerProgramName(args[0]);
+        if (hostCompiler) argv.Append(" \"--compiler\"");
         foreach (string arg in args)
             argv.Append(" \"").Append(arg.Replace("\"", "\\\"")).Append("\"");
         info.Arguments = argv.ToString();
@@ -105,12 +107,20 @@ static class DualMode
         info.RedirectStandardError = true;
         info.UseShellExecute = false;
         info.Environment["VIRE_SEAL_KEY"] = TestKeyB64();
-        info.Environment["VIRE_BUDGET"] = "5000000";
+        if (hostCompiler) info.Environment.Remove("VIRE_BUDGET");
+        else info.Environment["VIRE_BUDGET"] = "5000000";
         Process process = Process.Start(info);
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();
         Assert.True(process.WaitForExit(120000), "vire process timed out");
         return new Proc(process.ExitCode, stdout, stderr);
+    }
+
+    static bool IsHostCompilerProgramName(string path)
+    {
+        string name = Path.GetFileName(path);
+        return name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase);
     }
 
     public sealed class DualRun

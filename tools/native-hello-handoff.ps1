@@ -21,8 +21,9 @@ $hex = Join-Path $Data "guest-hello.hex"
 if (Test-Path $hex) { Remove-Item -Force $hex }
 $timeoutMs = 120000
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
+Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 $p = Start-Process -FilePath "dotnet" -ArgumentList @(
-    "exec", $VireDll, "compile-native.vire", "data/guest-hello.vire", "data/guest-hello.hex"
+    "exec", $VireDll, "--compiler", "compile-native.vire", "data/guest-hello.vire", "data/guest-hello.hex"
 ) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
 if (-not $p.WaitForExit($timeoutMs)) {
     try { $p.Kill($true) } catch { }
