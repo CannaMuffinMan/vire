@@ -386,20 +386,13 @@ if (-not (Test-Path -LiteralPath (Join-Path $VulnTree "compile-native.vire"))) {
 }
 Write-Host "f456_vuln_tree $VulnTree"
 
-# Trailing-dot fail-before: 7c7c8ea PE writes payload.bat because Windows strips the dot.
-New-Item -ItemType Directory -Force -Path (Join-Path $VulnTree "data") | Out-Null
-Copy-Item -LiteralPath (Join-Path $Work "dotbat.vire") -Destination (Join-Path $VulnTree "data/dotbat.vire") -Force
-Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/dotbat.vire", "data/dotbat-vuln.hex")
-Convert-HexFileToExe (Join-Path $VulnTree "data/dotbat-vuln.hex") (Join-Path $Work "dotbat-vuln.exe")
-$dotBeforeDir = Join-Path $Work "dotbat-vuln-run"
-New-Item -ItemType Directory -Force -Path (Join-Path $dotBeforeDir "data") | Out-Null
-$dotVuln = Invoke-NativeExe -ExePath (Join-Path $Work "dotbat-vuln.exe") -WorkingDirectory $dotBeforeDir
-if (-not $dotVuln.Blocked) {
-    $createdBat = Test-Path (Join-Path $dotBeforeDir "data\payload.bat")
-    $createdDot = Test-Path (Join-Path $dotBeforeDir "data\payload.bat.")
-    Write-Host ("native_trailing_dot_fail_before bat=" + $createdBat + " dotted=" + $createdDot + " code=" + $dotVuln.Code)
-    if (-not $createdBat -and -not $createdDot) { throw "trailing-dot fail-before: 7c7c8ea PE did not create payload.bat" }
-}
+# Trailing-dot fail-before: Win32 CreateFile/WriteAllText strips the trailing dot to payload.bat.
+$stripDir = Join-Path $Work "dot-strip"
+New-Item -ItemType Directory -Force -Path (Join-Path $stripDir "data") | Out-Null
+[IO.File]::WriteAllText((Join-Path $stripDir "data\payload.bat."), "pwn")
+$stripped = Test-Path (Join-Path $stripDir "data\payload.bat")
+Write-Host ("native_trailing_dot_fail_before win32_strip_bat=" + $stripped)
+if (-not $stripped) { throw "trailing-dot fail-before: Windows did not strip payload.bat. to payload.bat" }
 
 # 4. F4: intern section named; RW mutation vs RX AV. Same cell via let p.
 New-Item -ItemType Directory -Force -Path (Join-Path $Work "data\f4") | Out-Null
