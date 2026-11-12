@@ -114,5 +114,7 @@ public class NativeArenaTests
         Assert.DoesNotContain("96MB", proof);
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.DoesNotContain("native-selfhost-proof.ps1", yml);
+        Assert.Contains("native-oom.ps1", yml);
+        Assert.DoesNotContain("continue-on-error: true", yml);
     }
 }
