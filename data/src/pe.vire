@@ -28,10 +28,11 @@ define codeOf with ch
 end
 
 define emitStr with buf, raw
+  ~ codeOf keeps CR/LF/HT. ord is find+32, so CR/LF become 0x1F (HTTP framing break).
   let i be 0
   let n be length with raw
   while i < n
-    let buf be emitU8 with buf, (ord with (raw at i))
+    let buf be emitU8 with buf, (codeOf with (raw at i))
     let i be i + 1
   end
   let buf be emitU8 with buf, 0

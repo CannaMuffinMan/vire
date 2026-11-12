@@ -36,6 +36,8 @@ public class NativeNetTests
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("openNetImage", pe);
+        Assert.Contains("let buf be emitU8 with buf, (codeOf with (raw at i))", pe);
+        Assert.DoesNotContain("let buf be emitU8 with buf, (ord with (raw at i))", pe);
         string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
         Assert.Contains("path == \"/health\"", guest);
         Assert.Contains("path == \"/api/health\"", guest);
@@ -67,6 +69,9 @@ public class NativeNetTests
             string ascii = Encoding.ASCII.GetString(pe);
             HashSet<string> imports = PeImports.Names(pe);
             Assert.Contains("ws2_32.dll", ascii.ToLowerInvariant());
+            Assert.Contains(" OK\r\n", ascii);
+            Assert.Contains("\r\nConnection: close\r\n", ascii);
+            Assert.DoesNotContain(" OK\u001f\u001f", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);

@@ -96,6 +96,8 @@ if ($healthImp -notcontains "WSAStartup") { throw "health IAT missing WSAStartup
 if ($healthImp -contains "LoadLibraryA") { throw "health IAT has LoadLibraryA" }
 $peHex = ([System.BitConverter]::ToString($pe) -replace "-", "")
 if ($peHex -notmatch "E9F51000009090") { throw "guest PE missing hu_frame jump e9f51000009090" }
+if ($peHex -notmatch "4F4B0D0A") { throw "guest PE missing OK CRLF 4F4B0D0A" }
+if ($peHex -match "4F4B1F1F") { throw "guest PE still parks OK as 4F4B1F1F" }
 if ($ascii -notlike "*content-length:*") { throw "guest PE missing content-length: needle" }
 if ($ascii -notlike "*transfer-encoding:*") { throw "guest PE missing transfer-encoding: needle" }
 Write-Output "health_pe_iat ws2_32.dll WSAStartup (no LoadLibraryA/GetProcAddress)"
@@ -208,9 +210,35 @@ function Write-AdversaryWire([string]$Name, [byte[]]$Request, [byte[]]$Response)
     Write-Host ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
 }
 
+function Assert-RawHttpResponse([string]$Name, [byte[]]$Response) {
+    if ($null -eq $Response -or $Response.Length -eq 0) { throw "$Name empty response" }
+    for ($i = 0; $i -lt $Response.Length; $i++) {
+        if ($Response[$i] -eq 0x1F) { throw "$Name raw response contains 0x1F at offset $i" }
+    }
+    $split = -1
+    for ($i = 0; $i + 3 -lt $Response.Length; $i++) {
+        if ($Response[$i] -eq 13 -and $Response[$i + 1] -eq 10 -and $Response[$i + 2] -eq 13 -and $Response[$i + 3] -eq 10) {
+            $split = $i
+            break
+        }
+    }
+    if ($split -lt 0) { throw "$Name missing CRLF CRLF header terminator" }
+    for ($i = 0; $i -le ($split + 2); $i++) {
+        $b = $Response[$i]
+        if ($b -eq 10 -and ($i -eq 0 -or $Response[$i - 1] -ne 13)) { throw "$Name bare LF in headers at $i" }
+        if ($b -eq 13 -and ($i + 1 -ge $Response.Length -or $Response[$i + 1] -ne 10)) { throw "$Name lone CR in headers at $i" }
+    }
+    $head = [System.Text.Encoding]::ASCII.GetString($Response, 0, $split)
+    if ($head -notmatch '(?i)content-length:\s*(\d+)') { throw "$Name missing Content-Length" }
+    $cl = [int]$Matches[1]
+    $bodyLen = $Response.Length - ($split + 4)
+    if ($cl -ne $bodyLen) { throw "$Name Content-Length $cl != body $bodyLen (response_len $($Response.Length))" }
+}
+
 function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantStatus) {
     $resp = Send-RawBytes $port $Request
     Write-AdversaryWire $Name $Request $resp
+    Assert-RawHttpResponse $Name $resp
     $text = Convert-BytesToAscii $resp
     $prefix = "HTTP/1.1 $WantStatus "
     if ($text.Length -lt $prefix.Length -or $text.Substring(0, $prefix.Length) -cne $prefix) {
@@ -220,7 +248,11 @@ function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantSt
     return $text
 }
 
-$health = Send-Raw $port "GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+$healthReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$healthBytes = Send-RawBytes $port $healthReq
+Write-AdversaryWire "health" $healthReq $healthBytes
+if ($healthBytes.Length -gt 0) { Assert-RawHttpResponse "health" $healthBytes }
+$health = Convert-BytesToAscii $healthBytes
 if (-not $health) {
     $curl = & curl.exe -s -S -D - --max-time 5 "http://127.0.0.1:$port/health" 2>&1 | Out-String
     Write-Output "health_curl_exe $curl"
@@ -250,7 +282,11 @@ Write-Output "contract_health_content_type application/json"
 Write-Output "contract_health_body $healthBody"
 Write-Output "contract_source fcgcpa-prod main 5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4 inventory (unauth GET /health and GET /api/health) plus in-tree api/fcgcpa.vire body fields; this token cannot re-open the private Node handler"
 
-$apiHealth = Send-Raw $port "GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+$apiReq = [System.Text.Encoding]::ASCII.GetBytes("GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$apiBytes = Send-RawBytes $port $apiReq
+Write-AdversaryWire "api_health" $apiReq $apiBytes
+Assert-RawHttpResponse "api_health" $apiBytes
+$apiHealth = Convert-BytesToAscii $apiBytes
 Write-Output "api_health_curl_result $apiHealth"
 if ($apiHealth -notmatch "HTTP/1.1 200 ") { throw "api/health status not 200" }
 if ($apiHealth -notmatch "(?i)content-type:\s*application/json") { throw "api/health content-type not application/json" }
