@@ -1,0 +1,31 @@
+define main
+  let port be number with (args at 0)
+  let h be connect with "127.0.0.1", port
+  send with h, "ping"
+  let got be recv with h, 16
+  close with h
+  say got
+  try
+    connect with "127.0.0.1", 9
+    say "refused-port-missed"
+  miss problem
+    say "refused-port"
+  end
+  try
+    connect with "10.0.0.1", 80
+    say "private-missed"
+  miss problem
+    say problem
+  end
+  try
+    connect with "169.254.169.254", 80
+    say "linklocal-missed"
+  miss problem
+    say problem
+  end
+  let h2 be connect with "127.0.0.1", port
+  send with h2, "ok"
+  let big be recv with h2, 2000000
+  close with h2
+  say (length with big)
+end

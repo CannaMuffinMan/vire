@@ -694,7 +694,7 @@ define parseDefine with state
 end
 
 define noteNeed with state, nm
-  if nm == "listen"
+  if nm == "listen" or nm == "connect" or nm == "send" or nm == "recv" or nm == "close"
     put true into state at "needNet"
   end
   if nm == "json"
@@ -1212,10 +1212,10 @@ define builtinArity with nm
   if nm == "args" or nm == "ticks"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen" or nm == "close"
     return 1
   end
-  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
+  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend" or nm == "connect" or nm == "send" or nm == "recv"
     return 2
   end
   if nm == "slice" or nm == "replace"
@@ -1704,6 +1704,15 @@ define main
       end
     end
     let i be i + 1
+  end
+  if hits at "net"
+    if not hasRoute
+      pinHere with gen, "fn_route"
+      emitOp with gen, [72, 131, 236, 40]
+      emitCall with gen, "rt_push_none"
+      emitCall with gen, "rt_return"
+      emitOp with gen, [72, 131, 196, 40, 195]
+    end
   end
   say "emitted"
   if gen at "bad"
