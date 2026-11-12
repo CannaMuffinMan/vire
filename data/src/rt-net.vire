@@ -61,8 +61,37 @@ define netNames
 end
 
 define tlsNames
-  ~ One comma string (not 61 pool entries) so gen1 stays under the hex() cap.
-  return split with "rt_https,https_bad,https_tlsfail,rt_tls_load,load_fail,zero_cred,rt_tls_b64,b64_fail,rt_tls_serve,serve_done,rt_tls_hs,hs_loop,hs_accept,hs_first,hs_ctx,hs_nosend,hs_cont,hs_ok,hs_fail,rt_tls_recv,recv_have,recv_min,recv_need,recv_b1,recv_copy,recv_noextra,recv_raw,recv_err,rt_tls_send,send_fit,send_raw,send_err,txt_unisp,txt_mskey,txt_pkcs8,msg_tls,msg_https,rt_listen,rt_fail,rt_net_init,rt_read,rt_alloc,rt_memcpy,rt_net_client,rt_net_sendall,tls_recv_slot,tls_send_slot,tls_state,iat_ccc,iat_csc,iat_nop,iat_nik,iat_ach,iat_asc,iat_dsc,iat_qca,iat_dec,iat_enc,iat_c2b,iat_rv,iat_sd", ","
+  ~ Comma file + slice (not split). Host split != native rt_split for this table.
+  let raw be read with "data/src/rt-tls-names.txt"
+  let names be []
+  let start be 0
+  let i be 0
+  let n be length with raw
+  while i < n
+    let ch be raw at i
+    if ch == ","
+      let names be push with names, (slice with raw, start, i)
+      let start be i + 1
+    end
+    let i be i + 1
+  end
+  let lim be n
+  if n > 0
+    let last be raw at (n - 1)
+    if last == "\n"
+      let lim be n - 1
+    end
+  end
+  if lim > 0
+    let last be raw at (lim - 1)
+    if last == "\r"
+      let lim be lim - 1
+    end
+  end
+  if start < lim
+    let names be push with names, (slice with raw, start, lim)
+  end
+  return names
 end
 
 define remapTlsFixes with fixes, base
