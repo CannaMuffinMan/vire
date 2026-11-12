@@ -184,7 +184,7 @@ public class BudgetCapTests
             UseShellExecute = false
         };
         info.ArgumentList.Add("show");
-        info.ArgumentList.Add("dee819a7f0a256c70faa042b048fb4f8e542ab44:Vire.cs");
+        info.ArgumentList.Add("d818f1691ed8659538a10255c58211ebc1316e00:Vire.cs");
         System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
         string old = p.StandardOutput.ReadToEnd();
         p.WaitForExit(15000);
@@ -195,7 +195,7 @@ public class BudgetCapTests
         {
             Assert.Contains("static bool IsCompilerProgram", old);
             Assert.Contains("text.Contains(\"emitU8\")", old);
-            Console.WriteLine("compiler_claim_fail_before dee819a IsCompilerProgram=true");
+            Console.WriteLine("compiler_claim_fail_before d818f169 IsCompilerProgram=true");
         }
         Console.WriteLine("compiler_claim_pass_after --compiler host flag");
     }

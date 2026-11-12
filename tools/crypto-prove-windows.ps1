@@ -47,7 +47,7 @@ $prove = $prove -replace '(?m)^use "src/rt-crypto.vire"\s*', ''
 Set-Content -Path (Join-Path $Data "crypto-prove.vire") -Value ($lib + "`n" + $prove) -NoNewline
 $hexRel = "data/crypto-prove.hex"
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$compileOut = & dotnet exec $VireDll compile-native.vire data/crypto-prove.vire $hexRel
+$compileOut = & dotnet exec $VireDll --compiler compile-native.vire data/crypto-prove.vire $hexRel
 $compileCode = $LASTEXITCODE
 $sw.Stop()
 Write-Output $compileOut
@@ -78,7 +78,7 @@ $mbSrc = Get-Content -Raw (Join-Path $Root "crypto-mb.vire")
 Set-Content -Path (Join-Path $Data "crypto-mb.vire") -Value $mbSrc -NoNewline
 $mbHexRel = "data/crypto-mb.hex"
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$mbCompile = & dotnet exec $VireDll compile-native.vire data/crypto-mb.vire $mbHexRel
+$mbCompile = & dotnet exec $VireDll --compiler compile-native.vire data/crypto-mb.vire $mbHexRel
 $mbCompileCode = $LASTEXITCODE
 $sw.Stop()
 Write-Output $mbCompile

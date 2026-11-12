@@ -132,5 +132,43 @@ public class NativePathSafetyTests
         Assert.Contains("TestToctouDelayMs", paths);
         Assert.Contains("TryLinuxFdId", paths);
         Assert.Contains("TryLinuxPathId", paths);
+        var info = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("show");
+        info.ArgumentList.Add("d818f1691ed8659538a10255c58211ebc1316e00:VirePaths.cs");
+        System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+        string old = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(15000);
+        if (p.ExitCode == 0 && old.Length > 0)
+        {
+            Assert.DoesNotContain("TryLinuxFdId", old);
+            Console.WriteLine("host_fileid_fail_before d818f169 TryLinuxFdId=false");
+        }
+        Console.WriteLine("host_fileid_pass_after TryLinuxFdId=true");
+        var dbg = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        dbg.ArgumentList.Add("show");
+        dbg.ArgumentList.Add("d818f1691ed8659538a10255c58211ebc1316e00:VireDebug.cs");
+        System.Diagnostics.Process d = System.Diagnostics.Process.Start(dbg);
+        string oldDbg = d.StandardOutput.ReadToEnd();
+        d.WaitForExit(15000);
+        if (d.ExitCode == 0 && oldDbg.Length > 0)
+        {
+            Assert.DoesNotContain("if (Environment.GetEnvironmentVariable(\"VIRE_DEBUGGER\") != \"1\") return false;", oldDbg);
+            Console.WriteLine("break_probe_fail_before d818f169 always_opens_break_txt=true");
+        }
+        string nowDbg = File.ReadAllText(Path.Combine(root, "VireDebug.cs"));
+        Assert.Contains("if (Environment.GetEnvironmentVariable(\"VIRE_DEBUGGER\") != \"1\") return false;", nowDbg);
+        Console.WriteLine("break_probe_pass_after VIRE_DEBUGGER_gate=true");
     }
 }

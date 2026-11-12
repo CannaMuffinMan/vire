@@ -13,11 +13,21 @@ Write-Output "pass_after_sha $AfterSha"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 function Invoke-Vire {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+    $leaf = [IO.Path]::GetFileName($Args[0])
+    $savedBudget = $env:VIRE_BUDGET
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+        $Args = @("--compiler") + $Args
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    }
+    try {
     $out = & dotnet exec $VireDll @Args
     $code = $LASTEXITCODE
     if ($null -ne $out) { $out | Write-Host }
     if ($null -eq $code) { return 0 }
     return [int]$code
+    } finally {
+        if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
+    }
 }
 
 function Convert-HexToExe {

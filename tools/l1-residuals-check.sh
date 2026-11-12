@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail-before on frozen PR42 head dee819a vs pass-after HEAD for L1 residuals.
+# Fail-before on #57 merge d818f169 vs pass-after HEAD for L1 residuals.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
@@ -7,7 +7,7 @@ dll=bin/Release/net10.0/vire.dll
 if [[ ! -f $dll ]]; then
   dotnet build vire.csproj -c Release --nologo
 fi
-sha=dee819a7f0a256c70faa042b048fb4f8e542ab44
+sha=d818f1691ed8659538a10255c58211ebc1316e00
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 body='define main
@@ -29,7 +29,7 @@ if git cat-file -e "$sha^{commit}"; then
   old_dll=$old/bin/Release/net10.0/vire.dll
   hello_old=$(cd "$work" && VIRE_BUDGET=10 dotnet exec "$old_dll" hello.vire >/tmp/l1-hello-old.txt 2>&1; echo $?)
   guest_old=$(cd "$work" && VIRE_BUDGET=10 dotnet exec "$old_dll" compiler.vire >/tmp/l1-guest-old.txt 2>&1; echo $?)
-  echo "compiler_claim_fail_before dee819a hello=$hello_old guest=$guest_old"
+  echo "compiler_claim_fail_before d818f169 hello=$hello_old guest=$guest_old"
   test "$hello_old" != 0
   test "$guest_old" = 0
   git worktree remove --force "$old"

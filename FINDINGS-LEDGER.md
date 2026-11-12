@@ -1,9 +1,12 @@
 # Vulnerability / finding evidence ledger
 
 Vulnerable SHA (immutable): `7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867`
-Evidence commits: `0d1a320` · `b7ee393` · `3d9fc58` (F11 reload; Windows gen1==gen2 `48f12268…`) · `2b53c32` (F4/F5/F6 recipes; **native-windows failed** job `129746447109` before recipes: `Get-VulnTree` leaked `git` Object[] into `Copy-Item -Destination`) · this push (harness-only: git output to host, mkdir `data/` before copy).
-PR42 frozen review head: `dee819a7f0a256c70faa042b048fb4f8e542ab44`. L1 residuals (compiler-mode claim, product `VIRE_TEST_TOCTOU_MS`) ship on a stacked draft, not PR42.
-No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `129796754998` (gen1=gen2 `7fad8803…`). Caps/sandbox/Defender unchanged. Draft only.
+#57 merge baseline: `d818f1691ed8659538a10255c58211ebc1316e00` (proven head `4097d27f100c0b244ca8691349c513d4ac235962`).
+This branch replays PR42/48/49 commits after `3d9fc58` onto that baseline (not stacked on #42/#48/#49).
+Evidence commits include `0d1a320` · `b7ee393` · `3d9fc58` plus leftover `2b53c32`…`a8b080b`.
+PR42 frozen review head: `dee819a7f0a256c70faa042b048fb4f8e542ab44`.
+FAIL_BEFORE at d818f169 (check run `43214687746`, native-selfhost-windows job `131170809061`): `IsCompilerProgram` filename sniff; no `TryLinuxFdId`; `Break` always opens `data/break.txt`; gen1_host_sec 376.308; gen1=gen2 `debc11ec8a9e756626b27f8b917e02864015ec45922ecebff263a2c76f2ee60e`. Product `VIRE_TEST_TOCTOU_MS` was never on d818 (introduced on the #42 stack in `607624e` then removed in `7278a8d`); this land keeps it out of product OpenFile.
+No CVE IDs. Caps/sandbox/Defender unchanged.
 
 ## Implemented vs verified
 
@@ -27,8 +30,9 @@ No CVE IDs. Native F4/F5/F6/walk accepted at `5b39c9a` jobs `129796755075` / `12
 | Linux case | yes | `LinuxWritableZoneCompareIsCaseSensitive`; `use Data/` is not `data/` | — |
 | trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused`; Win32 `WriteAllText` strips to `payload.bat` (fail-before) | — |
 | F8 wrap | yes | host+Unicorn `[0, 0, 1]`; compile-native `72, 185` imm64 | 7c7c8ea native wrap mismatch in emu-check |
-| compiler-mode claim | yes | guest `compiler.vire` + `emitU8` + `VIRE_BUDGET=10` no longer gets 50M; `--compiler` host flag; env only lowers | stacked PR |
-| product TOCTOU env | yes | `VIRE_TEST_TOCTOU_MS` removed from product `OpenFile`; tests use `TestToctouDelayMs` | stacked PR |
+| compiler-mode claim | yes | guest `compiler.vire` + `emitU8` + `VIRE_BUDGET=10` no longer gets 50M; `--compiler` host flag; env only lowers | landed on #57 baseline |
+| product TOCTOU env | yes | `VIRE_TEST_TOCTOU_MS` never in d818 product; tests use `TestToctouDelayMs`; file-id bind is new vs d818 | landed on #57 baseline |
+| Break probe skip | yes | `VIRE_DEBUGGER=1` still stops; unset means `break_probes=0` | landed on #57 baseline |
 
 ## Fail-before / fail-after (linux-x64 this VM, SDK 10.0.403)
 
