@@ -2036,6 +2036,36 @@ define emitMore with image, fixes, labels
   pin with labels, "shl8_bad", image
   emitFail with image, fixes, "msg_shl8"
 
+  pin with labels, "rt_chr", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "chr_bad"
+  emitList with image, [72, 133, 210, 15, 136]
+  emitRel with image, fixes, "chr_bad"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 255
+  emitJcc with image, fixes, 135, "chr_bad"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 128
+  emitJcc with image, fixes, 131, "chr_alloc"
+  emitList with image, [72, 193, 226, 4, 72, 141, 5]
+  emitRel with image, fixes, "intern_tab"
+  emitList with image, [72, 1, 208, 72, 137, 194]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "chr_alloc", image
+  emitList with image, [72, 137, 85, 248, 185]
+  emitU32 with image, 16
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 199, 0]
+  emitU32 with image, 1
+  emitList with image, [72, 139, 77, 248, 136, 72, 8, 198, 64, 9, 0, 72, 137, 194]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "chr_bad", image
+  emitFail with image, fixes, "msg_chr"
+
   pin with labels, "rt_join", image
   emitPro with image
   emitPop2 with image
@@ -2240,6 +2270,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_sub", "- needs two numbers"
   parkMsg with image, labels, "msg_mul", "* needs two numbers"
   parkMsg with image, labels, "msg_shl8", "shl8 needs a number"
+  parkMsg with image, labels, "msg_chr", "chr needs a byte"
   parkMsg with image, labels, "msg_div", "/ needs two numbers"
   parkMsg with image, labels, "msg_mod", "% needs two numbers"
   parkMsg with image, labels, "msg_zero", "division by zero"

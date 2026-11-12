@@ -590,6 +590,14 @@ sealed class CompiledMachine
             return Program.HexBytes(args[0], line, col);
         }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
+        if (name == "chr")
+        {
+            if (args.Count != 1) throw new VireError("chr takes 1 values, got " + args.Count, line, col);
+            if (!(args[0] is int)) throw new VireError("chr needs a whole number", line, col);
+            int n = (int)args[0];
+            if (n < 0 || n > 255) throw new VireError("chr needs a byte", line, col);
+            return ((char)n).ToString();
+        }
         if (name == "read")
         {
             try
