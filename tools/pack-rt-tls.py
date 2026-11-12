@@ -19,7 +19,7 @@ SEC_I_COMPLETE_NEEDED = 0x00090313
 SEC_I_COMPLETE_AND_CONTINUE = 0x00090314
 # SCH_USE_STRONG_CRYPTO | SCH_CRED_NO_SYSTEM_MAPPER (server inbound).
 SCH_FLAGS = 0x00400002
-SCHANNEL_CRED_VERSION = 4
+SCH_CREDENTIALS_VERSION = 5
 CERT_NCRYPT_KEY = 78
 CRYPT_STRING_BASE64 = 1
 
@@ -204,14 +204,14 @@ def emit_load(a: Asm) -> None:
     a.raw(0x48, 0x8D, 0x4D, 0x80, 0x31, 0xC0, 0xB2, 0x50)
     a.pin("zero_cred")
     a.raw(0x88, 0x01, 0x48, 0xFF, 0xC1, 0xFE, 0xCA, 0x75, 0xF7)
-    # SCHANNEL_CRED v4: dwVersion@0, cCreds@4, paCred@8, dwFlags@68.
-    a.raw(0xC7, 0x45, 0x80, SCHANNEL_CRED_VERSION, 0, 0, 0)
-    a.raw(0xC7, 0x45, 0x84, 1, 0, 0, 0)
+    # SCH_CREDENTIALS v5 x64: cCreds@8, paCred@16, dwFlags@52.
+    a.raw(0xC7, 0x45, 0x80, SCH_CREDENTIALS_VERSION, 0, 0, 0)
+    a.raw(0xC7, 0x45, 0x88, 1, 0, 0, 0)
     a.lea("rax", "tls_state")
     a.raw(0x48, 0x8D, 0x80)
     a.u32(CERT)
-    a.raw(0x48, 0x89, 0x45, 0x88)
-    a.raw(0xC7, 0x45, 0xC4)
+    a.raw(0x48, 0x89, 0x45, 0x90)
+    a.raw(0xC7, 0x45, 0xB4)
     a.u32(SCH_FLAGS)
     a.raw(0x31, 0xC9)
     a.lea("rdx", "txt_unisp")
@@ -663,7 +663,7 @@ def emit_strings(a: Asm) -> None:
             a.raw(ord(c), 0)
         a.raw(0, 0)
 
-    z("txt_unisp", "Schannel")
+    z("txt_unisp", "Microsoft Unified Security Protocol Provider")
     wz("txt_mskey", "Microsoft Software Key Storage Provider")
     wz("txt_pkcs8", "PKCS8_PRIVATEKEY")
     vz("msg_tls", "tls setup failed")
