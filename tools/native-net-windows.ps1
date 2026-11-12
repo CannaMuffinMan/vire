@@ -179,8 +179,24 @@ if (-not $health) {
 }
 Write-Output "health_curl_result $health"
 if ($health -notmatch "HTTP/1.1 200 ") { throw "health status not 200" }
-if ($health -notmatch '"ok":true') { throw "health body missing ok true" }
+if ($health -notmatch "(?i)content-type:\s*application/json") { throw "health content-type not application/json" }
+$healthBody = ($health -split "`r`n`r`n", 2)[-1].Trim()
+if ($healthBody -cne '{"ok":true,"service":"fcgcpa","payments":false}') { throw "health body contract mismatch: $healthBody" }
 if ($health -match "(?i)set-cookie") { throw "unexpected set-cookie" }
+Write-Output "contract_health_status 200"
+Write-Output "contract_health_content_type application/json"
+Write-Output "contract_health_body $healthBody"
+Write-Output "contract_source fcgcpa-prod main 5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4 inventory (unauth GET /health and GET /api/health) plus in-tree api/fcgcpa.vire body fields; this token cannot re-open the private Node handler"
+
+$apiHealth = Send-Raw $port "GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+Write-Output "api_health_curl_result $apiHealth"
+if ($apiHealth -notmatch "HTTP/1.1 200 ") { throw "api/health status not 200" }
+if ($apiHealth -notmatch "(?i)content-type:\s*application/json") { throw "api/health content-type not application/json" }
+$apiBody = ($apiHealth -split "`r`n`r`n", 2)[-1].Trim()
+if ($apiBody -cne '{"ok":true,"service":"fcgcpa","payments":false}') { throw "api/health body contract mismatch: $apiBody" }
+Write-Output "contract_api_health_status 200"
+Write-Output "contract_api_health_content_type application/json"
+Write-Output "contract_api_health_body $apiBody"
 
 $mal = Send-Raw $port "GET /health`r`n`r`n"
 Write-Output "adversary_malformed_line $mal"

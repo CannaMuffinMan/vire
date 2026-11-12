@@ -28,6 +28,12 @@ public class NativeNetTests
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("openNetImage", pe);
+        string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
+        Assert.Contains("path == \"/health\"", guest);
+        Assert.Contains("path == \"/api/health\"", guest);
+        Assert.Contains("service", guest);
+        Assert.Contains("fcgcpa", guest);
+        Assert.Contains("payments", guest);
         Assert.Contains("ws2_32.dll", pe);
         Assert.Contains("GetTickCount", pe);
         Assert.DoesNotContain("\"LoadLibraryA\"", pe);

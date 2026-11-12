@@ -1,7 +1,14 @@
+~ Native PE health clone of FCG GET /health and GET /api/health.
+~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
+~ to this token). Both paths are unauthenticated in the Node inventory.
+
 define route with method, path, body
   if method == "GET"
     if path == "/health"
-      return "{\"ok\":true}"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if path == "/api/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
     end
   end
   return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
