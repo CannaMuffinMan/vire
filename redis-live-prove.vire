@@ -31,8 +31,8 @@ define main
   mustOk with "EXPIRE", e
   let d be redis_del with h, "vire:prove:k"
   mustOk with "DEL", d
-  let miss be redis_get with h, "vire:prove:k"
-  mustOk with "GETMISS", miss
+  let gone be redis_get with h, "vire:prove:k"
+  mustOk with "GETMISS", gone
   close with h
   say "REDIS LIVE PROVE pass"
 end
