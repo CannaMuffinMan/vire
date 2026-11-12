@@ -1,0 +1,36 @@
+~ Host and gen1 PE: wall clock plus JWT exp against unix.
+~ Caps stay 32MB / 100000 / 5M. Clock is not monotonic.
+
+use "src/rt-crypto.vire"
+
+define jwt_exp_check with token, secret
+  return jwt_hs256_verify with token, secret, unix
+end
+
+define main
+  let secret be ascii_bytes with "time-prove-secret"
+  let sec be secret at 1
+  let t be unix
+  say "unix " + (text with t)
+  let dead be jwt_hs256_sign with "{\"exp\":1}", sec
+  let got be jwt_exp_check with (dead at 1), sec
+  if (got at 0) == "bad"
+    say "EXPIRED JWT REJECT"
+  end
+  if (got at 0) != "bad"
+    say "EXPIRED JWT ACCEPT"
+    halt with 1
+  end
+  let liveExp be t + 3600
+  let livePay be "{\"exp\":" + (text with liveExp) + "}"
+  let live be jwt_hs256_sign with livePay, sec
+  let got2 be jwt_exp_check with (live at 1), sec
+  if (got2 at 0) == "ok"
+    say "VALID EXP JWT ACCEPT"
+  end
+  if (got2 at 0) != "ok"
+    say "VALID EXP JWT REJECT"
+    halt with 1
+  end
+  say "TIME PROVE pass"
+end
