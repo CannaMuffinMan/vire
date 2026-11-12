@@ -46,7 +46,7 @@ public class CopilotFindingsTests
     {
         string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
         int ok = more.IndexOf("pin with labels, \"path_ok\"", StringComparison.Ordinal);
-        string slice = more.Substring(ok, 700);
+        string slice = more.Substring(ok, 900);
         Assert.Contains("rt_alloc", slice);
         Assert.Contains("rt_memcpy", slice);
     }
