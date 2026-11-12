@@ -111,7 +111,7 @@ $ca = Join-Path $TlsDir "cert.pem"
 function Invoke-CurlHttps([string[]]$Extra, [string]$Url) {
     $out = Join-Path $Data ("curl-" + [Guid]::NewGuid().ToString("N") + ".txt")
     $err = "$out.err"
-    $args = @("-sS", "-D", "-", "--max-time", "15", "--http1.1", "--cacert", $ca) + $Extra + @($Url)
+    $args = @("-sS", "-D", "-", "--max-time", "15", "--http1.1", "--tlsv1.2", "--tls-max", "1.2", "--cacert", $ca) + $Extra + @($Url)
     $proc = Start-Process -FilePath "curl.exe" -ArgumentList $args -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
     return @{
         Code = $proc.ExitCode
@@ -122,7 +122,7 @@ function Invoke-CurlHttps([string[]]$Extra, [string]$Url) {
 
 $want = '{"ok":true,"service":"fcgcpa","payments":false}'
 $verbose = Join-Path $Data "https-curl-verbose.txt"
-$vproc = Start-Process -FilePath "curl.exe" -ArgumentList @("-v", "-sS", "-D", "-", "--max-time", "15", "--http1.1", "--cacert", $ca, "https://127.0.0.1:$hport/health") -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $Data "https-health.body.txt") -RedirectStandardError $verbose
+$vproc = Start-Process -FilePath "curl.exe" -ArgumentList @("-v", "-sS", "-D", "-", "--max-time", "15", "--http1.1", "--tlsv1.2", "--tls-max", "1.2", "--cacert", $ca, "https://127.0.0.1:$hport/health") -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $Data "https-health.body.txt") -RedirectStandardError $verbose
 $vtext = [string](Get-Content -Raw $verbose -ErrorAction SilentlyContinue)
 $body = [string](Get-Content -Raw (Join-Path $Data "https-health.body.txt") -ErrorAction SilentlyContinue)
 Write-Output ("PASS_AFTER_https_curl_exit " + $vproc.ExitCode)
