@@ -23,9 +23,9 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
 }
 
 function Write-Pem([string]$Path, [string]$Kind, [byte[]]$Der) {
+    # Native CryptStringToBinaryA uses CRYPT_STRING_BASE64 (no PEM envelope).
     $b64 = [Convert]::ToBase64String($Der, [Base64FormattingOptions]::InsertLineBreaks)
-    $text = "-----BEGIN $Kind-----`r`n$b64`r`n-----END $Kind-----`r`n"
-    [System.IO.File]::WriteAllText($Path, $text)
+    [System.IO.File]::WriteAllText($Path, $b64 + "`r`n")
 }
 
 $cert = New-SelfSignedCertificate -Subject "CN=127.0.0.1" -DnsName "127.0.0.1" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddDays(2) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -KeyExportPolicy Exportable
