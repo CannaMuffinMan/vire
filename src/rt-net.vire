@@ -123,10 +123,10 @@ define emitTlsRuntime with image, fixes, labels
   let image be emitHex with image, (read with "data/src/rt-tls-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-tls-pins.txt"), names
   applyPackedFixes with fixes, base, (read with "data/src/rt-tls-fixes.txt"), names
-  ~ Packed pin id 8 is rt_tls_serve at blob+1057. Re-pin so a names mismatch cannot drop it.
+  ~ Packed pin id 8 is rt_tls_serve at blob+1064. Re-pin so a names mismatch cannot drop it.
   put base into labels at "rt_https"
-  put (base + 1057) into labels at "rt_tls_serve"
-  put (base + 1198) into labels at "rt_tls_hs"
+  put (base + 1064) into labels at "rt_tls_serve"
+  put (base + 1205) into labels at "rt_tls_hs"
   return image
 end
 
