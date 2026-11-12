@@ -176,6 +176,8 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_err431", "{\"error\":\"headers too large\"}"
   parkMsg with image, labels, "txt_err501", "{\"error\":\"not implemented\"}"
   parkMsg with image, labels, "msg_net", "network setup failed"
+  parkMsg with image, labels, "msg_tls", "tls setup failed"
+  parkMsg with image, labels, "msg_https", "https needs a port, cert path, and key path"
   parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
   parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
   parkMsg with image, labels, "msg_json", "json is not valid"

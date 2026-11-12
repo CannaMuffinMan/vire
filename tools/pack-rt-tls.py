@@ -193,7 +193,8 @@ def emit_load(a: Asm) -> None:
     a.u32(CERT_NCRYPT_KEY)
     a.raw(0x45, 0x31, 0xC0)
     a.lea("rax", "tls_state")
-    a.raw(0x4C, 0x8B, 0x88)
+    # pvData is PCCERT_CONTEXT property: address of NCRYPT_KEY_HANDLE, not the handle.
+    a.raw(0x4C, 0x8D, 0x88)
     a.u32(NKEY)
     a.call_iat("iat_csc")
     a.raw(0x85, 0xC0)
@@ -207,7 +208,8 @@ def emit_load(a: Asm) -> None:
     a.raw(0x48, 0x8D, 0x80)
     a.u32(CERT)
     a.raw(0x48, 0x89, 0x45, 0x90)
-    a.raw(0xC7, 0x45, 0xB4)
+    # SCH_CREDENTIALS.dwFlags is at +40 (rbp-0x80+40 = [rbp-0x58] = 0xA8).
+    a.raw(0xC7, 0x45, 0xA8)
     a.u32(SCH_FLAGS)
     a.raw(0x31, 0xC9)
     a.lea("rdx", "txt_unisp")
@@ -634,6 +636,10 @@ def emit_send(a: Asm) -> None:
 def emit_strings(a: Asm) -> None:
     def z(name: str, s: str) -> None:
         a.pin(name)
+        a.raw(*[ord(c) for c in s], 0)
+
+    def vz(name: str, s: str) -> None:
+        a.pin(name)
         a.raw(*list(len(s).to_bytes(8, "little")))
         a.raw(*[ord(c) for c in s], 0)
 
@@ -646,8 +652,8 @@ def emit_strings(a: Asm) -> None:
     z("txt_unisp", "Microsoft Unified Security Protocol Provider")
     wz("txt_mskey", "Microsoft Software Key Storage Provider")
     wz("txt_pkcs8", "PKCS8_PRIVATEKEY")
-    z("msg_tls", "tls setup failed")
-    z("msg_https", "https needs a port, cert path, and key path")
+    vz("msg_tls", "tls setup failed")
+    vz("msg_https", "https needs a port, cert path, and key path")
 
 
 NAMES = [

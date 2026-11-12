@@ -19,6 +19,11 @@ public class NativeNetTests
         Assert.Contains("rt_listen", net);
         Assert.Contains("rt_tls_serve", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
         Assert.Contains("slice with raw, start, i", net);
+        Assert.Contains("parkMsg with image, labels, \"msg_tls\"", net);
+        string tlsBlob = File.ReadAllText(Path.Combine(root, "src", "rt-tls-blob.txt")).Trim();
+        Assert.Contains("4c8d88", tlsBlob);
+        Assert.DoesNotContain("4c8b88", tlsBlob);
+        Assert.Contains("c745a8", tlsBlob);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
