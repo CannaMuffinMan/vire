@@ -6,6 +6,7 @@ cp "$ROOT/compile-native.vire" "$ROOT/data/compile-native.vire"
 cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/src/rt-net.vire" \
   "$ROOT/src/rt-net-blob.txt" "$ROOT/src/rt-net-pins.txt" "$ROOT/src/rt-net-fixes.txt" \
   "$ROOT/src/rt-net-json-blob.txt" "$ROOT/src/rt-net-json-pins.txt" "$ROOT/src/rt-net-json-fixes.txt" \
+  "$ROOT/src/rt-tls-blob.txt" "$ROOT/src/rt-tls-pins.txt" "$ROOT/src/rt-tls-fixes.txt" \
   "$ROOT/data/src/"
 python3 - <<PY
 import hashlib, os
@@ -23,6 +24,9 @@ pairs = [
     ("src/rt-net-json-blob.txt", "data/src/rt-net-json-blob.txt"),
     ("src/rt-net-json-pins.txt", "data/src/rt-net-json-pins.txt"),
     ("src/rt-net-json-fixes.txt", "data/src/rt-net-json-fixes.txt"),
+    ("src/rt-tls-blob.txt", "data/src/rt-tls-blob.txt"),
+    ("src/rt-tls-pins.txt", "data/src/rt-tls-pins.txt"),
+    ("src/rt-tls-fixes.txt", "data/src/rt-tls-fixes.txt"),
 ]
 for a, b in pairs:
     ha = hashlib.sha256(open(os.path.join(root, a), "rb").read()).hexdigest()
