@@ -74,28 +74,46 @@ if ($beforeOut -notmatch "there is no definition named connect") {
 }
 Write-Output "FAIL_BEFORE at $BaseSha showing connect is unavailable"
 
-$listener = New-Object System.Net.Sockets.TcpListener ([System.Net.IPAddress]::Parse("127.0.0.1"), 0)
-$listener.Start()
-$port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
-Write-Output "echo_listen 127.0.0.1:$port"
-$echo = New-Object System.Threading.Thread ([System.Threading.ParameterizedThreadStart]{
-    param($bind)
-    try {
-        while ($true) {
-            $client = $bind.AcceptTcpClient()
-            try {
-                $stream = $client.GetStream()
-                $buf = New-Object byte[] 4096
-                $n = $stream.Read($buf, 0, $buf.Length)
-                if ($n -gt 0) { $stream.Write($buf, 0, $n) }
-            } finally {
-                $client.Close()
+Add-Type -TypeDefinition @"
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+public class VireTcpEcho {
+    public TcpListener Listener;
+    Thread worker;
+    volatile bool stop;
+    public int Start() {
+        Listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
+        Listener.Start();
+        worker = new Thread(Run);
+        worker.IsBackground = true;
+        worker.Start();
+        return ((IPEndPoint)Listener.LocalEndpoint).Port;
+    }
+    void Run() {
+        try {
+            while (!stop) {
+                TcpClient client = Listener.AcceptTcpClient();
+                try {
+                    NetworkStream stream = client.GetStream();
+                    byte[] buf = new byte[4096];
+                    int n = stream.Read(buf, 0, buf.Length);
+                    if (n > 0) stream.Write(buf, 0, n);
+                } finally { client.Close(); }
             }
-        }
-    } catch { }
-})
-$echo.IsBackground = $true
-$echo.Start($listener)
+        } catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+    }
+    public void Halt() {
+        stop = true;
+        try { Listener.Stop(); } catch (Exception) { }
+    }
+}
+"@
+$echoFix = New-Object VireTcpEcho
+$port = $echoFix.Start()
+Write-Output "echo_listen 127.0.0.1:$port"
 
 Copy-Item (Join-Path $Root "tests/native/tcp-client.vire") (Join-Path $Data "tcp-client.vire") -Force
 $portText = [string]$port
@@ -147,4 +165,4 @@ if ($hostNorm -ne $peNorm) {
 Write-Output "PASS_AFTER at $AfterSha host and gen1 PE tcp stdout identical"
 Write-Output "native tcp windows ok"
 
-try { $listener.Stop() } catch { }
+try { $echoFix.Halt() } catch { }
