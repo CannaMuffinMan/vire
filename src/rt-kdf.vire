@@ -1,0 +1,1771 @@
+~ Guest bcrypt ($2b$): EksBlowfish, OpenBSD layout, 72-byte key + NUL.
+~ Comparison walks every digest byte (not a CPU timing barrier).
+
+define bcryptXor8 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  return r
+end
+
+define bcryptTimes256 with n
+  let v be n + n
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  let v be v + v
+  return v
+end
+
+define bcryptMakeXorTab
+  let tab be []
+  let a be 0
+  while a < 256
+    let b be 0
+    while b < 256
+      let r be 0
+      let p be 1
+      let x be a
+      let y be b
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      let x be idiv with x, 2
+      let y be idiv with y, 2
+      let p be p + p
+      let xb be x % 2
+      let yb be y % 2
+      if xb != yb
+        let r be r + p
+      end
+      push with tab, r
+      let b be b + 1
+    end
+    let a be a + 1
+  end
+  return tab
+end
+
+define bcryptXor8tab with tab, a, b
+  let i be bcryptTimes256 with a
+  return tab at (i + b)
+end
+
+define bcryptXor16tab with tab, a, b
+  let ah be idiv with a, 256
+  let al be a % 256
+  let bh be idiv with b, 256
+  let bl be b % 256
+  let hi be bcryptXor8tab with tab, ah, bh
+  let lo be bcryptXor8tab with tab, al, bl
+  let out be bcryptTimes256 with hi
+  return out + lo
+end
+
+define bcryptXor32_into with tab, dst, a, b
+  let hi be bcryptXor16tab with tab, (a at 0), (b at 0)
+  let lo be bcryptXor16tab with tab, (a at 1), (b at 1)
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
+end
+
+define bcryptAdd32_into with dst, a, b
+  let lo be (a at 1) + (b at 1)
+  let c be 0
+  if lo >= 65536
+    let lo be lo - 65536
+    let c be 1
+  end
+  let hi be (a at 0) + (b at 0) + c
+  if hi >= 65536
+    let hi be hi - 65536
+  end
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
+end
+
+define bcryptCopy32_into with dst, src
+  put (src at 0) into dst at 0
+  put (src at 1) into dst at 1
+  return dst
+end
+
+define bcryptLoadBE_into with dst, buf, off
+  let i1 be off + 1
+  let i2 be off + 2
+  let i3 be off + 3
+  let hi be bcryptTimes256 with (buf at off)
+  let hi be hi + (buf at i1)
+  let lo be bcryptTimes256 with (buf at i2)
+  let lo be lo + (buf at i3)
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
+end
+
+define bcryptStoreBE with out, w
+  let hi be w at 0
+  let lo be w at 1
+  push with out, (idiv with hi, 256)
+  push with out, (hi % 256)
+  push with out, (idiv with lo, 256)
+  push with out, (lo % 256)
+  return out
+end
+
+define bcryptF_into with tab, dst, x, S
+  let a be idiv with (x at 0), 256
+  let b be (x at 0) % 256
+  let c be idiv with (x at 1), 256
+  let d be (x at 1) % 256
+  let s0 be S at a
+  let i1 be b + 256
+  let i2 be c + 512
+  let i3 be d + 768
+  let s1 be S at i1
+  let s2 be S at i2
+  let s3 be S at i3
+  bcryptAdd32_into with dst, s0, s1
+  bcryptXor32_into with tab, dst, dst, s2
+  bcryptAdd32_into with dst, dst, s3
+  return dst
+end
+
+define bcryptEncipher with tab, L, R, P, S, f, tmp
+  bcryptXor32_into with tab, L, L, (P at 0)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 1)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 2)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 3)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 4)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 5)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 6)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 7)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 8)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 9)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 10)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 11)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 12)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 13)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 14)
+  bcryptF_into with tab, f, L, S
+  bcryptXor32_into with tab, R, R, f
+  bcryptXor32_into with tab, R, R, (P at 15)
+  bcryptF_into with tab, f, R, S
+  bcryptXor32_into with tab, L, L, f
+  bcryptXor32_into with tab, L, L, (P at 16)
+  bcryptXor32_into with tab, tmp, R, (P at 17)
+  bcryptCopy32_into with R, L
+  bcryptCopy32_into with L, tmp
+  return 0
+end
+
+define bcryptStreamWord_into with dst, data, n, pos
+  let p be pos at 0
+  let b0 be data at p
+  let p be p + 1
+  if p >= n
+    let p be 0
+  end
+  let b1 be data at p
+  let p be p + 1
+  if p >= n
+    let p be 0
+  end
+  let b2 be data at p
+  let p be p + 1
+  if p >= n
+    let p be 0
+  end
+  let b3 be data at p
+  let p be p + 1
+  if p >= n
+    let p be 0
+  end
+  put p into pos at 0
+  let hi be bcryptTimes256 with b0
+  let hi be hi + b1
+  let lo be bcryptTimes256 with b2
+  let lo be lo + b3
+  put hi into dst at 0
+  put lo into dst at 1
+  return dst
+end
+
+define bcryptPiS
+  let xs be []
+  push with xs, [53553, 2982]
+  push with xs, [39135, 46508]
+  push with xs, [12285, 29403]
+  push with xs, [53274, 57271]
+  push with xs, [47329, 45037]
+  push with xs, [27174, 32406]
+  push with xs, [47740, 36933]
+  push with xs, [61740, 32665]
+  push with xs, [9377, 39239]
+  push with xs, [45969, 27895]
+  push with xs, [2049, 62178]
+  push with xs, [34190, 64534]
+  push with xs, [25449, 8408]
+  push with xs, [29015, 20073]
+  push with xs, [42072, 65187]
+  push with xs, [62611, 15742]
+  push with xs, [3477, 29839]
+  push with xs, [29326, 46680]
+  push with xs, [29067, 52568]
+  push with xs, [33301, 19182]
+  push with xs, [31572, 42013]
+  push with xs, [49754, 22965]
+  push with xs, [39984, 54585]
+  push with xs, [10994, 24595]
+  push with xs, [50641, 45091]
+  push with xs, [10336, 34288]
+  push with xs, [51777, 31000]
+  push with xs, [47323, 14575]
+  push with xs, [36473, 56496]
+  push with xs, [24634, 6158]
+  push with xs, [27806, 3723]
+  push with xs, [45086, 35390]
+  push with xs, [55061, 30657]
+  push with xs, [48433, 19239]
+  push with xs, [30895, 12250]
+  push with xs, [21856, 23648]
+  push with xs, [58965, 9715]
+  push with xs, [43605, 43924]
+  push with xs, [22344, 39010]
+  push with xs, [25576, 5184]
+  push with xs, [21962, 14698]
+  push with xs, [10923, 4278]
+  push with xs, [46284, 23604]
+  push with xs, [4417, 59598]
+  push with xs, [41300, 34479]
+  push with xs, [31858, 59795]
+  push with xs, [46062, 5137]
+  push with xs, [25455, 48170]
+  push with xs, [11177, 50525]
+  push with xs, [29720, 12790]
+  push with xs, [52828, 15894]
+  push with xs, [39815, 37662]
+  push with xs, [45014, 47667]
+  push with xs, [27684, 53084]
+  push with xs, [31282, 21377]
+  push with xs, [10389, 34423]
+  push with xs, [15247, 18584]
+  push with xs, [27467, 47535]
+  push with xs, [50367, 59419]
+  push with xs, [26152, 8595]
+  push with xs, [25048, 2508]
+  push with xs, [64289, 43409]
+  push with xs, [18556, 44128]
+  push with xs, [24044, 32818]
+  push with xs, [61316, 23901]
+  push with xs, [59781, 30129]
+  push with xs, [56358, 8962]
+  push with xs, [60261, 7048]
+  push with xs, [9097, 16001]
+  push with xs, [54166, 44229]
+  push with xs, [3949, 28659]
+  push with xs, [33780, 16953]
+  push with xs, [11787, 17538]
+  push with xs, [42116, 8196]
+  push with xs, [27080, 61514]
+  push with xs, [40479, 39774]
+  push with xs, [8646, 26690]
+  push with xs, [63209, 27802]
+  push with xs, [26380, 40033]
+  push with xs, [43987, 35056]
+  push with xs, [27217, 41170]
+  push with xs, [55380, 12136]
+  push with xs, [38415, 42792]
+  push with xs, [43857, 13219]
+  push with xs, [28399, 2924]
+  push with xs, [4986, 15332]
+  push with xs, [47675, 61520]
+  push with xs, [32507, 10904]
+  push with xs, [41457, 25885]
+  push with xs, [14767, 374]
+  push with xs, [26314, 22846]
+  push with xs, [33347, 3720]
+  push with xs, [36078, 34329]
+  push with xs, [17775, 40884]
+  push with xs, [32132, 42435]
+  push with xs, [15243, 24254]
+  push with xs, [57455, 30168]
+  push with xs, [34241, 8307]
+  push with xs, [16410, 17567]
+  push with xs, [22209, 27302]
+  push with xs, [20179, 43618]
+  push with xs, [13887, 30470]
+  push with xs, [7166, 57202]
+  push with xs, [17051, 573]
+  push with xs, [14288, 55076]
+  push with xs, [53258, 4680]
+  push with xs, [56079, 60115]
+  push with xs, [18929, 49307]
+  push with xs, [1875, 29385]
+  push with xs, [32921, 7035]
+  push with xs, [9684, 31192]
+  push with xs, [63208, 57079]
+  push with xs, [58366, 20506]
+  push with xs, [46713, 19515]
+  push with xs, [38764, 57533]
+  push with xs, [1216, 1722]
+  push with xs, [49577, 20406]
+  push with xs, [16543, 24772]
+  push with xs, [24156, 40642]
+  push with xs, [6506, 9315]
+  push with xs, [26875, 28591]
+  push with xs, [15980, 21429]
+  push with xs, [4921, 45803]
+  push with xs, [15186, 60527]
+  push with xs, [28156, 20767]
+  push with xs, [39728, 38188]
+  push with xs, [52353, 17732]
+  push with xs, [44894, 48393]
+  push with xs, [48867, 53252]
+  push with xs, [56883, 19197]
+  push with xs, [26127, 10247]
+  push with xs, [6446, 19379]
+  push with xs, [49355, 43095]
+  push with xs, [17864, 29711]
+  push with xs, [53771, 24377]
+  push with xs, [47571, 64475]
+  push with xs, [21881, 49341]
+  push with xs, [6752, 12810]
+  push with xs, [54945, 198]
+  push with xs, [16428, 29305]
+  push with xs, [26527, 9726]
+  push with xs, [64287, 41932]
+  push with xs, [36517, 59896]
+  push with xs, [56114, 8952]
+  push with xs, [15477, 5855]
+  push with xs, [64865, 27413]
+  push with xs, [12112, 7880]
+  push with xs, [44293, 21163]
+  push with xs, [12861, 46586]
+  push with xs, [64803, 34656]
+  push with xs, [21297, 31560]
+  push with xs, [15872, 57218]
+  push with xs, [40540, 22459]
+  push with xs, [51823, 36000]
+  push with xs, [6791, 22062]
+  push with xs, [57111, 27099]
+  push with xs, [54594, 43254]
+  push with xs, [10366, 65475]
+  push with xs, [44135, 12998]
+  push with xs, [35919, 21875]
+  push with xs, [26971, 10160]
+  push with xs, [48074, 22728]
+  push with xs, [57855, 41821]
+  push with xs, [47344, 4512]
+  push with xs, [4346, 15768]
+  push with xs, [64801, 33720]
+  push with xs, [19196, 46444]
+  push with xs, [11729, 54107]
+  push with xs, [39507, 58489]
+  push with xs, [46840, 17765]
+  push with xs, [53902, 18876]
+  push with xs, [19451, 38800]
+  push with xs, [57821, 62170]
+  push with xs, [42187, 32307]
+  push with xs, [25339, 4929]
+  push with xs, [52964, 50920]
+  push with xs, [61216, 51930]
+  push with xs, [13943, 19457]
+  push with xs, [53374, 40702]
+  push with xs, [11249, 8116]
+  push with xs, [38363, 55885]
+  push with xs, [44688, 37272]
+  push with xs, [60077, 36465]
+  push with xs, [27539, 54688]
+  push with xs, [53390, 53712]
+  push with xs, [44999, 9696]
+  push with xs, [36412, 23343]
+  push with xs, [36469, 38071]
+  push with xs, [36854, 58107]
+  push with xs, [61970, 11108]
+  push with xs, [34952, 47122]
+  push with xs, [36877, 61468]
+  push with xs, [20397, 24224]
+  push with xs, [26767, 49948]
+  push with xs, [53711, 61841]
+  push with xs, [45992, 49581]
+  push with xs, [12079, 8728]
+  push with xs, [48654, 6007]
+  push with xs, [60021, 11774]
+  push with xs, [35586, 8097]
+  push with xs, [58784, 52239]
+  push with xs, [46447, 29928]
+  push with xs, [6316, 62422]
+  push with xs, [52873, 58009]
+  push with xs, [46248, 20448]
+  push with xs, [64787, 57527]
+  push with xs, [31940, 15233]
+  push with xs, [53933, 43225]
+  push with xs, [5727, 41574]
+  push with xs, [32917, 30469]
+  push with xs, [37836, 29460]
+  push with xs, [8474, 5239]
+  push with xs, [59053, 8293]
+  push with xs, [30645, 64134]
+  push with xs, [51028, 17141]
+  push with xs, [64413, 13775]
+  push with xs, [60365, 44812]
+  push with xs, [31550, 35232]
+  push with xs, [54849, 7123]
+  push with xs, [44574, 32329]
+  push with xs, [37, 3629]
+  push with xs, [8305, 45918]
+  push with xs, [8808, 187]
+  push with xs, [22456, 57519]
+  push with xs, [9316, 13979]
+  push with xs, [61449, 47390]
+  push with xs, [21859, 37149]
+  push with xs, [23007, 42666]
+  push with xs, [30913, 17289]
+  push with xs, [55642, 21375]
+  push with xs, [8317, 23458]
+  push with xs, [741, 47557]
+  push with xs, [33574, 886]
+  push with xs, [25237, 53161]
+  push with xs, [4552, 6504]
+  push with xs, [20083, 19009]
+  push with xs, [45895, 11722]
+  push with xs, [31508, 43338]
+  push with xs, [6993, 82]
+  push with xs, [39507, 10517]
+  push with xs, [54799, 22335]
+  push with xs, [48283, 50916]
+  push with xs, [11104, 42102]
+  push with xs, [33254, 29696]
+  push with xs, [2234, 28597]
+  push with xs, [22299, 59679]
+  push with xs, [62102, 60523]
+  push with xs, [10765, 55573]
+  push with xs, [46691, 25889]
+  push with xs, [59321, 63926]
+  push with xs, [65332, 1326]
+  push with xs, [50565, 22116]
+  push with xs, [21424, 11613]
+  push with xs, [43423, 36769]
+  push with xs, [2234, 18329]
+  push with xs, [28293, 1898]
+  push with xs, [19322, 28905]
+  push with xs, [46515, 10564]
+  push with xs, [56181, 2350]
+  push with xs, [50201, 9763]
+  push with xs, [44398, 42672]
+  push with xs, [18855, 57213]
+  push with xs, [40174, 24760]
+  push with xs, [36845, 45670]
+  push with xs, [60586, 35953]
+  push with xs, [27034, 6143]
+  push with xs, [22116, 21100]
+  push with xs, [49841, 40673]
+  push with xs, [6454, 677]
+  push with xs, [29961, 19497]
+  push with xs, [41049, 4928]
+  push with xs, [58392, 14910]
+  push with xs, [16212, 39066]
+  push with xs, [23362, 40293]
+  push with xs, [27535, 58582]
+  push with xs, [39415, 16342]
+  push with xs, [41426, 39943]
+  push with xs, [61416, 12533]
+  push with xs, [19757, 14566]
+  push with xs, [61477, 24001]
+  push with xs, [19677, 8326]
+  push with xs, [33904, 60198]
+  push with xs, [25474, 59846]
+  push with xs, [542, 52318]
+  push with xs, [2408, 27455]
+  push with xs, [16058, 61385]
+  push with xs, [15511, 6164]
+  push with xs, [27498, 28833]
+  push with xs, [26751, 13700]
+  push with xs, [21152, 57990]
+  push with xs, [47004, 21253]
+  push with xs, [43600, 1847]
+  push with xs, [15879, 33820]
+  push with xs, [32734, 44636]
+  push with xs, [36477, 17644]
+  push with xs, [22294, 62136]
+  push with xs, [45114, 55863]
+  push with xs, [61520, 3085]
+  push with xs, [61468, 7940]
+  push with xs, [512, 46079]
+  push with xs, [44556, 62746]
+  push with xs, [15541, 29874]
+  push with xs, [9603, 31320]
+  push with xs, [56329, 8637]
+  push with xs, [53649, 5113]
+  push with xs, [31913, 12278]
+  push with xs, [37938, 18291]
+  push with xs, [8949, 18177]
+  push with xs, [15077, 58753]
+  push with xs, [14274, 56028]
+  push with xs, [51381, 30260]
+  push with xs, [39667, 56743]
+  push with xs, [43332, 24902]
+  push with xs, [4048, 782]
+  push with xs, [60616, 51006]
+  push with xs, [42101, 7745]
+  push with xs, [57912, 52633]
+  push with xs, [15338, 3631]
+  push with xs, [12928, 48033]
+  push with xs, [6206, 45873]
+  push with xs, [20052, 35640]
+  push with xs, [20333, 47368]
+  push with xs, [28482, 3331]
+  push with xs, [62986, 1215]
+  push with xs, [11448, 4752]
+  push with xs, [9367, 31865]
+  push with xs, [22137, 45170]
+  push with xs, [48303, 35247]
+  push with xs, [56986, 30495]
+  push with xs, [55699, 2064]
+  push with xs, [45963, 44562]
+  push with xs, [56527, 16174]
+  push with xs, [21778, 29215]
+  push with xs, [11883, 28964]
+  push with xs, [20506, 56806]
+  push with xs, [40836, 52615]
+  push with xs, [31320, 18200]
+  push with xs, [29704, 55831]
+  push with xs, [48287, 39612]
+  push with xs, [59723, 32140]
+  push with xs, [60538, 60474]
+  push with xs, [56197, 7674]
+  push with xs, [25353, 17254]
+  push with xs, [50276, 50130]
+  push with xs, [61212, 6215]
+  push with xs, [12821, 55560]
+  push with xs, [56643, 15159]
+  push with xs, [9410, 47638]
+  push with xs, [4769, 19779]
+  push with xs, [10853, 50257]
+  push with xs, [20628, 2]
+  push with xs, [4922, 58589]
+  push with xs, [29151, 63646]
+  push with xs, [4145, 20053]
+  push with xs, [33196, 30678]
+  push with xs, [24337, 6555]
+  push with xs, [1077, 22257]
+  push with xs, [55203, 51051]
+  push with xs, [15377, 6203]
+  push with xs, [22820, 42249]
+  push with xs, [62095, 59117]
+  push with xs, [38897, 64506]
+  push with xs, [40634, 48940]
+  push with xs, [7701, 15470]
+  push with xs, [34531, 17776]
+  push with xs, [60137, 28593]
+  push with xs, [34318, 24074]
+  push with xs, [23102, 10931]
+  push with xs, [30495, 59164]
+  push with xs, [20029, 1786]
+  push with xs, [10597, 56505]
+  push with xs, [39399, 7439]
+  push with xs, [32830, 35286]
+  push with xs, [21094, 51237]
+  push with xs, [11852, 51576]
+  push with xs, [39952, 45930]
+  push with xs, [50709, 3770]
+  push with xs, [38114, 60024]
+  push with xs, [42492, 15443]
+  push with xs, [7690, 11764]
+  push with xs, [62199, 20135]
+  push with xs, [13853, 11069]
+  push with xs, [6457, 9743]
+  push with xs, [6594, 31072]
+  push with xs, [21027, 42760]
+  push with xs, [63251, 4790]
+  push with xs, [60333, 65134]
+  push with xs, [60099, 8038]
+  push with xs, [58300, 17813]
+  push with xs, [42619, 51331]
+  push with xs, [45439, 14289]
+  push with xs, [396, 65320]
+  push with xs, [49970, 56815]
+  push with xs, [48748, 23205]
+  push with xs, [25944, 8581]
+  push with xs, [26795, 38914]
+  push with xs, [61134, 42255]
+  push with xs, [56111, 38203]
+  push with xs, [10991, 32173]
+  push with xs, [23406, 12164]
+  push with xs, [5409, 46632]
+  push with xs, [10503, 24944]
+  push with xs, [60637, 18293]
+  push with xs, [24991, 5392]
+  push with xs, [5068, 43056]
+  push with xs, [60257, 48534]
+  push with xs, [820, 65054]
+  push with xs, [43523, 25551]
+  push with xs, [46451, 23696]
+  push with xs, [19568, 41529]
+  push with xs, [54686, 40459]
+  push with xs, [52138, 56852]
+  push with xs, [61132, 34492]
+  push with xs, [24674, 11431]
+  push with xs, [40107, 23723]
+  push with xs, [45811, 33902]
+  push with xs, [25739, 7855]
+  push with xs, [6589, 61642]
+  push with xs, [40995, 27065]
+  push with xs, [25946, 47952]
+  push with xs, [16488, 23090]
+  push with xs, [15402, 46259]
+  push with xs, [12702, 59861]
+  push with xs, [49185, 47351]
+  push with xs, [39764, 2841]
+  push with xs, [34655, 41113]
+  push with xs, [38391, 39294]
+  push with xs, [25149, 32168]
+  push with xs, [63543, 34970]
+  push with xs, [38883, 11639]
+  push with xs, [4589, 37727]
+  push with xs, [5736, 4737]
+  push with xs, [3637, 34857]
+  push with xs, [51174, 8150]
+  push with xs, [38622, 57249]
+  push with xs, [30808, 47769]
+  push with xs, [22517, 33957]
+  push with xs, [6946, 29283]
+  push with xs, [39811, 50175]
+  push with xs, [6850, 18070]
+  push with xs, [52659, 2795]
+  push with xs, [21294, 12372]
+  push with xs, [36825, 18660]
+  push with xs, [28092, 12584]
+  push with xs, [22763, 62191]
+  push with xs, [13510, 65514]
+  push with xs, [65064, 60769]
+  push with xs, [61052, 15475]
+  push with xs, [23882, 5337]
+  push with xs, [59492, 47075]
+  push with xs, [16912, 23828]
+  push with xs, [8254, 5088]
+  push with xs, [17902, 58038]
+  push with xs, [41898, 44010]
+  push with xs, [56172, 20245]
+  push with xs, [64203, 20432]
+  push with xs, [51010, 62530]
+  push with xs, [61290, 48053]
+  push with xs, [25935, 15133]
+  push with xs, [16845, 8453]
+  push with xs, [55326, 31134]
+  push with xs, [34437, 19911]
+  push with xs, [58443, 18282]
+  push with xs, [15745, 25168]
+  push with xs, [53090, 41458]
+  push with xs, [23437, 9798]
+  push with xs, [64648, 33696]
+  push with xs, [49607, 46755]
+  push with xs, [32533, 9411]
+  push with xs, [27083, 29842]
+  push with xs, [18308, 35339]
+  push with xs, [22162, 45701]
+  push with xs, [2395, 48896]
+  push with xs, [44313, 18589]
+  push with xs, [5218, 45428]
+  push with xs, [9090, 3584]
+  push with xs, [22594, 36138]
+  push with xs, [3157, 62954]
+  push with xs, [7597, 62526]
+  push with xs, [9023, 28769]
+  push with xs, [13170, 61586]
+  push with xs, [36243, 32321]
+  push with xs, [54879, 60657]
+  push with xs, [27682, 15323]
+  push with xs, [31966, 14169]
+  push with xs, [52206, 29792]
+  push with xs, [16517, 62119]
+  push with xs, [52855, 12910]
+  push with xs, [42503, 32900]
+  push with xs, [6648, 20638]
+  push with xs, [59631, 55381]
+  push with xs, [25049, 38709]
+  push with xs, [43369, 42922]
+  push with xs, [50444, 1730]
+  push with xs, [23044, 44028]
+  push with xs, [32779, 51932]
+  push with xs, [40516, 31278]
+  push with xs, [49989, 13444]
+  push with xs, [64981, 26373]
+  push with xs, [3614, 40649]
+  push with xs, [56179, 56275]
+  push with xs, [4181, 35021]
+  push with xs, [26463, 55929]
+  push with xs, [58215, 17216]
+  push with xs, [50628, 13413]
+  push with xs, [28990, 14552]
+  push with xs, [15656, 63646]
+  push with xs, [61805, 65312]
+  push with xs, [5438, 8679]
+  push with xs, [36784, 15690]
+  push with xs, [59107, 40747]
+  push with xs, [56195, 44535]
+  push with xs, [59709, 23144]
+  push with xs, [38017, 16631]
+  push with xs, [63052, 9756]
+  push with xs, [37993, 10548]
+  push with xs, [16661, 8439]
+  push with xs, [30210, 54519]
+  push with xs, [48372, 27438]
+  push with xs, [54434, 104]
+  push with xs, [54280, 9329]
+  push with xs, [13088, 62570]
+  push with xs, [17335, 54455]
+  push with xs, [20480, 25007]
+  push with xs, [7737, 63022]
+  push with xs, [38692, 17734]
+  push with xs, [5153, 20340]
+  push with xs, [49035, 34880]
+  push with xs, [19861, 64541]
+  push with xs, [38581, 37295]
+  push with xs, [28916, 56787]
+  push with xs, [26272, 12101]
+  push with xs, [49084, 2540]
+  push with xs, [957, 38789]
+  push with xs, [32684, 28112]
+  push with xs, [12747, 34052]
+  push with xs, [38635, 10163]
+  push with xs, [22013, 14657]
+  push with xs, [55845, 18406]
+  push with xs, [43978, 2714]
+  push with xs, [10320, 30757]
+  push with xs, [21252, 10740]
+  push with xs, [2604, 34522]
+  push with xs, [59830, 28155]
+  push with xs, [26844, 5218]
+  push with xs, [55112, 26880]
+  push with xs, [26638, 49316]
+  push with xs, [10145, 36334]
+  push with xs, [20287, 65186]
+  push with xs, [59527, 44428]
+  push with xs, [46476, 57350]
+  push with xs, [31476, 54966]
+  push with xs, [43726, 7804]
+  push with xs, [54071, 24556]
+  push with xs, [52856, 41881]
+  push with xs, [16491, 10818]
+  push with xs, [8446, 40501]
+  push with xs, [55795, 34233]
+  push with xs, [60985, 55211]
+  push with xs, [15122, 20107]
+  push with xs, [7625, 64247]
+  push with xs, [19309, 6230]
+  push with xs, [9891, 26161]
+  push with xs, [60131, 38834]
+  push with xs, [14958, 64116]
+  push with xs, [56667, 17202]
+  push with xs, [26689, 59383]
+  push with xs, [51832, 8443]
+  push with xs, [64266, 62798]
+  push with xs, [55550, 45975]
+  push with xs, [17728, 22188]
+  push with xs, [47688, 38183]
+  push with xs, [21843, 14906]
+  push with xs, [8323, 36231]
+  push with xs, [65131, 43447]
+  push with xs, [53398, 38219]
+  push with xs, [21928, 26556]
+  push with xs, [41237, 39512]
+  push with xs, [52393, 10595]
+  push with xs, [39393, 56115]
+  push with xs, [42538, 19030]
+  push with xs, [16177, 9721]
+  push with xs, [24308, 32284]
+  push with xs, [36905, 12668]
+  push with xs, [65016, 59394]
+  push with xs, [1063, 12144]
+  push with xs, [32955, 5468]
+  push with xs, [1320, 11491]
+  push with xs, [38337, 5448]
+  push with xs, [58566, 27938]
+  push with xs, [18625, 4927]
+  push with xs, [50959, 34524]
+  push with xs, [2041, 51694]
+  push with xs, [16644, 7951]
+  push with xs, [16455, 31140]
+  push with xs, [23944, 28183]
+  push with xs, [12895, 20971]
+  push with xs, [54683, 49361]
+  push with xs, [62140, 49551]
+  push with xs, [16657, 13668]
+  push with xs, [9595, 30772]
+  push with xs, [24618, 40032]
+  push with xs, [57336, 59555]
+  push with xs, [8035, 27675]
+  push with xs, [3602, 46274]
+  push with xs, [737, 12958]
+  push with xs, [44902, 20433]
+  push with xs, [51921, 33045]
+  push with xs, [27427, 38368]
+  push with xs, [13118, 37601]
+  push with xs, [15140, 2914]
+  push with xs, [61118, 47394]
+  push with xs, [34226, 41486]
+  push with xs, [59066, 3481]
+  push with xs, [56946, 3212]
+  push with xs, [11682, 63272]
+  push with xs, [53266, 30789]
+  push with xs, [38327, 38141]
+  push with xs, [25725, 2146]
+  push with xs, [59340, 62960]
+  push with xs, [21577, 41839]
+  push with xs, [34685, 18682]
+  push with xs, [50077, 64807]
+  push with xs, [62270, 36126]
+  push with xs, [2631, 25409]
+  push with xs, [39214, 65396]
+  push with xs, [14959, 28331]
+  push with xs, [62712, 64823]
+  push with xs, [43026, 56416]
+  push with xs, [41451, 56824]
+  push with xs, [39195, 57676]
+  push with xs, [56174, 27405]
+  push with xs, [50811, 21776]
+  push with xs, [28007, 11319]
+  push with xs, [10085, 54331]
+  push with xs, [56528, 59396]
+  push with xs, [61737, 3527]
+  push with xs, [52224, 65443]
+  push with xs, [46393, 3986]
+  push with xs, [26895, 60683]
+  push with xs, [26235, 40955]
+  push with xs, [52955, 32156]
+  push with xs, [41105, 53003]
+  push with xs, [55573, 24227]
+  push with xs, [47891, 12168]
+  push with xs, [20827, 44324]
+  push with xs, [31636, 31167]
+  push with xs, [30267, 55019]
+  push with xs, [14137, 11955]
+  push with xs, [52241, 22905]
+  push with xs, [32806, 58007]
+  push with xs, [62510, 12589]
+  push with xs, [26690, 44455]
+  push with xs, [50794, 11067]
+  push with xs, [4725, 19660]
+  push with xs, [30766, 61724]
+  push with xs, [27154, 16951]
+  push with xs, [46994, 20967]
+  push with xs, [1697, 48102]
+  push with xs, [19451, 25424]
+  push with xs, [6763, 4120]
+  push with xs, [4554, 60922]
+  push with xs, [15653, 48600]
+  push with xs, [58081, 50121]
+  push with xs, [17474, 5721]
+  push with xs, [2578, 4998]
+  push with xs, [55564, 60526]
+  push with xs, [54699, 59946]
+  push with xs, [25775, 26446]
+  push with xs, [55942, 43103]
+  push with xs, [48831, 59784]
+  push with xs, [25828, 50174]
+  push with xs, [40380, 32855]
+  push with xs, [61687, 49286]
+  push with xs, [24696, 31736]
+  push with xs, [24579, 24653]
+  push with xs, [53757, 33606]
+  push with xs, [63032, 8112]
+  push with xs, [30533, 44548]
+  push with xs, [55094, 64716]
+  push with xs, [33602, 27443]
+  push with xs, [61470, 43889]
+  push with xs, [45184, 16775]
+  push with xs, [15360, 24159]
+  push with xs, [30624, 22462]
+  push with xs, [48616, 44580]
+  push with xs, [21830, 17049]
+  push with xs, [48984, 11873]
+  push with xs, [20056, 62607]
+  push with xs, [62173, 64930]
+  push with xs, [62580, 61240]
+  push with xs, [34697, 48578]
+  push with xs, [21350, 63939]
+  push with xs, [51379, 36468]
+  push with xs, [46197, 62037]
+  push with xs, [18172, 55737]
+  push with xs, [31467, 9825]
+  push with xs, [35613, 57220]
+  push with xs, [33898, 3705]
+  push with xs, [37215, 38370]
+  push with xs, [18030, 22926]
+  push with xs, [8372, 22384]
+  push with xs, [36053, 21905]
+  push with xs, [51458, 56908]
+  push with xs, [47371, 44257]
+  push with xs, [48002, 1488]
+  push with xs, [4520, 25160]
+  push with xs, [30068, 43422]
+  push with xs, [46975, 6582]
+  push with xs, [57513, 56329]
+  push with xs, [26157, 2465]
+  push with xs, [50226, 17971]
+  push with xs, [59482, 7938]
+  push with xs, [2544, 48780]
+  push with xs, [19097, 40997]
+  push with xs, [7534, 65040]
+  push with xs, [6841, 15645]
+  push with xs, [2981, 42207]
+  push with xs, [41350, 61967]
+  push with xs, [10344, 61801]
+  push with xs, [56503, 55939]
+  push with xs, [22329, 1790]
+  push with xs, [41442, 52891]
+  push with xs, [20429, 32594]
+  push with xs, [20497, 24065]
+  push with xs, [42758, 33786]
+  push with xs, [40962, 46532]
+  push with xs, [3558, 53287]
+  push with xs, [39672, 35879]
+  push with xs, [30527, 34369]
+  push with xs, [50016, 19462]
+  push with xs, [25000, 1717]
+  push with xs, [61463, 31272]
+  push with xs, [49397, 34528]
+  push with xs, [96, 22698]
+  push with xs, [12508, 32098]
+  push with xs, [4582, 40663]
+  push with xs, [9016, 60003]
+  push with xs, [21442, 56724]
+  push with xs, [49858, 5684]
+  push with xs, [48075, 61014]
+  push with xs, [37052, 46814]
+  push with xs, [60412, 32161]
+  push with xs, [52825, 7542]
+  push with xs, [28421, 58377]
+  push with xs, [19324, 392]
+  push with xs, [14706, 2621]
+  push with xs, [31890, 31780]
+  push with xs, [34531, 29279]
+  push with xs, [29261, 40377]
+  push with xs, [6849, 23476]
+  push with xs, [54174, 47356]
+  push with xs, [60756, 21880]
+  push with xs, [2300, 42421]
+  push with xs, [55357, 31955]
+  push with xs, [19885, 4036]
+  push with xs, [7760, 61278]
+  push with xs, [45409, 59128]
+  push with xs, [41605, 5337]
+  push with xs, [27729, 4924]
+  push with xs, [28629, 51175]
+  push with xs, [22241, 20164]
+  push with xs, [13866, 49102]
+  push with xs, [56774, 51255]
+  push with xs, [55194, 12852]
+  push with xs, [37475, 33298]
+  push with xs, [26382, 64142]
+  push with xs, [16480, 224]
+  push with xs, [14905, 52791]
+  push with xs, [54266, 62927]
+  push with xs, [43970, 30519]
+  push with xs, [23237, 11547]
+  push with xs, [23728, 26526]
+  push with xs, [20387, 14146]
+  push with xs, [54146, 10048]
+  push with xs, [39356, 39870]
+  push with xs, [54545, 36509]
+  push with xs, [48911, 29461]
+  push with xs, [54829, 7294]
+  push with xs, [50944, 50299]
+  push with xs, [46988, 7019]
+  push with xs, [8609, 36933]
+  push with xs, [45678, 45502]
+  push with xs, [27190, 28340]
+  push with xs, [22344, 43823]
+  push with xs, [48276, 28281]
+  push with xs, [50851, 30418]
+  push with xs, [25929, 49864]
+  push with xs, [21263, 63726]
+  push with xs, [18061, 56957]
+  push with xs, [54643, 2589]
+  push with xs, [19664, 19910]
+  push with xs, [10553, 48091]
+  push with xs, [43450, 18000]
+  push with xs, [44181, 9960]
+  push with xs, [48734, 58116]
+  push with xs, [41466, 54768]
+  push with xs, [27181, 20890]
+  push with xs, [25583, 36066]
+  push with xs, [39558, 60962]
+  push with xs, [49289, 49848]
+  push with xs, [17188, 12022]
+  push with xs, [42270, 938]
+  push with xs, [40178, 53412]
+  push with xs, [33728, 25018]
+  push with xs, [39913, 27213]
+  push with xs, [36837, 5456]
+  push with xs, [47716, 23510]
+  push with xs, [10278, 41721]
+  push with xs, [42810, 15073]
+  push with xs, [19369, 38278]
+  push with xs, [61269, 25321]
+  push with xs, [50991, 61395]
+  push with xs, [63314, 63450]
+  push with xs, [16132, 28521]
+  push with xs, [30714, 2649]
+  push with xs, [32996, 43285]
+  push with xs, [34736, 34305]
+  push with xs, [39689, 59053]
+  push with xs, [15166, 58771]
+  push with xs, [59792, 64858]
+  push with xs, [40500, 55191]
+  push with xs, [11504, 47065]
+  push with xs, [555, 35665]
+  push with xs, [38613, 44090]
+  push with xs, [381, 42621]
+  push with xs, [53711, 16086]
+  push with xs, [31869, 11560]
+  push with xs, [8095, 9679]
+  push with xs, [44530, 47259]
+  push with xs, [23254, 46194]
+  push with xs, [23176, 62796]
+  push with xs, [57385, 44145]
+  push with xs, [57369, 42470]
+  push with xs, [18352, 44285]
+  push with xs, [60819, 64155]
+  push with xs, [59603, 50317]
+  push with xs, [10299, 22476]
+  push with xs, [63701, 26153]
+  push with xs, [30995, 11816]
+  push with xs, [30815, 401]
+  push with xs, [60789, 24661]
+  push with xs, [63382, 3652]
+  push with xs, [58323, 24204]
+  push with xs, [5381, 28116]
+  push with xs, [35060, 28090]
+  push with xs, [929, 24869]
+  push with xs, [1380, 61629]
+  push with xs, [50155, 40469]
+  push with xs, [15504, 22434]
+  push with xs, [38695, 6892]
+  push with xs, [43322, 1834]
+  push with xs, [6975, 28059]
+  push with xs, [7779, 8693]
+  push with xs, [62876, 26363]
+  push with xs, [9948, 62233]
+  push with xs, [30003, 55592]
+  push with xs, [45397, 65013]
+  push with xs, [854, 13442]
+  push with xs, [35514, 15547]
+  push with xs, [10321, 30481]
+  push with xs, [49674, 55800]
+  push with xs, [43980, 20839]
+  push with xs, [52397, 37471]
+  push with xs, [19944, 5969]
+  push with xs, [14384, 56462]
+  push with xs, [14237, 22626]
+  push with xs, [37664, 63889]
+  push with xs, [60026, 37058]
+  push with xs, [64318, 31694]
+  push with xs, [20769, 52836]
+  push with xs, [30543, 48690]
+  push with xs, [43190, 58238]
+  push with xs, [49961, 15686]
+  push with xs, [18654, 21353]
+  push with xs, [25619, 59008]
+  push with xs, [41646, 2064]
+  push with xs, [56685, 45604]
+  push with xs, [27013, 11773]
+  push with xs, [2311, 8550]
+  push with xs, [45978, 17930]
+  push with xs, [25669, 49373]
+  push with xs, [22636, 57039]
+  push with xs, [7200, 51374]
+  push with xs, [23486, 63453]
+  push with xs, [7000, 36160]
+  push with xs, [52434, 383]
+  push with xs, [27572, 58299]
+  push with xs, [56738, 27262]
+  push with xs, [14937, 65349]
+  push with xs, [15925, 2628]
+  push with xs, [48308, 52693]
+  push with xs, [29418, 52904]
+  push with xs, [64100, 33979]
+  push with xs, [36198, 4782]
+  push with xs, [48956, 28487]
+  push with xs, [53915, 58467]
+  push with xs, [21551, 23966]
+  push with xs, [44738, 30491]
+  push with xs, [63054, 25456]
+  push with xs, [29710, 3469]
+  push with xs, [59227, 4951]
+  push with xs, [63602, 5745]
+  push with xs, [44883, 32093]
+  push with xs, [16448, 51976]
+  push with xs, [20148, 58060]
+  push with xs, [13522, 18026]
+  push with xs, [277, 44932]
+  push with xs, [57776, 1064]
+  push with xs, [38296, 14877]
+  push with xs, [1720, 40884]
+  push with xs, [52846, 41032]
+  push with xs, [28479, 15234]
+  push with xs, [13600, 43906]
+  push with xs, [282, 7499]
+  push with xs, [10098, 10232]
+  push with xs, [24853, 24753]
+  push with xs, [59283, 16348]
+  push with xs, [47930, 31019]
+  push with xs, [13381, 9661]
+  push with xs, [41096, 14817]
+  push with xs, [20942, 31051]
+  push with xs, [12082, 51639]
+  push with xs, [40991, 47817]
+  push with xs, [57372, 51326]
+  push with xs, [48327, 53750]
+  push with xs, [52993, 4547]
+  push with xs, [41448, 43719]
+  push with xs, [6800, 34633]
+  push with xs, [54351, 48538]
+  push with xs, [53466, 57035]
+  push with xs, [54538, 55864]
+  push with xs, [825, 49962]
+  push with xs, [50833, 13927]
+  push with xs, [36345, 12668]
+  push with xs, [57521, 11087]
+  push with xs, [63390, 22967]
+  push with xs, [17397, 47930]
+  push with xs, [62165, 6655]
+  push with xs, [10201, 17820]
+  push with xs, [49047, 8748]
+  push with xs, [5606, 64554]
+  push with xs, [3985, 64625]
+  push with xs, [39828, 5413]
+  push with xs, [64229, 37729]
+  push with xs, [52918, 40171]
+  push with xs, [49832, 25689]
+  push with xs, [4794, 43217]
+  push with xs, [46785, 1886]
+  push with xs, [58117, 27148]
+  push with xs, [4306, 20581]
+  push with xs, [51971, 42050]
+  push with xs, [57580, 28174]
+  push with xs, [5784, 56123]
+  push with xs, [19608, 41150]
+  push with xs, [12920, 59748]
+  push with xs, [40735, 38194]
+  push with xs, [57555, 37599]
+  push with xs, [54176, 13355]
+  push with xs, [35185, 61982]
+  push with xs, [6922, 29761]
+  push with xs, [19363, 13452]
+  push with xs, [50622, 28960]
+  push with xs, [50038, 13016]
+  push with xs, [57141, 40845]
+  push with xs, [39833, 12078]
+  push with xs, [58891, 28487]
+  push with xs, [4067, 61725]
+  push with xs, [58700, 55892]
+  push with xs, [7898, 55441]
+  push with xs, [52834, 31183]
+  push with xs, [52542, 32367]
+  push with xs, [5656, 45414]
+  push with xs, [64812, 7429]
+  push with xs, [33935, 53957]
+  push with xs, [63227, 8857]
+  push with xs, [62755, 62295]
+  push with xs, [42546, 30243]
+  push with xs, [37800, 13617]
+  push with xs, [22220, 52482]
+  push with xs, [44272, 33122]
+  push with xs, [23157, 60341]
+  push with xs, [28182, 13975]
+  push with xs, [35026, 29644]
+  push with xs, [56982, 25234]
+  push with xs, [33209, 18896]
+  push with xs, [19536, 36891]
+  push with xs, [29126, 22036]
+  push with xs, [59078, 51133]
+  push with xs, [12922, 5130]
+  push with xs, [17889, 53254]
+  push with xs, [50162, 31642]
+  push with xs, [51626, 21501]
+  push with xs, [25256, 3840]
+  push with xs, [47909, 49122]
+  push with xs, [13757, 54006]
+  push with xs, [28946, 26885]
+  push with xs, [45572, 546]
+  push with xs, [46795, 53116]
+  push with xs, [52598, 39979]
+  push with xs, [21265, 16064]
+  push with xs, [5696, 58323]
+  push with xs, [14507, 48480]
+  push with xs, [9543, 44528]
+  push with xs, [47672, 8348]
+  push with xs, [63302, 52854]
+  push with xs, [30639, 41413]
+  push with xs, [8309, 24672]
+  push with xs, [34251, 65102]
+  push with xs, [35560, 36312]
+  push with xs, [31402, 63920]
+  push with xs, [19705, 43646]
+  push with xs, [6472, 49756]
+  push with xs, [763, 35468]
+  push with xs, [451, 27364]
+  push with xs, [55019, 57849]
+  push with xs, [37076, 63593]
+  push with xs, [42588, 56992]
+  push with xs, [16137, 9517]
+  push with xs, [49672, 59039]
+  push with xs, [46926, 24882]
+  push with xs, [52855, 57947]
+  push with xs, [22415, 57315]
+  push with xs, [15043, 29414]
+  return xs
+end
+
+define bcryptPiP
+  let xs be []
+  push with xs, [9279, 27272]
+  push with xs, [34211, 2259]
+  push with xs, [4889, 35374]
+  push with xs, [880, 29508]
+  push with xs, [41993, 14370]
+  push with xs, [10655, 12752]
+  push with xs, [2094, 64152]
+  push with xs, [60494, 27785]
+  push with xs, [17704, 8678]
+  push with xs, [14544, 4983]
+  push with xs, [48724, 26319]
+  push with xs, [13545, 3180]
+  push with xs, [49324, 10679]
+  push with xs, [51580, 20701]
+  push with xs, [16260, 54709]
+  push with xs, [46407, 2327]
+  push with xs, [37398, 54745]
+  push with xs, [35193, 64283]
+  return xs
+end
+
+define bcryptExpand0 with tab, P, S, key, klen, L, R, f, tmp, kw
+  let pos be [0]
+  let i be 0
+  while i < 18
+    bcryptStreamWord_into with kw, key, klen, pos
+    bcryptXor32_into with tab, (P at i), (P at i), kw
+    let i be i + 1
+  end
+  put 0 into L at 0
+  put 0 into L at 1
+  put 0 into R at 0
+  put 0 into R at 1
+  let i be 0
+  while i < 18
+    bcryptEncipher with tab, L, R, P, S, f, tmp
+    bcryptCopy32_into with (P at i), L
+    let i1 be i + 1
+    bcryptCopy32_into with (P at i1), R
+    let i be i + 2
+  end
+  let i be 0
+  while i < 1024
+    bcryptEncipher with tab, L, R, P, S, f, tmp
+    bcryptCopy32_into with (S at i), L
+    let i1 be i + 1
+    bcryptCopy32_into with (S at i1), R
+    let i be i + 2
+  end
+  return 0
+end
+
+define bcryptExpandState with tab, P, S, salt, slen, key, klen, L, R, f, tmp, kw
+  let pos be [0]
+  let i be 0
+  while i < 18
+    bcryptStreamWord_into with kw, key, klen, pos
+    bcryptXor32_into with tab, (P at i), (P at i), kw
+    let i be i + 1
+  end
+  let spos be [0]
+  put 0 into L at 0
+  put 0 into L at 1
+  put 0 into R at 0
+  put 0 into R at 1
+  let i be 0
+  while i < 18
+    bcryptStreamWord_into with kw, salt, slen, spos
+    bcryptXor32_into with tab, L, L, kw
+    bcryptStreamWord_into with kw, salt, slen, spos
+    bcryptXor32_into with tab, R, R, kw
+    bcryptEncipher with tab, L, R, P, S, f, tmp
+    bcryptCopy32_into with (P at i), L
+    let i1 be i + 1
+    bcryptCopy32_into with (P at i1), R
+    let i be i + 2
+  end
+  let i be 0
+  while i < 1024
+    bcryptStreamWord_into with kw, salt, slen, spos
+    bcryptXor32_into with tab, L, L, kw
+    bcryptStreamWord_into with kw, salt, slen, spos
+    bcryptXor32_into with tab, R, R, kw
+    bcryptEncipher with tab, L, R, P, S, f, tmp
+    bcryptCopy32_into with (S at i), L
+    let i1 be i + 1
+    bcryptCopy32_into with (S at i1), R
+    let i be i + 2
+  end
+  return 0
+end
+
+define bcryptItoa64
+  return "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+end
+
+define bcryptB64Val with ch
+  let t be bcryptItoa64
+  return find with t, ch
+end
+
+define bcryptEncode with buf, n
+  let alpha be bcryptItoa64
+  let out be ""
+  let i be 0
+  while i < n
+    let c1 be buf at i
+    let i be i + 1
+    let idx be idiv with c1, 4
+    let out be out + (alpha at idx)
+    let c1 be c1 % 4
+    let c1 be c1 + c1
+    let c1 be c1 + c1
+    let c1 be c1 + c1
+    let c1 be c1 + c1
+    if i >= n
+      let out be out + (alpha at c1)
+      stop
+    end
+    let c2 be buf at i
+    let i be i + 1
+    let mix be c1 + (idiv with c2, 16)
+    let out be out + (alpha at mix)
+    let c1 be c2 % 16
+    let c1 be c1 + c1
+    let c1 be c1 + c1
+    if i >= n
+      let out be out + (alpha at c1)
+      stop
+    end
+    let c2 be buf at i
+    let i be i + 1
+    let mix be c1 + (idiv with c2, 64)
+    let out be out + (alpha at mix)
+    let out be out + (alpha at (c2 % 64))
+  end
+  return out
+end
+
+define bcryptDecode with text, nwant
+  let out be []
+  let i be 0
+  let n be length with text
+  while (length with out) < nwant
+    if i >= n
+      return ["bad", out]
+    end
+    let c1 be bcryptB64Val with (text at i)
+    let i be i + 1
+    if c1 < 0
+      return ["bad", out]
+    end
+    if i >= n
+      return ["bad", out]
+    end
+    let c2 be bcryptB64Val with (text at i)
+    let i be i + 1
+    if c2 < 0
+      return ["bad", out]
+    end
+    let b be c1 + c1
+    let b be b + b
+    let b be b + (idiv with c2, 16)
+    push with out, b
+    if (length with out) >= nwant
+      stop
+    end
+    if i >= n
+      return ["bad", out]
+    end
+    let c3 be bcryptB64Val with (text at i)
+    let i be i + 1
+    if c3 < 0
+      return ["bad", out]
+    end
+    let t be c2 % 16
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    let b be t + (idiv with c3, 4)
+    push with out, b
+    if (length with out) >= nwant
+      stop
+    end
+    if i >= n
+      return ["bad", out]
+    end
+    let c4 be bcryptB64Val with (text at i)
+    let i be i + 1
+    if c4 < 0
+      return ["bad", out]
+    end
+    let t be (c3 % 4)
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    let t be t + t
+    push with out, (t + c4)
+  end
+  return ["ok", out]
+end
+
+define bcryptPrepareKey with pw
+  let out be []
+  let n be length with pw
+  if n > 72
+    let n be 72
+  end
+  let i be 0
+  while i < n
+    push with out, (pw at i)
+    let i be i + 1
+  end
+  push with out, 0
+  return out
+end
+
+define bcryptCostText with cost
+  let tens be idiv with cost, 10
+  let ones be cost % 10
+  let d be "0123456789"
+  return (d at tens) + (d at ones)
+end
+
+define bcryptParseCost with a, b
+  let d be "0123456789"
+  let t be find with d, a
+  let o be find with d, b
+  if t < 0
+    return 0 - 1
+  end
+  if o < 0
+    return 0 - 1
+  end
+  return (t + t + t + t + t + t + t + t + t + t) + o
+end
+
+define bcrypt_hash_tab with tab, pw, cost, salt
+  if cost < 4
+    return ["bad", "bcrypt cost"]
+  end
+  if cost > 31
+    return ["bad", "bcrypt cost"]
+  end
+  let slen be length with salt
+  if slen != 16
+    return ["bad", "bcrypt salt"]
+  end
+  let key be bcryptPrepareKey with pw
+  let klen be length with key
+  let P be bcryptPiP
+  let S be bcryptPiS
+  let L be [0, 0]
+  let R be [0, 0]
+  let f be [0, 0]
+  let tmp be [0, 0]
+  let kw be [0, 0]
+  bcryptExpandState with tab, P, S, salt, 16, key, klen, L, R, f, tmp, kw
+  let rounds be 1
+  let i be 0
+  while i < cost
+    let rounds be rounds + rounds
+    let i be i + 1
+  end
+  let k be 0
+  while k < rounds
+    bcryptExpand0 with tab, P, S, key, klen, L, R, f, tmp, kw
+    bcryptExpand0 with tab, P, S, salt, 16, L, R, f, tmp, kw
+    let k be k + 1
+  end
+  let magic be [79, 114, 112, 104, 101, 97, 110, 66, 101, 104, 111, 108, 100, 101, 114, 83, 99, 114, 121, 68, 111, 117, 98, 116]
+  let c0l be [0, 0]
+  let c0r be [0, 0]
+  let c1l be [0, 0]
+  let c1r be [0, 0]
+  let c2l be [0, 0]
+  let c2r be [0, 0]
+  bcryptLoadBE_into with c0l, magic, 0
+  bcryptLoadBE_into with c0r, magic, 4
+  bcryptLoadBE_into with c1l, magic, 8
+  bcryptLoadBE_into with c1r, magic, 12
+  bcryptLoadBE_into with c2l, magic, 16
+  bcryptLoadBE_into with c2r, magic, 20
+  let k be 0
+  while k < 64
+    bcryptEncipher with tab, c0l, c0r, P, S, f, tmp
+    bcryptEncipher with tab, c1l, c1r, P, S, f, tmp
+    bcryptEncipher with tab, c2l, c2r, P, S, f, tmp
+    let k be k + 1
+  end
+  let ct be []
+  let ct be bcryptStoreBE with ct, c0l
+  let ct be bcryptStoreBE with ct, c0r
+  let ct be bcryptStoreBE with ct, c1l
+  let ct be bcryptStoreBE with ct, c1r
+  let ct be bcryptStoreBE with ct, c2l
+  let ct be bcryptStoreBE with ct, c2r
+  let prefix be "$2b$" + (bcryptCostText with cost) + "$"
+  let enc be prefix + (bcryptEncode with salt, 16) + (bcryptEncode with ct, 23)
+  return ["ok", enc]
+end
+
+define bcrypt_hash with pw, cost, salt
+  return bcrypt_hash_tab with (bcryptMakeXorTab), pw, cost, salt
+end
+
+define bcrypt_parse with setting
+  let n be length with setting
+  if n != 60
+    return ["bad", "bcrypt setting"]
+  end
+  if (setting at 0) != "$"
+    return ["bad", "bcrypt setting"]
+  end
+  if (setting at 1) != "2"
+    return ["bad", "bcrypt setting"]
+  end
+  let minor be setting at 2
+  if minor != "b"
+    if minor != "a"
+      if minor != "y"
+        return ["bad", "bcrypt setting"]
+      end
+    end
+  end
+  if (setting at 3) != "$"
+    return ["bad", "bcrypt setting"]
+  end
+  if (setting at 6) != "$"
+    return ["bad", "bcrypt setting"]
+  end
+  let cost be bcryptParseCost with (setting at 4), (setting at 5)
+  if cost < 4
+    return ["bad", "bcrypt cost"]
+  end
+  if cost > 31
+    return ["bad", "bcrypt cost"]
+  end
+  let salt22 be slice with setting, 7, 29
+  let dec be bcryptDecode with salt22, 16
+  if (dec at 0) != "ok"
+    return ["bad", "bcrypt salt"]
+  end
+  return ["ok", cost, (dec at 1), setting]
+end
+
+define bcrypt_ct_eq with left, right
+  let n be length with left
+  let m be length with right
+  let d be 0
+  if n != m
+    let d be 1
+  end
+  let lim be n
+  if m > lim
+    let lim be m
+  end
+  let i be 0
+  while i < lim
+    let a be " "
+    let b be " "
+    if i < n
+      let a be left at i
+    end
+    if i < m
+      let b be right at i
+    end
+    if a != b
+      let d be 1
+    end
+    let i be i + 1
+  end
+  if d == 0
+    return true
+  end
+  return false
+end
+
+define bcrypt_verify_tab with tab, pw, setting
+  let parsed be bcrypt_parse with setting
+  if (parsed at 0) != "ok"
+    return false
+  end
+  let cost be parsed at 1
+  let salt be parsed at 2
+  let got be bcrypt_hash_tab with tab, pw, cost, salt
+  if (got at 0) != "ok"
+    return false
+  end
+  let rec be got at 1
+  ~ Full 60-char digest walk; 2a/2y vs emitted 2b compared from '$' cost onward.
+  let left be slice with rec, 3, 60
+  let right be slice with setting, 3, 60
+  return bcrypt_ct_eq with left, right
+end
+
+define bcrypt_verify with pw, setting
+  return bcrypt_verify_tab with (bcryptMakeXorTab), pw, setting
+end

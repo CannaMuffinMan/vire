@@ -46,3 +46,30 @@ echo "$out" | grep -q "ADV exp safe equal REJECT"
 echo "$out" | grep -q "ADV exp 17 digit REJECT"
 echo "$out" | grep -q "CT eq residual not a CPU timing barrier"
 echo "crypto host prove ok"
+
+sha_pw=$(dotnet exec "$dll" tests/kdf-sha-password.vire)
+bcrypt_vec='$2b$04$......................LAtw7/ohmmBAhnXqmkuIz83Rl5Qdjhm'
+if [[ "$sha_pw" == "$bcrypt_vec" ]]; then
+  echo "SHA-256 unexpectedly equals bcrypt vector" >&2
+  exit 1
+fi
+if git show d89edb29743c580613816d19cb1e7c749bce71e6:src/rt-crypto.vire | grep -q bcrypt_; then
+  echo "base rt-crypto already has bcrypt" >&2
+  exit 1
+fi
+echo "FAIL_BEFORE at d89edb29743c580613816d19cb1e7c749bce71e6: canonical bcrypt vector does not verify (no KDF / SHA-256 $sha_pw != $bcrypt_vec)"
+
+start=$(date +%s)
+kdf=$(dotnet exec "$dll" kdf-prove.vire)
+end=$(date +%s)
+echo "$kdf"
+echo "kdf_host_sec $((end-start))"
+echo "$kdf" | grep -q "KDF PROVE pass"
+echo "$kdf" | grep -q "BCRYPT password cost4 PASS"
+echo "$kdf" | grep -q "BCRYPT empty cost4 PASS"
+echo "$kdf" | grep -q "BCRYPT utf8 cost4 PASS"
+echo "$kdf" | grep -q "BCRYPT 72-byte truncation PASS"
+echo "$kdf" | grep -q "BCRYPT wrong password REJECT"
+echo "$kdf" | grep -q "not a CPU timing barrier"
+echo "PASS_AFTER host bcrypt outputs match published \$2b\$04 vectors"
+echo "kdf host prove ok"
