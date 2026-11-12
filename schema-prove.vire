@@ -1,0 +1,116 @@
+use "src/rt-schema.vire"
+
+define proveOk with tag, got
+  if (got at 0) == "ok"
+    say tag + " PASS"
+    return 0
+  end
+  say tag + " FAIL got " + (got at 0) + " " + (got at 1)
+  return 1
+end
+
+define proveBad with tag, got, needle
+  if (got at 0) != "bad"
+    say tag + " FAIL expected reject got " + (got at 0)
+    return 1
+  end
+  let why be got at 1
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    return 1
+  end
+  say tag + " REJECT " + why
+  return 0
+end
+
+define fillText with n, ch
+  let s be ""
+  let i be 0
+  while i < n
+    let s be s + ch
+    let i be i + 1
+  end
+  return s
+end
+
+define nestArray with n
+  let raw be "0"
+  let i be 0
+  while i < n
+    let raw be "[" + raw + "]"
+    let i be i + 1
+  end
+  return raw
+end
+
+define main
+  let fails be 0
+  let health be schema_health
+  let good be schema_parse with "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}", health
+  let fails be fails + (proveOk with "HEALTH valid", good)
+
+  let badType be schema_parse with "{\"ok\":1,\"service\":\"fcgcpa\",\"payments\":false}", health
+  let fails be fails + (proveBad with "TYPE mismatch", badType, "type mismatch")
+
+  let missing be schema_parse with "{\"ok\":true,\"payments\":false}", health
+  let fails be fails + (proveBad with "MISSING required", missing, "missing required")
+
+  let extra be schema_parse with "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false,\"x\":1}", health
+  let fails be fails + (proveBad with "UNKNOWN field", extra, "unknown field")
+
+  let longName be fillText with 40, "a"
+  let longRaw be "{\"ok\":true,\"service\":\"" + longName + "\",\"payments\":false}"
+  let longGot be schema_parse with longRaw, health
+  let fails be fails + (proveBad with "OVERSIZE string", longGot, "oversize string")
+
+  let listShape be {"type": "list", "item": {"type": "number"}, "max": 8}
+  let xs be [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  let wide be schema_check with xs, listShape
+  let fails be fails + (proveBad with "OVERSIZE array", wide, "oversize array")
+
+  let deepArr be 0
+  let di be 0
+  while di < 20
+    let deepArr be [deepArr]
+    let di be di + 1
+  end
+  let deepShape be {"type": "list", "item": {"type": "number"}}
+  let deepGot be schema_check with deepArr, deepShape
+  let fails be fails + (proveBad with "ADV too-deep array", deepGot, "too-deep nesting")
+
+  let deepObj be 0
+  let di be 0
+  while di < 20
+    let deepObj be {"n": deepObj}
+    let di be di + 1
+  end
+  let anyNum be {"type": "number"}
+  let deepMapGot be schema_check with deepObj, anyNum
+  let fails be fails + (proveBad with "ADV too-deep object", deepMapGot, "too-deep nesting")
+
+  let optShape be {"type": "map", "fields": {"ok": {"type": "bool"}, "note": {"type": "text", "need": false, "max": 8}}}
+  let optGot be schema_parse with "{\"ok\":true}", optShape
+  let fails be fails + (proveOk with "OPTIONAL absent", optGot)
+
+  let rangeShape be {"type": "number", "min": 0, "max": 10}
+  let lo be schema_check with (0 - 1), rangeShape
+  let fails be fails + (proveBad with "NUMBER range", lo, "number out of range")
+  let hi be schema_check with 11, rangeShape
+  let fails be fails + (proveBad with "NUMBER high", hi, "number out of range")
+  let mid be schema_check with 5, rangeShape
+  let fails be fails + (proveOk with "NUMBER mid", mid)
+
+  let junk be schema_parse with "{not json", health
+  let fails be fails + (proveBad with "ADV bad json", junk, "json is not valid")
+
+  let twoRaw be nestArray with 2
+  let twoShape be {"type": "list", "item": {"type": "list", "item": {"type": "number"}}}
+  let lived be schema_parse with twoRaw, twoShape
+  let fails be fails + (proveOk with "DEPTH two lists", lived)
+
+  if fails == 0
+    say "SCHEMA PROVE pass"
+  else
+    say "SCHEMA PROVE fails " + (text with fails)
+  end
+end
