@@ -94,7 +94,12 @@ $healthImp = Get-PeImportNames $pe
 if ($ascii -notmatch "ws2_32.dll") { throw "PE missing ws2_32.dll" }
 if ($healthImp -notcontains "WSAStartup") { throw "health IAT missing WSAStartup" }
 if ($healthImp -contains "LoadLibraryA") { throw "health IAT has LoadLibraryA" }
+$peHex = ([System.BitConverter]::ToString($pe) -replace "-", "")
+if ($peHex -notmatch "E9F51000009090") { throw "guest PE missing hu_frame jump e9f51000009090" }
+if ($ascii -notlike "*content-length:*") { throw "guest PE missing content-length: needle" }
+if ($ascii -notlike "*transfer-encoding:*") { throw "guest PE missing transfer-encoding: needle" }
 Write-Output "health_pe_iat ws2_32.dll WSAStartup (no LoadLibraryA/GetProcAddress)"
+Write-Output "health_pe_hu_frame jump+needles present"
 
 $helloSrc = Join-Path $Data "guest-hello.vire"
 if (-not (Test-Path $helloSrc)) { Copy-Item (Join-Path $Root "guest-hello.vire") $helloSrc -Force }

@@ -5,6 +5,8 @@
 ~ CR not followed by LF, controls other than HT, and obs-fold (SP / HT after LF).
 ~ Duplicate Content-Length is 400. Transfer-Encoding is 501 (not implemented).
 ~ hu_frame re-scans field lines for those two names so prefix misses cannot smuggle.
+~ hdrend's index is the CR that ends the last field line (start of CRLFCRLF), so
+~ that last line has no LF in [0, headerEnd); hu_frame matches the leftover.
 
 define hexNibble with ch
   return find with "0123456789abcdef", ch
