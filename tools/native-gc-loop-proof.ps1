@@ -5,7 +5,8 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
 git fetch origin native-compiler
-$BaseSha = (git rev-parse origin/native-compiler).Trim()
+# Pin the pre-GC tree. origin/native-compiler is #57 (GC already present).
+$BaseSha = "7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
@@ -65,6 +66,12 @@ function Compile-Run {
 
 function Restore-RuntimeFrom {
     param([string]$Sha)
+    git cat-file -e "$Sha^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        git fetch --depth 1 origin $Sha
+        git cat-file -e "$Sha^{commit}" 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "missing commit $Sha" }
+    }
     git checkout $Sha -- src/rt.vire src/rt-more.vire data/src/rt.vire data/src/rt-more.vire compile-native.vire data/compile-native.vire
     if ($LASTEXITCODE -ne 0) { throw "checkout runtime from $Sha failed" }
 }

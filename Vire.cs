@@ -2893,7 +2893,9 @@ sealed class Program
         List<object> list = value as List<object>;
         if (list == null) throw new VireError("hex needs a list of whole numbers", line, col);
         int n = list.Count;
-        if (n > 500000) throw new VireError("out of memory", line, col);
+        // Guest lists cannot exceed 100000. Compiler mode itemCap is 1e6 so a
+        // full native image (path bind + HTTP) can hex up to that, not 500000.
+        if (n > 1000000) throw new VireError("out of memory", line, col);
         char[] chars = new char[n * 2];
         string digits = "0123456789abcdef";
         for (int i = 0; i < n; i++)
