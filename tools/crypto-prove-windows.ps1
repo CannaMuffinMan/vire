@@ -100,4 +100,56 @@ if ("$mbPeOut" -notmatch "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39
     throw "crypto-mb PE missing FIPS 1M digest"
 }
 Write-Output "crypto mb pe ok"
+
+$shaProg = Join-Path $Root "tests/kdf-sha-password.vire"
+$shaOut = (& dotnet exec $VireDll $shaProg | Out-String).Trim()
+$bcryptVec = '$2b$04$......................LAtw7/ohmmBAhnXqmkuIz83Rl5Qdjhm'
+if ($shaOut -eq $bcryptVec) { throw "SHA-256 unexpectedly equals bcrypt vector" }
+$baseCrypto = git -C $Root show d89edb29743c580613816d19cb1e7c749bce71e6:src/rt-crypto.vire
+if ($baseCrypto -match "bcrypt") { throw "base rt-crypto already has bcrypt" }
+Write-Output "FAIL_BEFORE at d89edb29743c580613816d19cb1e7c749bce71e6: canonical bcrypt vector does not verify (no KDF / SHA-256 $shaOut != $bcryptVec)"
+
+Write-Output "kdf_host_start"
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$kdfHost = & dotnet exec $VireDll kdf-prove.vire
+$kdfCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $kdfHost
+Write-Output "kdf_host_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "kdf_host_exit $kdfCode"
+if ($kdfCode -ne 0) { throw "host kdf-prove exit $kdfCode" }
+if ("$kdfHost" -notmatch "KDF PROVE pass") { throw "host kdf-prove missing pass" }
+
+$kdfLib = Get-Content -Raw (Join-Path $Root "src/rt-kdf.vire")
+$kdfProve = Get-Content -Raw (Join-Path $Root "kdf-prove.vire")
+$kdfProve = $kdfProve -replace '(?m)^use "src/rt-kdf.vire"\s*', ''
+Set-Content -Path (Join-Path $Data "kdf-prove.vire") -Value ($kdfLib + "`n" + $kdfProve) -NoNewline
+$kdfHexRel = "data/kdf-prove.hex"
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$kdfCompile = & dotnet exec $VireDll --compiler compile-native.vire data/kdf-prove.vire $kdfHexRel
+$kdfCompileCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $kdfCompile
+Write-Output "kdf_pe_compile_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "kdf_pe_compile_exit $kdfCompileCode"
+if ($kdfCompileCode -ne 0) { throw "compile-native kdf-prove exit $kdfCompileCode" }
+if ("$kdfCompile" -notmatch "compiled") { throw "compile-native kdf-prove missing compiled" }
+$kdfExe = Join-Path $Data "kdf-prove.exe"
+Convert-HexToExe (Join-Path $Root $kdfHexRel) $kdfExe
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$kdfPeOut = & $kdfExe
+$kdfPeCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $kdfPeOut
+Write-Output "kdf_pe_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "kdf_pe_exit $kdfPeCode"
+if ($kdfPeCode -ne 0) { throw "kdf PE exit $kdfPeCode" }
+$kdfHostNorm = (($kdfHost | Out-String) -replace '\r','').Trim()
+$kdfPeNorm = (($kdfPeOut | Out-String) -replace '\r','').Trim()
+if ($kdfHostNorm -ne $kdfPeNorm) {
+    Write-Output "HOST_PE_MISMATCH"
+    throw "host interpreter and gen1 PE kdf stdout differ"
+}
+Write-Output "PASS_AFTER host and gen1 PE bcrypt outputs identical"
+Write-Output "kdf host pe match"
 Write-Output "crypto windows prove ok"

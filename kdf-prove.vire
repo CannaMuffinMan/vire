@@ -1,0 +1,105 @@
+use "src/rt-kdf.vire"
+
+define proveLine with tag, got, want
+  if got == want
+    say tag + " PASS " + got
+    return 0
+  end
+  say tag + " FAIL got=" + got + " want=" + want
+  return 1
+end
+
+define fillA with n
+  let xs be []
+  let i be 0
+  while i < n
+    push with xs, 97
+    let i be i + 1
+  end
+  return xs
+end
+
+define keysEqual with a, b
+  let n be length with a
+  let m be length with b
+  if n != m
+    return false
+  end
+  let i be 0
+  while i < n
+    if (a at i) != (b at i)
+      return false
+    end
+    let i be i + 1
+  end
+  return true
+end
+
+define main
+  let fails be 0
+  let tab be bcryptMakeXorTab
+  let saltDots be bcryptDecode with "......................", 16
+  if (saltDots at 0) != "ok"
+    say "salt decode FAIL"
+    return 1
+  end
+  let salt be saltDots at 1
+
+  let pw be [112, 97, 115, 115, 119, 111, 114, 100]
+  let got be bcrypt_hash_tab with tab, pw, 4, salt
+  let recPw be got at 1
+  let nfail be proveLine with "BCRYPT password cost4", recPw, "$2b$04$......................LAtw7/ohmmBAhnXqmkuIz83Rl5Qdjhm"
+  let fails be fails + nfail
+
+  let empty be []
+  let got be bcrypt_hash_tab with tab, empty, 4, salt
+  let recEmpty be got at 1
+  let nfail be proveLine with "BCRYPT empty cost4", recEmpty, "$2b$04$......................w74bL5gU7LSJClZClCa.Pkz14aTv/XO"
+  let fails be fails + nfail
+
+  let cafe be [195, 169]
+  let got be bcrypt_hash_tab with tab, cafe, 4, salt
+  let recUtf be got at 1
+  let nfail be proveLine with "BCRYPT utf8 cost4", recUtf, "$2b$04$......................wczkLs3T24YtZ7Z/jPGiPFACdvld6Dm"
+  let fails be fails + nfail
+
+  let k72 be bcryptPrepareKey with (fillA with 72)
+  let k73 be bcryptPrepareKey with (fillA with 73)
+  if keysEqual with k72, k73
+    say "BCRYPT 72-byte truncation PASS keylen=" + (text with (length with k72))
+  else
+    say "BCRYPT 72-byte truncation FAIL"
+    let fails be fails + 1
+  end
+  let n72 be length with k72
+  if n72 != 73
+    say "BCRYPT 72-byte key+NUL FAIL"
+    let fails be fails + 1
+  else
+    say "BCRYPT 72-byte key+NUL PASS"
+  end
+
+  let same be bcrypt_ct_eq with recPw, recPw
+  if same
+    say "BCRYPT ct_eq same PASS"
+  else
+    say "BCRYPT ct_eq same FAIL"
+    let fails be fails + 1
+  end
+  let diff be bcrypt_ct_eq with recPw, recEmpty
+  if diff
+    say "BCRYPT wrong password FAIL"
+    let fails be fails + 1
+  else
+    say "BCRYPT wrong password REJECT"
+  end
+
+  say "BCRYPT cost used 4 (16 ExpandKey pairs); a fourth cost-4 hash hits the 5M cap; cost 5 ~2x and cost 10+ cannot fit"
+  say "BCRYPT ct_eq walks the full digest; not a CPU timing barrier"
+
+  if fails == 0
+    say "KDF PROVE pass"
+  else
+    say "KDF PROVE fails " + (text with fails)
+  end
+end
