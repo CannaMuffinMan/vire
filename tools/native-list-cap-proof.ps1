@@ -5,7 +5,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
 git fetch origin native-compiler
-$BaseSha = "945734de981fa82c2629ec943f05591446c76d05"
+$BaseSha = "5b10ea5fa5eea46859f17a52b36037d9d088c01d"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
