@@ -33,72 +33,56 @@ define fillText with n, ch
   return s
 end
 
-define nestArray with n
-  let raw be "0"
-  let i be 0
-  while i < n
-    let raw be "[" + raw + "]"
-    let i be i + 1
-  end
-  return raw
-end
-
 define main
   let fails be 0
   let health be schema_health
-  let good be schema_parse with "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}", health
-  let fails be fails + (proveOk with "HEALTH valid", good)
+  let good be {"ok": true, "service": "fcgcpa", "payments": false}
+  let fails be fails + (proveOk with "HEALTH valid", (schema_check with good, health))
 
-  let badType be schema_parse with "{\"ok\":1,\"service\":\"fcgcpa\",\"payments\":false}", health
-  let fails be fails + (proveBad with "TYPE mismatch", badType, "type mismatch")
+  let badType be {"ok": 1, "service": "fcgcpa", "payments": false}
+  let fails be fails + (proveBad with "TYPE mismatch", (schema_check with badType, health), "type mismatch")
 
-  let missing be schema_parse with "{\"ok\":true,\"payments\":false}", health
-  let fails be fails + (proveBad with "MISSING required", missing, "missing required")
+  let missing be {"ok": true, "payments": false}
+  let fails be fails + (proveBad with "MISSING required", (schema_check with missing, health), "missing required")
 
-  let extra be schema_parse with "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false,\"x\":1}", health
-  let fails be fails + (proveBad with "UNKNOWN field", extra, "unknown field")
+  let extra be {"ok": true, "service": "fcgcpa", "payments": false, "x": 1}
+  let fails be fails + (proveBad with "UNKNOWN field", (schema_check with extra, health), "unknown field")
 
   let longName be fillText with 40, "a"
-  let longRaw be "{\"ok\":true,\"service\":\"" + longName + "\",\"payments\":false}"
-  let longGot be schema_parse with longRaw, health
-  let fails be fails + (proveBad with "OVERSIZE string", longGot, "oversize string")
+  let longBody be {"ok": true, "service": longName, "payments": false}
+  let fails be fails + (proveBad with "OVERSIZE string", (schema_check with longBody, health), "oversize string")
 
   let listShape be {"type": "list", "item": {"type": "number"}, "max": 8}
   let xs be [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  let wide be schema_check with xs, listShape
-  let fails be fails + (proveBad with "OVERSIZE array", wide, "oversize array")
+  let fails be fails + (proveBad with "OVERSIZE array", (schema_check with xs, listShape), "oversize array")
 
   let deepArr be 0
+  let deepShape be {"type": "number"}
   let di be 0
   while di < 20
     let deepArr be [deepArr]
+    let deepShape be {"type": "list", "item": deepShape}
     let di be di + 1
   end
-  let deepShape be {"type": "list", "item": {"type": "number"}}
-  let deepGot be schema_check with deepArr, deepShape
-  let fails be fails + (proveBad with "ADV too-deep array", deepGot, "too-deep nesting")
+  let fails be fails + (proveBad with "ADV too-deep array", (schema_check with deepArr, deepShape), "too-deep nesting")
 
   let deepObj be 0
+  let deepMapShape be {"type": "number"}
   let di be 0
   while di < 20
     let deepObj be {"n": deepObj}
+    let deepMapShape be {"type": "map", "fields": {"n": deepMapShape}}
     let di be di + 1
   end
-  let anyNum be {"type": "number"}
-  let deepMapGot be schema_check with deepObj, anyNum
-  let fails be fails + (proveBad with "ADV too-deep object", deepMapGot, "too-deep nesting")
+  let fails be fails + (proveBad with "ADV too-deep object", (schema_check with deepObj, deepMapShape), "too-deep nesting")
 
   let optShape be {"type": "map", "fields": {"ok": {"type": "bool"}, "note": {"type": "text", "need": false, "max": 8}}}
-  let optGot be schema_parse with "{\"ok\":true}", optShape
-  let fails be fails + (proveOk with "OPTIONAL absent", optGot)
+  let fails be fails + (proveOk with "OPTIONAL absent", (schema_check with {"ok": true}, optShape))
 
   let rangeShape be {"type": "number", "min": 0, "max": 10}
-  let lo be schema_check with (0 - 1), rangeShape
-  let fails be fails + (proveBad with "NUMBER range", lo, "number out of range")
-  let hi be schema_check with 11, rangeShape
-  let fails be fails + (proveBad with "NUMBER high", hi, "number out of range")
-  let mid be schema_check with 5, rangeShape
-  let fails be fails + (proveOk with "NUMBER mid", mid)
+  let fails be fails + (proveBad with "NUMBER range", (schema_check with (0 - 1), rangeShape), "number out of range")
+  let fails be fails + (proveBad with "NUMBER high", (schema_check with 11, rangeShape), "number out of range")
+  let fails be fails + (proveOk with "NUMBER mid", (schema_check with 5, rangeShape))
 
   try
     parse with "{not json"
@@ -108,10 +92,12 @@ define main
     say "ADV bad json REJECT json is not valid"
   end
 
-  let twoRaw be nestArray with 2
+  let two be [[0]]
   let twoShape be {"type": "list", "item": {"type": "list", "item": {"type": "number"}}}
-  let lived be schema_parse with twoRaw, twoShape
-  let fails be fails + (proveOk with "DEPTH two lists", lived)
+  let fails be fails + (proveOk with "DEPTH two lists", (schema_check with two, twoShape))
+
+  let parsed be schema_parse with "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}", health
+  let fails be fails + (proveOk with "HEALTH json parse", parsed)
 
   if fails == 0
     say "SCHEMA PROVE pass"
