@@ -185,14 +185,22 @@ function Send-RawBytes([int]$Port, [byte[]]$Payload, [int]$WaitMs = 3000) {
     $client.Connect("127.0.0.1", $Port)
     $stream = $client.GetStream()
     $stream.Write($Payload, 0, $Payload.Length)
+    $ms = New-Object System.IO.MemoryStream
     $buf = New-Object byte[] 8192
-    $n = 0
-    try { $n = $stream.Read($buf, 0, $buf.Length) } catch { $n = 0 }
-    $client.Close()
-    if ($n -le 0) { return ,[byte[]]@() }
-    $out = New-Object byte[] $n
-    [Array]::Copy($buf, $out, $n)
-    return ,$out
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        while ($sw.ElapsedMilliseconds -lt $WaitMs) {
+            $n = 0
+            try { $n = $stream.Read($buf, 0, $buf.Length) } catch { break }
+            if ($n -le 0) { break }
+            $ms.Write($buf, 0, $n)
+            if ($ms.Length -ge 65536) { break }
+        }
+    } finally {
+        $client.Close()
+    }
+    if ($ms.Length -le 0) { return ,[byte[]]@() }
+    return ,$ms.ToArray()
 }
 
 function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
