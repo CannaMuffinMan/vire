@@ -291,12 +291,13 @@ try {
     Write-Output "redis_live_host_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
     Write-Output "redis_live_host_exit $hostLiveCode"
     if ($hostLiveCode -ne 0) { throw "host redis-live-prove exit $hostLiveCode" }
-    if ("$hostLive" -notmatch "REDIS LIVE PROVE pass") { throw "host live missing pass" }
-    if ("$hostLive" -notmatch "(?m)^PING PONG$") { throw "host missing PING PONG" }
-    if ("$hostLive" -notmatch "(?m)^SET OK$") { throw "host missing SET OK" }
-    if ("$hostLive" -notmatch "(?m)^GET hello$") { throw "host missing GET hello" }
-    if ("$hostLive" -notmatch "(?m)^INCR 1$") { throw "host missing INCR 1" }
-    if ("$hostLive" -notmatch "(?m)^GETMISS null$") { throw "host missing GETMISS null" }
+    $hostLiveNorm = (($hostLive | Out-String) -replace '\r', '').Trim()
+    if ($hostLiveNorm -notmatch "REDIS LIVE PROVE pass") { throw "host live missing pass" }
+    if ($hostLiveNorm -notmatch "(?m)^PING PONG$") { throw "host missing PING PONG" }
+    if ($hostLiveNorm -notmatch "(?m)^SET OK$") { throw "host missing SET OK" }
+    if ($hostLiveNorm -notmatch "(?m)^GET hello$") { throw "host missing GET hello" }
+    if ($hostLiveNorm -notmatch "(?m)^INCR 1$") { throw "host missing INCR 1" }
+    if ($hostLiveNorm -notmatch "(?m)^GETMISS null$") { throw "host missing GETMISS null" }
 
     Inline-Guest "redis-live-prove.vire" "data/redis-live-prove.vire"
     $liveHexRel = "data/redis-live-prove.hex"
@@ -316,7 +317,6 @@ try {
     Write-Output "redis_live_pe_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
     Write-Output "redis_live_pe_exit $peLiveCode"
     if ($peLiveCode -ne 0) { throw "redis live PE exit $peLiveCode" }
-    $hostLiveNorm = (($hostLive | Out-String) -replace '\r', '').Trim()
     $peLiveNorm = (($peLive | Out-String) -replace '\r', '').Trim()
     if ($hostLiveNorm -ne $peLiveNorm) {
         Write-Output "HOST_PE_MISMATCH live"
