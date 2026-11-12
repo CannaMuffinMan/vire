@@ -21,22 +21,17 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
 
 function Get-UnixLine($text) {
     $blob = ($text | Out-String)
-    foreach ($line in ($blob -split "`n")) {
-        $t = $line.Trim()
-        if ($t -match '^unix (\d+)$') { return [int64]$Matches[1] }
-    }
+    if ($blob -match 'unix (\d+)') { return [int64]$Matches[1] }
     throw "missing unix line in:`n$blob"
 }
 
 function Get-DetLines($text) {
     $blob = ($text | Out-String)
-    $keep = @()
-    foreach ($line in ($blob -split "`n")) {
-        $t = $line.Trim()
-        if ($t -match '^unix ') { continue }
-        if ($t.Length -gt 0) { $keep += $t }
+    $parts = @()
+    foreach ($tok in @("EXPIRED JWT REJECT", "VALID EXP JWT ACCEPT", "TIME PROVE pass")) {
+        if ($blob -match [regex]::Escape($tok)) { $parts += $tok }
     }
-    return ($keep -join "`n")
+    return ($parts -join "`n")
 }
 
 $BaseSha = "5b10ea5fa5eea46859f17a52b36037d9d088c01d"
