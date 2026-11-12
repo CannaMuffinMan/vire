@@ -140,13 +140,13 @@ define emitTcpClient with image, fixes, labels
   emitU32 with image, 65535
   emitJcc with image, fixes, 135, "conn_port"
   emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 131, 249, 9, 15, 133]
-  emitRel with image, fixes, "conn_addr"
+  emitRel with image, fixes, "conn_notloop"
   emitList with image, [129, 122, 8, 49, 50, 55, 46]
-  emitJcc with image, fixes, 133, "conn_priv"
+  emitJcc with image, fixes, 133, "conn_notloop"
   emitList with image, [129, 122, 12, 48, 46, 48, 46]
-  emitJcc with image, fixes, 133, "conn_priv"
+  emitJcc with image, fixes, 133, "conn_notloop"
   emitList with image, [128, 122, 16, 49, 15, 133]
-  emitRel with image, fixes, "conn_priv"
+  emitRel with image, fixes, "conn_notloop"
   emitCallTo with image, fixes, "rt_net_init"
   emitList with image, [185]
   emitU32 with image, 2
@@ -157,40 +157,47 @@ define emitTcpClient with image, fixes, labels
   let image be emitIat with image, fixes, "iat_sk"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "conn_fail"
-  emitList with image, [72, 137, 69, 216, 49, 192]
-  emitList with image, [72, 137, 69, 176, 72, 137, 69, 184]
-  emitList with image, [102, 199, 69, 176, 2, 0]
-  emitList with image, [139, 69, 232, 102, 193, 192, 8]
-  emitList with image, [102, 137, 69, 178]
-  emitList with image, [199, 69, 180, 127, 0, 0, 1]
+  ~ Same sockaddr layout as rt_listen (rbp-48). htons via xchg al,ah.
+  emitList with image, [72, 137, 69, 240, 72, 199, 69, 208, 0, 0, 0, 0]
+  emitList with image, [72, 199, 69, 216, 0, 0, 0, 0, 198, 69, 208, 2]
+  emitList with image, [139, 69, 232, 102, 134, 224, 102, 137, 69, 210]
+  emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
   emitList with image, [199, 69, 168]
   emitU32 with image, 5000
-  emitList with image, [72, 139, 77, 216, 186]
+  emitList with image, [72, 139, 77, 240, 186]
   emitU32 with image, 65535
   emitList with image, [65, 184]
   emitU32 with image, 4102
   emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
   emitU32 with image, 4
   let image be emitIat with image, fixes, "iat_ss"
-  emitList with image, [72, 139, 77, 216, 186]
+  emitList with image, [72, 139, 77, 240, 186]
   emitU32 with image, 65535
   emitList with image, [65, 184]
   emitU32 with image, 4101
   emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
   emitU32 with image, 4
   let image be emitIat with image, fixes, "iat_ss"
-  emitList with image, [72, 139, 77, 216, 72, 141, 85, 176, 65, 184]
+  emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
   emitU32 with image, 16
   let image be emitIat with image, fixes, "iat_cn"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "conn_close"
-  emitList with image, [72, 139, 85, 216]
+  emitList with image, [72, 139, 85, 240]
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "conn_close", image
-  emitList with image, [72, 139, 77, 216]
+  emitList with image, [72, 139, 77, 240]
   let image be emitIat with image, fixes, "iat_cs"
   emitJmpTo with image, fixes, "conn_fail"
+  pin with labels, "conn_notloop", image
+  emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [15, 182, 66, 8, 131, 248, 48, 15, 130]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [131, 248, 57, 15, 135]
+  emitRel with image, fixes, "conn_addr"
+  emitJmpTo with image, fixes, "conn_priv"
   pin with labels, "conn_host", image
   emitFail with image, fixes, "msg_conn_host"
   pin with labels, "conn_port", image
@@ -216,16 +223,16 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [72, 137, 85, 248, 76, 137, 77, 240]
   emitList with image, [73, 139, 1, 72, 137, 69, 232]
   emitList with image, [73, 141, 65, 8, 72, 137, 69, 224]
-  pin with labels, "send_loop", image
+  pin with labels, "tcp_tx_loop", image
   emitList with image, [72, 139, 69, 232, 72, 133, 192, 15, 132]
-  emitRel with image, fixes, "send_done"
+  emitRel with image, fixes, "tcp_tx_done"
   emitList with image, [72, 139, 77, 248, 72, 139, 85, 224, 76, 139, 192, 69, 49, 201]
   let image be emitIat with image, fixes, "iat_sd"
   emitList with image, [133, 192, 15, 142]
   emitRel with image, fixes, "send_fail"
   emitList with image, [72, 99, 200, 72, 1, 77, 224, 72, 41, 77, 232, 233]
-  emitRel with image, fixes, "send_loop"
-  pin with labels, "send_done", image
+  emitRel with image, fixes, "tcp_tx_loop"
+  pin with labels, "tcp_tx_done", image
   emitList with image, [72, 139, 85, 240, 72, 139, 18]
   emitPushTag with image, 1
   emitEpi with image

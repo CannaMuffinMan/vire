@@ -1,16 +1,6 @@
 define main
-  let port be number with (args at 0)
-  let h be connect with "127.0.0.1", port
-  send with h, "ping"
-  let got be recv with h, 16
-  close with h
-  say got
-  try
-    connect with "127.0.0.1", 9
-    say "refused-port-missed"
-  miss problem
-    say "refused-port"
-  end
+  say "hi"
+  let port be PORT_PLACEHOLDER
   try
     connect with "10.0.0.1", 80
     say "private-missed"
@@ -22,6 +12,17 @@ define main
     say "linklocal-missed"
   miss problem
     say problem
+  end
+  let h be connect with "127.0.0.1", port
+  send with h, "ping"
+  let got be recv with h, 16
+  close with h
+  say got
+  try
+    connect with "127.0.0.1", 9
+    say "refused-port-missed"
+  miss problem
+    say "refused-port"
   end
   let h2 be connect with "127.0.0.1", port
   send with h2, "ok"

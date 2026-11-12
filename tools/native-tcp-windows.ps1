@@ -115,7 +115,10 @@ $echoFix = New-Object VireTcpEcho
 $port = $echoFix.Start()
 Write-Output "echo_listen 127.0.0.1:$port"
 
-Copy-Item (Join-Path $Root "tests/native/tcp-client.vire") (Join-Path $Data "tcp-client.vire") -Force
+$guest = [System.IO.File]::ReadAllText((Join-Path $Root "tests/native/tcp-client.vire"))
+if ($guest -notmatch "PORT_PLACEHOLDER") { throw "tcp-client.vire missing PORT_PLACEHOLDER" }
+$guest = $guest.Replace("PORT_PLACEHOLDER", [string]$port)
+[System.IO.File]::WriteAllText((Join-Path $Data "tcp-client.vire"), $guest)
 $portText = [string]$port
 
 Write-Output "tcp_host_start"
@@ -128,6 +131,7 @@ Write-Output "tcp_host_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
 Write-Output "tcp_host_exit $hostCode"
 if ($hostCode -ne 0) { throw "host tcp-client exit $hostCode" }
 $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
+if ($hostNorm -notmatch "(?m)^hi$") { throw "host missing hi" }
 if ($hostNorm -notmatch "(?m)^ping$") { throw "host missing ping echo" }
 if ($hostNorm -notmatch "refused-port") { throw "host missing refused-port" }
 if ($hostNorm -notmatch "connect stays off this machine and private networks") {
