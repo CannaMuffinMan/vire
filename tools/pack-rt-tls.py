@@ -220,15 +220,20 @@ def emit_load(a: Asm) -> None:
     a.call_iat("iat_ach")
     a.raw(0x85, 0xC0)
     a.jcc(0x85, "die_ach")
-    for off in (SCRATCH, ENC, PLAIN):
-        a.raw(0xB9)
-        a.u32(32768)
-        a.call("rt_alloc")
-        a.raw(0x48, 0x85, 0xC0)
-        a.jcc(0x84, "die_tls")
-        a.lea("rcx", "tls_state")
-        a.raw(0x48, 0x89, 0x81)
-        a.u32(off)
+    # Byte buffers live in PE BSS, not the GC heap. rt_alloc objects are
+    # unmarked from tls_state, so the first client alloc compacted them.
+    a.lea("rax", "tls_scratch")
+    a.lea("rcx", "tls_state")
+    a.raw(0x48, 0x89, 0x81)
+    a.u32(SCRATCH)
+    a.lea("rax", "tls_enc")
+    a.lea("rcx", "tls_state")
+    a.raw(0x48, 0x89, 0x81)
+    a.u32(ENC)
+    a.lea("rax", "tls_plain")
+    a.lea("rcx", "tls_state")
+    a.raw(0x48, 0x89, 0x81)
+    a.u32(PLAIN)
     a.lea("rcx", "tls_state")
     a.raw(0xC7, 0x81)
     a.u32(ENCCAP)
@@ -410,7 +415,8 @@ def emit_hs(a: Asm) -> None:
     a.raw(0x48, 0x8B, 0x55, 0xB8)
     a.raw(0x44, 0x8B, 0x45, 0xB0)
     a.call("rt_net_sendall")
-    a.raw(0x48, 0x8B, 0x4D, 0xB8)
+    a.raw(0x48, 0x8B, 0x4D, 0xB8, 0x48, 0x85, 0xC9)
+    a.ljcc(0x84, "hs_nosend")
     a.call_iat("iat_fcb")
     a.pin("hs_nosend")
     a.raw(0x8B, 0x45, 0xEC, 0x85, 0xC0)
@@ -450,6 +456,8 @@ def emit_hs(a: Asm) -> None:
     a.raw(0x49, 0x81, 0xC0)
     a.u32(SIZES)
     a.call_iat("iat_qca")
+    a.raw(0x85, 0xC0)
+    a.ljcc(0x85, "hs_fail")
     a.raw(0xB8, 1, 0, 0, 0)
     a.epi()
     a.pin("hs_fail")
@@ -525,7 +533,7 @@ def emit_recv(a: Asm) -> None:
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0x8D, 0x89)
     a.u32(CTX)
-    a.raw(0x31, 0xD2, 0x4C, 0x8D, 0x45, 0x80, 0x45, 0x31, 0xC9)
+    a.raw(0x31, 0xD2, 0x4C, 0x8D, 0x45, 0x80, 0x4C, 0x8D, 0x4D, 0x7C)
     a.call_iat("iat_dec")
     a.raw(0x3D)
     a.u32(SEC_E_INCOMPLETE)
@@ -638,7 +646,7 @@ def emit_send(a: Asm) -> None:
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0x8D, 0x89)
     a.u32(CTX)
-    a.raw(0x31, 0xD2, 0x4C, 0x8D, 0x45, 0x80, 0x45, 0x31, 0xC9)
+    a.raw(0x31, 0xD2, 0x4C, 0x8D, 0x45, 0x80, 0x4C, 0x8D, 0x4D, 0x7C)
     a.call_iat("iat_enc")
     a.raw(0x85, 0xC0)
     a.jcc(0x85, "send_err")
@@ -701,6 +709,7 @@ NAMES = [
     "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
     "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state",
+    "tls_scratch", "tls_enc", "tls_plain",
     "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_cos", "iat_cfd", "iat_ach", "iat_asc", "iat_fcb",
     "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd",
     "msg_tls_b64", "msg_tls_cert", "msg_tls_prov", "msg_tls_key", "msg_tls_prop", "msg_tls_ach",
