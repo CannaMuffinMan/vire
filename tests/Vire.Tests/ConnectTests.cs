@@ -93,7 +93,7 @@ public class ConnectTests
         Assert.Contains("127.0.0.1", src);
         string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
         Assert.Contains("nm == \"connect\"", native);
-        Assert.Contains("or nm == \"close\"", native);
+        Assert.Contains("nm == \"close\"", native);
     }
 
     static string Diff(DualMode.DualRun run)

@@ -51,7 +51,8 @@ if ($LASTEXITCODE -ne 0) {
 $oldNative = git show "${BaseSha}:compile-native.vire"
 if ($oldNative -match 'nm == "connect"') { throw "base compile-native already has connect" }
 $oldSrc = Join-Path $Root "compile-native-fail-before.vire"
-Set-Content -Path $oldSrc -Value $oldNative -NoNewline
+$utf8 = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($oldSrc, $oldNative.Replace("`r`n", "`n"), $utf8)
 Set-Content -Path (Join-Path $Data "tcp-fail-before.vire") -Value "define main`n  connect with `"127.0.0.1`", 9`nend`n"
 $probeHex = Join-Path $Data "tcp-fail-before.hex"
 if (Test-Path $probeHex) { Remove-Item -Force $probeHex }

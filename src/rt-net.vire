@@ -141,11 +141,9 @@ define emitTcpClient with image, fixes, labels
   emitJcc with image, fixes, 135, "conn_port"
   emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 131, 249, 9, 15, 133]
   emitRel with image, fixes, "conn_addr"
-  emitList with image, [129, 122, 8]
-  emitU32 with image, 775705137
+  emitList with image, [129, 122, 8, 49, 50, 55, 46]
   emitJcc with image, fixes, 133, "conn_priv"
-  emitList with image, [129, 122, 12]
-  emitU32 with image, 775701040
+  emitList with image, [129, 122, 12, 48, 46, 48, 46]
   emitJcc with image, fixes, 133, "conn_priv"
   emitList with image, [128, 122, 16, 49, 15, 133]
   emitRel with image, fixes, "conn_priv"
@@ -159,8 +157,12 @@ define emitTcpClient with image, fixes, labels
   let image be emitIat with image, fixes, "iat_sk"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "conn_fail"
-  emitList with image, [72, 137, 69, 216, 49, 192, 72, 137, 69, 176, 72, 137, 69, 184, 102, 199, 69, 176, 2, 0, 139, 69, 232, 102, 193, 192, 8, 102, 137, 69, 178, 199, 69, 180]
-  emitU32 with image, 16777343
+  emitList with image, [72, 137, 69, 216, 49, 192]
+  emitList with image, [72, 137, 69, 176, 72, 137, 69, 184]
+  emitList with image, [102, 199, 69, 176, 2, 0]
+  emitList with image, [139, 69, 232, 102, 193, 192, 8]
+  emitList with image, [102, 137, 69, 178]
+  emitList with image, [199, 69, 180, 127, 0, 0, 1]
   emitList with image, [199, 69, 168]
   emitU32 with image, 5000
   emitList with image, [72, 139, 77, 216, 186]
@@ -211,7 +213,9 @@ define emitTcpClient with image, fixes, labels
   emitRel with image, fixes, "send_closed"
   emitList with image, [72, 131, 250, 255, 15, 132]
   emitRel with image, fixes, "send_closed"
-  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240, 73, 139, 1, 72, 137, 69, 232, 73, 141, 65, 8, 72, 137, 69, 224]
+  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240]
+  emitList with image, [73, 139, 1, 72, 137, 69, 232]
+  emitList with image, [73, 141, 65, 8, 72, 137, 69, 224]
   pin with labels, "send_loop", image
   emitList with image, [72, 139, 69, 232, 72, 133, 192, 15, 132]
   emitRel with image, fixes, "send_done"
@@ -254,7 +258,8 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [76, 137, 77, 232, 139, 77, 232, 72, 131, 193, 9]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
-  emitList with image, [72, 137, 69, 224, 72, 139, 77, 248, 72, 141, 80, 8, 44, 139, 69, 232, 69, 49, 201]
+  emitList with image, [72, 137, 69, 224, 72, 139, 77, 248]
+  emitList with image, [72, 141, 80, 8, 44, 139, 69, 232, 69, 49, 201]
   let image be emitIat with image, fixes, "iat_rv"
   emitList with image, [133, 192, 15, 136]
   emitRel with image, fixes, "recv_fail"
