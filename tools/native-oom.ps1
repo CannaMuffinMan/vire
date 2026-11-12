@@ -1,6 +1,6 @@
 # Fail-closed native heap checks. A list that outgrows the 32MB bump arena,
-# and a read that cannot fit the remaining arena (800000-byte blob under the
-# 1_000_000 byte cap), must print "out of memory" and exit 1 instead of
+# and repeated 800000-byte reads (under the 1_000_000 byte cap) that exhaust
+# the remaining arena, must print "out of memory" and exit 1 instead of
 # writing RX .text or past VirtualAlloc.
 # Fail-before (native-windows job 131039507932, SHAs 7c7c8ea3 and c8ec7712):
 #   FAIL oom-read exit=1 got=crash rip=00000001400051f7
