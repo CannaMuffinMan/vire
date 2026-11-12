@@ -23,7 +23,7 @@ public class NativeNetTests
         string tlsBlob = File.ReadAllText(Path.Combine(root, "src", "rt-tls-blob.txt")).Trim();
         Assert.Contains("4c8d88", tlsBlob);
         Assert.DoesNotContain("4c8b88", tlsBlob);
-        Assert.Contains("c745c4", tlsBlob);
+        Assert.Contains("c745a8", tlsBlob);
         Assert.Contains("msg_tls_ach", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);

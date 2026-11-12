@@ -204,15 +204,16 @@ def emit_load(a: Asm) -> None:
     a.raw(0x48, 0x8D, 0x4D, 0x80, 0x31, 0xC0, 0xB2, 0x50)
     a.pin("zero_cred")
     a.raw(0x88, 0x01, 0x48, 0xFF, 0xC1, 0xFE, 0xCA, 0x75, 0xF7)
-    # SCH_CREDENTIALS v5 x64: cCreds@8, paCred@16, dwFlags@52.
+    # SCH_CREDENTIALS v5 x64 pack8: dwVersion@0, dwCredFormat@4, cCreds@8,
+    # pad@12, paCred@16, dwFlags@40.
     a.raw(0xC7, 0x45, 0x80, SCH_CREDENTIALS_VERSION, 0, 0, 0)
     a.raw(0xC7, 0x45, 0x88, 1, 0, 0, 0)
     a.lea("rax", "tls_state")
     a.raw(0x48, 0x8D, 0x80)
     a.u32(CERT)
     a.raw(0x48, 0x89, 0x45, 0x90)
-    a.raw(0xC7, 0x45, 0xB4)
-    a.u32(SCH_FLAGS)
+    a.raw(0xC7, 0x45, 0xA8)
+    a.u32(0)
     a.raw(0x31, 0xC9)
     a.lea("rdx", "txt_unisp")
     a.raw(0x41, 0xB8, 1, 0, 0, 0, 0x45, 0x31, 0xC9)
@@ -255,11 +256,21 @@ def emit_load(a: Asm) -> None:
         ("die_prov", "msg_tls_prov"),
         ("die_key", "msg_tls_key"),
         ("die_prop", "msg_tls_prop"),
-        ("die_ach", "msg_tls_ach"),
     ):
         a.pin(name)
         a.lea("rcx", msg)
         a.call("rt_fail")
+    a.pin("die_ach")
+    a.raw(0x89, 0xC6)
+    a.lea("rax", "msg_tls_ach")
+    a.raw(0x48, 0x8D, 0x78, 16)
+    a.lea("r8", "txt_hex")
+    a.raw(0xB9, 8, 0, 0, 0)
+    a.pin("ach_hex")
+    a.raw(0xC1, 0xC6, 4, 0x89, 0xF0, 0x83, 0xE0, 15)
+    a.raw(0x41, 0x8A, 0x04, 0x00, 0xAA, 0xE2, 0xF1)
+    a.lea("rcx", "msg_tls_ach")
+    a.call("rt_fail")
 
 
 def emit_b64(a: Asm) -> None:
@@ -673,7 +684,8 @@ def emit_strings(a: Asm) -> None:
     vz("msg_tls_prov", "tls ncrypt provider failed")
     vz("msg_tls_key", "tls pkcs8 import failed")
     vz("msg_tls_prop", "tls cert key property failed")
-    vz("msg_tls_ach", "tls acquire credentials failed")
+    vz("msg_tls_ach", "tls ach 00000000")
+    z("txt_hex", "0123456789abcdef")
 
 
 NAMES = [
@@ -690,6 +702,7 @@ NAMES = [
     "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd",
     "msg_tls_b64", "msg_tls_cert", "msg_tls_prov", "msg_tls_key", "msg_tls_prop", "msg_tls_ach",
     "die_tls", "die_b64", "die_cert", "die_prov", "die_key", "die_prop", "die_ach",
+    "ach_hex", "txt_hex",
 ]
 
 
