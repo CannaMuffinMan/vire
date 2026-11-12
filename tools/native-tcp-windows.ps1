@@ -132,6 +132,7 @@ Write-Output "tcp_host_exit $hostCode"
 if ($hostCode -ne 0) { throw "host tcp-client exit $hostCode" }
 $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
 if ($hostNorm -notmatch "(?m)^hi$") { throw "host missing hi" }
+if ($hostNorm -notmatch "(?m)^up$") { throw "host missing up" }
 if ($hostNorm -notmatch "(?m)^ping$") { throw "host missing ping echo" }
 if ($hostNorm -notmatch "refused-port") { throw "host missing refused-port" }
 if ($hostNorm -notmatch "connect stays off this machine and private networks") {

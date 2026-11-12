@@ -14,6 +14,7 @@ define main
     say problem
   end
   let h be connect with "127.0.0.1", port
+  say "up"
   send with h, "ping"
   let got be recv with h, 16
   close with h
