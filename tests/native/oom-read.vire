@@ -1,4 +1,16 @@
 define main
+  let held be []
+  let n be 0
+  while n < 31
+    let piece be "x"
+    let i be 0
+    while i < 20
+      let piece be piece + piece
+      let i be i + 1
+    end
+    let held be push with held, (piece + (text with n))
+    let n be n + 1
+  end
   let body be read with "data/oom-blob.bin"
   say "ok"
 end
