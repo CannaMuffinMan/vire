@@ -4,8 +4,8 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
-git fetch origin native-compiler
-$BaseSha = (git rev-parse origin/native-compiler).Trim()
+$BaseSha = "7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867"
+git fetch --depth 1 origin $BaseSha
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"

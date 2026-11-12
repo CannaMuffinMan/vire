@@ -78,8 +78,6 @@ function Ensure-Commit {
     param([string]$Sha)
     git cat-file -e "$Sha^{commit}" 2>$null
     if ($LASTEXITCODE -eq 0) { return }
-    git fetch --depth 50 origin native-compiler
-    git fetch --depth 50 origin cursor/native-gc-loop-budget-d4e3
     git fetch --depth 1 origin $Sha
     git cat-file -e "$Sha^{commit}" 2>$null
     if ($LASTEXITCODE -ne 0) { throw "missing commit $Sha" }
