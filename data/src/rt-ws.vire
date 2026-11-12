@@ -332,8 +332,8 @@ define ws_parse_frame with buf
       return ["bad", "ctl-len"]
     end
   end
-  let need be extra + 4 + plen
-  if n < need
+  let taken be extra + 4 + plen
+  if n < taken
     return ["bad", "short"]
   end
   let key be [buf at extra, buf at (extra + 1), buf at (extra + 2), buf at (extra + 3)]
@@ -349,7 +349,7 @@ define ws_parse_frame with buf
       return ["bad", "utf8"]
     end
   end
-  return ["ok", {"fin": fin, "op": op, "payload": body, "need": need}]
+  return ["ok", {"fin": fin, "op": op, "payload": body, "taken": taken}]
 end
 
 define ws_write_frame with fin, op, payload
