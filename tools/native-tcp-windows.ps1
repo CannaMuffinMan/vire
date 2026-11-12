@@ -10,7 +10,7 @@ $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$BaseSha = "d89edb29743c580613816d19cb1e7c749bce71e6"
+$BaseSha = "945734de981fa82c2629ec943f05591446c76d05"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
