@@ -84,6 +84,7 @@ sealed class CompiledMachine
     int nextLeft = 16;
     internal int ListenPort;
     VireThreadTable threads = new VireThreadTable();
+    VireTcpTable tcp = new VireTcpTable();
     const int MaxItems = 100000;
     const int MaxText = 1000000;
 
@@ -973,6 +974,26 @@ sealed class CompiledMachine
             int port = Machine.RequirePort(args[0], line);
             VireListen.WithCancel(port, line, root, DispatchRoute, Show, p => ListenPort = p);
             return null;
+        }
+        if (name == "connect")
+        {
+            if (args.Count != 2) throw new VireError("connect takes 2 values, got " + args.Count, line, col);
+            return VireNet.ConnectHost(args[0] as string, args[1], tcp, line, col);
+        }
+        if (name == "send")
+        {
+            if (args.Count != 2) throw new VireError("send takes 2 values, got " + args.Count, line, col);
+            return VireNet.SendAll(args[0], args[1], tcp, line, col);
+        }
+        if (name == "recv")
+        {
+            if (args.Count != 2) throw new VireError("recv takes 2 values, got " + args.Count, line, col);
+            return VireNet.RecvBound(args[0], args[1], tcp, line, col);
+        }
+        if (name == "close")
+        {
+            if (args.Count != 1) throw new VireError("close takes 1 values, got " + args.Count, line, col);
+            return VireNet.CloseHandle(args[0], tcp, line, col);
         }
         if (name == "line")
         {

@@ -372,6 +372,7 @@ sealed class Machine
     int watchLine;
     internal int ListenPort;
     VireThreadTable threads = new VireThreadTable();
+    VireTcpTable tcp = new VireTcpTable();
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
@@ -380,6 +381,7 @@ sealed class Machine
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "connect", "send", "recv", "close",
         "start", "wait", "result"
     });
 
@@ -629,7 +631,7 @@ sealed class Machine
                 throw new VireError("start takes a definition name and at most one value", line, col);
             need = args.Count;
         }
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv") need = 2;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -744,6 +746,10 @@ sealed class Machine
             throw new HaltSignal((int)args[0]);
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
+        if (name == "connect") return VireNet.ConnectHost(args[0] as string, args[1], tcp, line, col);
+        if (name == "send") return VireNet.SendAll(args[0], args[1], tcp, line, col);
+        if (name == "recv") return VireNet.RecvBound(args[0], args[1], tcp, line, col);
+        if (name == "close") return VireNet.CloseHandle(args[0], tcp, line, col);
         if (name == "kind") return KindOf(args[0]);
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);

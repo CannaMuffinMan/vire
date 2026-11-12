@@ -198,10 +198,10 @@ define openNetImage
   let kilt be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_st", "ilt_fp", "ilt_gt"]
   let kiat be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_st", "iat_fp", "iat_gt"]
   let khint be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_st", "hint_fp", "hint_gt"]
-  let ws be ["WSAStartup", "socket", "bind", "listen", "accept", "recv", "send", "closesocket", "setsockopt", "getsockname"]
-  let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn"]
-  let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn"]
-  let whint be ["hint_wsa", "hint_sk", "hint_bd", "hint_ln", "hint_ac", "hint_rv", "hint_sd", "hint_cs", "hint_ss", "hint_gn"]
+  let ws be ["WSAStartup", "socket", "bind", "listen", "accept", "recv", "send", "closesocket", "setsockopt", "getsockname", "connect"]
+  let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn", "ilt_cn"]
+  let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn", "iat_cn"]
+  let whint be ["hint_wsa", "hint_sk", "hint_bd", "hint_ln", "hint_ac", "hint_rv", "hint_sd", "hint_cs", "hint_ss", "hint_gn", "hint_cn"]
   let i be 0
   while i < (length with k32)
     pin with labels, (kilt at i), image

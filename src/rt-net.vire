@@ -67,7 +67,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return image
+    return (emitTcpClient with image, fixes, labels)
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -105,8 +105,191 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
   parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
   parkMsg with image, labels, "msg_json", "json is not valid"
+  parkMsg with image, labels, "msg_conn_priv", "connect stays off this machine and private networks"
+  parkMsg with image, labels, "msg_conn_addr", "that address is not allowed"
+  parkMsg with image, labels, "msg_conn_port", "connect needs a port from 1 to 65535"
+  parkMsg with image, labels, "msg_conn_host", "connect needs a host and a port"
+  parkMsg with image, labels, "msg_conn_fail", "could not connect"
+  parkMsg with image, labels, "msg_send_bad", "send needs a connection and text"
+  parkMsg with image, labels, "msg_recv_bad", "recv needs a connection and a size"
+  parkMsg with image, labels, "msg_conn_closed", "that connection is closed"
   pin with labels, "ws2_ready", image
   emitU64 with image, 0
+  pin with labels, "tcp_socks", image
+  emitU64 with image, 0
+  return image
+end
+
+define emitIat with image, fixes, name
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, name
+  return image
+end
+
+define emitTcpClient with image, fixes, labels
+  ~ Guest connect/send/recv/close. Loopback 127.0.0.1 only. No TLS. Check
+  ~ the IPv4 literal before socket+connect. Recv cap 1000000.
+  ~ WSAStartup via rt_net_init (same as listen). Send via rt_net_sendall.
+  ~ Host still applies 5s send/recv timeouts; native send uses rt_net_sendall.
+  pin with labels, "rt_connect", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 137, 85, 248, 76, 137, 77, 232, 72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "conn_host"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "conn_host"
+  emitList with image, [77, 133, 201, 15, 142]
+  emitRel with image, fixes, "conn_port"
+  emitList with image, [73, 129, 249]
+  emitU32 with image, 65535
+  emitJcc with image, fixes, 135, "conn_port"
+  emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 131, 249, 9, 15, 133]
+  emitRel with image, fixes, "conn_notloop"
+  emitList with image, [129, 122, 8, 49, 50, 55, 46]
+  emitJcc with image, fixes, 133, "conn_notloop"
+  emitList with image, [129, 122, 12, 48, 46, 48, 46]
+  emitJcc with image, fixes, 133, "conn_notloop"
+  emitList with image, [128, 122, 16, 49, 15, 133]
+  emitRel with image, fixes, "conn_notloop"
+  emitCallTo with image, fixes, "rt_net_init"
+  emitList with image, [185]
+  emitU32 with image, 2
+  emitList with image, [186]
+  emitU32 with image, 1
+  emitList with image, [65, 184]
+  emitU32 with image, 6
+  let image be emitIat with image, fixes, "iat_sk"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "conn_fail"
+  ~ Same sockaddr layout as rt_listen (rbp-48). htons via xchg al,ah.
+  emitList with image, [72, 137, 69, 240, 72, 199, 69, 208, 0, 0, 0, 0]
+  emitList with image, [72, 199, 69, 216, 0, 0, 0, 0, 198, 69, 208, 2]
+  emitList with image, [139, 69, 232, 102, 134, 224, 102, 137, 69, 210]
+  emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
+  emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
+  emitU32 with image, 16
+  let image be emitIat with image, fixes, "iat_cn"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "conn_close"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 139, 85, 240, 72, 137, 17, 186]
+  emitU32 with image, 1
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "conn_close", image
+  emitList with image, [72, 139, 77, 240]
+  let image be emitIat with image, fixes, "iat_cs"
+  emitJmpTo with image, fixes, "conn_fail"
+  pin with labels, "conn_notloop", image
+  emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [15, 182, 66, 8, 131, 248, 48, 15, 130]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [131, 248, 57, 15, 135]
+  emitRel with image, fixes, "conn_addr"
+  emitJmpTo with image, fixes, "conn_priv"
+  pin with labels, "conn_host", image
+  emitFail with image, fixes, "msg_conn_host"
+  pin with labels, "conn_port", image
+  emitFail with image, fixes, "msg_conn_port"
+  pin with labels, "conn_addr", image
+  emitFail with image, fixes, "msg_conn_addr"
+  pin with labels, "conn_priv", image
+  emitFail with image, fixes, "msg_conn_priv"
+  pin with labels, "conn_fail", image
+  emitFail with image, fixes, "msg_conn_fail"
+
+  pin with labels, "rt_send", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "send_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "send_bad"
+  emitList with image, [72, 131, 250, 1, 15, 133]
+  emitRel with image, fixes, "send_closed"
+  emitList with image, [76, 137, 77, 240]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "send_closed"
+  emitList with image, [72, 131, 249, 255, 15, 132]
+  emitRel with image, fixes, "send_closed"
+  emitList with image, [72, 139, 85, 240, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "send_fail"
+  emitList with image, [72, 139, 85, 240, 72, 139, 18]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "send_fail", image
+  emitFail with image, fixes, "msg_conn_fail"
+  pin with labels, "send_bad", image
+  emitFail with image, fixes, "msg_send_bad"
+  pin with labels, "send_closed", image
+  emitFail with image, fixes, "msg_conn_closed"
+
+  pin with labels, "rt_recv", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "recv_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "recv_bad"
+  emitList with image, [72, 131, 250, 1, 15, 133]
+  emitRel with image, fixes, "recv_closed"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "recv_closed"
+  emitList with image, [72, 131, 249, 255, 15, 132]
+  emitRel with image, fixes, "recv_closed"
+  emitList with image, [72, 137, 77, 248, 77, 133, 201, 15, 136]
+  emitRel with image, fixes, "recv_bad"
+  emitList with image, [73, 129, 249]
+  emitU32 with image, 1000000
+  emitJcc with image, fixes, 134, "recv_cap"
+  emitList with image, [73, 199, 193]
+  emitU32 with image, 1000000
+  pin with labels, "recv_cap", image
+  emitList with image, [76, 137, 77, 232, 139, 77, 232, 72, 131, 193, 16, 15, 130]
+  emitRel with image, fixes, "recv_bad"
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 139, 77, 248, 72, 141, 80, 8, 139, 69, 232, 76, 99, 192, 69, 49, 201]
+  let image be emitIat with image, fixes, "iat_rv"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "recv_fail"
+  emitList with image, [72, 139, 85, 224, 72, 99, 200, 72, 137, 10, 198, 68, 10, 8, 0]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "recv_fail", image
+  emitFail with image, fixes, "msg_conn_fail"
+  pin with labels, "recv_bad", image
+  emitFail with image, fixes, "msg_recv_bad"
+  pin with labels, "recv_closed", image
+  emitFail with image, fixes, "msg_conn_closed"
+
+  pin with labels, "rt_close", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "close_bad"
+  emitList with image, [72, 131, 250, 1, 15, 133]
+  emitRel with image, fixes, "close_bad"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "close_bad"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 199, 2, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_cs"
+  emitCallTo with image, fixes, "rt_push_none"
+  emitEpi with image
+  pin with labels, "close_bad", image
+  emitFail with image, fixes, "msg_conn_closed"
   return image
 end
 

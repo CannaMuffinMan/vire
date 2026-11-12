@@ -33,8 +33,11 @@ public class NativeNetTests
         Assert.Contains("use \"src/rt-net.vire\"", native);
         Assert.Contains("nm == \"json\"", native);
         Assert.Contains("nm == \"listen\"", native);
+        Assert.Contains("nm == \"connect\"", native);
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        Assert.Contains("iat_cn", pe);
+        Assert.Contains("\"connect\"", pe);
         Assert.Contains("openNetImage", pe);
         Assert.Contains("let buf be emitU8 with buf, (codeOf with (raw at i))", pe);
         Assert.DoesNotContain("let buf be emitU8 with buf, (ord with (raw at i))", pe);
