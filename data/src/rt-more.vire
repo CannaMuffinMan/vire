@@ -1872,7 +1872,7 @@ define emitMore with image, fixes, labels
   emitList with image, [76, 139, 69, 248, 76, 139, 77, 240, 76, 137, 192, 76, 137, 202]
   emitCallTo with image, fixes, "rt_to_text"
   emitList with image, [72, 137, 85, 224, 72, 139, 2, 72, 129, 248]
-  emitU32 with image, 1000000
+  emitU32 with image, 2000000
   emitJcc with image, fixes, 135, "write_big"
   emitList with image, [72, 139, 77, 232, 72, 141, 73, 8, 186]
   emitU32 with image, 1073741824
@@ -2062,7 +2062,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "hex_bad"
   pin with labels, "hex_ready", image
   emitList with image, [72, 139, 10, 72, 137, 77, 240, 72, 137, 200, 72, 209, 224, 72, 61]
-  emitU32 with image, 1000000
+  emitU32 with image, 2000000
   emitJcc with image, fixes, 135, "hex_big"
   emitList with image, [72, 141, 72, 16]
   emitCallTo with image, fixes, "rt_alloc"

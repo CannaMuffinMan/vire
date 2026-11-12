@@ -335,6 +335,7 @@ sealed class Machine
     const int MaxItems = 100000;
     int itemCap = 100000;
     const int MaxText = 1000000;
+    int textCap = MaxText;
     internal Budget budget = new Budget();
     List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
@@ -402,6 +403,7 @@ sealed class Machine
     public void UseCompilerLimits()
     {
         itemCap = 1000000;
+        textCap = 2000000;
         compilerProgress = true;
         compilerBeatMs = Environment.TickCount64;
     }
@@ -677,8 +679,9 @@ sealed class Machine
         if (name == "write")
         {
             string path = SafePath(args[0], line, col);
-            string text = Show(args[1]);
-            if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
+            string text = args[1] as string;
+            if (text == null) text = Show(args[1]);
+            if (text.Length > textCap) throw new VireError("text is too large to write", line, col);
             VirePaths.RefuseProgram(path, line, col);
             try
             {
@@ -1084,8 +1087,9 @@ sealed class Machine
         {
             string path = SafePath(args[0], line, col);
             VirePaths.RefuseProgram(path, line, col);
-            string text = Show(args[1]);
-            if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
+            string text = args[1] as string;
+            if (text == null) text = Show(args[1]);
+            if (text.Length > textCap) throw new VireError("text is too large to write", line, col);
             try { VirePaths.AppendAllTextInside(path, text, root, line, col); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
