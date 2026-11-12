@@ -63,7 +63,7 @@ public class NativeNetTests
             string srcRel = ("data/native-net/" + Path.GetFileName(work) + "/guest-health.vire").Replace('\\', '/');
             string hexRel = ("data/native-net/" + Path.GetFileName(work) + "/guest-health.hex").Replace('\\', '/');
             DualMode.Proc compiled = DualMode.RunVire(root, new string[] { "compile-native.vire", srcRel, hexRel }, root);
-            Assert.Equal(0, compiled.Code);
+            Assert.True(compiled.Code == 0, DualMode.Norm(compiled.Out + " " + compiled.Err));
             Assert.Contains("compiled", DualMode.Norm(compiled.Out));
             byte[] pe = HexToPe(root, hexRel);
             string ascii = Encoding.ASCII.GetString(pe);
