@@ -23,6 +23,20 @@ public class NativeArenaTests
         Assert.DoesNotContain("268435456", pe);
         Assert.Equal(5000000, Program.ProgramStepCap);
         Assert.Contains("2000000", more);
+        Assert.Contains("pin with labels, \"rt_gc\", image", more);
+        Assert.Contains("pin with labels, \"rt_note_wait\", image", more);
+        Assert.Contains("33554432", more);
+    }
+
+    [Fact]
+    public void NativeGcAndWaitCellsStayInTheImageData()
+    {
+        string rt = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt.vire"));
+        Assert.Contains("pin with labels, \"gc_busy\", image", rt);
+        Assert.Contains("pin with labels, \"wait_cell\", image", rt);
+        string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
+        Assert.Contains("nm == \"args\" or nm == \"ticks\"", native);
+        Assert.DoesNotContain("MaxCalls", File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire")));
     }
 
     [Fact]
@@ -100,5 +114,7 @@ public class NativeArenaTests
         Assert.DoesNotContain("96MB", proof);
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.DoesNotContain("native-selfhost-proof.ps1", yml);
+        Assert.Contains("native-oom.ps1", yml);
+        Assert.DoesNotContain("continue-on-error: true", yml);
     }
 }

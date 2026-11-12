@@ -1220,7 +1220,7 @@ define emitBoolAcc with gen
 end
 
 define builtinArity with nm
-  if nm == "args"
+  if nm == "args" or nm == "ticks"
     return 0
   end
   if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8"
@@ -1246,6 +1246,7 @@ end
 define parkCounters with image, labels, counters
   ~ Must run after parkRuntime so these u64 slots land in .data (RW).
   ~ while/for save trap_sp here; RX .text makes that ACCESS_VIOLATION.
+  ~ String pool has the same rule: path_walk used to write NULs into literals.
   let i be 0
   let n be length with counters
   while i < n
@@ -1313,6 +1314,10 @@ define emitExpr with gen, funcs, func, expr
     end
     if nm == "bytes"
       emitCall with gen, "rt_bytes"
+      return true
+    end
+    if nm == "ticks"
+      emitCall with gen, "rt_ticks"
       return true
     end
     let found be findFunc with funcs, nm
@@ -1703,8 +1708,9 @@ define main
     say "compile failed"
     halt with 1
   end
-  put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
+  ~ Pool strings must follow frame_base so they land in RW .data, not RX .text.
+  put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")

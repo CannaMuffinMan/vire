@@ -683,6 +683,10 @@ define parkRuntime with image, labels
   let image be emitU64 with image, 0
   pin with labels, "heap_cell", image
   let image be emitU64 with image, 0
+  pin with labels, "gc_busy", image
+  let image be emitU64 with image, 0
+  pin with labels, "wait_cell", image
+  let image be emitU64 with image, 0
   pin with labels, "crash_rip_msg", image
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 114, 105, 112, 61]
   pin with labels, "crash_path", image

@@ -1,0 +1,14 @@
+define main
+  let i be 0
+  let keep be [7]
+  while i < 8000
+    let junk be []
+    let k be 0
+    while k < 200
+      let junk be push with junk, k
+      let k be k + 1
+    end
+    let i be i + 1
+  end
+  say (keep at 0)
+end

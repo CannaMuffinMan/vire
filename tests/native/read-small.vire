@@ -1,0 +1,4 @@
+define main
+  let body be read with "data/oom-blob.bin"
+  say (length with body)
+end
