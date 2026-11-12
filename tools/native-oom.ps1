@@ -74,15 +74,23 @@ function Restore-NativeFrom {
     if ($LASTEXITCODE -ne 0) { throw "checkout native sources from $Sha failed" }
 }
 
+function Ensure-Commit {
+    param([string]$Sha)
+    git cat-file -e "$Sha^{commit}" 2>$null
+    if ($LASTEXITCODE -eq 0) { return }
+    git fetch --depth 50 origin native-compiler
+    git fetch --depth 50 origin cursor/native-gc-loop-budget-d4e3
+    git fetch --depth 1 origin $Sha
+    git cat-file -e "$Sha^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "missing commit $Sha" }
+}
+
 $AfterSha = (git rev-parse HEAD).Trim()
 $FailShas = @("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", "c8ec7712ab7d7f081c70cf4028098f0c70744421")
 
 Write-Output "phase fail-before"
 foreach ($sha in $FailShas) {
-    git rev-parse --verify "$sha^{commit}" 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        git fetch origin native-compiler
-    }
+    Ensure-Commit $sha
     Restore-NativeFrom $sha
     $before = Run-Exe (Compile-Native "oom-read-before-$sha" (Join-Path $Root "tests/native/read-small.vire"))
     Write-Output "fail_before_sha $sha exit=$($before.Exit) out=$($before.Out)"
