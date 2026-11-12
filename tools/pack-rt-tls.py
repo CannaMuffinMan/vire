@@ -10,7 +10,7 @@ SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
 ON, CRED, CTX, CTXSET, CERT = 0, 8, 24, 40, 48
 SIZES, ENC, ENCLEN, ENCCAP = 56, 80, 88, 96
 PLAIN, PLEN, POFF, SCRATCH = 104, 112, 120, 128
-NPROV, NKEY, SOCK, ATTR, EXPIRY = 136, 144, 152, 160, 168
+NPROV, NKEY, SOCK, ATTR, EXPIRY, KPI = 136, 144, 152, 160, 168, 176
 
 ASC_REQ = 0x0001001C
 SEC_I_CONTINUE = 0x00090312
@@ -19,9 +19,14 @@ SEC_I_COMPLETE_NEEDED = 0x00090313
 SEC_I_COMPLETE_AND_CONTINUE = 0x00090314
 # SCH_USE_STRONG_CRYPTO | SCH_CRED_NO_SYSTEM_MAPPER (server inbound).
 SCH_FLAGS = 0x00400002
-SCH_CREDENTIALS_VERSION = 5
+SCHANNEL_CRED_VERSION = 4
 CERT_NCRYPT_KEY = 78
+CERT_KEY_PROV_INFO = 2
+CERT_NCRYPT_KEY_SPEC = 0xFFFFFFFF
 CRYPT_STRING_BASE64 = 1
+NCRYPTBUFFER_PKCS_KEYNAME = 45
+NCRYPT_SILENT_OVERWRITE = 0x000000C0
+SP_PROT_TLS12_13_SERVER = 0x00004400
 
 
 class Asm:
@@ -133,7 +138,7 @@ def emit_https(a: Asm) -> None:
 
 def emit_load(a: Asm) -> None:
     a.pin("rt_tls_load")
-    a.pro()
+    a.pro(0x160)
     a.raw(0x48, 0x89, 0x4D, 0xF8, 0x48, 0x89, 0x55, 0xF0)
     a.call("rt_net_init")
     a.raw(0x49, 0xC7, 0x45, 0x00, 2, 0, 0, 0)
@@ -181,14 +186,35 @@ def emit_load(a: Asm) -> None:
     a.u32(NPROV)
     a.raw(0x48, 0x31, 0xD2)
     a.lea("r8", "txt_pkcs8")
-    a.raw(0x45, 0x31, 0xC9)
+    a.raw(0xC7, 0x85)
+    a.u32(0xFFFFFF40)
+    a.u32(16)
+    a.raw(0xC7, 0x85)
+    a.u32(0xFFFFFF44)
+    a.u32(NCRYPTBUFFER_PKCS_KEYNAME)
+    a.lea("rax", "txt_keyname")
+    a.raw(0x48, 0x89, 0x85)
+    a.u32(0xFFFFFF48)
+    a.raw(0xC7, 0x85)
+    a.u32(0xFFFFFF30)
+    a.u32(0)
+    a.raw(0xC7, 0x85)
+    a.u32(0xFFFFFF34)
+    a.u32(1)
+    a.raw(0x48, 0x8D, 0x85)
+    a.u32(0xFFFFFF40)
+    a.raw(0x48, 0x89, 0x85)
+    a.u32(0xFFFFFF38)
+    a.raw(0x4C, 0x8D, 0x8D)
+    a.u32(0xFFFFFF30)
     a.lea("rax", "tls_state")
     a.raw(0x48, 0x8D, 0x80)
     a.u32(NKEY)
     a.raw(0x48, 0x89, 0x44, 0x24, 0x20)
     a.raw(0x48, 0x8B, 0x45, 0xC0, 0x48, 0x89, 0x44, 0x24, 0x28)
     a.raw(0x48, 0x8B, 0x45, 0xB8, 0x48, 0x89, 0x44, 0x24, 0x30)
-    a.raw(0x48, 0xC7, 0x44, 0x24, 0x38, 0x40, 0, 0, 0)
+    a.raw(0x48, 0xC7, 0x44, 0x24, 0x38)
+    a.u32(NCRYPT_SILENT_OVERWRITE)
     a.call_iat("iat_nik")
     a.raw(0x85, 0xC0)
     a.jcc(0x85, "die_key")
@@ -201,19 +227,41 @@ def emit_load(a: Asm) -> None:
     a.call_iat("iat_csc")
     a.raw(0x85, 0xC0)
     a.jcc(0x84, "die_prop")
+    a.lea("rax", "txt_keyname")
+    a.lea("rcx", "tls_state")
+    a.raw(0x48, 0x89, 0x81)
+    a.u32(KPI)
+    a.lea("rax", "txt_mskey")
+    a.lea("rcx", "tls_state")
+    a.raw(0x48, 0x89, 0x81)
+    a.u32(KPI + 8)
+    a.lea("rcx", "tls_state")
+    a.raw(0xC7, 0x81)
+    a.u32(KPI + 40)
+    a.u32(CERT_NCRYPT_KEY_SPEC)
+    a.raw(0x48, 0x8B, 0x4D, 0xC8, 0xBA)
+    a.u32(CERT_KEY_PROV_INFO)
+    a.raw(0x45, 0x31, 0xC0)
+    a.lea("rax", "tls_state")
+    a.raw(0x4C, 0x8D, 0x88)
+    a.u32(KPI)
+    a.call_iat("iat_csc")
+    a.raw(0x85, 0xC0)
+    a.jcc(0x84, "die_prop")
     a.raw(0x48, 0x8D, 0x4D, 0x80, 0x31, 0xC0, 0xB2, 0x50)
     a.pin("zero_cred")
     a.raw(0x88, 0x01, 0x48, 0xFF, 0xC1, 0xFE, 0xCA, 0x75, 0xF7)
-    # SCH_CREDENTIALS v5 x64 pack8: dwVersion@0, dwCredFormat@4, cCreds@8,
-    # pad@12, paCred@16, dwFlags@40.
-    a.raw(0xC7, 0x45, 0x80, SCH_CREDENTIALS_VERSION, 0, 0, 0)
-    a.raw(0xC7, 0x45, 0x88, 1, 0, 0, 0)
+    # SCHANNEL_CRED v4 x64: cCreds@4, paCred@8, grbit@56, dwFlags@72.
+    a.raw(0xC7, 0x45, 0x80, SCHANNEL_CRED_VERSION, 0, 0, 0)
+    a.raw(0xC7, 0x45, 0x84, 1, 0, 0, 0)
     a.lea("rax", "tls_state")
     a.raw(0x48, 0x8D, 0x80)
     a.u32(CERT)
-    a.raw(0x48, 0x89, 0x45, 0x90)
-    a.raw(0xC7, 0x45, 0xA8)
-    a.u32(0)
+    a.raw(0x48, 0x89, 0x45, 0x88)
+    a.raw(0xC7, 0x45, 0xB8)
+    a.u32(SP_PROT_TLS12_13_SERVER)
+    a.raw(0xC7, 0x45, 0xC8)
+    a.u32(SCH_FLAGS)
     a.raw(0x31, 0xC9)
     a.lea("rdx", "txt_unisp")
     a.raw(0x41, 0xB8, 1, 0, 0, 0, 0x45, 0x31, 0xC9)
@@ -677,6 +725,7 @@ def emit_strings(a: Asm) -> None:
     z("txt_unisp", "Microsoft Unified Security Protocol Provider")
     wz("txt_mskey", "Microsoft Software Key Storage Provider")
     wz("txt_pkcs8", "PKCS8_PRIVATEKEY")
+    wz("txt_keyname", "viretls")
     vz("msg_tls", "tls setup failed")
     vz("msg_https", "https needs a port, cert path, and key path")
     vz("msg_tls_b64", "tls pem decode failed")
@@ -695,7 +744,7 @@ NAMES = [
     "hs_ok", "hs_fail", "rt_tls_recv", "recv_have", "recv_min", "recv_need",
     "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err",
     "rt_tls_send", "send_fit", "send_raw", "send_err", "txt_unisp",
-    "txt_mskey", "txt_pkcs8", "msg_tls", "msg_https", "rt_listen", "rt_fail",
+    "txt_mskey", "txt_pkcs8", "txt_keyname", "msg_tls", "msg_https", "rt_listen", "rt_fail",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
     "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state",
     "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_ach", "iat_asc",
