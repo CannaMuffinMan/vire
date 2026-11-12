@@ -322,7 +322,15 @@ def emit_serve(a: Asm) -> None:
     a.u32(0)
     a.call("rt_tls_hs")
     a.raw(0x48, 0x85, 0xC0)
-    a.jcc(0x84, "serve_done")
+    a.jcc(0x84, "serve_hsfail")
+    a.lea("rcx", "msg_hs_ok")
+    a.call("rt_say")
+    a.ljmp("serve_go")
+    a.pin("serve_hsfail")
+    a.lea("rcx", "msg_hs_fail")
+    a.call("rt_say")
+    a.ljmp("serve_done")
+    a.pin("serve_go")
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0xC7, 0x01, 1, 0, 0, 0)
     a.raw(0x48, 0x8B, 0x4D, 0xF8)
@@ -574,11 +582,16 @@ def emit_recv(a: Asm) -> None:
     a.ljcc(0x84, "recv_sock")
     a.raw(0x85, 0xC0)
     a.ljcc(0x84, "recv_plain")
-    a.lea("rax", "tls_state")
-    a.raw(0x48, 0xC7, 0x80)
-    a.u32(ENCLEN)
-    a.u32(0)
-    a.ljmp("recv_need")
+    a.raw(0x89, 0xC6)
+    a.lea("rax", "msg_tls_dec")
+    a.raw(0x48, 0x8D, 0x78, 16)
+    a.lea("r8", "txt_hex")
+    a.raw(0xB9, 8, 0, 0, 0)
+    a.raw(0xC1, 0xC6, 4, 0x89, 0xF0, 0x83, 0xE0, 15)
+    a.raw(0x41, 0x8A, 0x04, 0x00, 0xAA, 0xE2, 0xF1)
+    a.lea("rcx", "msg_tls_dec")
+    a.call("rt_say")
+    a.ljmp("recv_err")
     a.pin("recv_plain")
     a.raw(0x8B, 0x45, 0xA4, 0x83, 0xF8, 1)
     a.ljcc(0x84, "recv_b1")
@@ -730,6 +743,9 @@ def emit_strings(a: Asm) -> None:
     vz("msg_tls_key", "tls pkcs8 import failed")
     vz("msg_tls_prop", "tls cert key property failed")
     vz("msg_tls_ach", "tls ach 00000000")
+    vz("msg_tls_dec", "tls_dec 00000000")
+    vz("msg_hs_ok", "tls_handshake_ok")
+    vz("msg_hs_fail", "tls_handshake_fail")
     z("txt_hex", "0123456789abcdef")
 
 
@@ -741,13 +757,14 @@ NAMES = [
     "recv_plain", "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err",
     "recv_try", "recv_sock",
     "rt_tls_send", "send_fit", "send_raw", "send_err", "txt_unisp",
-    "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail",
+    "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail", "rt_say",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
     "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state",
     "tls_scratch", "tls_enc", "tls_plain",
     "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_cos", "iat_cfd", "iat_ach", "iat_asc", "iat_fcb",
     "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd",
     "msg_tls_b64", "msg_tls_cert", "msg_tls_prov", "msg_tls_key", "msg_tls_prop", "msg_tls_ach",
+    "msg_tls_dec", "msg_hs_ok", "msg_hs_fail", "serve_hsfail", "serve_go",
     "die_tls", "die_b64", "die_cert", "die_prov", "die_key", "die_prop", "die_ach",
     "ach_hex", "txt_hex",
 ]
