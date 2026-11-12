@@ -29,6 +29,10 @@ public class ListenSecurityTests
             byte[] ok = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: x\r\nX-Foo: bar\r\nSet-Cookie: stolen\r\n\r\n");
             Assert.False(HttpWire.HeaderBytesUnsafe(ok, HttpWire.HeaderEnd(ok, ok.Length)));
             Assert.Equal(0, HttpWire.ParseComplete(ok, ok.Length).Status);
+            byte[] xte = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: x\r\nX-Transfer-Encoding: opaque\r\n\r\n");
+            Assert.Equal(0, HttpWire.ParseComplete(xte, xte.Length).Status);
+            byte[] note = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: x\r\nX-Note: content-length: foo content-length: bar\r\n\r\n");
+            Assert.Equal(0, HttpWire.ParseComplete(note, note.Length).Status);
         }
     }
 

@@ -4,8 +4,9 @@
 ~ returns unsafe (client answers 400 and closes) for NUL, bare LF, lone CR,
 ~ CR not followed by LF, controls other than HT, and obs-fold (SP / HT after LF).
 ~ Duplicate Content-Length is 400. Transfer-Encoding is 501 (not implemented).
-~ hu_frame sliding-window scans [0, headerEnd) for those names (ci) so a last
-~ field line whose CR is headerEnd itself cannot skip the count.
+~ hu_frame counts those names only at field-line starts (after the request-line
+~ LF). The last field has no LF; headerEnd is its CR. Substrings in values or
+~ X-Transfer-Encoding do not count.
 
 define hexNibble with ch
   return find with "0123456789abcdef", ch

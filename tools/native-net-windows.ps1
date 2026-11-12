@@ -208,19 +208,45 @@ function Write-AdversaryWire([string]$Name, [byte[]]$Request, [byte[]]$Response)
     Write-Host ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
 }
 
+function Test-Http11Framing([string]$Name, [byte[]]$Response, [string]$WantStatus) {
+    $prefix = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 $WantStatus ")
+    if ($Response.Length -lt $prefix.Length) {
+        throw ("{0} expected {1}, got empty/short {2}" -f $Name, $WantStatus, $Response.Length)
+    }
+    for ($i = 0; $i -lt $prefix.Length; $i++) {
+        if ($Response[$i] -ne $prefix[$i]) {
+            throw ("{0} expected {1}, got {2}" -f $Name, $WantStatus, (Convert-BytesToAscii $Response))
+        }
+    }
+    $crlf = 0
+    $sawEnd = $false
+    for ($i = 0; $i -lt $Response.Length; $i++) {
+        if ($Response[$i] -eq 13) {
+            if (($i + 1) -ge $Response.Length -or $Response[$i + 1] -ne 10) {
+                throw "$Name response has CR not followed by LF"
+            }
+            if ($i -gt 0 -and $Response[$i - 1] -eq 10) { $sawEnd = $true }
+            $crlf++
+            $i++
+        } elseif ($Response[$i] -eq 10) {
+            throw "$Name response has bare LF"
+        }
+    }
+    if ($crlf -lt 2 -or -not $sawEnd) { throw "$Name response missing CRLFCRLF terminator" }
+    $ascii = [System.Text.Encoding]::ASCII.GetString($Response)
+    if ($ascii -notmatch "(?i)connection:\s*close") { throw "$Name missing Connection: close" }
+}
+
 function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantStatus) {
     $resp = Send-RawBytes $port $Request
     Write-AdversaryWire $Name $Request $resp
-    $text = Convert-BytesToAscii $resp
-    $prefix = "HTTP/1.1 $WantStatus "
-    if ($text.Length -lt $prefix.Length -or $text.Substring(0, $prefix.Length) -cne $prefix) {
-        throw ("{0} expected {1}, got {2}" -f $Name, $WantStatus, $text)
-    }
-    if ($text -notmatch "(?i)connection:\s*close") { throw "$Name missing Connection: close" }
-    return $text
+    Test-Http11Framing $Name $resp $WantStatus
+    return (Convert-BytesToAscii $resp)
 }
 
-$health = Send-Raw $port "GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+$healthReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$healthBytes = Send-RawBytes $port $healthReq
+$health = Convert-BytesToAscii $healthBytes
 if (-not $health) {
     $curl = & curl.exe -s -S -D - --max-time 5 "http://127.0.0.1:$port/health" 2>&1 | Out-String
     Write-Output "health_curl_exe $curl"
@@ -240,6 +266,7 @@ function Get-JsonBody([string]$Raw) {
     return $Matches[1].Trim()
 }
 $want = '{"ok":true,"service":"fcgcpa","payments":false}'
+Test-Http11Framing "health" $healthBytes "200"
 if ($health -notmatch "HTTP/1.1 200 ") { throw "health status not 200" }
 if ($health -notmatch "(?i)content-type:\s*application/json") { throw "health content-type not application/json" }
 $healthBody = Get-JsonBody $health
@@ -250,8 +277,11 @@ Write-Output "contract_health_content_type application/json"
 Write-Output "contract_health_body $healthBody"
 Write-Output "contract_source fcgcpa-prod main 5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4 inventory (unauth GET /health and GET /api/health) plus in-tree api/fcgcpa.vire body fields; this token cannot re-open the private Node handler"
 
-$apiHealth = Send-Raw $port "GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+$apiReq = [System.Text.Encoding]::ASCII.GetBytes("GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$apiBytes = Send-RawBytes $port $apiReq
+$apiHealth = Convert-BytesToAscii $apiBytes
 Write-Output "api_health_curl_result $apiHealth"
+Test-Http11Framing "api_health" $apiBytes "200"
 if ($apiHealth -notmatch "HTTP/1.1 200 ") { throw "api/health status not 200" }
 if ($apiHealth -notmatch "(?i)content-type:\s*application/json") { throw "api/health content-type not application/json" }
 $apiBody = Get-JsonBody $apiHealth
@@ -290,6 +320,11 @@ if ($injectBody -cne $want) { throw "crlf_request_header body $injectBody" }
 [void](Assert-AdversaryStatus "obs_fold" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`n folded`r`n`r`n")) "400")
 [void](Assert-AdversaryStatus "dup_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nContent-Length: 0`r`nContent-Length: 5`r`n`r`nhello")) "400")
 [void](Assert-AdversaryStatus "te_and_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nTransfer-Encoding: chunked`r`nContent-Length: 5`r`n`r`nhello")) "501")
+# Framing names only count as field names, not substrings in other fields.
+$xTe = Assert-AdversaryStatus "x_transfer_encoding" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Transfer-Encoding: opaque`r`n`r`n")) "200"
+if ((Get-JsonBody $xTe) -cne $want) { throw "x_transfer_encoding body" }
+$clNote = Assert-AdversaryStatus "content_length_in_value" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Note: content-length: foo content-length: bar`r`n`r`n")) "200"
+if ((Get-JsonBody $clNote) -cne $want) { throw "content_length_in_value body" }
 
 $partial = $null
 $c = New-Object System.Net.Sockets.TcpClient
