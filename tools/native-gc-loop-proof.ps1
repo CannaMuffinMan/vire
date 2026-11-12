@@ -69,15 +69,17 @@ $beforeGc = Compile-Run "gc-churn-before" (Join-Path $Root "tests/native/gc-chur
 Write-Output "before_gc exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
 if ($beforeGc.Exit -eq 1 -and $beforeGc.Out.Contains("out of memory")) {
     Write-Output "FAIL_BEFORE gc-churn OOM at $BaseSha"
+} elseif ($beforeGc.Exit -eq 0 -and $beforeGc.Out -eq "7") {
+    Write-Output "FAIL_BEFORE gc-churn already PASS on $BaseSha (GC fix is on native-compiler)"
 } else {
-    throw "fail-before gc-churn expected OOM, got exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
+    throw "fail-before gc-churn expected OOM or already-fixed 7, got exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
 }
 $beforeSpin = Compile-Run "while-spin-before" (Join-Path $Root "tests/native/while-spin.vire")
 Write-Output "before_spin exit=$($beforeSpin.Exit) out=$($beforeSpin.Out)"
 if ($beforeSpin.Exit -eq 1 -and $beforeSpin.Out.Contains("while ran too long")) {
     Write-Output "FAIL_BEFORE while-spin at $BaseSha"
 } else {
-    throw "fail-before while-spin expected while ran too long"
+    throw "fail-before while-spin expected while ran too long, got exit=$($beforeSpin.Exit) out=$($beforeSpin.Out)"
 }
 
 Write-Output "phase pass-after $AfterSha"

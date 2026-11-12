@@ -61,7 +61,9 @@ define netNames
 end
 
 define tlsNames
-  return ["rt_https", "https_bad", "https_tlsfail", "rt_tls_load", "load_fail", "zero_cred", "rt_tls_b64", "b64_fail", "rt_tls_serve", "serve_done", "rt_tls_hs", "hs_loop", "hs_accept", "hs_first", "hs_ctx", "hs_nosend", "hs_cont", "hs_ok", "hs_fail", "rt_tls_recv", "recv_have", "recv_min", "recv_need", "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err", "rt_tls_send", "send_fit", "send_raw", "send_err", "txt_unisp", "txt_mskey", "txt_pkcs8", "msg_tls", "msg_https", "rt_listen", "rt_fail", "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client", "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state", "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_ach", "iat_asc", "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd"]
+  let raw be replace with (read with "data/src/rt-tls-names.txt"), "\n", ""
+  let raw be replace with raw, "\r", ""
+  return split with raw, ","
 end
 
 define remapTlsFixes with fixes, base

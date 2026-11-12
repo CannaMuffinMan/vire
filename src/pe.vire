@@ -202,113 +202,6 @@ define openNetImage
   let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn"]
   let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn"]
   let whint be ["hint_wsa", "hint_sk", "hint_bd", "hint_ln", "hint_ac", "hint_rv", "hint_sd", "hint_cs", "hint_ss", "hint_gn"]
-  let i be 0
-  while i < (length with k32)
-    pin with labels, (kilt at i), image
-    let image be emitU64 with image, 0
-    let i be i + 1
-  end
-  let image be emitU64 with image, 0
-  let i be 0
-  while i < (length with ws)
-    pin with labels, (wilt at i), image
-    let image be emitU64 with image, 0
-    let i be i + 1
-  end
-  let image be emitU64 with image, 0
-  let i be 0
-  while i < (length with kiat)
-    pin with labels, (kiat at i), image
-    let image be emitU64 with image, 0
-    let i be i + 1
-  end
-  let image be emitU64 with image, 0
-  let i be 0
-  while i < (length with wiat)
-    pin with labels, (wiat at i), image
-    let image be emitU64 with image, 0
-    let i be i + 1
-  end
-  let image be emitU64 with image, 0
-  pin with labels, "desc", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_ws", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_end", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "dll", image
-  let image be emitStr with image, "kernel32.dll"
-  let image be alignTo with image, 2
-  pin with labels, "dll_ws", image
-  let image be emitStr with image, "ws2_32.dll"
-  let image be alignTo with image, 2
-  let i be 0
-  while i < (length with khint)
-    pin with labels, (khint at i), image
-    let image be emitU8 with image, 0
-    let image be emitU8 with image, 0
-    let image be emitStr with image, (k32 at i)
-    let image be alignTo with image, 2
-    let i be i + 1
-  end
-  let i be 0
-  while i < (length with whint)
-    pin with labels, (whint at i), image
-    let image be emitU8 with image, 0
-    let image be emitU8 with image, 0
-    let image be emitStr with image, (ws at i)
-    let image be alignTo with image, 2
-    let i be i + 1
-  end
-  let image be alignTo with image, 16
-  let image be alignTo with image, 4096
-  let image be emitRuntime with image, fixes, labels
-  let hints be []
-  let ilts be []
-  let iats be []
-  let i be 0
-  while i < (length with khint)
-    push with hints, (khint at i)
-    push with ilts, (kilt at i)
-    push with iats, (kiat at i)
-    let i be i + 1
-  end
-  let i be 0
-  while i < (length with whint)
-    push with hints, (whint at i)
-    push with ilts, (wilt at i)
-    push with iats, (wiat at i)
-    let i be i + 1
-  end
-  return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats, "impSize": 60, "net": true}
-end
-
-define openTlsImage
-  ~ IAT_TLS: kernel32 + ws2_32 + crypt32 + secur32 + ncrypt. Schannel server only.
-  ~ No LoadLibraryA, no GetProcAddress, no CreateProcess.
-  let image be bytes
-  let labels be {}
-  let fixes be []
-  let k32 be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetTickCount"]
-  let kilt be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_gt"]
-  let kiat be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_gt"]
-  let khint be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_gt"]
-  let ws be ["WSAStartup", "socket", "bind", "listen", "accept", "recv", "send", "closesocket", "setsockopt", "getsockname"]
-  let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn"]
-  let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn"]
-  let whint be ["hint_wsa", "hint_sk", "hint_bd", "hint_ln", "hint_ac", "hint_rv", "hint_sd", "hint_cs", "hint_ss", "hint_gn"]
   let c32 be ["CryptStringToBinaryA", "CertCreateCertificateContext", "CertSetCertificateContextProperty", "CertFreeCertificateContext"]
   let cilt be ["ilt_c2b", "ilt_ccc", "ilt_csc", "ilt_cfc"]
   let ciat be ["iat_c2b", "iat_ccc", "iat_csc", "iat_cfc"]
@@ -321,72 +214,22 @@ define openTlsImage
   let nilt be ["ilt_nop", "ilt_nik", "ilt_nfo"]
   let niat be ["iat_nop", "iat_nik", "iat_nfo"]
   let nhint be ["hint_nop", "hint_nik", "hint_nfo"]
-  let groups be [k32, ws, c32, sec, nc]
-  let gilts be [kilt, wilt, cilt, silt, nilt]
-  let giats be [kiat, wiat, ciat, siat, niat]
-  let ghints be [khint, whint, chint, shint, nhint]
-  let g be 0
-  while g < (length with groups)
-    let names be groups at g
-    let ilts be gilts at g
-    let i be 0
-    while i < (length with names)
-      pin with labels, (ilts at i), image
-      let image be emitU64 with image, 0
-      let i be i + 1
-    end
-    let image be emitU64 with image, 0
-    let g be g + 1
-  end
-  let g be 0
-  while g < (length with groups)
-    let names be groups at g
-    let iats be giats at g
-    let i be 0
-    while i < (length with names)
-      pin with labels, (iats at i), image
-      let image be emitU64 with image, 0
-      let i be i + 1
-    end
-    let image be emitU64 with image, 0
-    let g be g + 1
-  end
-  pin with labels, "desc", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_ws", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_c32", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_sec", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_nc", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
-  pin with labels, "desc_end", image
-  let i be 0
-  while i < 5
-    let image be emitU32 with image, 0
-    let i be i + 1
-  end
+  let image be emitThunks with image, labels, kilt
+  let image be emitThunks with image, labels, wilt
+  let image be emitThunks with image, labels, cilt
+  let image be emitThunks with image, labels, silt
+  let image be emitThunks with image, labels, nilt
+  let image be emitThunks with image, labels, kiat
+  let image be emitThunks with image, labels, wiat
+  let image be emitThunks with image, labels, ciat
+  let image be emitThunks with image, labels, siat
+  let image be emitThunks with image, labels, niat
+  let image be emitDesc with image, labels, "desc"
+  let image be emitDesc with image, labels, "desc_ws"
+  let image be emitDesc with image, labels, "desc_c32"
+  let image be emitDesc with image, labels, "desc_sec"
+  let image be emitDesc with image, labels, "desc_nc"
+  let image be emitDesc with image, labels, "desc_end"
   pin with labels, "dll", image
   let image be emitStr with image, "kernel32.dll"
   let image be alignTo with image, 2
@@ -402,42 +245,76 @@ define openTlsImage
   pin with labels, "dll_nc", image
   let image be emitStr with image, "ncrypt.dll"
   let image be alignTo with image, 2
-  let g be 0
-  while g < (length with groups)
-    let names be groups at g
-    let hints be ghints at g
-    let i be 0
-    while i < (length with names)
-      pin with labels, (hints at i), image
-      let image be emitU8 with image, 0
-      let image be emitU8 with image, 0
-      let image be emitStr with image, (names at i)
-      let image be alignTo with image, 2
-      let i be i + 1
-    end
-    let g be g + 1
-  end
+  let image be emitHints with image, labels, khint, k32
+  let image be emitHints with image, labels, whint, ws
+  let image be emitHints with image, labels, chint, c32
+  let image be emitHints with image, labels, shint, sec
+  let image be emitHints with image, labels, nhint, nc
   let image be alignTo with image, 16
   let image be alignTo with image, 4096
   let image be emitRuntime with image, fixes, labels
   let hints be []
   let ilts be []
   let iats be []
-  let g be 0
-  while g < (length with ghints)
-    let hs be ghints at g
-    let ils be gilts at g
-    let ias be giats at g
-    let i be 0
-    while i < (length with hs)
-      push with hints, (hs at i)
-      push with ilts, (ils at i)
-      push with iats, (ias at i)
-      let i be i + 1
-    end
-    let g be g + 1
-  end
+  let hints be catHints with hints, khint
+  let ilts be catHints with ilts, kilt
+  let iats be catHints with iats, kiat
+  let hints be catHints with hints, whint
+  let ilts be catHints with ilts, wilt
+  let iats be catHints with iats, wiat
+  let hints be catHints with hints, chint
+  let ilts be catHints with ilts, cilt
+  let iats be catHints with iats, ciat
+  let hints be catHints with hints, shint
+  let ilts be catHints with ilts, silt
+  let iats be catHints with iats, siat
+  let hints be catHints with hints, nhint
+  let ilts be catHints with ilts, nilt
+  let iats be catHints with iats, niat
   return {"image": image, "labels": labels, "fixes": fixes, "hints": hints, "ilts": ilts, "iats": iats, "impSize": 120, "net": true}
+end
+
+define emitThunks with image, labels, names
+  let i be 0
+  while i < (length with names)
+    pin with labels, (names at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be emitU64 with image, 0
+  return image
+end
+
+define emitDesc with image, labels, name
+  pin with labels, name, image
+  let i be 0
+  while i < 5
+    let image be emitU32 with image, 0
+    let i be i + 1
+  end
+  return image
+end
+
+define emitHints with image, labels, hints, apis
+  let i be 0
+  while i < (length with hints)
+    pin with labels, (hints at i), image
+    let image be emitU8 with image, 0
+    let image be emitU8 with image, 0
+    let image be emitStr with image, (apis at i)
+    let image be alignTo with image, 2
+    let i be i + 1
+  end
+  return image
+end
+
+define catHints with dest, extra
+  let i be 0
+  while i < (length with extra)
+    push with dest, (extra at i)
+    let i be i + 1
+  end
+  return dest
 end
 
 define parkPool with image, labels, pool

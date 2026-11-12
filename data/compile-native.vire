@@ -1701,13 +1701,8 @@ define main
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson", "tls": loaded at "needTls"}
   say "needs-ok"
   let opened be openImage
-  if hits at "tls"
-    let opened be openTlsImage
-  end
-  if not (hits at "tls")
-    if hits at "net"
-      let opened be openNetImage
-    end
+  if hits at "net"
+    let opened be openNetImage
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0

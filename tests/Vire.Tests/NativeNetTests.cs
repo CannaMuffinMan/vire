@@ -17,7 +17,7 @@ public class NativeNetTests
         Assert.Contains("emitNetRuntime", net);
         Assert.Contains("emitTlsRuntime", net);
         Assert.Contains("rt_listen", net);
-        Assert.Contains("rt_https", net);
+        Assert.Contains("rt_https", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
@@ -37,10 +37,10 @@ public class NativeNetTests
         Assert.Contains("nm == \"listen\"", native);
         Assert.Contains("nm == \"https\"", native);
         Assert.Contains("openNetImage", native);
-        Assert.Contains("openTlsImage", native);
+        Assert.DoesNotContain("openTlsImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("openNetImage", pe);
-        Assert.Contains("openTlsImage", pe);
+        Assert.Contains("emitThunks", pe);
         Assert.Contains("secur32.dll", pe);
         Assert.Contains("AcquireCredentialsHandleA", pe);
         Assert.Contains("let buf be emitU8 with buf, (codeOf with (raw at i))", pe);
@@ -87,7 +87,7 @@ public class NativeNetTests
             Assert.DoesNotContain("GetProcAddress", imports);
             Assert.DoesNotContain("CreateProcessA", imports);
             Assert.DoesNotContain("VirtualProtect", imports);
-            Assert.DoesNotContain("AcquireCredentialsHandleA", imports);
+            Assert.Contains("AcquireCredentialsHandleA", imports);
         }
         finally
         {
