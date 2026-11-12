@@ -18,6 +18,14 @@ public class NativeNetTests
         Assert.Contains("rt_listen", net);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
+        Assert.Contains("hu_fold", net);
+        Assert.Contains("hu_frame", net);
+        Assert.Contains("rt_net_hdrunsafe", net);
+        string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
+        Assert.True(blob.Length % 2 == 0);
+        Assert.Equal("e9", blob.Substring(0x62d * 2, 2));
+        Assert.Contains("636f6e74656e742d6c656e6774683a", blob);
+        Assert.Contains("7472616e736665722d656e636f64696e673a", blob);
         Assert.DoesNotContain("CreateFileA", net);
         Assert.DoesNotContain("GetProcAddress", net);
         Assert.DoesNotContain("LoadLibraryA", net);

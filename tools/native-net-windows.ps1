@@ -94,7 +94,12 @@ $healthImp = Get-PeImportNames $pe
 if ($ascii -notmatch "ws2_32.dll") { throw "PE missing ws2_32.dll" }
 if ($healthImp -notcontains "WSAStartup") { throw "health IAT missing WSAStartup" }
 if ($healthImp -contains "LoadLibraryA") { throw "health IAT has LoadLibraryA" }
+$peHex = ([System.BitConverter]::ToString($pe) -replace "-", "")
+if ($peHex -notmatch "E9F51000009090") { throw "guest PE missing hu_frame jump e9f51000009090" }
+if ($ascii -notlike "*content-length:*") { throw "guest PE missing content-length: needle" }
+if ($ascii -notlike "*transfer-encoding:*") { throw "guest PE missing transfer-encoding: needle" }
 Write-Output "health_pe_iat ws2_32.dll WSAStartup (no LoadLibraryA/GetProcAddress)"
+Write-Output "health_pe_hu_frame jump+needles present"
 
 $helloSrc = Join-Path $Data "guest-hello.vire"
 if (-not (Test-Path $helloSrc)) { Copy-Item (Join-Path $Root "guest-hello.vire") $helloSrc -Force }
@@ -148,22 +153,101 @@ Write-Output "health_listen 127.0.0.1:$port"
 Start-Sleep -Milliseconds 400
 if ($server.HasExited) { throw "health server exited $($server.ExitCode) after listen" }
 
-function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
+function Convert-BytesToHex([byte[]]$Bytes) {
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return "" }
+    $n = [Math]::Min(512, $Bytes.Length)
+    $slice = New-Object byte[] $n
+    [Array]::Copy($Bytes, $slice, $n)
+    $hex = ([System.BitConverter]::ToString($slice) -replace "-", "")
+    if ($Bytes.Length -gt 512) { $hex = $hex + "...trunc" }
+    return $hex
+}
+
+function Convert-BytesToAscii([byte[]]$Bytes) {
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return "" }
+    $n = [Math]::Min(512, $Bytes.Length)
+    $chars = New-Object char[] $n
+    for ($i = 0; $i -lt $n; $i++) {
+        $b = $Bytes[$i]
+        $chars[$i] = [char]$(if ($b -ge 32 -and $b -le 126) { $b } else { 46 })
+    }
+    $s = New-Object string (,$chars)
+    if ($Bytes.Length -gt 512) { $s = $s + "...trunc" }
+    return $s
+}
+
+function Send-RawBytes([int]$Port, [byte[]]$Payload, [int]$WaitMs = 3000) {
     $client = New-Object System.Net.Sockets.TcpClient
     $client.ReceiveTimeout = $WaitMs
     $client.SendTimeout = $WaitMs
     $client.Connect("127.0.0.1", $Port)
     $stream = $client.GetStream()
-    $bytes = [System.Text.Encoding]::ASCII.GetBytes($Payload)
-    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Write($Payload, 0, $Payload.Length)
     $buf = New-Object byte[] 8192
     $n = 0
     try { $n = $stream.Read($buf, 0, $buf.Length) } catch { $n = 0 }
     $client.Close()
-    return [System.Text.Encoding]::ASCII.GetString($buf, 0, [Math]::Max(0, $n))
+    if ($n -le 0) { return ,[byte[]]@() }
+    $out = New-Object byte[] $n
+    [Array]::Copy($buf, $out, $n)
+    return ,$out
 }
 
-$health = Send-Raw $port "GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes($Payload)
+    $resp = Send-RawBytes $Port $bytes $WaitMs
+    return Convert-BytesToAscii $resp
+}
+
+function Write-AdversaryWire([string]$Name, [byte[]]$Request, [byte[]]$Response) {
+    Write-Host ("adversary_{0}_request_len {1}" -f $Name, $Request.Length)
+    Write-Host ("adversary_{0}_request_hex {1}" -f $Name, (Convert-BytesToHex $Request))
+    Write-Host ("adversary_{0}_request_ascii {1}" -f $Name, (Convert-BytesToAscii $Request))
+    Write-Host ("adversary_{0}_response_len {1}" -f $Name, $Response.Length)
+    Write-Host ("adversary_{0}_response_hex {1}" -f $Name, (Convert-BytesToHex $Response))
+    Write-Host ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
+}
+
+function Find-ByteSeq([byte[]]$Hay, [byte[]]$Needle) {
+    if ($null -eq $Hay -or $Hay.Length -lt $Needle.Length) { return -1 }
+    $last = $Hay.Length - $Needle.Length
+    for ($i = 0; $i -le $last; $i++) {
+        $ok = $true
+        for ($j = 0; $j -lt $Needle.Length; $j++) {
+            if ($Hay[$i + $j] -ne $Needle[$j]) { $ok = $false; break }
+        }
+        if ($ok) { return $i }
+    }
+    return -1
+}
+
+function Test-Http11Framing([string]$Name, [byte[]]$Response, [string]$WantStatus) {
+    $prefix = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 $WantStatus ")
+    if ($Response.Length -lt $prefix.Length) {
+        throw ("{0} expected {1}, got empty/short {2} hex {3}" -f $Name, $WantStatus, $Response.Length, (Convert-BytesToHex $Response))
+    }
+    for ($i = 0; $i -lt $prefix.Length; $i++) {
+        if ($Response[$i] -ne $prefix[$i]) {
+            throw ("{0} expected {1}, got {2} hex {3}" -f $Name, $WantStatus, (Convert-BytesToAscii $Response), (Convert-BytesToHex $Response))
+        }
+    }
+    if ((Find-ByteSeq $Response ([byte[]](13, 10, 13, 10))) -lt 0) {
+        throw ("{0} response missing CRLFCRLF terminator hex {1}" -f $Name, (Convert-BytesToHex $Response))
+    }
+    $ascii = [System.Text.Encoding]::ASCII.GetString($Response)
+    if ($ascii -notmatch "(?i)connection:\s*close") { throw "$Name missing Connection: close" }
+}
+
+function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantStatus) {
+    $resp = Send-RawBytes $port $Request
+    Write-AdversaryWire $Name $Request $resp
+    Test-Http11Framing $Name $resp $WantStatus
+    return (Convert-BytesToAscii $resp)
+}
+
+$healthReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$healthBytes = Send-RawBytes $port $healthReq
+$health = Convert-BytesToAscii $healthBytes
 if (-not $health) {
     $curl = & curl.exe -s -S -D - --max-time 5 "http://127.0.0.1:$port/health" 2>&1 | Out-String
     Write-Output "health_curl_exe $curl"
@@ -183,6 +267,7 @@ function Get-JsonBody([string]$Raw) {
     return $Matches[1].Trim()
 }
 $want = '{"ok":true,"service":"fcgcpa","payments":false}'
+Test-Http11Framing "health" $healthBytes "200"
 if ($health -notmatch "HTTP/1.1 200 ") { throw "health status not 200" }
 if ($health -notmatch "(?i)content-type:\s*application/json") { throw "health content-type not application/json" }
 $healthBody = Get-JsonBody $health
@@ -193,8 +278,11 @@ Write-Output "contract_health_content_type application/json"
 Write-Output "contract_health_body $healthBody"
 Write-Output "contract_source fcgcpa-prod main 5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4 inventory (unauth GET /health and GET /api/health) plus in-tree api/fcgcpa.vire body fields; this token cannot re-open the private Node handler"
 
-$apiHealth = Send-Raw $port "GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
+$apiReq = [System.Text.Encoding]::ASCII.GetBytes("GET /api/health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+$apiBytes = Send-RawBytes $port $apiReq
+$apiHealth = Convert-BytesToAscii $apiBytes
 Write-Output "api_health_curl_result $apiHealth"
+Test-Http11Framing "api_health" $apiBytes "200"
 if ($apiHealth -notmatch "HTTP/1.1 200 ") { throw "api/health status not 200" }
 if ($apiHealth -notmatch "(?i)content-type:\s*application/json") { throw "api/health content-type not application/json" }
 $apiBody = Get-JsonBody $apiHealth
@@ -203,9 +291,8 @@ Write-Output "contract_api_health_status 200"
 Write-Output "contract_api_health_content_type application/json"
 Write-Output "contract_api_health_body $apiBody"
 
-$mal = Send-Raw $port "GET /health`r`n`r`n"
-Write-Output "adversary_malformed_line $mal"
-if ($mal -notmatch "^HTTP/1.1 400 ") { throw "malformed line expected 400" }
+$malReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health`r`n`r`n")
+[void](Assert-AdversaryStatus "malformed_line" $malReq "400")
 
 # Exactly 16384 bytes, no leftover write after the 16KiB header cap, so
 # closesocket cannot RST and drop the 431.
@@ -213,13 +300,32 @@ $huge = "GET / HTTP/1.1`r`nHost: x`r`n"
 $pad = "X: " + ("y" * 240) + "`r`n"
 while ($huge.Length + $pad.Length -le 16384) { $huge += $pad }
 if ($huge.Length -lt 16384) { $huge += "Z" * (16384 - $huge.Length) }
-$big = Send-Raw $port $huge
-Write-Output "adversary_oversize_headers $($big.Substring(0, [Math]::Min(80, $big.Length)))"
-if ($big -notmatch "^HTTP/1.1 431 ") { throw "oversize headers expected 431" }
+$hugeBytes = [System.Text.Encoding]::ASCII.GetBytes($huge)
+[void](Assert-AdversaryStatus "oversize_headers" $hugeBytes "431")
 
-$inject = Send-Raw $port "GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`nSet-Cookie: stolen`r`n`r`n"
-Write-Output "adversary_crlf_request_header $($inject.Substring(0, [Math]::Min(120, $inject.Length)))"
-if ($inject -match "(?i)set-cookie: stolen") { throw "request header leaked into response" }
+# Well-formed GET /health with extra request fields. RFC 9112 allows them.
+# 200 is required. Request Set-Cookie must not appear in the response.
+$injectReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`nSet-Cookie: stolen`r`n`r`n")
+$injectText = Assert-AdversaryStatus "crlf_request_header" $injectReq "200"
+Write-Output "adversary_crlf_request_header $injectText"
+if ($injectText -match "(?i)set-cookie: stolen") { throw "request header leaked into response" }
+if ($injectText -notmatch "(?i)content-type:\s*application/json") { throw "crlf_request_header content-type" }
+$injectBody = Get-JsonBody $injectText
+if ($injectBody -cne $want) { throw "crlf_request_header body $injectBody" }
+
+# RFC 9112: request line and field lines are CR LF. Bare LF, lone CR,
+# CR inside a field value, and obs-fold are malformed -> 400 and close.
+[void](Assert-AdversaryStatus "bare_lf" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`nHost: x`r`n`r`n")) "400")
+[void](Assert-AdversaryStatus "lone_cr" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`rHost: x`r`n`r`n")) "400")
+[void](Assert-AdversaryStatus "cr_in_header_value" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`ry`r`n`r`n")) "400")
+[void](Assert-AdversaryStatus "obs_fold" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`n folded`r`n`r`n")) "400")
+[void](Assert-AdversaryStatus "dup_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nContent-Length: 0`r`nContent-Length: 5`r`n`r`nhello")) "400")
+[void](Assert-AdversaryStatus "te_and_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nTransfer-Encoding: chunked`r`nContent-Length: 5`r`n`r`nhello")) "501")
+# Framing names only count as field names, not substrings in other fields.
+$xTe = Assert-AdversaryStatus "x_transfer_encoding" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Transfer-Encoding: opaque`r`n`r`n")) "200"
+if ((Get-JsonBody $xTe) -cne $want) { throw "x_transfer_encoding body" }
+$clNote = Assert-AdversaryStatus "content_length_in_value" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Note: content-length: foo content-length: bar`r`n`r`n")) "200"
+if ((Get-JsonBody $clNote) -cne $want) { throw "content_length_in_value body" }
 
 $partial = $null
 $c = New-Object System.Net.Sockets.TcpClient
