@@ -113,11 +113,9 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_send_bad", "send needs a connection and text"
   parkMsg with image, labels, "msg_recv_bad", "recv needs a connection and a size"
   parkMsg with image, labels, "msg_conn_closed", "that connection is closed"
-  parkMsg with image, labels, "dbg_a", "A"
-  parkMsg with image, labels, "dbg_b", "B"
-  parkMsg with image, labels, "dbg_c", "C"
-  parkMsg with image, labels, "dbg_d", "D"
   pin with labels, "ws2_ready", image
+  emitU64 with image, 0
+  pin with labels, "tcp_socks", image
   emitU64 with image, 0
   pin with labels, "wsa_scratch", image
   let zi be 0
@@ -134,31 +132,10 @@ define emitIat with image, fixes, name
   return image
 end
 
-define emitNote with image, fixes, name
-  ~ WriteFile a parked length-prefixed line. rbx is the entry stdout handle.
-  emitList with image, [72, 141, 13]
-  emitRel with image, fixes, name
-  emitList with image, [76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
-  emitRel with image, fixes, "written"
-  emitList with image, [72, 199, 68, 36, 32]
-  emitU32 with image, 0
-  let image be emitIat with image, fixes, "iat_wf"
-  emitList with image, [72, 137, 217, 72, 141, 21]
-  emitRel with image, fixes, "nlchar"
-  emitList with image, [65, 184]
-  emitU32 with image, 1
-  emitList with image, [76, 141, 13]
-  emitRel with image, fixes, "written"
-  emitList with image, [72, 199, 68, 36, 32]
-  emitU32 with image, 0
-  let image be emitIat with image, fixes, "iat_wf"
-  return image
-end
-
 define emitTcpClient with image, fixes, labels
   ~ Guest connect/send/recv/close. Loopback 127.0.0.1 only. No TLS. Check
   ~ the IPv4 literal before socket+connect. Recv cap 1000000. Host apply
-  ~ 5s timeouts; native connect uses blocking Winsock after WSAStartup.
+  ~ 5s timeouts via SO_RCVTIMEO/SO_SNDTIMEO after connect returns.
   pin with labels, "rt_connect", image
   emitPro with image
   emitPop2 with image
@@ -179,7 +156,6 @@ define emitTcpClient with image, fixes, labels
   emitJcc with image, fixes, 133, "conn_notloop"
   emitList with image, [128, 122, 16, 49, 15, 133]
   emitRel with image, fixes, "conn_notloop"
-  let image be emitNote with image, fixes, "dbg_a"
   ~ WSAStartup into .data, not a heap WSADATA (rt_alloc is a GC object).
   emitList with image, [72, 139, 5]
   emitRel with image, fixes, "ws2_ready"
@@ -196,7 +172,6 @@ define emitTcpClient with image, fixes, labels
   emitU32 with image, 1
   emitList with image, [72, 137, 5]
   emitRel with image, fixes, "ws2_ready"
-  let image be emitNote with image, fixes, "dbg_b"
   pin with labels, "conn_ws2", image
   emitList with image, [185]
   emitU32 with image, 2
@@ -207,7 +182,6 @@ define emitTcpClient with image, fixes, labels
   let image be emitIat with image, fixes, "iat_sk"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "conn_fail"
-  let image be emitNote with image, fixes, "dbg_c"
   ~ Same sockaddr layout as rt_listen (rbp-48). htons via xchg al,ah.
   emitList with image, [72, 137, 69, 240, 72, 199, 69, 208, 0, 0, 0, 0]
   emitList with image, [72, 199, 69, 216, 0, 0, 0, 0, 198, 69, 208, 2]
@@ -216,10 +190,28 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
   emitU32 with image, 16
   let image be emitIat with image, fixes, "iat_cn"
-  let image be emitNote with image, fixes, "dbg_d"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "conn_close"
-  emitList with image, [72, 139, 85, 240]
+  emitList with image, [199, 69, 168]
+  emitU32 with image, 5000
+  emitList with image, [72, 139, 77, 240, 186]
+  emitU32 with image, 65535
+  emitList with image, [65, 184]
+  emitU32 with image, 4102
+  emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
+  emitU32 with image, 4
+  let image be emitIat with image, fixes, "iat_ss"
+  emitList with image, [72, 139, 77, 240, 186]
+  emitU32 with image, 65535
+  emitList with image, [65, 184]
+  emitU32 with image, 4101
+  emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
+  emitU32 with image, 4
+  let image be emitIat with image, fixes, "iat_ss"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 139, 85, 240, 72, 137, 17, 186]
+  emitU32 with image, 1
   emitPushTag with image, 1
   emitEpi with image
   pin with labels, "conn_close", image
@@ -252,11 +244,15 @@ define emitTcpClient with image, fixes, labels
   emitRel with image, fixes, "send_bad"
   emitList with image, [73, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "send_bad"
+  emitList with image, [72, 131, 250, 1, 15, 133]
+  emitRel with image, fixes, "send_closed"
+  emitList with image, [76, 137, 77, 240, 72, 139, 21]
+  emitRel with image, fixes, "tcp_socks"
   emitList with image, [72, 133, 210, 15, 132]
   emitRel with image, fixes, "send_closed"
   emitList with image, [72, 131, 250, 255, 15, 132]
   emitRel with image, fixes, "send_closed"
-  emitList with image, [72, 137, 85, 248, 76, 137, 77, 240]
+  emitList with image, [72, 137, 85, 248]
   emitList with image, [73, 139, 1, 72, 137, 69, 232]
   emitList with image, [73, 141, 65, 8, 72, 137, 69, 224]
   pin with labels, "tcp_tx_loop", image
@@ -286,6 +282,10 @@ define emitTcpClient with image, fixes, labels
   emitRel with image, fixes, "recv_bad"
   emitList with image, [73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "recv_bad"
+  emitList with image, [72, 131, 250, 1, 15, 133]
+  emitRel with image, fixes, "recv_closed"
+  emitList with image, [76, 137, 77, 240, 72, 139, 21]
+  emitRel with image, fixes, "tcp_socks"
   emitList with image, [72, 133, 210, 15, 132]
   emitRel with image, fixes, "recv_closed"
   emitList with image, [72, 131, 250, 255, 15, 132]
@@ -321,11 +321,15 @@ define emitTcpClient with image, fixes, labels
   emitPop1 with image
   emitList with image, [72, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 133, 210, 15, 132]
+  emitList with image, [72, 131, 250, 1, 15, 133]
   emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 131, 250, 255, 15, 132]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 133, 201, 15, 132]
   emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 137, 209]
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tcp_socks"
+  emitList with image, [72, 199, 2, 0, 0, 0, 0]
   let image be emitIat with image, fixes, "iat_cs"
   emitCallTo with image, fixes, "rt_push_none"
   emitEpi with image
