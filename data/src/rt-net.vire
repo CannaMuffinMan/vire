@@ -125,8 +125,8 @@ define emitTlsRuntime with image, fixes, labels
   applyPackedFixes with fixes, base, (read with "data/src/rt-tls-fixes.txt"), names
   ~ Packed pin id 8 is rt_tls_serve. Re-pin so a names mismatch cannot drop it.
   put base into labels at "rt_https"
-  put (base + 1141) into labels at "rt_tls_serve"
-  put (base + 1282) into labels at "rt_tls_hs"
+  put (base + 1137) into labels at "rt_tls_serve"
+  put (base + 1278) into labels at "rt_tls_hs"
   return image
 end
 

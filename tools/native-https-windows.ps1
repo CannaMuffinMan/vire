@@ -96,6 +96,7 @@ while ((Get-Date) -lt $deadline) {
     if ($hs.HasExited) {
         Start-Sleep -Milliseconds 200
         Write-Output ("https_server_exit " + $hs.ExitCode)
+        Write-Output ("https_server_exit_hex " + ("{0:X8}" -f [uint32]$hs.ExitCode))
         Write-Output ("https_server_out [" + (Get-Content -Raw $hout -ErrorAction SilentlyContinue) + "]")
         Write-Output ("https_server_err [" + (Get-Content -Raw $herr -ErrorAction SilentlyContinue) + "]")
         throw "https server exited $($hs.ExitCode) early"
