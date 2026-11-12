@@ -150,17 +150,25 @@ if ($server.HasExited) { throw "health server exited $($server.ExitCode) after l
 
 function Convert-BytesToHex([byte[]]$Bytes) {
     if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return "" }
-    return ([System.BitConverter]::ToString($Bytes) -replace "-", "")
+    $n = [Math]::Min(512, $Bytes.Length)
+    $slice = New-Object byte[] $n
+    [Array]::Copy($Bytes, $slice, $n)
+    $hex = ([System.BitConverter]::ToString($slice) -replace "-", "")
+    if ($Bytes.Length -gt 512) { $hex = $hex + "...trunc" }
+    return $hex
 }
 
 function Convert-BytesToAscii([byte[]]$Bytes) {
     if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return "" }
-    $chars = New-Object char[] $Bytes.Length
-    for ($i = 0; $i -lt $Bytes.Length; $i++) {
+    $n = [Math]::Min(512, $Bytes.Length)
+    $chars = New-Object char[] $n
+    for ($i = 0; $i -lt $n; $i++) {
         $b = $Bytes[$i]
         $chars[$i] = [char]$(if ($b -ge 32 -and $b -le 126) { $b } else { 46 })
     }
-    return New-Object string (,$chars)
+    $s = New-Object string (,$chars)
+    if ($Bytes.Length -gt 512) { $s = $s + "...trunc" }
+    return $s
 }
 
 function Send-RawBytes([int]$Port, [byte[]]$Payload, [int]$WaitMs = 3000) {

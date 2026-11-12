@@ -19,6 +19,7 @@ public class NativeNetTests
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
+        Assert.Contains("hu_frame", net);
         Assert.Contains("rt_net_hdrunsafe", net);
         Assert.DoesNotContain("CreateFileA", net);
         Assert.DoesNotContain("GetProcAddress", net);
