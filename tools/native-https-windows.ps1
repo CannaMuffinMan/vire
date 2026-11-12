@@ -28,7 +28,7 @@ function Write-Pem([string]$Path, [string]$Kind, [byte[]]$Der) {
     [System.IO.File]::WriteAllText($Path, $pem)
 }
 
-$cert = New-SelfSignedCertificate -Subject "CN=127.0.0.1" -DnsName "127.0.0.1" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddDays(2) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -KeyExportPolicy Exportable -Type SSLServerAuthentication
+$cert = New-SelfSignedCertificate -Subject "CN=127.0.0.1" -TextExtension @("2.5.29.17={text}IPAddress=127.0.0.1") -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddDays(2) -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -KeyExportPolicy Exportable -Type SSLServerAuthentication
 Write-Pem (Join-Path $TlsDir "cert.pem") "CERTIFICATE" $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
 $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
 Write-Pem (Join-Path $TlsDir "key.pem") "PRIVATE KEY" $rsa.ExportPkcs8PrivateKey()
