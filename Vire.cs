@@ -2610,6 +2610,7 @@ internal static class HttpWire
             if (b == (byte)'\n')
             {
                 if (i == 0 || buffer[i - 1] != (byte)'\r') return true;
+                if (i + 1 < headerEnd && (buffer[i + 1] == (byte)' ' || buffer[i + 1] == (byte)'\t')) return true;
             }
             else if (b == (byte)'\r')
             {
