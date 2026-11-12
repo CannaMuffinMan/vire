@@ -1,4 +1,4 @@
-use "rt-ws.vire"
+use "src/rt-ws.vire"
 
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
