@@ -38,6 +38,7 @@ public class SchemaTests
         Assert.Contains("OVERSIZE array REJECT", outp);
         Assert.Contains("ADV too-deep array REJECT", outp);
         Assert.Contains("ADV too-deep object REJECT", outp);
+        Assert.DoesNotContain("crash rip", outp);
     }
 
     [Fact]

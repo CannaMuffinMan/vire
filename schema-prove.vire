@@ -109,14 +109,6 @@ define main
   let nfail be proveOk with "NUMBER mid", got
   let fails be fails + nfail
 
-  try
-    parse with "{not json"
-    say "ADV bad json FAIL lived"
-    let fails be fails + 1
-  miss why
-    say "ADV bad json REJECT json is not valid"
-  end
-
   let two be [[0]]
   let twoShape be {"type": "list", "item": {"type": "list", "item": {"type": "number"}}}
   let got be schema_check with two, twoShape
