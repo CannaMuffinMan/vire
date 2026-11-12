@@ -305,6 +305,7 @@ def emit_serve(a: Asm) -> None:
     a.lea("rax", "rt_tls_send")
     a.lea("rcx", "tls_send_slot")
     a.raw(0x48, 0x89, 0x01)
+    a.raw(0x48, 0x8B, 0x4D, 0xF8)
     a.lea("rax", "tls_state")
     a.raw(0x48, 0x89, 0x88)
     a.u32(SOCK)
