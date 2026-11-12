@@ -634,6 +634,7 @@ def emit_send(a: Asm) -> None:
 def emit_strings(a: Asm) -> None:
     def z(name: str, s: str) -> None:
         a.pin(name)
+        a.raw(*list(len(s).to_bytes(8, "little")))
         a.raw(*[ord(c) for c in s], 0)
 
     def wz(name: str, s: str) -> None:

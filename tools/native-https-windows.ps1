@@ -94,8 +94,10 @@ while ((Get-Date) -lt $deadline) {
         if ($txt -match "listening on 127.0.0.1:(\d+)") { $hport = [int]$Matches[1]; break }
     }
     if ($hs.HasExited) {
-        Write-Output ("https_server_out " + (Get-Content -Raw $hout -ErrorAction SilentlyContinue))
-        Write-Output ("https_server_err " + (Get-Content -Raw $herr -ErrorAction SilentlyContinue))
+        Start-Sleep -Milliseconds 200
+        Write-Output ("https_server_exit " + $hs.ExitCode)
+        Write-Output ("https_server_out [" + (Get-Content -Raw $hout -ErrorAction SilentlyContinue) + "]")
+        Write-Output ("https_server_err [" + (Get-Content -Raw $herr -ErrorAction SilentlyContinue) + "]")
         throw "https server exited $($hs.ExitCode) early"
     }
     Start-Sleep -Milliseconds 100

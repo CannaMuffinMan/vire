@@ -72,8 +72,18 @@ function Restore-RuntimeFrom {
         git cat-file -e "$Sha^{commit}" 2>$null
         if ($LASTEXITCODE -ne 0) { throw "missing commit $Sha" }
     }
-    git checkout $Sha -- src/rt.vire src/rt-more.vire src/pe.vire src/rt-net.vire data/src/rt.vire data/src/rt-more.vire data/src/pe.vire data/src/rt-net.vire compile-native.vire data/compile-native.vire
-    if ($LASTEXITCODE -ne 0) { throw "checkout runtime from $Sha failed" }
+    $files = @(
+        "src/rt.vire", "src/rt-more.vire", "src/pe.vire",
+        "data/src/rt.vire", "data/src/rt-more.vire", "data/src/pe.vire",
+        "compile-native.vire", "data/compile-native.vire"
+    )
+    foreach ($f in $files) {
+        git checkout $Sha -- $f
+        if ($LASTEXITCODE -ne 0) { throw "checkout $f from $Sha failed" }
+    }
+    foreach ($opt in @("src/rt-net.vire", "data/src/rt-net.vire")) {
+        git checkout $Sha -- $opt 2>$null
+    }
 }
 
 $Work = Join-Path $Root "data/native-gc-loop"
