@@ -174,10 +174,10 @@ function Send-RawBytes([int]$Port, [byte[]]$Payload, [int]$WaitMs = 3000) {
     $n = 0
     try { $n = $stream.Read($buf, 0, $buf.Length) } catch { $n = 0 }
     $client.Close()
-    if ($n -le 0) { return [byte[]]@() }
+    if ($n -le 0) { return ,[byte[]]@() }
     $out = New-Object byte[] $n
     [Array]::Copy($buf, $out, $n)
-    return $out
+    return ,$out
 }
 
 function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
@@ -187,12 +187,12 @@ function Send-Raw([int]$Port, [string]$Payload, [int]$WaitMs = 3000) {
 }
 
 function Write-AdversaryWire([string]$Name, [byte[]]$Request, [byte[]]$Response) {
-    Write-Output ("adversary_{0}_request_len {1}" -f $Name, $Request.Length)
-    Write-Output ("adversary_{0}_request_hex {1}" -f $Name, (Convert-BytesToHex $Request))
-    Write-Output ("adversary_{0}_request_ascii {1}" -f $Name, (Convert-BytesToAscii $Request))
-    Write-Output ("adversary_{0}_response_len {1}" -f $Name, $Response.Length)
-    Write-Output ("adversary_{0}_response_hex {1}" -f $Name, (Convert-BytesToHex $Response))
-    Write-Output ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
+    Write-Host ("adversary_{0}_request_len {1}" -f $Name, $Request.Length)
+    Write-Host ("adversary_{0}_request_hex {1}" -f $Name, (Convert-BytesToHex $Request))
+    Write-Host ("adversary_{0}_request_ascii {1}" -f $Name, (Convert-BytesToAscii $Request))
+    Write-Host ("adversary_{0}_response_len {1}" -f $Name, $Response.Length)
+    Write-Host ("adversary_{0}_response_hex {1}" -f $Name, (Convert-BytesToHex $Response))
+    Write-Host ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
 }
 
 function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantStatus) {
@@ -204,7 +204,7 @@ function Assert-AdversaryStatus([string]$Name, [byte[]]$Request, [string]$WantSt
         throw ("{0} expected {1}, got {2}" -f $Name, $WantStatus, $text)
     }
     if ($text -notmatch "(?i)connection:\s*close") { throw "$Name missing Connection: close" }
-    return $resp
+    return $text
 }
 
 $health = Send-Raw $port "GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n"
@@ -262,8 +262,7 @@ $hugeBytes = [System.Text.Encoding]::ASCII.GetBytes($huge)
 # Well-formed GET /health with extra request fields. RFC 9112 allows them.
 # 200 is required. Request Set-Cookie must not appear in the response.
 $injectReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`nSet-Cookie: stolen`r`n`r`n")
-$injectResp = Assert-AdversaryStatus "crlf_request_header" $injectReq "200"
-$injectText = Convert-BytesToAscii $injectResp
+$injectText = Assert-AdversaryStatus "crlf_request_header" $injectReq "200"
 Write-Output "adversary_crlf_request_header $injectText"
 if ($injectText -match "(?i)set-cookie: stolen") { throw "request header leaked into response" }
 if ($injectText -notmatch "(?i)content-type:\s*application/json") { throw "crlf_request_header content-type" }
