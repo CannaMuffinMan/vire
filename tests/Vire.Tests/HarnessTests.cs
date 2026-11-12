@@ -127,6 +127,7 @@ public class HarnessTests
         Assert.Contains("native-sec-windows.ps1", yml);
         Assert.Contains("native-oom.ps1", yml);
         Assert.Contains("native-gc-loop-proof.ps1", yml);
+        Assert.Contains("schema-prove-windows.ps1", yml);
         Assert.Contains("native-selfhost-handoff.ps1", yml);
         Assert.Contains("native-selfhost-windows", yml);
         Assert.DoesNotContain("continue-on-error: true", yml);
