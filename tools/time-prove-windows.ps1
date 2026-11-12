@@ -19,17 +19,19 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
 
-function Get-UnixLine([string]$text) {
-    foreach ($line in ($text -split "`n")) {
+function Get-UnixLine($text) {
+    $blob = ($text | Out-String)
+    foreach ($line in ($blob -split "`n")) {
         $t = $line.Trim()
         if ($t -match '^unix (\d+)$') { return [int64]$Matches[1] }
     }
-    throw "missing unix line in:`n$text"
+    throw "missing unix line in:`n$blob"
 }
 
-function Get-DetLines([string]$text) {
+function Get-DetLines($text) {
+    $blob = ($text | Out-String)
     $keep = @()
-    foreach ($line in ($text -split "`n")) {
+    foreach ($line in ($blob -split "`n")) {
         $t = $line.Trim()
         if ($t -match '^unix ') { continue }
         if ($t.Length -gt 0) { $keep += $t }
