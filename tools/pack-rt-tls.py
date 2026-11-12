@@ -26,7 +26,7 @@ CERT_NCRYPT_KEY_SPEC = 0xFFFFFFFF
 CRYPT_STRING_BASE64_ANY = 6
 NCRYPTBUFFER_PKCS_KEYNAME = 45
 NCRYPT_SILENT_OVERWRITE = 0x000000C0
-SP_PROT_TLS12_13_SERVER = 0x00004400
+SP_PROT_TLS12_13_SERVER = 0x00000400
 
 
 class Asm:
@@ -463,20 +463,6 @@ def emit_hs(a: Asm) -> None:
     a.raw(0x48, 0xC7, 0x45, 0xF8, 0, 0, 0, 0)
     a.ljmp("hs_loop")
     a.pin("hs_ok")
-    a.raw(0x8B, 0x45, 0xA4, 0x83, 0xF8, 5)
-    a.ljcc(0x85, "hs_sizes")
-    a.raw(0x8B, 0x4D, 0xA0, 0x85, 0xC9)
-    a.ljcc(0x84, "hs_sizes")
-    a.lea("rax", "tls_state")
-    a.raw(0x48, 0x8B, 0x80)
-    a.u32(ENC)
-    a.raw(0x48, 0x89, 0xC1)
-    a.raw(0x48, 0x8B, 0x55, 0xA8)
-    a.raw(0x44, 0x8B, 0x45, 0xA0)
-    a.call("rt_memcpy")
-    a.lea("rax", "tls_state")
-    a.raw(0x8B, 0x4D, 0xA0, 0x48, 0x89, 0x88)
-    a.u32(ENCLEN)
     a.pin("hs_sizes")
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0x8D, 0x89)
