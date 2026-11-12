@@ -82,6 +82,15 @@ class Asm:
     def epi(self) -> None:
         self.raw(0xC9, 0xC3)
 
+    def sayz(self, name: str, n: int) -> None:
+        self.raw(0xB9, 0xF5, 0xFF, 0xFF, 0xFF)
+        self.call_iat("iat_gs")
+        self.raw(0x48, 0x89, 0xC1)
+        self.lea("rdx", name)
+        self.raw(0x48, 0x83, 0xC2, 0x08, 0x41, 0xB8, n, 0, 0, 0)
+        self.raw(0x4C, 0x8D, 0x4D, 0xA8, 0x48, 0xC7, 0x44, 0x24, 0x20, 0, 0, 0, 0)
+        self.call_iat("iat_wf")
+
     def ljcc(self, op: int, name: str) -> None:
         self.raw(0x0F, op)
         self.patches.append((len(self.b), name))
@@ -323,12 +332,10 @@ def emit_serve(a: Asm) -> None:
     a.call("rt_tls_hs")
     a.raw(0x48, 0x85, 0xC0)
     a.jcc(0x84, "serve_hsfail")
-    a.lea("rcx", "msg_hs_ok")
-    a.call("rt_say")
+    a.sayz("msg_hs_ok", 16)
     a.ljmp("serve_go")
     a.pin("serve_hsfail")
-    a.lea("rcx", "msg_hs_fail")
-    a.call("rt_say")
+    a.sayz("msg_hs_fail", 18)
     a.ljmp("serve_done")
     a.pin("serve_go")
     a.lea("rcx", "tls_state")
@@ -575,7 +582,7 @@ def emit_recv(a: Asm) -> None:
     a.raw(0x48, 0x8D, 0x89)
     a.u32(CTX)
     # DecryptMessage(phContext, pMessage, MessageSeqNo, pfQOP)
-    a.raw(0x48, 0x8D, 0x55, 0x80, 0x45, 0x31, 0xC0, 0x45, 0x31, 0xC9)
+    a.raw(0x48, 0x8D, 0x55, 0x80, 0x45, 0x31, 0xC0, 0x4C, 0x8D, 0x4D, 0xD0, 0xC7, 0x45, 0xD0, 0, 0, 0, 0)
     a.call_iat("iat_dec")
     a.raw(0x3D)
     a.u32(SEC_E_INCOMPLETE)
@@ -589,8 +596,7 @@ def emit_recv(a: Asm) -> None:
     a.raw(0xB9, 8, 0, 0, 0)
     a.raw(0xC1, 0xC6, 4, 0x89, 0xF0, 0x83, 0xE0, 15)
     a.raw(0x41, 0x8A, 0x04, 0x00, 0xAA, 0xE2, 0xF1)
-    a.lea("rcx", "msg_tls_dec")
-    a.call("rt_say")
+    a.sayz("msg_tls_dec", 16)
     a.ljmp("recv_err")
     a.pin("recv_plain")
     a.raw(0x8B, 0x45, 0xA4, 0x83, 0xF8, 1)
@@ -762,7 +768,7 @@ NAMES = [
     "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state",
     "tls_scratch", "tls_enc", "tls_plain",
     "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_cos", "iat_cfd", "iat_ach", "iat_asc", "iat_fcb",
-    "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd",
+    "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd", "iat_gs", "iat_wf",
     "msg_tls_b64", "msg_tls_cert", "msg_tls_prov", "msg_tls_key", "msg_tls_prop", "msg_tls_ach",
     "msg_tls_dec", "msg_hs_ok", "msg_hs_fail", "serve_hsfail", "serve_go",
     "die_tls", "die_b64", "die_cert", "die_prov", "die_key", "die_prop", "die_ach",
