@@ -557,6 +557,25 @@ def emit_recv(a: Asm) -> None:
     a.u32(ENCLEN)
     a.raw(0x83, 0xF9, 5)
     a.ljcc(0x82, "recv_sock")
+    a.raw(0x80, 0x3A, 0x17)
+    a.ljcc(0x84, "recv_rec")
+    a.raw(0x80, 0x3A, 0x16)
+    a.ljcc(0x84, "recv_rec")
+    a.raw(0x80, 0x3A, 0x15)
+    a.ljcc(0x84, "recv_rec")
+    a.raw(0x80, 0x3A, 0x14)
+    a.ljcc(0x84, "recv_rec")
+    a.pin("recv_shift")
+    a.raw(0x8A, 0x44, 0x0A, 0xFF, 0x88, 0x04, 0x0A, 0xFF, 0xC9, 0x75, 0xF4)
+    a.raw(0xC6, 0x02, 0x17)
+    a.lea("rax", "tls_state")
+    a.raw(0x48, 0xFF, 0x80)
+    a.u32(ENCLEN)
+    a.raw(0x8B, 0x88)
+    a.u32(ENCLEN)
+    a.raw(0x48, 0x8B, 0x90)
+    a.u32(ENC)
+    a.pin("recv_rec")
     a.raw(0x0F, 0xB6, 0x42, 0x03, 0xC1, 0xE0, 0x08, 0x44, 0x0F, 0xB6, 0x42, 0x04, 0x44, 0x01, 0xC0, 0x83, 0xC0, 0x05)
     a.raw(0x39, 0xC1)
     a.ljcc(0x82, "recv_sock")
@@ -788,7 +807,7 @@ NAMES = [
     "hs_loop", "hs_accept", "hs_first", "hs_ctx", "hs_nosend", "hs_cont",
     "hs_ok", "hs_fail", "hs_sizes", "hs_sized", "rt_tls_recv", "recv_have", "recv_min", "recv_need",
     "recv_plain", "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err",
-    "recv_try", "recv_sock",
+    "recv_try", "recv_sock", "recv_shift", "recv_rec",
     "rt_tls_send", "send_fit", "send_raw", "send_err", "txt_unisp",
     "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail", "rt_say",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
