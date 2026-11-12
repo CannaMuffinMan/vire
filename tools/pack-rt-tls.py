@@ -17,7 +17,8 @@ SEC_I_CONTINUE = 0x00090312
 SEC_E_INCOMPLETE = 0x80090318
 SEC_I_COMPLETE_NEEDED = 0x00090313
 SEC_I_COMPLETE_AND_CONTINUE = 0x00090314
-SCH_FLAGS = 0x00400010
+# SCH_USE_STRONG_CRYPTO | SCH_CRED_NO_SYSTEM_MAPPER (server inbound).
+SCH_FLAGS = 0x00400002
 SCHANNEL_CRED_VERSION = 4
 CERT_NCRYPT_KEY = 78
 CRYPT_STRING_BASE64 = 1
@@ -662,7 +663,7 @@ def emit_strings(a: Asm) -> None:
             a.raw(ord(c), 0)
         a.raw(0, 0)
 
-    z("txt_unisp", "Microsoft Unified Security Protocol Provider")
+    z("txt_unisp", "Schannel")
     wz("txt_mskey", "Microsoft Software Key Storage Provider")
     wz("txt_pkcs8", "PKCS8_PRIVATEKEY")
     vz("msg_tls", "tls setup failed")
