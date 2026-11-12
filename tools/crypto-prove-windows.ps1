@@ -73,4 +73,31 @@ if ($hostNorm -ne $peNorm) {
     throw "host interpreter and gen1 PE stdout differ"
 }
 Write-Output "crypto host pe match"
+
+$mbSrc = Get-Content -Raw (Join-Path $Root "crypto-mb.vire")
+Set-Content -Path (Join-Path $Data "crypto-mb.vire") -Value $mbSrc -NoNewline
+$mbHexRel = "data/crypto-mb.hex"
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$mbCompile = & dotnet exec $VireDll compile-native.vire data/crypto-mb.vire $mbHexRel
+$mbCompileCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $mbCompile
+Write-Output "crypto_mb_pe_compile_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "crypto_mb_pe_compile_exit $mbCompileCode"
+if ($mbCompileCode -ne 0) { throw "compile-native crypto-mb exit $mbCompileCode" }
+if ("$mbCompile" -notmatch "compiled") { throw "compile-native crypto-mb missing compiled" }
+$mbExe = Join-Path $Data "crypto-mb.exe"
+Convert-HexToExe (Join-Path $Root $mbHexRel) $mbExe
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$mbPeOut = & $mbExe
+$mbPeCode = $LASTEXITCODE
+$sw.Stop()
+Write-Output $mbPeOut
+Write-Output "crypto_mb_pe_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+Write-Output "crypto_mb_pe_exit $mbPeCode"
+if ($mbPeCode -ne 0) { throw "crypto-mb PE exit $mbPeCode" }
+if ("$mbPeOut" -notmatch "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0") {
+    throw "crypto-mb PE missing FIPS 1M digest"
+}
+Write-Output "crypto mb pe ok"
 Write-Output "crypto windows prove ok"

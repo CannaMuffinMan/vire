@@ -206,6 +206,75 @@ define main
   let nfail be showBad with "ADV nbf", gotv
   let fails be fails + nfail
 
+  let cafe be [195, 169]
+  let asAscii be ascii_text with cafe
+  let nfail be showBad with "UTF8 ascii_text", asAscii
+  let fails be fails + nfail
+  let asUtf be utf8_text with cafe
+  if (asUtf at 0) == "ok"
+    say "UTF8 text PASS"
+  end
+  if (asUtf at 0) != "ok"
+    say "UTF8 text FAIL"
+    let fails be fails + 1
+  end
+  let payUtf be "{\"n\":\"" + (chr with 195) + (chr with 169) + "\"}"
+  let signedUtf be jwt_hs256_sign with payUtf, sec
+  let utfTok be ""
+  if (signedUtf at 0) == "ok"
+    let utfTok be signedUtf at 1
+  end
+  if (signedUtf at 0) != "ok"
+    say "JWT utf8 sign FAIL"
+    let fails be fails + 1
+  end
+  let gotUtf be jwt_hs256_verify with utfTok, sec, none
+  if (signedUtf at 0) == "ok"
+    if (gotUtf at 0) == "ok"
+      if (gotUtf at 1) == payUtf
+        say "JWT utf8 PASS"
+      end
+      if (gotUtf at 1) != payUtf
+        say "JWT utf8 PAYLOAD FAIL"
+        let fails be fails + 1
+      end
+    end
+    if (gotUtf at 0) != "ok"
+      say "JWT utf8 verify FAIL"
+      let fails be fails + 1
+    end
+  end
+
+  let msPay be "{\"exp\":1735689600000}"
+  let msTok be jwt_hs256_sign with msPay, sec
+  let msRaw be msTok at 1
+  let late be number with "1735689600001"
+  let gotv be jwt_hs256_verify with msRaw, sec, late
+  let nfail be showBad with "ADV exp ms", gotv
+  let fails be fails + nfail
+  let early be number with "1735689599999"
+  let gotv be jwt_hs256_verify with msRaw, sec, early
+  if (gotv at 0) == "ok"
+    say "JWT exp ms live PASS"
+  end
+  if (gotv at 0) != "ok"
+    say "JWT exp ms live FAIL"
+    let fails be fails + 1
+  end
+  let safePay be "{\"exp\":9007199254740991}"
+  let safeTok be jwt_hs256_sign with safePay, sec
+  let safeRaw be safeTok at 1
+  let safeLate be number with "9007199254740991"
+  let gotv be jwt_hs256_verify with safeRaw, sec, safeLate
+  let nfail be showBad with "ADV exp safe equal", gotv
+  let fails be fails + nfail
+  let hugePay be "{\"exp\":10000000000000000}"
+  let hugeTok be jwt_hs256_sign with hugePay, sec
+  let hugeRaw be hugeTok at 1
+  let gotv be jwt_hs256_verify with hugeRaw, sec, 1
+  let nfail be showBad with "ADV exp 17 digit", gotv
+  let fails be fails + nfail
+
   let same be ct_eq with [1, 2], [1, 2]
   if not same
     say "CT eq PASS fail"
@@ -220,6 +289,7 @@ define main
   else
     say "CT neq PASS"
   end
+  say "CT eq residual not a CPU timing barrier"
 
   if fails == 0
     say "CRYPTO PROVE pass"

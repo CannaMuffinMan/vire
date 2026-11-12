@@ -1,9 +1,11 @@
 define millionA
   let a be "a"
-  while (length with a) < 1000000
+  while (length with a) < 524288
     let a be a + a
   end
-  return slice with a, 0, 1000000
+  let rest be 1000000 - (length with a)
+  let tail be slice with a, 0, rest
+  return a + tail
 end
 
 define main

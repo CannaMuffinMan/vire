@@ -945,6 +945,150 @@ define ascii_text with buf
   return ["ok", out]
 end
 
+define utf8_cont with b
+  if b < 128
+    return false
+  end
+  if b > 191
+    return false
+  end
+  return true
+end
+
+define utf8_ok with buf
+  let n be length with buf
+  let i be 0
+  while i < n
+    let b be buf at i
+    if b < 0
+      return false
+    end
+    if b > 255
+      return false
+    end
+    if b < 128
+      let i be i + 1
+      skip
+    end
+    if b < 194
+      return false
+    end
+    if b < 224
+      if (i + 1) >= n
+        return false
+      end
+      if not (utf8_cont with (buf at (i + 1)))
+        return false
+      end
+      let i be i + 2
+      skip
+    end
+    if b < 240
+      if (i + 2) >= n
+        return false
+      end
+      let c1 be buf at (i + 1)
+      let c2 be buf at (i + 2)
+      if not (utf8_cont with c1)
+        return false
+      end
+      if not (utf8_cont with c2)
+        return false
+      end
+      if b == 224
+        if c1 < 160
+          return false
+        end
+      end
+      if b == 237
+        if c1 > 159
+          return false
+        end
+      end
+      let i be i + 3
+      skip
+    end
+    if b > 244
+      return false
+    end
+    if (i + 3) >= n
+      return false
+    end
+    let c1 be buf at (i + 1)
+    let c2 be buf at (i + 2)
+    let c3 be buf at (i + 3)
+    if not (utf8_cont with c1)
+      return false
+    end
+    if not (utf8_cont with c2)
+      return false
+    end
+    if not (utf8_cont with c3)
+      return false
+    end
+    if b == 240
+      if c1 < 144
+        return false
+      end
+    end
+    if b == 244
+      if c1 > 143
+        return false
+      end
+    end
+    let i be i + 4
+  end
+  return true
+end
+
+define latin1_all
+  let s be ""
+  let n be 0
+  while n < 256
+    let s be s + (chr with n)
+    let n be n + 1
+  end
+  return s
+end
+
+define utf8_bytes with text
+  let fast be ascii_bytes with text
+  if (fast at 0) == "ok"
+    return fast
+  end
+  let table be latin1_all
+  let out be []
+  let i be 0
+  let n be length with text
+  while i < n
+    let ch be text at i
+    let c be find with table, ch
+    if c < 0
+      return ["bad", "non-utf8"]
+    end
+    push with out, c
+    let i be i + 1
+  end
+  if not (utf8_ok with out)
+    return ["bad", "bad utf8"]
+  end
+  return ["ok", out]
+end
+
+define utf8_text with buf
+  if not (utf8_ok with buf)
+    return ["bad", "bad utf8"]
+  end
+  let out be ""
+  let i be 0
+  let n be length with buf
+  while i < n
+    let out be out + (chr with (buf at i))
+    let i be i + 1
+  end
+  return ["ok", out]
+end
+
 define hex_digit with ch
   if ch == "0"
     return 0
@@ -1241,6 +1385,30 @@ end
 
 define jwt_token_cap
   return 8192
+end
+
+define jwt_digits_too_wide with raw
+  let n be length with raw
+  if n > 16
+    return true
+  end
+  if n < 16
+    return false
+  end
+  let cap be "9007199254740991"
+  let i be 0
+  while i < 16
+    let a be number with (raw at i)
+    let b be number with (cap at i)
+    if a > b
+      return true
+    end
+    if a < b
+      return false
+    end
+    let i be i + 1
+  end
+  return false
 end
 
 define jwt_skip_space with text, i
@@ -1553,7 +1721,7 @@ define jwt_field_number with text, key
       if (length with raw) == 0
         return ["bad", 0]
       end
-      if (length with raw) > 15
+      if jwt_digits_too_wide with raw
         return ["bad", 0]
       end
       if i < n
@@ -1683,7 +1851,7 @@ end
 
 define jwt_hs256_sign with payload_text, secret
   let header be "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-  let p be ascii_bytes with payload_text
+  let p be utf8_bytes with payload_text
   if (p at 0) != "ok"
     return ["bad", p at 1]
   end
@@ -1750,7 +1918,7 @@ define jwt_hs256_verify with token, secret, clock
   if not (ct_eq with want, (sb at 1))
     return ["bad", "bad signature"]
   end
-  let pt be ascii_text with (pb at 1)
+  let pt be utf8_text with (pb at 1)
   if (pt at 0) != "ok"
     return ["bad", pt at 1]
   end

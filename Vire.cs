@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -638,6 +638,13 @@ sealed class Machine
             List<object> dest = args[0] as List<object>;
             List<object> extra = args[1] as List<object>;
             return Program.ExtendList(dest, extra, itemCap, line, col);
+        }
+        if (name == "chr")
+        {
+            if (!(args[0] is int)) throw new VireError("chr needs a whole number", line, col);
+            int n = (int)args[0];
+            if (n < 0 || n > 255) throw new VireError("chr needs a byte", line, col);
+            return ((char)n).ToString();
         }
         if (name == "text") return Show(args[0]);
         if (name == "number")
