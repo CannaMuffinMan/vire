@@ -335,6 +335,7 @@ sealed class Machine
     const int MaxItems = 100000;
     int itemCap = 100000;
     const int MaxText = 1000000;
+    int textCap = MaxText;
     internal Budget budget = new Budget();
     List<object> programArgs = new List<object>();
     Dictionary<string, Func> funcs;
@@ -402,6 +403,7 @@ sealed class Machine
     public void UseCompilerLimits()
     {
         itemCap = 1000000;
+        textCap = 2000000;
         compilerProgress = true;
         compilerBeatMs = Environment.TickCount64;
     }
@@ -668,7 +670,7 @@ sealed class Machine
         {
             string path = SafePath(args[0], line, col);
             string text;
-            try { text = File.ReadAllText(path); }
+            try { text = VirePaths.ReadAllTextInside(path, root, line, col); }
             catch (IOException) { throw new VireError("could not read that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not read that file", line, col); }
             if (text.Length > MaxText) throw new VireError("file is too large", line, col);
@@ -677,8 +679,9 @@ sealed class Machine
         if (name == "write")
         {
             string path = SafePath(args[0], line, col);
-            string text = Show(args[1]);
-            if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
+            string text = args[1] as string;
+            if (text == null) text = Show(args[1]);
+            if (text.Length > textCap) throw new VireError("text is too large to write", line, col);
             VirePaths.RefuseProgram(path, line, col);
             try
             {
@@ -1084,9 +1087,10 @@ sealed class Machine
         {
             string path = SafePath(args[0], line, col);
             VirePaths.RefuseProgram(path, line, col);
-            string text = Show(args[1]);
-            if (text.Length > MaxText) throw new VireError("text is too large to write", line, col);
-            try { VireFiles.AppendAllText(path, text); }
+            string text = args[1] as string;
+            if (text == null) text = Show(args[1]);
+            if (text.Length > textCap) throw new VireError("text is too large to write", line, col);
+            try { VirePaths.AppendAllTextInside(path, text, root, line, col); }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }
             return text;
@@ -2866,25 +2870,25 @@ sealed class Program
         else throw new VireError("extend needs numbers in the extra list", line, col);
         double x;
         if (!AsReal(n, out x)) throw new VireError("extend needs numbers in the extra list", line, col);
-        if (x < 0) x += 256;
-        if (x >= 256)
+        if (x != Math.Floor(x)) throw new VireError("extend needs numbers in the extra list", line, col);
+        if (x < 0)
         {
-            int q = WholeDiv(x, 256, line, col);
-            x = x - ((double)q * 256.0);
+            x += 256;
+            if (x < 0) return 0;
+            if (x < 256) return (int)x;
         }
-        if (x < 0) x = 0;
-        if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;
-        return x;
+        long bits = (long)x;
+        return (int)(bits & 255);
     }
 
-    internal static int WholeDiv(object left, object right, int line, int col)
+    internal static object WholeDiv(object left, object right, int line, int col)
     {
         double num;
         double den;
         if (!AsReal(left, out num) || !AsReal(right, out den)) throw new VireError("idiv needs numbers", line, col);
         if (den == 0 || num < 0) return 0;
         double quote = Math.Floor(num / den);
-        if (quote > int.MaxValue) return int.MaxValue;
+        if (quote > int.MaxValue || quote < int.MinValue) return quote;
         return (int)quote;
     }
 
@@ -2893,7 +2897,9 @@ sealed class Program
         List<object> list = value as List<object>;
         if (list == null) throw new VireError("hex needs a list of whole numbers", line, col);
         int n = list.Count;
-        if (n > 500000) throw new VireError("out of memory", line, col);
+        // Guest lists cannot exceed 100000. Compiler mode itemCap is 1e6 so a
+        // full native image (path bind + HTTP) can hex up to that, not 500000.
+        if (n > 1000000) throw new VireError("out of memory", line, col);
         char[] chars = new char[n * 2];
         string digits = "0123456789abcdef";
         for (int i = 0; i < n; i++)
@@ -2961,7 +2967,7 @@ sealed class Program
         try
         {
         string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
+        if (!full.StartsWith(folderFull, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
             throw new VireError("use stays inside the program folder", 1);
         VirePaths.RefuseReparse(full, folder, 1);
         if (CompilerProgress != 0) CompilerNote("loading " + Path.GetFileName(full));
@@ -2969,7 +2975,7 @@ sealed class Program
         if (!info.Exists) throw new VireError("could not read " + Path.GetFileName(full), 1);
         if (info.Length > 1000000) throw new VireError("that file is too large to run", 1);
         string text;
-        try { text = File.ReadAllText(full); }
+        try { text = VirePaths.ReadProgramText(full, folder, 1, 1); }
         catch (IOException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
         catch (UnauthorizedAccessException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
         return LoadText(full, text, folder, seen, loaded);
@@ -2996,7 +3002,7 @@ sealed class Program
             string next = VirePaths.UseFile(folder, "deps/" + package + "/lib.vire", 1);
             VirePaths.RefuseFileReparse(next, folder, 1, 1);
             string body;
-            try { body = File.ReadAllText(next); }
+            try { body = VirePaths.ReadProgramText(next, folder, 1, 1); }
             catch (IOException) { throw new VireError("could not read lib.vire", 1); }
             catch (UnauthorizedAccessException) { throw new VireError("could not read lib.vire", 1); }
             if (!VirePaths.LockHexEqual(VireSeal.HashText(body), locked))
@@ -3031,21 +3037,25 @@ sealed class Program
 
     public static int BudgetFor(string program)
     {
-        if (IsCompilerProgram(program)) return CompilerStepCap;
-        return BudgetOf(File.ReadAllText(program));
+        return BudgetFor(program, false);
     }
 
-    static bool IsCompilerProgram(string program)
+    public static int BudgetFor(string program, bool hostCompiler)
     {
-        string name = Path.GetFileName(program);
-        if (!name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-            && !name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
-            return false;
-        string text;
-        try { text = File.ReadAllText(program); }
-        catch (IOException) { return false; }
-        catch (UnauthorizedAccessException) { return false; }
-        return text.Contains("define main") && (text.Contains("emitU8") || text.Contains("compileUnit"));
+        if (hostCompiler)
+        {
+            int budget = CompilerStepCap;
+            string chosen = Environment.GetEnvironmentVariable("VIRE_BUDGET");
+            if (!string.IsNullOrWhiteSpace(chosen))
+            {
+                int value;
+                if (!int.TryParse(chosen.Trim(), out value) || value < 1 || value > ProgramStepCap)
+                    throw new VireError("VIRE_BUDGET must be from 1 to 5000000", 1);
+                if (value < budget) budget = value;
+            }
+            return budget;
+        }
+        return BudgetOf(File.ReadAllText(program));
     }
 
     public static bool HeaderTokenMatches(string head, string expected)
@@ -3166,41 +3176,45 @@ sealed class Program
         Console.Error.Flush();
     }
 
-    static bool CompilerArg(string[] args)
+    static bool HasHostCompilerFlag(string[] args)
     {
-        if (args == null || args.Length < 1) return false;
-        int i = 0;
-        if (args[0] == "--key-file" && args.Length >= 2) i = 2;
-        if (i >= args.Length) return false;
-        string name = Path.GetFileName(args[i]);
-        return name.Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("compiler.vire", StringComparison.OrdinalIgnoreCase);
+        if (args == null) return false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--compiler") return true;
+        }
+        return false;
+    }
+
+    static string[] StripHostCompiler(string[] args)
+    {
+        if (args == null || args.Length == 0) return args;
+        List<string> rest = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--compiler") continue;
+            rest.Add(args[i]);
+        }
+        return rest.ToArray();
     }
 
     internal static int Execute(string[] args)
     {
-        if (CompilerArg(args))
+        bool hostCompiler = HasHostCompilerFlag(args);
+        args = StripHostCompiler(args);
+        if (hostCompiler)
         {
             CompilerProgress = 1;
             try { Console.SetIn(TextReader.Null); }
             catch (IOException) { }
-            string shown = args[0];
-            for (int n = 0; n < args.Length; n++)
-            {
-                if (Path.GetFileName(args[n]).Equals("compile-native.vire", StringComparison.OrdinalIgnoreCase)
-                    || Path.GetFileName(args[n]).Equals("compiler.vire", StringComparison.OrdinalIgnoreCase))
-                {
-                    shown = args[n];
-                    break;
-                }
-            }
+            string shown = args.Length > 0 ? args[0] : "--compiler";
             CompilerNote("starting " + Path.GetFileName(shown));
         }
         int code = 0;
         Exception failure = null;
         Thread thread = new Thread(delegate ()
         {
-            try { code = ExecuteBody(args); }
+            try { code = ExecuteBody(args, hostCompiler); }
             catch (Exception ex) { failure = ex; }
         }, 64 * 1024 * 1024);
         thread.IsBackground = true;
@@ -3236,7 +3250,7 @@ sealed class Program
         return 1;
     }
 
-    static int ExecuteBody(string[] args)
+    static int ExecuteBody(string[] args, bool hostCompiler)
     {
         if (args.Length < 1)
         {
@@ -3300,13 +3314,13 @@ sealed class Program
             }
             string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
-            int budget = BudgetFor(program);
+            int budget = BudgetFor(program, hostCompiler);
             Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseSource(program);
             machine.UseBudget(budget);
-            if (IsCompilerProgram(program))
+            if (hostCompiler)
             {
                 machine.UseCompilerLimits();
                 CompilerNote("loaded, running main");
@@ -3315,8 +3329,8 @@ sealed class Program
             for (int i = 1; i < rest.Length; i++) extra.Add(rest[i]);
             machine.UseArgs(extra);
             machine.Run();
-            if (IsCompilerProgram(program))
-                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch);
+            if (hostCompiler)
+                CompilerNote("total_steps=" + machine.ChargedSteps() + " total_pending=" + machine.PendingSteps() + " step_batch=" + Budget.StepBatch + " break_probes=" + System.Threading.Interlocked.Read(ref VireDebug.ProbeCalls));
             return 0;
         }
         catch (HaltSignal halt)

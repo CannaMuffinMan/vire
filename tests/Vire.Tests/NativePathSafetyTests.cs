@@ -25,11 +25,15 @@ public class NativePathSafetyTests
         Assert.Contains("AddVectoredExceptionHandler", pe);
         Assert.Contains("SetFilePointerEx", pe);
         Assert.Contains("SetEndOfFile", pe);
+        Assert.Contains("GetFinalPathNameByHandleA", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
         Assert.Contains("iat_ue", pe);
         Assert.Contains("iat_sp", pe);
         Assert.Contains("iat_se", pe);
+        Assert.Contains("iat_fp", pe);
+        Assert.DoesNotContain("\"Sleep\"", pe);
+        Assert.DoesNotContain("iat_sl", pe);
     }
 
     [Fact]
@@ -62,6 +66,11 @@ public class NativePathSafetyTests
         Assert.Contains("rt_memcpy", more);
         Assert.Contains("iat_fi", rt);
         Assert.Contains("iat_fi", more);
+        Assert.Contains("rt_bind_path", more);
+        Assert.Contains("iat_fp", more);
+        Assert.Contains("rt_bind_path", rt);
+        Assert.Contains("path_space", more);
+        Assert.Contains("read_space", rt);
     }
 
     [Fact]
@@ -94,5 +103,72 @@ public class NativePathSafetyTests
         int runtime = src.LastIndexOf("parkRuntime with (gen at \"image\")", StringComparison.Ordinal);
         int counters = src.LastIndexOf("parkCounters with (gen at \"image\")", StringComparison.Ordinal);
         Assert.True(runtime >= 0 && counters > runtime);
+    }
+
+    [Fact]
+    public void ProductPeOmitsSleepWidenerAndIatSl()
+    {
+        string root = Root();
+        string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
+        string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
+        Assert.DoesNotContain("\"Sleep\"", pe);
+        Assert.DoesNotContain("iat_sl", pe);
+        Assert.DoesNotContain("iat_sl", more);
+        Assert.DoesNotContain("Sleep", native);
+        string dataPe = Path.Combine(root, "data", "src", "pe.vire");
+        if (File.Exists(dataPe))
+        {
+            string dpe = File.ReadAllText(dataPe);
+            Assert.DoesNotContain("\"Sleep\"", dpe);
+            Assert.DoesNotContain("iat_sl", dpe);
+        }
+        string ps1 = File.ReadAllText(Path.Combine(root, "tools", "native-sec-windows.ps1"));
+        Assert.Contains("Test-only", ps1);
+        Assert.Contains("Never apply to the product checkout", ps1);
+        Assert.Contains("Apply-SecWiden", ps1);
+        string paths = File.ReadAllText(Path.Combine(root, "VirePaths.cs"));
+        Assert.DoesNotContain("VIRE_TEST_TOCTOU_MS", paths);
+        Assert.Contains("TestToctouDelayMs", paths);
+        Assert.Contains("TryLinuxFdId", paths);
+        Assert.Contains("TryLinuxPathId", paths);
+        var info = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("show");
+        info.ArgumentList.Add("d818f1691ed8659538a10255c58211ebc1316e00:VirePaths.cs");
+        System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+        string old = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(15000);
+        if (p.ExitCode == 0 && old.Length > 0)
+        {
+            Assert.DoesNotContain("TryLinuxFdId", old);
+            Console.WriteLine("host_fileid_fail_before d818f169 TryLinuxFdId=false");
+        }
+        Console.WriteLine("host_fileid_pass_after TryLinuxFdId=true");
+        var dbg = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        dbg.ArgumentList.Add("show");
+        dbg.ArgumentList.Add("d818f1691ed8659538a10255c58211ebc1316e00:VireDebug.cs");
+        System.Diagnostics.Process d = System.Diagnostics.Process.Start(dbg);
+        string oldDbg = d.StandardOutput.ReadToEnd();
+        d.WaitForExit(15000);
+        if (d.ExitCode == 0 && oldDbg.Length > 0)
+        {
+            Assert.DoesNotContain("if (Environment.GetEnvironmentVariable(\"VIRE_DEBUGGER\") != \"1\") return false;", oldDbg);
+            Console.WriteLine("break_probe_fail_before d818f169 always_opens_break_txt=true");
+        }
+        string nowDbg = File.ReadAllText(Path.Combine(root, "VireDebug.cs"));
+        Assert.Contains("if (Environment.GetEnvironmentVariable(\"VIRE_DEBUGGER\") != \"1\") return false;", nowDbg);
+        Console.WriteLine("break_probe_pass_after VIRE_DEBUGGER_gate=true");
     }
 }

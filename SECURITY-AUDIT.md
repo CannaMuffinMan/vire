@@ -30,17 +30,17 @@ Native `CreateFileA` followed reparse points. **Fixed in emit** with prefix `Get
 
 Unbounded `rt_save_frame`. **Fixed** at 64 frames (512 bytes from `frame_base`). Unicorn `boom with 65` printed `definitions called too deeply` and not `survived`. Independent of PR 31 intern/`heap_cell`. Hot file `src/rt.vire`.
 
-### F4. Native hardlinks
+### F4. Interned path walk / double-read
 
-`GetFileInformationByHandle` `nlink` at offset 40. Write opens `OPEN_EXISTING` first. Unicorn `nlink2` refused and left `SECRET`. Then `CREATE_ALWAYS` only after a clean nlink check so a normal file still truncates. Windows hardlink execute **blocked** (same recipe).
+Vuln `7c7c8ea` interned path literals in RX `.text`; in-place NUL during the walk AVs (Windows `f4_double_read vuln NOTE x0`). **Fixed** with `rt_alloc`+`rt_memcpy` scratch copy. Exact-head Windows `5b39c9a` job `129796755075`: `fixed NOTE x2 code=0`.
 
-### F5. Path index and length clobbered (this review)
+### F5. Reopen-after-nlink and walk-then-open
 
-`mov al, [rcx+rax]` replaced the index with `'/'` (47). A later `movzx edx` on the scan overwrote `rdx` (the length), so the scan walked into the terminating NUL and refused legal long names. Proven by CPU probe and Unicorn. **Fixed** with `movzx r8d` in the scan (length stays in `rdx`) and `movzx edx` in the walk (length already on the stack). Unicorn long name GFA is `data` then the full leaf. `data/../outside.txt` fails closed with `CREATE []`.
+Write inspects nlink then truncates with `SetFilePointerEx`+`SetEndOfFile` on that handle. There is no `CREATE_ALWAYS` after the nlink check. Walk-then-open (GFA then `CreateFileA`) is closed by `rt_bind_path` / `GetFinalPathNameByHandleA`. Windows proof uses a **test-only** `Sleep` widener on isolated worktrees (not product IAT). Job `129796755075`: F5 vuln `victim_hits=1` outside=`HACKED`; fixed `victim_hits=0` `write_code=1`. Walk vuln `outside_hits=1`; fixed `0`.
 
-### F6. `CREATE_ALWAYS` truncated before nlink (this review)
+### F6. Crash filter `CREATE_ALWAYS` on `crash-rip.txt`
 
-Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. **Fixed** by `OPEN_EXISTING` inspect, refuse without truncate, `CREATE_ALWAYS` only after nlink==1.
+Vuln hello PE patched after VEH smashed a `crash-rip.txt` hardlink onto KEEP. **Fixed**: RIP only on stdout; no `iat_cf` in `crash_filter`. Job `129796755075`: vuln smashed KEEP; fixed `KEEP=KEEP` and `crash rip=`.
 
 ## Overlap (do not concatenate drafts)
 
@@ -51,24 +51,20 @@ Disposition 2 emptied a hardlink, then the refuse path ran. Proven in Unicorn. *
 | 33 emitList | `3f9e0cd` | `src/rt.vire` `emitList` | Untouched here. Performance agent owns 33/34. |
 | 34 hexOf | `7cbc63c` (base 33) | none expected | Do not pull. |
 
-CI `test` 8 failures on this PR match base Linux Windows-only foreign/Android/APK/toolchain/headless contracts. Not introduced here. `native-windows` **PASS hello** on GitHub (real `hello.exe`). That is not the junction/hardlink recipe.
+Host check-then-open: `RefuseReparse` then `File.*` by path lost a `renameat2` swap. **Fixed** by opening a handle and matching Linux `lstat`/`fstat` identity (Windows `GetFinalPathNameByHandleW`). Test `HostCheckThenOpenToctouFailBeforePassAfter` (env `VIRE_TEST_TOCTOU_MS` is test-only). Linux writable zones use `StringComparison.Ordinal`. Native trailing `data/payload.bat.` is refused in `path_space`. F8 host `EmitU8Byte` `(long)x & 255` agrees with native `mov rcx,imm64`. F13 `native-arena-check.sh` forbids 32MB at PE offsets 224 **and** 240; planted 240 write fails; `check.yml` selfhost runs the script. ARM job filter includes `HardLinkCannotRewriteDepsLock`.
 
-## Verification on this Linux VM
+## Verification
 
-- PathSsrf + NativePathSafety + NativeArena + NativePeEmit: Native* filter 11 passed after intern port. Full suite still has the same Linux Windows-only foreign/Android/APK/toolchain/headless failures as base.
-- `bash tools/native-sec-emu-check.sh`: hello stdout, long-name GFA `data`, parent reparse, nlink2 keeps `SECRET`, depth 65, `data/../outside.txt` refused, `data/linkdir` symlink refused. Unicorn 2.1.4. Heap mapping `0x2000000`.
-- `bash tools/native-pe-emu-check.sh`: intern-chars prints `A`/`b`/`9`/`Ab9`, hello-stage prints `hello from stage`, HEAP_SIZE `0x2000000`. intern-chars HEAP_BUMP `0x500a0` (value stack 0x50000 plus ~160B). Stubbed kernel32, not OS proof.
-- Host `dotnet compile-native` medians (3 runs, python `perf_counter`, no GNU time): hello.vire 2.551s, intern-chars.vire 2.599s. Protection path/frame/nlink still on. Intern is an alloc cut at runtime, not a compile-speed claim.
-- Windows junction/hardlink: **blocked**. Recipe `tools/native-sec-windows.ps1`.
-- Native fixed-point gen1→gen2 hash + hello: **not run**. `tools/native-selfhost-proof.ps1` is the bounded Windows recipe. Not wired into `check.yml`.
-- Self-host `files stay in data or site` on CI: pre-existing vs compiler.vire. Not treated as this patch. Hours-long selfhost not run.
+- Windows `native-windows` job `129796755075` (`5b39c9a`) and `129811692427` (`607624e`): F4/F5/F6/walk recipe ok; host TOCTOU + trailing-dot on the same job. `native-selfhost-windows` job `129796754998`: gen1=gen2 `7fad880322a59feaa9542f51557939bdd5eb7b65070ea8f1c37e50f6509be9cb`.
+- `tools/native-sec-emu-check.sh` is on the Linux `selfhost` job (pip unicorn + `fetch-depth: 0`): wrap `[0, 0, 1]`, trailing-dot refuse, walk-open-race fail-before `7c7c8ea` / pass-after HEAD.
+- Caps 32MB / list 100000 / 5M, sandbox, and Defender are unchanged. PR 42 stays draft.
 
 ## Gates
 
 - `/poteto-mode`: smallest fail-closed emit fixes after proven probes.
 - `/setup-pstack`: **blocked** (interactive).
 - `/interrogate`: two Grok adversaries, not four (Opus weekly cap). Findings F5 and F6 survived reruns and were fixed. Remaining "emu follows leaf symlink" was an emu `stat` vs `lstat` bug and was fixed in the stub.
-- `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; hello still prints.
+- `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; write uses SetEndOfFile; hello still prints.
 
 ## Caps
 

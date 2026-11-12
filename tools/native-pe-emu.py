@@ -76,6 +76,7 @@ class Emu:
             "AddVectoredExceptionHandler",
             "SetFilePointerEx",
             "SetEndOfFile",
+            "GetFinalPathNameByHandleA",
         ]
         self.stubs = {}
         for i, name in enumerate(names):
@@ -133,6 +134,7 @@ class Emu:
             "AddVectoredExceptionHandler",
             "SetFilePointerEx",
             "SetEndOfFile",
+            "GetFinalPathNameByHandleA",
         ]
         iat = runs[-1]
         if len(iat) < len(names):
@@ -277,6 +279,9 @@ class Emu:
 
     def api_SetEndOfFile(self):
         self.wr(UC_X86_REG_RAX, 1)
+
+    def api_GetFinalPathNameByHandleA(self):
+        self.wr(UC_X86_REG_RAX, 0)
 
     def run(self, count=200000000):
         start = self.image + self.entry

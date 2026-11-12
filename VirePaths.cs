@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using Microsoft.Win32.SafeHandles;
 
 static class VirePaths
 {
@@ -122,14 +125,21 @@ static class VirePaths
         return false;
     }
 
+    static StringComparison FolderComparison()
+    {
+        if (OperatingSystem.IsLinux()) return StringComparison.Ordinal;
+        return StringComparison.OrdinalIgnoreCase;
+    }
+
     public static bool InFolder(string folder, string path)
     {
         string fullFolder = Path.GetFullPath(folder);
         string fullPath = Path.GetFullPath(path);
         string prefix = fullFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
-        return string.Equals(fullPath, fullFolder, StringComparison.OrdinalIgnoreCase) ||
-            fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        StringComparison cmp = FolderComparison();
+        return string.Equals(fullPath, fullFolder, cmp) ||
+            fullPath.StartsWith(prefix, cmp);
     }
 
     public static bool UnderWritableZone(string root, string path)
@@ -150,8 +160,8 @@ static class VirePaths
         if (string.IsNullOrEmpty(folder)) folder = Directory.GetCurrentDirectory();
         string leaf = Path.GetFileName(folder);
         if (leaf != null &&
-            (string.Equals(leaf, "data", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(leaf, "site", StringComparison.OrdinalIgnoreCase)))
+            (string.Equals(leaf, "data", FolderComparison()) ||
+             string.Equals(leaf, "site", FolderComparison())))
         {
             string parent = Path.GetDirectoryName(folder);
             if (!string.IsNullOrEmpty(parent)) folder = parent;
@@ -189,6 +199,96 @@ static class VirePaths
         if (!UnderWritableZone(root, full))
             throw new VireError("files stay in data or site", line, column);
         return full;
+    }
+
+    public static string ReadAllTextInside(string path, string root, int line, int column)
+    {
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read, root, line, column);
+        ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
+        using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+        return reader.ReadToEnd();
+    }
+
+    public static void AppendAllTextInside(string path, string text, string root, int line, int column)
+    {
+        string parent = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+        using FileStream fs = OpenFile(path, FileMode.Append, FileAccess.Write, root, line, column);
+        ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
+        using StreamWriter writer = new StreamWriter(fs, leaveOpen: false);
+        writer.Write(text);
+        writer.Flush();
+    }
+
+    public static string ReadProgramText(string path, string folder, int line, int column)
+    {
+        using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read, folder, line, column);
+        ConfirmOpenedUnder(fs.SafeFileHandle, folder, line, column);
+        using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+        return reader.ReadToEnd();
+    }
+
+    // Tests set this. Product OpenFile does not read process environment.
+    internal static int TestToctouDelayMs;
+
+    static FileStream OpenFile(string path, FileMode mode, FileAccess access, string root, int line, int column)
+    {
+        ulong dev = 0;
+        ulong ino = 0;
+        bool existed = false;
+        if (OperatingSystem.IsLinux())
+            existed = TryLinuxPathId(path, out dev, out ino);
+        int widenMs = TestToctouDelayMs;
+        if (widenMs > 0 && widenMs < 2000)
+            Thread.Sleep(widenMs);
+        FileStream fs = new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
+        if (OperatingSystem.IsLinux() && existed)
+        {
+            ulong d2;
+            ulong i2;
+            if (!TryLinuxFdId(fs.SafeFileHandle, out d2, out i2) || d2 != dev || i2 != ino)
+                throw new VireError("files stay inside the program folder", line, column);
+        }
+        return fs;
+    }
+
+    static void ConfirmOpenedWritable(SafeFileHandle handle, string root, int line, int column)
+    {
+        string final = FinalPathOf(handle, line, column);
+        if (!UnderWritableZone(root, final))
+            throw new VireError("files stay inside the program folder", line, column);
+    }
+
+    static void ConfirmOpenedUnder(SafeFileHandle handle, string root, int line, int column)
+    {
+        string final = FinalPathOf(handle, line, column);
+        if (!InFolder(root, final))
+            throw new VireError("files stay inside the program folder", line, column);
+    }
+
+    static string FinalPathOf(SafeFileHandle handle, int line, int column)
+    {
+        if (handle == null || handle.IsInvalid)
+            throw new VireError("files stay inside the program folder", line, column);
+        if (OperatingSystem.IsWindows())
+        {
+            StringBuilder buf = new StringBuilder(1024);
+            uint n = GetFinalPathNameByHandleW(handle, buf, (uint)buf.Capacity, 0);
+            if (n == 0 || n >= buf.Capacity)
+                throw new VireError("files stay inside the program folder", line, column);
+            string raw = buf.ToString();
+            if (raw.StartsWith(@"\\?\", StringComparison.Ordinal)) raw = raw.Substring(4);
+            return Path.GetFullPath(raw);
+        }
+        if (OperatingSystem.IsLinux())
+        {
+            int fd = handle.DangerousGetHandle().ToInt32();
+            FileSystemInfo target = File.ResolveLinkTarget("/proc/self/fd/" + fd, true);
+            if (target == null)
+                throw new VireError("files stay inside the program folder", line, column);
+            return Path.GetFullPath(target.FullName);
+        }
+        return Path.GetFullPath(".");
     }
 
     public static string ProgramFile(string root, string rel, int line)
@@ -369,6 +469,56 @@ static class VirePaths
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr handle);
 
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder filePath, uint cchFilePath, uint flags);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static bool TryLinuxPathId(string path, out ulong dev, out ulong ino)
+    {
+        dev = 0;
+        ino = 0;
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            LinuxStatArm64 stat;
+            if (LinuxLStatArm64(path, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+        else
+        {
+            LinuxStatX64 stat;
+            if (LinuxLStatX64(path, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static bool TryLinuxFdId(SafeFileHandle handle, out ulong dev, out ulong ino)
+    {
+        dev = 0;
+        ino = 0;
+        int fd = handle.DangerousGetHandle().ToInt32();
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            LinuxStatArm64 stat;
+            if (LinuxFStatArm64(fd, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+        else
+        {
+            LinuxStatX64 stat;
+            if (LinuxFStatX64(fd, out stat) != 0) return false;
+            dev = stat.Dev;
+            ino = stat.Ino;
+            return true;
+        }
+    }
+
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static int LinuxLinkCount(string path)
     {
@@ -446,4 +596,12 @@ static class VirePaths
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     [DllImport("libc", EntryPoint = "lstat", SetLastError = true)]
     static extern int LinuxLStatArm64(string path, out LinuxStatArm64 stat);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
+    static extern int LinuxFStatX64(int fd, out LinuxStatX64 stat);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
+    static extern int LinuxFStatArm64(int fd, out LinuxStatArm64 stat);
 }

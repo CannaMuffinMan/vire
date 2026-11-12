@@ -28,7 +28,7 @@ fi
 run_vire() { "${VIRE[@]}" "$@"; }
 
 echo "stage 1: interpreter compiles compiler.vire"
-run_vire compiler.vire data/compiler.vire data/stage1.vc
+VIRE_BUDGET= "${VIRE[@]}" --compiler compiler.vire data/compiler.vire data/stage1.vc
 
 echo "stage 2: stage1.vc compiles compiler.vire"
 run_vire run data/stage1.vc data/compiler.vire data/stage2.vc
