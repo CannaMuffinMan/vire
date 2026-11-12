@@ -972,6 +972,16 @@ sealed class CompiledMachine
             VireListen.WithCancel(port, line, root, DispatchRoute, Show, p => ListenPort = p);
             return null;
         }
+        if (name == "https")
+        {
+            if (args.Count != 3) throw new VireError("https takes 3 values, got " + args.Count, line, col);
+            if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
+            string cert = args[1] as string;
+            string key = args[2] as string;
+            if (cert == null || key == null) throw new VireError("https needs a port, cert path, and key path", line, col);
+            VireListen.WithCancelTls(Machine.RequirePort(args[0], line), line, root, cert, key, DispatchRoute, Show, p => ListenPort = p);
+            return null;
+        }
         if (name == "line")
         {
             string text = args[0] as string;

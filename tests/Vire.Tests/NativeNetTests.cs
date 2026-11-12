@@ -15,7 +15,15 @@ public class NativeNetTests
         string staged = File.ReadAllText(Path.Combine(root, "data", "src", "rt-net.vire"));
         Assert.Equal(net, staged);
         Assert.Contains("emitNetRuntime", net);
+        Assert.Contains("emitTlsRuntime", net);
         Assert.Contains("rt_listen", net);
+        Assert.Contains("rt_tls_serve", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
+        Assert.Contains("slice with raw, start, i", net);
+        Assert.Contains("parkMsg with image, labels, \"msg_tls\"", net);
+        string tlsBlob = File.ReadAllText(Path.Combine(root, "src", "rt-tls-blob.txt")).Trim();
+        Assert.Contains("4c8d05", tlsBlob);
+        Assert.Contains("c745c8", tlsBlob);
+        Assert.Contains("msg_tls_ach", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
@@ -33,9 +41,14 @@ public class NativeNetTests
         Assert.Contains("use \"src/rt-net.vire\"", native);
         Assert.Contains("nm == \"json\"", native);
         Assert.Contains("nm == \"listen\"", native);
+        Assert.Contains("nm == \"https\"", native);
         Assert.Contains("openNetImage", native);
+        Assert.DoesNotContain("openTlsImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("openNetImage", pe);
+        Assert.Contains("emitThunks", pe);
+        Assert.Contains("secur32.dll", pe);
+        Assert.Contains("AcquireCredentialsHandleA", pe);
         Assert.Contains("let buf be emitU8 with buf, (codeOf with (raw at i))", pe);
         Assert.DoesNotContain("let buf be emitU8 with buf, (ord with (raw at i))", pe);
         string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
@@ -80,6 +93,40 @@ public class NativeNetTests
             Assert.DoesNotContain("GetProcAddress", imports);
             Assert.DoesNotContain("CreateProcessA", imports);
             Assert.DoesNotContain("VirtualProtect", imports);
+            Assert.Contains("AcquireCredentialsHandleA", imports);
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void HostCompileOfHttpsGuestImportsSchannelAllowlist()
+    {
+        string root = DualMode.FindRoot();
+        string work = Path.Combine(root, "data", "native-net", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            File.Copy(Path.Combine(root, "guest-health-https.vire"), Path.Combine(work, "guest-health-https.vire"));
+            string srcRel = ("data/native-net/" + Path.GetFileName(work) + "/guest-health-https.vire").Replace('\\', '/');
+            string hexRel = ("data/native-net/" + Path.GetFileName(work) + "/guest-health-https.hex").Replace('\\', '/');
+            DualMode.Proc compiled = DualMode.RunVire(root, new string[] { "compile-native.vire", srcRel, hexRel }, root);
+            Assert.Equal(0, compiled.Code);
+            byte[] pe = HexToPe(root, hexRel);
+            string ascii = Encoding.ASCII.GetString(pe);
+            HashSet<string> imports = PeImports.Names(pe);
+            Assert.Contains("secur32.dll", ascii.ToLowerInvariant());
+            Assert.Contains("crypt32.dll", ascii.ToLowerInvariant());
+            Assert.Contains("ncrypt.dll", ascii.ToLowerInvariant());
+            Assert.Contains("AcquireCredentialsHandleA", imports);
+            Assert.Contains("AcceptSecurityContext", imports);
+            Assert.Contains("EncryptMessage", imports);
+            Assert.Contains("DecryptMessage", imports);
+            Assert.Contains("WSAStartup", imports);
+            Assert.DoesNotContain("LoadLibraryA", imports);
+            Assert.DoesNotContain("GetProcAddress", imports);
         }
         finally
         {

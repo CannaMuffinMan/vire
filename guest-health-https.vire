@@ -1,0 +1,18 @@
+~ Native PE HTTPS health clone. Same /health contract as guest-health.vire.
+~ Cert and key stay under data/ (sandbox). CI mints throwaway PEM, never committed.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if path == "/api/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  https with 18443, "data/tls-ci/cert.pem", "data/tls-ci/key.pem"
+end

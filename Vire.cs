@@ -379,7 +379,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "https", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -618,7 +618,7 @@ sealed class Machine
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
         if (name == "serve" || name == "escape") need = 1;
-        if (name == "slice") need = 3;
+        if (name == "slice" || name == "https") need = 3;
         if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "length")
         {
@@ -727,6 +727,15 @@ sealed class Machine
             throw new HaltSignal((int)args[0]);
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
+        if (name == "https")
+        {
+            if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
+            string cert = args[1] as string;
+            string key = args[2] as string;
+            if (cert == null || key == null) throw new VireError("https needs a port, cert path, and key path", line, col);
+            VireListen.WithCancelTls(RequirePort(args[0], line), line, root, cert, key, DispatchRoute, Show, p => ListenPort = p);
+            return null;
+        }
         if (name == "kind") return KindOf(args[0]);
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);

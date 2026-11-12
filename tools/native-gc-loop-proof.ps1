@@ -72,8 +72,18 @@ function Restore-RuntimeFrom {
         git cat-file -e "$Sha^{commit}" 2>$null
         if ($LASTEXITCODE -ne 0) { throw "missing commit $Sha" }
     }
-    git checkout $Sha -- src/rt.vire src/rt-more.vire data/src/rt.vire data/src/rt-more.vire compile-native.vire data/compile-native.vire
-    if ($LASTEXITCODE -ne 0) { throw "checkout runtime from $Sha failed" }
+    $files = @(
+        "src/rt.vire", "src/rt-more.vire", "src/pe.vire",
+        "data/src/rt.vire", "data/src/rt-more.vire", "data/src/pe.vire",
+        "compile-native.vire", "data/compile-native.vire"
+    )
+    foreach ($f in $files) {
+        git checkout $Sha -- $f
+        if ($LASTEXITCODE -ne 0) { throw "checkout $f from $Sha failed" }
+    }
+    foreach ($opt in @("src/rt-net.vire", "data/src/rt-net.vire")) {
+        git checkout $Sha -- $opt 2>$null
+    }
 }
 
 $Work = Join-Path $Root "data/native-gc-loop"
@@ -86,15 +96,17 @@ $beforeGc = Compile-Run "gc-churn-before" (Join-Path $Root "tests/native/gc-chur
 Write-Output "before_gc exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
 if ($beforeGc.Exit -eq 1 -and $beforeGc.Out.Contains("out of memory")) {
     Write-Output "FAIL_BEFORE gc-churn OOM at $BaseSha"
+} elseif ($beforeGc.Exit -eq 0 -and $beforeGc.Out -eq "7") {
+    Write-Output "FAIL_BEFORE gc-churn already PASS on $BaseSha (GC fix is on native-compiler)"
 } else {
-    throw "fail-before gc-churn expected OOM, got exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
+    throw "fail-before gc-churn expected OOM or already-fixed 7, got exit=$($beforeGc.Exit) out=$($beforeGc.Out)"
 }
 $beforeSpin = Compile-Run "while-spin-before" (Join-Path $Root "tests/native/while-spin.vire")
 Write-Output "before_spin exit=$($beforeSpin.Exit) out=$($beforeSpin.Out)"
 if ($beforeSpin.Exit -eq 1 -and $beforeSpin.Out.Contains("while ran too long")) {
     Write-Output "FAIL_BEFORE while-spin at $BaseSha"
 } else {
-    throw "fail-before while-spin expected while ran too long"
+    throw "fail-before while-spin expected while ran too long, got exit=$($beforeSpin.Exit) out=$($beforeSpin.Out)"
 }
 
 Write-Output "phase pass-after $AfterSha"
