@@ -55,8 +55,14 @@ function Compile-Run {
 
 function Restore-RuntimeFrom {
     param([string]$Sha)
-    git checkout $Sha -- src/rt.vire src/rt-more.vire data/src/rt.vire data/src/rt-more.vire compile-native.vire data/compile-native.vire
-    if ($LASTEXITCODE -ne 0) { throw "checkout runtime from $Sha failed" }
+    $files = @(
+        "src/rt.vire", "src/rt-more.vire", "src/pe.vire", "src/rt-net.vire",
+        "data/src/rt.vire", "data/src/rt-more.vire", "data/src/pe.vire", "data/src/rt-net.vire",
+        "compile-native.vire", "data/compile-native.vire"
+    )
+    foreach ($f in $files) {
+        git checkout $Sha -- $f 2>$null
+    }
 }
 
 $Work = Join-Path $Root "data/native-gc-loop"

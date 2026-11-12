@@ -17,7 +17,8 @@ public class NativeNetTests
         Assert.Contains("emitNetRuntime", net);
         Assert.Contains("emitTlsRuntime", net);
         Assert.Contains("rt_listen", net);
-        Assert.Contains("rt_https", File.ReadAllText(Path.Combine(root, "src", "rt-tls-names.txt")));
+        Assert.Contains("rt_https,https_bad", net);
+        Assert.Contains("rt_tls_serve", net);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
