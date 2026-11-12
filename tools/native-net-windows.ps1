@@ -208,31 +208,32 @@ function Write-AdversaryWire([string]$Name, [byte[]]$Request, [byte[]]$Response)
     Write-Host ("adversary_{0}_response_ascii {1}" -f $Name, (Convert-BytesToAscii $Response))
 }
 
+function Find-ByteSeq([byte[]]$Hay, [byte[]]$Needle) {
+    if ($null -eq $Hay -or $Hay.Length -lt $Needle.Length) { return -1 }
+    $last = $Hay.Length - $Needle.Length
+    for ($i = 0; $i -le $last; $i++) {
+        $ok = $true
+        for ($j = 0; $j -lt $Needle.Length; $j++) {
+            if ($Hay[$i + $j] -ne $Needle[$j]) { $ok = $false; break }
+        }
+        if ($ok) { return $i }
+    }
+    return -1
+}
+
 function Test-Http11Framing([string]$Name, [byte[]]$Response, [string]$WantStatus) {
     $prefix = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 $WantStatus ")
     if ($Response.Length -lt $prefix.Length) {
-        throw ("{0} expected {1}, got empty/short {2}" -f $Name, $WantStatus, $Response.Length)
+        throw ("{0} expected {1}, got empty/short {2} hex {3}" -f $Name, $WantStatus, $Response.Length, (Convert-BytesToHex $Response))
     }
     for ($i = 0; $i -lt $prefix.Length; $i++) {
         if ($Response[$i] -ne $prefix[$i]) {
-            throw ("{0} expected {1}, got {2}" -f $Name, $WantStatus, (Convert-BytesToAscii $Response))
+            throw ("{0} expected {1}, got {2} hex {3}" -f $Name, $WantStatus, (Convert-BytesToAscii $Response), (Convert-BytesToHex $Response))
         }
     }
-    $crlf = 0
-    $sawEnd = $false
-    for ($i = 0; $i -lt $Response.Length; $i++) {
-        if ($Response[$i] -eq 13) {
-            if (($i + 1) -ge $Response.Length -or $Response[$i + 1] -ne 10) {
-                throw "$Name response has CR not followed by LF"
-            }
-            if ($i -gt 0 -and $Response[$i - 1] -eq 10) { $sawEnd = $true }
-            $crlf++
-            $i++
-        } elseif ($Response[$i] -eq 10) {
-            throw "$Name response has bare LF"
-        }
+    if ((Find-ByteSeq $Response ([byte[]](13, 10, 13, 10))) -lt 0) {
+        throw ("{0} response missing CRLFCRLF terminator hex {1}" -f $Name, (Convert-BytesToHex $Response))
     }
-    if ($crlf -lt 2 -or -not $sawEnd) { throw "$Name response missing CRLFCRLF terminator" }
     $ascii = [System.Text.Encoding]::ASCII.GetString($Response)
     if ($ascii -notmatch "(?i)connection:\s*close") { throw "$Name missing Connection: close" }
 }
