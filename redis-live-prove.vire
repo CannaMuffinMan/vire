@@ -1,0 +1,38 @@
+use "src/rt-redis.vire"
+
+define mustOk with tag, got
+  if (got at 0) != "ok"
+    say tag + " FAIL " + (got at 1)
+    halt with 1
+  end
+  say tag + " " + (redis_show with (got at 1))
+  return 0
+end
+
+define main
+  let a be args
+  let port be number with (a at 0)
+  let h be redis_open with port
+  let auth be redis_auth with h, ""
+  mustOk with "AUTH", auth
+  let ping be redis_ping with h
+  mustOk with "PING", ping
+  let d0 be redis_del with h, "vire:prove:k"
+  mustOk with "DELK0", d0
+  let d1 be redis_del with h, "vire:prove:c"
+  mustOk with "DELC0", d1
+  let s be redis_set with h, "vire:prove:k", "hello"
+  mustOk with "SET", s
+  let g be redis_get with h, "vire:prove:k"
+  mustOk with "GET", g
+  let c be redis_incr with h, "vire:prove:c"
+  mustOk with "INCR", c
+  let e be redis_expire with h, "vire:prove:k", 60
+  mustOk with "EXPIRE", e
+  let d be redis_del with h, "vire:prove:k"
+  mustOk with "DEL", d
+  let miss be redis_get with h, "vire:prove:k"
+  mustOk with "GETMISS", miss
+  close with h
+  say "REDIS LIVE PROVE pass"
+end

@@ -1,0 +1,363 @@
+~ Guest RESP2 Redis client over loopback TCP from PR #64.
+~ Loopback 127.0.0.1 only. No TLS, no DNS, no RESP3, no pub/sub.
+~ Caps stay inside host limits: bulk 65536, array 1024, depth 16,
+~ frame 1000000 (recv cap), list 100000, steps 5M, arena 32MB.
+
+define redis_ok with value
+  return ["ok", value]
+end
+
+define redis_bad with why
+  return ["bad", why]
+end
+
+define redis_need
+  return ["need"]
+end
+
+define redis_max_bulk
+  return 65536
+end
+
+define redis_max_array
+  return 1024
+end
+
+define redis_max_depth
+  return 16
+end
+
+define redis_max_frame
+  return 1000000
+end
+
+define redis_crlf
+  return "\r\n"
+end
+
+define redis_bulk with s
+  return "$" + (text with (length with s)) + "\r\n" + s + "\r\n"
+end
+
+define redis_encode with parts
+  let n be length with parts
+  let out be "*" + (text with n) + "\r\n"
+  let i be 0
+  while i < n
+    let out be out + (redis_bulk with (parts at i))
+    let i be i + 1
+  end
+  return out
+end
+
+define redis_parse_int with raw, allowNeg
+  let n be length with raw
+  if n == 0
+    return redis_bad with "empty integer"
+  end
+  let i be 0
+  let neg be 0
+  if (raw at 0) == "-"
+    if allowNeg == false
+      return redis_bad with "negative length"
+    end
+    if n == 1
+      return redis_bad with "empty integer"
+    end
+    let neg be 1
+    let i be 1
+  end
+  if (n - i) > 10
+    return redis_bad with "overflow length"
+  end
+  if (raw at i) == "0"
+    if (i + 1) < n
+      return redis_bad with "bad integer"
+    end
+  end
+  let v be 0
+  while i < n
+    let d be find with "0123456789", (raw at i)
+    if d < 0
+      return redis_bad with "bad integer"
+    end
+    if v > 214748364
+      return redis_bad with "overflow length"
+    end
+    if v == 214748364
+      if d > 7
+        return redis_bad with "overflow length"
+      end
+    end
+    let v be (v * 10) + d
+    let i be i + 1
+  end
+  if neg == 1
+    return redis_ok with (0 - v)
+  end
+  return redis_ok with v
+end
+
+define redis_line with buf, i
+  let n be length with buf
+  let j be i
+  while j < n
+    let ch be buf at j
+    if ch == "\n"
+      return redis_bad with "bare LF"
+    end
+    if ch == "\r"
+      if (j + 1) >= n
+        return redis_need
+      end
+      if (buf at (j + 1)) != "\n"
+        return redis_bad with "bad CRLF"
+      end
+      return ["ok", (slice with buf, i, j), (j + 2)]
+    end
+    let j be j + 1
+  end
+  return redis_need
+end
+
+define redis_null_bulk
+  return {"k": "$"}
+end
+
+define redis_null_array
+  return {"k": "*"}
+end
+
+define redis_decode with buf, i, d
+  if d > (redis_max_depth)
+    return redis_bad with "too-deep nesting"
+  end
+  let n be length with buf
+  if i >= n
+    return redis_need
+  end
+  let t be buf at i
+  let line be redis_line with buf, (i + 1)
+  if (line at 0) == "need"
+    return redis_need
+  end
+  if (line at 0) == "bad"
+    return line
+  end
+  let raw be line at 1
+  let next be line at 2
+  if t == "+"
+    return ["ok", {"k": "+", "s": raw}, next]
+  end
+  if t == "-"
+    return ["ok", {"k": "-", "s": raw}, next]
+  end
+  if t == ":"
+    let num be redis_parse_int with raw, true
+    if (num at 0) != "ok"
+      return num
+    end
+    return ["ok", {"k": ":", "n": (num at 1)}, next]
+  end
+  if t == "$"
+    if raw == "-1"
+      return ["ok", (redis_null_bulk), next]
+    end
+    let num be redis_parse_int with raw, false
+    if (num at 0) != "ok"
+      return num
+    end
+    let ln be num at 1
+    if ln > (redis_max_bulk)
+      return redis_bad with "oversize bulk"
+    end
+    if (next + ln + 2) > n
+      return redis_need
+    end
+    let body be slice with buf, next, (next + ln)
+    let cr be buf at (next + ln)
+    let lf be buf at (next + ln + 1)
+    if cr != "\r"
+      return redis_bad with "bad CRLF"
+    end
+    if lf != "\n"
+      return redis_bad with "bad CRLF"
+    end
+    return ["ok", {"k": "$", "s": body}, (next + ln + 2)]
+  end
+  if t == "*"
+    if raw == "-1"
+      return ["ok", (redis_null_array), next]
+    end
+    let num be redis_parse_int with raw, false
+    if (num at 0) != "ok"
+      return num
+    end
+    let ln be num at 1
+    if ln > (redis_max_array)
+      return redis_bad with "oversize array"
+    end
+    let items be []
+    let pos be next
+    let k be 0
+    while k < ln
+      let one be redis_decode with buf, pos, (d + 1)
+      if (one at 0) != "ok"
+        return one
+      end
+      push with items, (one at 1)
+      let pos be one at 2
+      let k be k + 1
+    end
+    return ["ok", {"k": "*", "a": items}, pos]
+  end
+  return redis_bad with "bad type"
+end
+
+define redis_decode_full with buf
+  if (length with buf) > (redis_max_frame)
+    return redis_bad with "oversize frame"
+  end
+  let got be redis_decode with buf, 0, 0
+  if (got at 0) == "need"
+    return redis_bad with "truncated frame"
+  end
+  return got
+end
+
+define redis_open with port
+  return connect with "127.0.0.1", port
+end
+
+define redis_read with h
+  let buf be ""
+  let turns be 0
+  while turns < 64
+    let chunk be recv with h, 4096
+    if (length with chunk) == 0
+      return redis_bad with "truncated frame"
+    end
+    let buf be buf + chunk
+    if (length with buf) > (redis_max_frame)
+      return redis_bad with "oversize frame"
+    end
+    let got be redis_decode with buf, 0, 0
+    if (got at 0) == "ok"
+      return got
+    end
+    if (got at 0) == "bad"
+      return got
+    end
+    let turns be turns + 1
+  end
+  return redis_bad with "truncated frame"
+end
+
+define redis_exec with h, parts
+  send with h, (redis_encode with parts)
+  return redis_read with h
+end
+
+define redis_is_err with got
+  if (got at 0) != "ok"
+    return true
+  end
+  let v be got at 1
+  if (v at "k") == "-"
+    return true
+  end
+  return false
+end
+
+define redis_err_why with got
+  if (got at 0) == "bad"
+    return got at 1
+  end
+  let v be got at 1
+  return v at "s"
+end
+
+define redis_auth with h, password
+  if password == ""
+    return redis_ok with {"k": "+", "s": "OK"}
+  end
+  let got be redis_exec with h, ["AUTH", password]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_ping with h
+  let got be redis_exec with h, ["PING"]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_set with h, key, value
+  let got be redis_exec with h, ["SET", key, value]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_get with h, key
+  let got be redis_exec with h, ["GET", key]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_del with h, key
+  let got be redis_exec with h, ["DEL", key]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_incr with h, key
+  let got be redis_exec with h, ["INCR", key]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_expire with h, key, sec
+  let got be redis_exec with h, ["EXPIRE", key, (text with sec)]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_show with v
+  let k be v at "k"
+  if k == "+"
+    return v at "s"
+  end
+  if k == "-"
+    return v at "s"
+  end
+  if k == ":"
+    return text with (v at "n")
+  end
+  if k == "$"
+    if has with v, "s"
+      return v at "s"
+    end
+    return "null"
+  end
+  if k == "*"
+    if has with v, "a"
+      return "*" + (text with (length with (v at "a")))
+    end
+    return "null"
+  end
+  return "?"
+end
