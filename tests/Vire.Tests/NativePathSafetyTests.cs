@@ -42,7 +42,8 @@ public class NativePathSafetyTests
         Assert.DoesNotContain("138, 68, 1, 8, 60, 58", more);
         Assert.Contains("rt_check_path", rt);
         Assert.Contains("path_copy_oom", more);
-        Assert.Contains("72, 141, 81, 8, 72, 137, 85, 216", more);
+        Assert.Contains("72, 139, 85, 248, 72, 141, 82, 8", more);
+        Assert.DoesNotContain("72, 141, 81, 8, 72, 137, 85, 216", more);
         Assert.DoesNotContain("72, 141, 73, 8, 72, 137, 77, 232, 72, 199, 69, 224, 0, 0, 0, 0", more);
         string native = File.ReadAllText(Path.Combine(Root(), "compile-native.vire"));
         int runtime = native.LastIndexOf("parkRuntime with (gen at \"image\")", StringComparison.Ordinal);
