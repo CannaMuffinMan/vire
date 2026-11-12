@@ -128,6 +128,8 @@ $body = [string](Get-Content -Raw (Join-Path $Data "https-health.body.txt") -Err
 Write-Output ("PASS_AFTER_https_curl_exit " + $vproc.ExitCode)
 Write-Output ("PASS_AFTER_https_verbose " + (([string]$vtext -replace '\s+', ' ').Trim()))
 Write-Output ("PASS_AFTER_https_health " + (($body -replace '\s+', ' ').Trim()))
+Write-Output ("https_server_alive " + (-not $hs.HasExited))
+if ($hs.HasExited) { Write-Output ("https_server_exit " + $hs.ExitCode) }
 if ($vproc.ExitCode -ne 0) { throw "HTTPS GET /health failed" }
 if ($body -notmatch "HTTP/1.1 200 ") { throw "https health status not 200" }
 if ($body -notmatch [regex]::Escape($want)) { throw "https health body mismatch" }
