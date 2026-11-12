@@ -171,15 +171,21 @@ define redis_decode with buf, i, d
     if ln > (redis_max_bulk)
       return redis_bad with "oversize bulk"
     end
-    if (next + ln + 2) > n
+    if (next + ln) > n
+      return redis_need
+    end
+    if (next + ln) == n
       return redis_need
     end
     let body be slice with buf, next, (next + ln)
     let cr be buf at (next + ln)
-    let lf be buf at (next + ln + 1)
     if cr != "\r"
       return redis_bad with "bad CRLF"
     end
+    if (next + ln + 1) >= n
+      return redis_need
+    end
+    let lf be buf at (next + ln + 1)
     if lf != "\n"
       return redis_bad with "bad CRLF"
     end
