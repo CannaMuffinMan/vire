@@ -1,0 +1,123 @@
+use "src/rt-schema.vire"
+
+define proveOk with tag, got
+  if (got at 0) == "ok"
+    say tag + " PASS"
+    return 0
+  end
+  say tag + " FAIL got " + (got at 0) + " " + (got at 1)
+  return 1
+end
+
+define proveBad with tag, got, needle
+  if (got at 0) != "bad"
+    say tag + " FAIL expected reject got " + (got at 0)
+    return 1
+  end
+  let why be got at 1
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    return 1
+  end
+  say tag + " REJECT " + why
+  return 0
+end
+
+define fillText with n, ch
+  let s be ""
+  let i be 0
+  while i < n
+    let s be s + ch
+    let i be i + 1
+  end
+  return s
+end
+
+define main
+  let fails be 0
+  let health be schema_health
+  let good be {"ok": true, "service": "fcgcpa", "payments": false}
+  let got be schema_check with good, health
+  let nfail be proveOk with "HEALTH valid", got
+  let fails be fails + nfail
+
+  let badType be {"ok": "yes", "service": "fcgcpa", "payments": false}
+  let got be schema_check with badType, health
+  let nfail be proveBad with "TYPE mismatch", got, "type mismatch"
+  let fails be fails + nfail
+
+  let missing be {"ok": true, "payments": false}
+  let got be schema_check with missing, health
+  let nfail be proveBad with "MISSING required", got, "missing required"
+  let fails be fails + nfail
+
+  let extra be {"ok": true, "service": "fcgcpa", "payments": false, "x": true}
+  let got be schema_check with extra, health
+  let nfail be proveBad with "UNKNOWN field", got, "unknown field"
+  let fails be fails + nfail
+
+  let longName be fillText with 40, "a"
+  let longBody be {"ok": true, "service": longName, "payments": false}
+  let got be schema_check with longBody, health
+  let nfail be proveBad with "OVERSIZE string", got, "oversize string"
+  let fails be fails + nfail
+
+  let listShape be {"type": "list", "item": {"type": "number"}, "max": 8}
+  let xs be [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  let got be schema_check with xs, listShape
+  let nfail be proveBad with "OVERSIZE array", got, "oversize array"
+  let fails be fails + nfail
+
+  let deepArr be 0
+  let deepShape be {"type": "number"}
+  let di be 0
+  while di < 20
+    let deepArr be [deepArr]
+    let deepShape be {"type": "list", "item": deepShape}
+    let di be di + 1
+  end
+  let got be schema_check with deepArr, deepShape
+  let nfail be proveBad with "ADV too-deep array", got, "too-deep nesting"
+  let fails be fails + nfail
+
+  let deepObj be 0
+  let deepMapShape be {"type": "number"}
+  let di be 0
+  while di < 20
+    let deepObj be {"n": deepObj}
+    let deepMapShape be {"type": "map", "fields": {"n": deepMapShape}}
+    let di be di + 1
+  end
+  let got be schema_check with deepObj, deepMapShape
+  let nfail be proveBad with "ADV too-deep object", got, "too-deep nesting"
+  let fails be fails + nfail
+
+  let optShape be {"type": "map", "fields": {"ok": {"type": "bool"}, "note": {"type": "text", "need": false, "max": 8}}}
+  let optVal be {"ok": true}
+  let got be schema_check with optVal, optShape
+  let nfail be proveOk with "OPTIONAL absent", got
+  let fails be fails + nfail
+
+  let rangeShape be {"type": "number", "min": 0, "max": 10}
+  let got be schema_check with (0 - 1), rangeShape
+  let nfail be proveBad with "NUMBER range", got, "number out of range"
+  let fails be fails + nfail
+  let got be schema_check with 11, rangeShape
+  let nfail be proveBad with "NUMBER high", got, "number out of range"
+  let fails be fails + nfail
+  let got be schema_check with 5, rangeShape
+  let nfail be proveOk with "NUMBER mid", got
+  let fails be fails + nfail
+
+  let two be [[0]]
+  let twoShape be {"type": "list", "item": {"type": "list", "item": {"type": "number"}}}
+  let got be schema_check with two, twoShape
+  let nfail be proveOk with "DEPTH two lists", got
+  let fails be fails + nfail
+
+  if fails == 0
+    say "SCHEMA PROVE pass"
+  else
+    say "SCHEMA PROVE fails " + (text with fails)
+  end
+end

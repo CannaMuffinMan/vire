@@ -1,0 +1,177 @@
+~ Guest JSON body validation. parse only checks syntax; this checks a shape.
+~ Caps stay inside the host list/text limits (100000 / 1e6). Depth 16 is
+~ stricter than host parse (256) so a future FCG route fails closed.
+~ Expected types come from the shape so native PE does not need kind/try.
+
+define schema_ok with value
+  return ["ok", value]
+end
+
+define schema_bad with why
+  return ["bad", why]
+end
+
+define schema_need with spec
+  if not (has with spec, "need")
+    return true
+  end
+  if (spec at "need") == false
+    return false
+  end
+  return true
+end
+
+define schema_max_of with spec, fallback
+  if has with spec, "max"
+    return spec at "max"
+  end
+  return fallback
+end
+
+define schema_is_bool with value
+  if value == true
+    return true
+  end
+  if value == false
+    return true
+  end
+  return false
+end
+
+define schema_match with value, shape, d
+  if d > 16
+    return schema_bad with "too-deep nesting"
+  end
+  if not (has with shape, "type")
+    return schema_bad with "bad shape"
+  end
+  let want be shape at "type"
+  if want == "bool"
+    if schema_is_bool with value
+      return schema_ok with value
+    end
+    return schema_bad with "type mismatch want bool"
+  end
+  if want == "none"
+    if value == none
+      return schema_ok with value
+    end
+    return schema_bad with "type mismatch want none"
+  end
+  if want == "text"
+    if schema_is_bool with value
+      return schema_bad with "type mismatch want text"
+    end
+    if value == none
+      return schema_bad with "type mismatch want text"
+    end
+    let n be length with value
+    if has with shape, "min"
+      if n < (shape at "min")
+        return schema_bad with "oversize string"
+      end
+    end
+    if n > (schema_max_of with shape, 4096)
+      return schema_bad with "oversize string"
+    end
+    return schema_ok with value
+  end
+  if want == "number"
+    if schema_is_bool with value
+      return schema_bad with "type mismatch want number"
+    end
+    if value == none
+      return schema_bad with "type mismatch want number"
+    end
+    if has with shape, "min"
+      if value < (shape at "min")
+        return schema_bad with "number out of range"
+      end
+    end
+    if has with shape, "max"
+      if value > (shape at "max")
+        return schema_bad with "number out of range"
+      end
+    end
+    return schema_ok with value
+  end
+  if want == "list"
+    if schema_is_bool with value
+      return schema_bad with "type mismatch want list"
+    end
+    let n be length with value
+    if n > (schema_max_of with shape, 256)
+      return schema_bad with "oversize array"
+    end
+    if has with shape, "min"
+      if n < (shape at "min")
+        return schema_bad with "oversize array"
+      end
+    end
+    if not (has with shape, "item")
+      return schema_bad with "bad shape"
+    end
+    let item be shape at "item"
+    let i be 0
+    while i < n
+      let one be schema_match with (value at i), item, (d + 1)
+      if (one at 0) != "ok"
+        return one
+      end
+      let i be i + 1
+    end
+    return schema_ok with value
+  end
+  if want == "map"
+    if schema_is_bool with value
+      return schema_bad with "type mismatch want map"
+    end
+    if not (has with shape, "fields")
+      return schema_bad with "bad shape"
+    end
+    let fields be shape at "fields"
+    let names be keys with fields
+    let ni be 0
+    while ni < (length with names)
+      let name be names at ni
+      let spec be fields at name
+      let present be has with value, name
+      if present == true
+        let one be schema_match with (value at name), spec, (d + 1)
+        if (one at 0) != "ok"
+          return one
+        end
+      end
+      if present == false
+        if (schema_need with spec) == true
+          return schema_bad with ("missing required " + name)
+        end
+      end
+      let ni be ni + 1
+    end
+    let gotNames be keys with value
+    let gi be 0
+    while gi < (length with gotNames)
+      let name be gotNames at gi
+      if (has with fields, name) == false
+        return schema_bad with ("unknown field " + name)
+      end
+      let gi be gi + 1
+    end
+    return schema_ok with value
+  end
+  return schema_bad with "bad shape"
+end
+
+define schema_check with value, shape
+  return schema_match with value, shape, 0
+end
+
+define schema_parse with raw, shape
+  let value be parse with raw
+  return schema_check with value, shape
+end
+
+define schema_health
+  return {"type": "map", "fields": {"ok": {"type": "bool"}, "service": {"type": "text", "max": 32}, "payments": {"type": "bool"}}}
+end

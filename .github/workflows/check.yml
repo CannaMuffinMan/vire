@@ -84,6 +84,7 @@ jobs:
       - run: pwsh -File tools/native-smoke.ps1
       - run: pwsh -File tools/native-oom.ps1
       - run: pwsh -File tools/native-gc-loop-proof.ps1
+      - run: pwsh -File tools/schema-prove-windows.ps1
   native-selfhost-windows:
     runs-on: windows-latest
     steps:
