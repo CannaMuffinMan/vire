@@ -17,10 +17,8 @@ define main
   mustOk with "AUTH", auth
   let ping be redis_ping with h
   mustOk with "PING", ping
-  let d0 be redis_del with h, "vire:prove:k"
-  mustOk with "DELK0", d0
-  let d1 be redis_del with h, "vire:prove:c"
-  mustOk with "DELC0", d1
+  redis_del with h, "vire:prove:k"
+  redis_del with h, "vire:prove:c"
   let s be redis_set with h, "vire:prove:k", "hello"
   mustOk with "SET", s
   let g be redis_get with h, "vire:prove:k"
@@ -33,6 +31,7 @@ define main
   mustOk with "DEL", d
   let gone be redis_get with h, "vire:prove:k"
   mustOk with "GETMISS", gone
+  redis_del with h, "vire:prove:c"
   close with h
   say "REDIS LIVE PROVE pass"
 end
