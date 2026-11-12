@@ -28,4 +28,14 @@ public class ExtendTests
         Assert.Equal(0, run.InterpCode);
         Assert.Equal("[72, 44, 255]\n", DualMode.Norm(run.InterpOut));
     }
+
+    [Fact]
+    public void SelfExtendCopiesOriginalElementsOnce()
+    {
+        DualMode.DualRun run = DualMode.RunSource(
+            "define main\n  let a be [1, 2]\n  say (extend with a, a)\nend\n",
+            null);
+        Assert.True(run.Matched, run.InterpOut + run.CompOut + run.InterpErr + run.CompErr);
+        Assert.Equal("[1, 2, 1, 2]\n", DualMode.Norm(run.InterpOut));
+    }
 }

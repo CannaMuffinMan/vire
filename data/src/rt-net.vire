@@ -1,0 +1,113 @@
+~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
+~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
+~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe
+~ returns unsafe (client answers 400 and closes) for NUL, bare LF, lone CR,
+~ CR not followed by LF, controls other than HT, and obs-fold (SP / HT after LF).
+~ Duplicate Content-Length is 400. Transfer-Encoding is 501 (not implemented).
+~ hu_frame sliding-window scans [0, headerEnd) for those names (ci) so a last
+~ field line whose CR is headerEnd itself cannot skip the count.
+
+define hexNibble with ch
+  return find with "0123456789abcdef", ch
+end
+
+define emitHex with image, raw
+  let i be 0
+  let n be length with raw
+  while i + 1 < n
+    let v be ((hexNibble with (raw at i)) * 16) + (hexNibble with (raw at (i + 1)))
+    let image be emitU8 with image, v
+    let i be i + 2
+  end
+  return image
+end
+
+define parseU16 with raw, i
+  let lo be ((hexNibble with (raw at i)) * 16) + (hexNibble with (raw at (i + 1)))
+  let hi be ((hexNibble with (raw at (i + 2))) * 16) + (hexNibble with (raw at (i + 3)))
+  return lo + (hi * 256)
+end
+
+define parseU32 with raw, i
+  return (parseU16 with raw, i) + ((parseU16 with raw, (i + 4)) * 65536)
+end
+
+define applyPackedPins with labels, base, raw, names
+  let i be 0
+  let n be length with raw
+  while i + 11 < n
+    let off be parseU32 with raw, i
+    let id be parseU16 with raw, (i + 8)
+    put (base + off) into labels at (names at id)
+    let i be i + 12
+  end
+  return true
+end
+
+define applyPackedFixes with fixes, base, raw, names
+  let i be 0
+  let n be length with raw
+  while i + 11 < n
+    let off be parseU32 with raw, i
+    let id be parseU16 with raw, (i + 8)
+    push with fixes, {"at": (base + off), "to": (names at id)}
+    let i be i + 12
+  end
+  return true
+end
+
+define netNames
+  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdrs", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "rt_save_frame", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "hu_fold", "hu_frame"]
+end
+
+define emitNetRuntime with image, fixes, labels, has_route, need_net
+  let base be length with image
+  let names be netNames
+  if need_net
+    let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
+    applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
+    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
+    return image
+  end
+  let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
+  applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
+  applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.txt"), names
+  return image
+end
+
+define parkNet with image, labels
+  parkMsg with image, labels, "txt_listen", "listening on 127.0.0.1:"
+  parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
+  parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
+  parkMsg with image, labels, "txt_sp_err", " Error\r\n"
+  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json; charset=utf-8\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
+  parkMsg with image, labels, "txt_GET", "GET"
+  parkMsg with image, labels, "txt_POST", "POST"
+  parkMsg with image, labels, "txt_HEAD", "HEAD"
+  parkMsg with image, labels, "txt_PUT", "PUT"
+  parkMsg with image, labels, "txt_http11v", "HTTP/1.1"
+  parkMsg with image, labels, "txt_http10v", "HTTP/1.0"
+  parkMsg with image, labels, "txt_empty", ""
+  parkMsg with image, labels, "txt_clen", "content-length"
+  parkMsg with image, labels, "txt_te", "transfer-encoding"
+  parkMsg with image, labels, "txt_host", "host"
+  parkMsg with image, labels, "txt_null", "null"
+  parkMsg with image, labels, "txt_true", "true"
+  parkMsg with image, labels, "txt_false", "false"
+  parkMsg with image, labels, "txt_err400", "{\"error\":\"bad request\"}"
+  parkMsg with image, labels, "txt_err404", "{\"error\":\"not found\"}"
+  parkMsg with image, labels, "txt_err408", "{\"error\":\"timeout\"}"
+  parkMsg with image, labels, "txt_err413", "{\"error\":\"body too large\"}"
+  parkMsg with image, labels, "txt_err431", "{\"error\":\"headers too large\"}"
+  parkMsg with image, labels, "txt_err501", "{\"error\":\"not implemented\"}"
+  parkMsg with image, labels, "msg_net", "network setup failed"
+  parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
+  parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
+  parkMsg with image, labels, "msg_json", "json is not valid"
+  pin with labels, "ws2_ready", image
+  emitU64 with image, 0
+  return image
+end
+
+

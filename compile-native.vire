@@ -1,6 +1,7 @@
 ~ Compile let, if, calls, and read into a native Windows executable.
 
 use "src/pe.vire"
+use "src/rt-net.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -362,6 +363,7 @@ define parseAtom with state, func
         bump with state
         push with args, (parseProduct with state, func)
       end
+      noteNeed with state, nm
       return ["call", nm, args]
     end
     return ["name", nm]
@@ -382,54 +384,13 @@ define parseAtom with state, func
       bump with state
       return ["list", items]
     end
-    if (form with state) == "num" or (form with state) == "-"
-      let n be 0
-      if (form with state) == "-"
-        bump with state
-        if (form with state) != "num"
-          return markBad with state, "that expression is not ready"
-        end
-        let n be 0 - (valueOf with state)
-        bump with state
+    push with items, (parseExpr with state, func)
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "]"
+        stop
       end
-      if (form with state) == "num"
-        let n be valueOf with state
-        bump with state
-      end
-      push with items, n
-      while (form with state) == ","
-        bump with state
-        if (form with state) == "]"
-          stop
-        end
-        if (form with state) != "num" and (form with state) != "-"
-          return markBad with state, "that expression is not ready"
-        end
-        let n be 0
-        if (form with state) == "-"
-          bump with state
-          if (form with state) != "num"
-            return markBad with state, "that expression is not ready"
-          end
-          let n be 0 - (valueOf with state)
-          bump with state
-        end
-        if (form with state) == "num"
-          let n be valueOf with state
-          bump with state
-        end
-        push with items, n
-      end
-    end
-    if (form with state) != "num" and (length with items) == 0
       push with items, (parseExpr with state, func)
-      while (form with state) == ","
-        bump with state
-        if (form with state) == "]"
-          stop
-        end
-        push with items, (parseExpr with state, func)
-      end
     end
     if (form with state) != "]"
       return markBad with state, "that expression is not ready"
@@ -672,6 +633,7 @@ define parseStmt with state, func
   end
   if (expr at 0) == "name"
     let bare be []
+    noteNeed with state, (expr at 1)
     return ["call", expr at 1, bare]
   end
   return markBad with state, "that statement is not ready"
@@ -731,8 +693,21 @@ define parseDefine with state
   return func
 end
 
+define noteNeed with state, nm
+  if nm == "listen"
+    put true into state at "needNet"
+  end
+  if nm == "json"
+    put true into state at "needJson"
+  end
+  if nm == "parse"
+    put true into state at "needJson"
+  end
+  return true
+end
+
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": ""}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false}
   let funcs be []
   let uses be []
   let needs be []
@@ -778,7 +753,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson"}
 end
 
 define normPath with path
@@ -1017,7 +992,7 @@ define loadUnit with path, folder, seen
     let missing be true
   end
   if missing
-    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": []}
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false}
   end
   return loadText with path, source, folder, seen
 end
@@ -1045,6 +1020,8 @@ define loadText with path, source, folder, seen
   end
   let funcs be parsed at "funcs"
   let uses be parsed at "uses"
+  let needNet be parsed at "needNet"
+  let needJson be parsed at "needJson"
   let ui be 0
   while ui < (length with uses)
     let rel be uses at ui
@@ -1069,6 +1046,12 @@ define loadText with path, source, folder, seen
       return {"bad": true, "why": merged at "why", "funcs": funcs}
     end
     let funcs be merged at "funcs"
+    if extra at "needNet"
+      let needNet be true
+    end
+    if extra at "needJson"
+      let needJson be true
+    end
     let ui be ui + 1
   end
   let needs be parsed at "needs"
@@ -1124,10 +1107,16 @@ define loadText with path, source, folder, seen
       return {"bad": true, "why": merged at "why", "funcs": funcs}
     end
     let funcs be merged at "funcs"
+    if extra at "needNet"
+      let needNet be true
+    end
+    if extra at "needJson"
+      let needJson be true
+    end
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson}
 end
 
 define emitOp with gen, bytes
@@ -1223,7 +1212,7 @@ define builtinArity with nm
   if nm == "args" or nm == "ticks"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "json" or nm == "parse" or nm == "listen"
     return 1
   end
   if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
@@ -1671,12 +1660,14 @@ end
 
 define main
   let files be args
+  say "go"
   if (length with files) < 2
     say "usage: compile-native source.vire out.hex"
     say "compile failed"
     halt with 1
   end
   let loaded be loadUnit with (files at 0), (dirOf with (files at 0)), {}
+  say "loaded"
   if loaded at "bad"
     say loaded at "why"
     say "compile failed"
@@ -1696,24 +1687,42 @@ define main
     say "compile failed"
     halt with 1
   end
+  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
+  say "needs-ok"
   let opened be openImage
+  if hits at "net"
+    let opened be openNetImage
+  end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
+  let hasRoute be false
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
+    if ((funcs at i) at "name") == "route"
+      if ((funcs at i) at "nparams") == 3
+        let hasRoute be true
+      end
+    end
     let i be i + 1
   end
+  say "emitted"
   if gen at "bad"
     say gen at "why"
     say "compile failed"
     halt with 1
   end
+  if (hits at "net") or (hits at "json")
+    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"
+  end
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
   ~ Pool strings must follow frame_base so they land in RW .data, not RX .text.
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
+  if (hits at "net") or (hits at "json")
+    put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
+  end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
-  let exe be buildExe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base")
+  let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)
   say "compiled"
 end

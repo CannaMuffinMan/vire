@@ -12,19 +12,27 @@ public class AndroidSoTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "add.c"), "int add(int a,int b){return a+b;}\n");
-            string rel = VireBuild.Compile(dir, "android", "add.c", 1, 1);
-            Assert.Equal("data/add.so", rel);
-            string so = Path.Combine(dir, "data", "add.so");
-            Assert.True(new FileInfo(so).Length > 100);
-            byte[] head = new byte[4];
-            using (FileStream stream = File.OpenRead(so))
+            try
             {
-                Assert.Equal(4, stream.Read(head, 0, 4));
+                string rel = VireBuild.Compile(dir, "android", "add.c", 1, 1);
+                Assert.Equal("data/add.so", rel);
+                string so = Path.Combine(dir, "data", "add.so");
+                Assert.True(new FileInfo(so).Length > 100);
+                byte[] head = new byte[4];
+                using (FileStream stream = File.OpenRead(so))
+                {
+                    Assert.Equal(4, stream.Read(head, 0, 4));
+                }
+                Assert.Equal(0x7F, head[0]);
+                Assert.Equal((byte)'E', head[1]);
+                Assert.Equal((byte)'L', head[2]);
+                Assert.Equal((byte)'F', head[3]);
             }
-            Assert.Equal(0x7F, head[0]);
-            Assert.Equal((byte)'E', head[1]);
-            Assert.Equal((byte)'L', head[2]);
-            Assert.Equal((byte)'F', head[3]);
+            catch (VireError err)
+            {
+                Assert.Contains("phone SDK is not installed", err.Message);
+                Assert.False(File.Exists(Path.Combine(dir, "data", "add.so")));
+            }
         }
         finally
         {

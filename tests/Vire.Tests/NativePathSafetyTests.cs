@@ -23,9 +23,13 @@ public class NativePathSafetyTests
         Assert.Contains("GetFileInformationByHandle", pe);
         Assert.Contains("SetUnhandledExceptionFilter", pe);
         Assert.Contains("AddVectoredExceptionHandler", pe);
+        Assert.Contains("SetFilePointerEx", pe);
+        Assert.Contains("SetEndOfFile", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
         Assert.Contains("iat_ue", pe);
+        Assert.Contains("iat_sp", pe);
+        Assert.Contains("iat_se", pe);
     }
 
     [Fact]
@@ -52,7 +56,10 @@ public class NativePathSafetyTests
         Assert.Contains("2097280", more);
         Assert.Contains("72, 199, 68, 36, 32, 3, 0, 0, 0", more);
         Assert.Contains("72, 199, 68, 36, 32, 1, 0, 0, 0", more);
-        Assert.Contains("72, 199, 68, 36, 32, 2, 0, 0, 0", more);
+        Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", more);
+        Assert.Contains("iat_sp", more);
+        Assert.Contains("iat_se", more);
+        Assert.Contains("rt_memcpy", more);
         Assert.Contains("iat_fi", rt);
         Assert.Contains("iat_fi", more);
     }
@@ -67,6 +74,17 @@ public class NativePathSafetyTests
         Assert.Contains("frame_deep", rt);
         Assert.Contains("heap_cell", rt);
         Assert.Contains("intern_tab", rt);
+    }
+
+    [Fact]
+    public void CrashFilterOmitsUncheckedCreateFile()
+    {
+        string rt = File.ReadAllText(Path.Combine(Root(), "src", "rt.vire"));
+        int crash = rt.IndexOf("pin with labels, \"crash_filter\"", StringComparison.Ordinal);
+        int after = rt.IndexOf("pin with labels, \"rt_push_int\"", crash);
+        string slice = rt.Substring(crash, after - crash);
+        Assert.DoesNotContain("iat_cf", slice);
+        Assert.Contains("crash_rip_msg", slice);
     }
 
     [Fact]
