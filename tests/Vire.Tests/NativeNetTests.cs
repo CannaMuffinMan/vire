@@ -69,9 +69,11 @@ public class NativeNetTests
             string ascii = Encoding.ASCII.GetString(pe);
             HashSet<string> imports = PeImports.Names(pe);
             Assert.Contains("ws2_32.dll", ascii.ToLowerInvariant());
-            Assert.Contains(" OK\r\n", ascii);
+            byte[] okCrlf = new byte[] { 5, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x4F, 0x4B, 0x0D, 0x0A, 0 };
+            byte[] okUs = new byte[] { 5, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x4F, 0x4B, 0x1F, 0x1F, 0 };
+            Assert.True(IndexOf(pe, okCrlf) >= 0, "parked txt_sp_ok must be CR LF");
+            Assert.True(IndexOf(pe, okUs) < 0, "parked txt_sp_ok must not use 0x1F");
             Assert.Contains("\r\nConnection: close\r\n", ascii);
-            Assert.DoesNotContain(" OK\u001f\u001f", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);
@@ -188,6 +190,17 @@ public class NativeNetTests
         for (int i = 0; i < pe.Length; i++)
             pe[i] = byte.Parse(hex.Substring(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         return pe;
+    }
+
+    static int IndexOf(byte[] hay, byte[] needle)
+    {
+        for (int i = 0; i + needle.Length <= hay.Length; i++)
+        {
+            int k = 0;
+            while (k < needle.Length && hay[i + k] == needle[k]) k++;
+            if (k == needle.Length) return i;
+        }
+        return -1;
     }
 }
 
