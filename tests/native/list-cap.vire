@@ -1,0 +1,9 @@
+define main
+  let xs be []
+  let i be 0
+  while i < 100001
+    let xs be push with xs, 1
+    let i be i + 1
+  end
+  say (length with xs)
+end
