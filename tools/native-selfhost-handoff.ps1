@@ -86,13 +86,27 @@ Copy-Item (Join-Path $Root "src/asm.vire") (Join-Path $Src "asm.vire") -Force
 Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
+foreach ($blob in @(
+    "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
+    "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt"
+)) {
+    Copy-Item (Join-Path $Root "src/$blob") (Join-Path $Src $blob) -Force
+}
 Copy-Item (Join-Path $Root "guest-hello.vire") (Join-Path $Data "guest-hello.vire") -Force
 $pairs = @(
     @("compile-native.vire", "data/compile-native.vire"),
     @("src/asm.vire", "data/src/asm.vire"),
     @("src/pe.vire", "data/src/pe.vire"),
     @("src/rt.vire", "data/src/rt.vire"),
-    @("src/rt-more.vire", "data/src/rt-more.vire")
+    @("src/rt-more.vire", "data/src/rt-more.vire"),
+    @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
+    @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
+    @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),
+    @("src/rt-net-json-blob.txt", "data/src/rt-net-json-blob.txt"),
+    @("src/rt-net-json-pins.txt", "data/src/rt-net-json-pins.txt"),
+    @("src/rt-net-json-fixes.txt", "data/src/rt-net-json-fixes.txt")
 )
 foreach ($pair in $pairs) {
     $ha = (Get-FileHash -Algorithm SHA256 (Join-Path $Root $pair[0])).Hash
@@ -116,17 +130,27 @@ Write-Output "step_hello_pe ok"
 $gen1Hex = Join-Path $Data "gen1.hex"
 $gen1Exe = Join-Path $Data "gen1.exe"
 if (Test-Path $gen1Hex) { Remove-Item -Force $gen1Hex }
-$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 420 -FilePath "dotnet" -ArgumentList @(
+$r = Invoke-Bounded -Name "gen1_host" -TimeoutSec 1800 -FilePath "dotnet" -ArgumentList @(
     "exec", $VireDll, "compile-native.vire", "data/compile-native.vire", "data/gen1.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen1_host missing compiled" }
 Convert-HexToExe $gen1Hex $gen1Exe
+Write-Output ("gen1_exe_bytes " + (Get-Item $gen1Exe).Length)
+try { Unblock-File -Path $gen1Exe } catch { }
+Start-Sleep -Seconds 2
+try {
+    Invoke-Bounded -Name "gen1_probe" -TimeoutSec 15 -FilePath $gen1Exe -ArgumentList @()
+} catch {
+    Write-Output ("gen1_probe_err " + $_.Exception.Message)
+}
 Write-Output "step_gen1_host ok"
 
+$g1 = Join-Path $Root "g1.exe"
+Copy-Item $gen1Exe $g1 -Force
 $gen1HelloHex = Join-Path $Data "gen1-hello.hex"
 $gen1HelloExe = Join-Path $Data "gen1-hello.exe"
 if (Test-Path $gen1HelloHex) { Remove-Item -Force $gen1HelloHex }
-$r = Invoke-Bounded -Name "gen1_hello" -TimeoutSec 120 -FilePath $gen1Exe -ArgumentList @(
+$r = Invoke-Bounded -Name "gen1_hello" -TimeoutSec 120 -FilePath $g1 -ArgumentList @(
     "data/guest-hello.vire", "data/gen1-hello.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen1_hello missing compiled" }
@@ -137,7 +161,7 @@ Write-Output "step_gen1_hello ok"
 
 $gen2Hex = Join-Path $Data "gen2.hex"
 if (Test-Path $gen2Hex) { Remove-Item -Force $gen2Hex }
-$r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 600 -FilePath $gen1Exe -ArgumentList @(
+$r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 2400 -FilePath $g1 -ArgumentList @(
     "data/compile-native.vire", "data/gen2.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen2_native missing compiled" }

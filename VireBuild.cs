@@ -71,11 +71,7 @@ static class VireBuild
             ? output
             : Path.Combine(Path.GetDirectoryName(output), Path.GetFileNameWithoutExtension(output) + ".so");
         string clang = FindClang();
-        string[] args;
-        if (clang.IndexOf("ndk", StringComparison.OrdinalIgnoreCase) >= 0)
-            args = new string[] { "--target=aarch64-linux-android35", "-shared", "-fPIC", "-o", so, source };
-        else
-            args = new string[] { "-shared", "-fPIC", "-o", so, source };
+        string[] args = new string[] { "--target=aarch64-linux-android35", "-shared", "-fPIC", "-o", so, source };
         RunTool(clang, args, "", "", Path.GetDirectoryName(clang) ?? "", root, line, col);
         if (!File.Exists(so) || new FileInfo(so).Length < 8) throw new VireError("could not compile", line, col);
         return "data/" + Path.GetFileName(so);
@@ -238,8 +234,6 @@ static class VireBuild
                 }
             }
         }
-        string host = FindOnPath(OperatingSystem.IsWindows() ? "clang.exe" : "clang");
-        if (host != null) return host;
         throw new VireError("the phone SDK is not installed", 1);
     }
 

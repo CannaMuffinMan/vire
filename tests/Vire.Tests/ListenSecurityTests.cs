@@ -19,7 +19,16 @@ public class ListenSecurityTests
             Assert.Equal(501, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding\t: chunked\r\nContent-Length: 5\r\n\r\nhello"));
             Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n\r\nhello"));
             Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\n Foo: bar\r\nContent-Length: 5\r\n\r\nhello"));
+            Assert.Equal(400, Status(host.Port, "GET / HTTP/1.1\rHost: x\r\n\r\n"));
+            Assert.Equal(400, Status(host.Port, "GET / HTTP/1.1\r\nHost: x\ry\r\n\r\n"));
             Assert.Equal(400, HttpWire.ParseComplete(Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\nx"), 64).Status);
+            AssertUnsafe("GET / HTTP/1.1\nHost: x\r\n\r\n");
+            AssertUnsafe("GET / HTTP/1.1\rHost: x\r\n\r\n");
+            AssertUnsafe("GET / HTTP/1.1\r\nHost: x\ry\r\n\r\n");
+            AssertUnsafe("GET / HTTP/1.1\r\nHost: x\r\n folded\r\n\r\n");
+            byte[] ok = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: x\r\nX-Foo: bar\r\nSet-Cookie: stolen\r\n\r\n");
+            Assert.False(HttpWire.HeaderBytesUnsafe(ok, HttpWire.HeaderEnd(ok, ok.Length)));
+            Assert.Equal(0, HttpWire.ParseComplete(ok, ok.Length).Status);
         }
     }
 
@@ -133,6 +142,15 @@ public class ListenSecurityTests
         {
             return PortGuard.GetFreeLoopbackPort();
         }
+    }
+
+    static void AssertUnsafe(string request)
+    {
+        byte[] raw = Encoding.ASCII.GetBytes(request);
+        int end = HttpWire.HeaderEnd(raw, raw.Length);
+        Assert.True(end >= 0, "expected a header terminator so the scan runs");
+        Assert.True(HttpWire.HeaderBytesUnsafe(raw, end));
+        Assert.Equal(400, HttpWire.ParseComplete(raw, raw.Length).Status);
     }
 
     static int Status(int port, string request)

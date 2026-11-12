@@ -14,6 +14,13 @@ public class CompilerStageTests
         AssertSame(root, Path.Combine("src", "pe.vire"), Path.Combine("data", "src", "pe.vire"));
         AssertSame(root, Path.Combine("src", "rt.vire"), Path.Combine("data", "src", "rt.vire"));
         AssertSame(root, Path.Combine("src", "rt-more.vire"), Path.Combine("data", "src", "rt-more.vire"));
+        AssertSame(root, Path.Combine("src", "rt-net.vire"), Path.Combine("data", "src", "rt-net.vire"));
+        AssertSame(root, Path.Combine("src", "rt-net-blob.txt"), Path.Combine("data", "src", "rt-net-blob.txt"));
+        AssertSame(root, Path.Combine("src", "rt-net-pins.txt"), Path.Combine("data", "src", "rt-net-pins.txt"));
+        AssertSame(root, Path.Combine("src", "rt-net-fixes.txt"), Path.Combine("data", "src", "rt-net-fixes.txt"));
+        AssertSame(root, Path.Combine("src", "rt-net-json-blob.txt"), Path.Combine("data", "src", "rt-net-json-blob.txt"));
+        AssertSame(root, Path.Combine("src", "rt-net-json-pins.txt"), Path.Combine("data", "src", "rt-net-json-pins.txt"));
+        AssertSame(root, Path.Combine("src", "rt-net-json-fixes.txt"), Path.Combine("data", "src", "rt-net-json-fixes.txt"));
         string guest = Path.Combine(root, "data", "staged-use.vire");
         File.WriteAllText(guest, "use \"src/asm.vire\"\ndefine main\n  say (hexOf with [72, 300, -1])\nend\n");
         DualMode.Proc proc = DualMode.RunVire(

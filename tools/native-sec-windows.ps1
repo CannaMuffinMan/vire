@@ -89,6 +89,7 @@ function Invoke-NativeExe {
             $script:DefenderBlocked = $true
             return @{ Blocked = $true; Output = $out; Code = $code }
         }
+        if ($out) { Write-Host $out.TrimEnd() }
         if ($err) { Write-Host $err.TrimEnd() }
         return @{ Blocked = $false; Output = $out; Code = $code }
     }
@@ -129,6 +130,9 @@ $got = Invoke-NativeExe -ExePath (Join-Path $Work "read.exe") -WorkingDirectory 
 if (-not $got.Blocked) {
     if (([string]$got.Output).Contains("outside-secret")) { throw "parent junction leaked" }
     if ($got.Code -eq 0) { throw "parent junction did not fail closed" }
+    if (-not ([string]$got.Output).Contains("files stay inside the program folder")) {
+        throw "parent junction did not report sandbox error: $($got.Output)"
+    }
 } else {
     Write-Host "native_sec_junction_compile_ok (PE execute skipped: Defender)"
 }
@@ -149,6 +153,9 @@ $kept = [System.IO.File]::ReadAllText($alias)
 if ($kept -ne "SECRET") { throw "hardlink truncated: $kept" }
 if (-not $got.Blocked) {
     if ($got.Code -eq 0) { throw "hardlink write did not fail closed" }
+    if (-not ([string]$got.Output).Contains("files stay inside the program folder")) {
+        throw "hardlink write did not report sandbox error: $($got.Output)"
+    }
 } else {
     Write-Host "native_sec_hardlink_compile_ok (PE execute skipped: Defender)"
 }

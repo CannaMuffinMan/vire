@@ -378,7 +378,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "hex", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "start", "wait", "result"
     });
 
@@ -638,6 +638,13 @@ sealed class Machine
             List<object> dest = args[0] as List<object>;
             List<object> extra = args[1] as List<object>;
             return Program.ExtendList(dest, extra, itemCap, line, col);
+        }
+        if (name == "chr")
+        {
+            if (!(args[0] is int)) throw new VireError("chr needs a whole number", line, col);
+            int n = (int)args[0];
+            if (n < 0 || n > 255) throw new VireError("chr needs a byte", line, col);
+            return ((char)n).ToString();
         }
         if (name == "text") return Show(args[0]);
         if (name == "number")
@@ -2610,6 +2617,7 @@ internal static class HttpWire
             if (b == (byte)'\n')
             {
                 if (i == 0 || buffer[i - 1] != (byte)'\r') return true;
+                if (i + 1 < headerEnd && (buffer[i + 1] == (byte)' ' || buffer[i + 1] == (byte)'\t')) return true;
             }
             else if (b == (byte)'\r')
             {
@@ -2836,9 +2844,10 @@ sealed class Program
     internal static object ExtendList(List<object> dest, List<object> extra, int cap, int line, int col)
     {
         if (dest == null || extra == null) throw new VireError("extend needs two lists", line, col);
-        if (extra.Count > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
-        if (extra.Count > cap - dest.Count) throw new VireError("list is too large", line, col);
-        for (int i = 0; i < extra.Count; i++) dest.Add(EmitU8Byte(extra[i], line, col));
+        int add = extra.Count;
+        if (add > 0 && dest.Count >= cap) throw new VireError("list is too large", line, col);
+        if (add > cap - dest.Count) throw new VireError("list is too large", line, col);
+        for (int i = 0; i < add; i++) dest.Add(EmitU8Byte(extra[i], line, col));
         return dest;
     }
 
@@ -2861,7 +2870,7 @@ sealed class Program
         if (x >= 256)
         {
             int q = WholeDiv(x, 256, line, col);
-            x = x - (q * 256);
+            x = x - ((double)q * 256.0);
         }
         if (x < 0) x = 0;
         if (x == Math.Floor(x) && x <= int.MaxValue && x >= int.MinValue) return (int)x;

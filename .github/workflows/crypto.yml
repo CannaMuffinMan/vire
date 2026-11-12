@@ -1,0 +1,42 @@
+name: crypto
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  crypto-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - run: bash tools/crypto-prove.sh
+      - name: 1MB SHA-256 builtin
+        run: |
+          export VIRE_BUDGET=5000000 VIRE_HEADLESS=1
+          start=$(date +%s)
+          out=$(dotnet exec bin/Release/net10.0/vire.dll crypto-mb.vire)
+          end=$(date +%s)
+          echo "$out"
+          echo "sha256_1mb_sec $((end-start))"
+          echo "$out" | grep -q cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0
+  crypto-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - run: pwsh -File tools/crypto-prove-windows.ps1
+      - name: native selfhost hashes if present
+        shell: pwsh
+        run: |
+          $self = Get-Content tools/native-selfhost-handoff.ps1 -Raw
+          if ($self -notmatch "gen1_sha256") { throw "missing gen1_sha256 in handoff" }
+          Write-Output "compiler sources untouched; selfhost fixed point owned by check.yml native-selfhost-windows"

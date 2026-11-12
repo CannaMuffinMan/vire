@@ -31,6 +31,8 @@ NAMES = [
     "GetFileInformationByHandle",
     "SetUnhandledExceptionFilter",
     "AddVectoredExceptionHandler",
+    "SetFilePointerEx",
+    "SetEndOfFile",
 ]
 
 
@@ -55,7 +57,7 @@ def load_pe(path):
 
 
 class Emu:
-    def __init__(self, pe_path, cwd, reparse_names=None, force_nlink=None):
+    def __init__(self, pe_path, cwd, reparse_names=None, force_nlink=None, cmdline=b"\0"):
         self.raw, self.image, self.image_size, self.entry, self.headers, self.sections = load_pe(pe_path)
         self.cwd = cwd
         self.reparse_names = set(reparse_names or [])
@@ -82,7 +84,9 @@ class Emu:
             self.stubs[addr] = getattr(self, "api_" + name)
         self._patch_iat()
         self._map(0x500000000, 0x1000)
-        self.mu.mem_write(0x500000000, b"\0")
+        if not cmdline.endswith(b"\0"):
+            cmdline = cmdline + b"\0"
+        self.mu.mem_write(0x500000000, cmdline[:0xFFF])
         rsp = STACK_BASE + STACK_SIZE - 0x1000
         rsp -= rsp % 16
         rsp -= 8
@@ -279,8 +283,24 @@ class Emu:
     def api_AddVectoredExceptionHandler(self):
         self.wr(UC_X86_REG_RAX, 1)
 
+    def api_SetFilePointerEx(self):
+        self.wr(UC_X86_REG_RAX, 1)
+
+    def api_SetEndOfFile(self):
+        rec = self.files.get(self.rd(UC_X86_REG_RCX))
+        if rec is not None:
+            rec[b"data"] = b""
+            path = rec[b"path"]
+            if path:
+                full = os.path.join(self.cwd, path.decode("latin1"))
+                if os.path.exists(full):
+                    open(full, "wb").close()
+        self.wr(UC_X86_REG_RAX, 1)
+
     def run(self):
-        self.mu.emu_start(self.image + self.entry, 0, timeout=8_000_000, count=5_000_000)
+        count = int(os.environ.get("NATIVE_EMU_COUNT", "5000000"))
+        timeout = int(os.environ.get("NATIVE_EMU_TIMEOUT", "8000000"))
+        self.mu.emu_start(self.image + self.entry, 0, timeout=timeout, count=count)
         return self.exit_code, bytes(self.out), self.gfa, self.creates, self.faults, self.heap_size
 
 
@@ -289,7 +309,8 @@ def main():
     mode = sys.argv[3] if len(sys.argv) > 3 else "plain"
     reparse = ["data"] if mode == "reparse-parent" else []
     nlink = 2 if mode == "nlink2" else None
-    emu = Emu(pe, cwd, reparse_names=reparse, force_nlink=nlink)
+    cmdline = (sys.argv[4] + "\0").encode("ascii") if len(sys.argv) > 4 else b"\0"
+    emu = Emu(pe, cwd, reparse_names=reparse, force_nlink=nlink, cmdline=cmdline)
     code, out, gfa, creates, faults, heap = emu.run()
     print("EXIT", code)
     print("STDOUT", out)

@@ -123,8 +123,11 @@ public class HarnessTests
         Assert.Contains("120000", hello);
         Assert.Contains("native-hello-handoff.ps1", yml);
         Assert.Contains("native-sec-windows.ps1", yml);
+        Assert.Contains("native-oom.ps1", yml);
+        Assert.Contains("native-gc-loop-proof.ps1", yml);
         Assert.Contains("native-selfhost-handoff.ps1", yml);
         Assert.Contains("native-selfhost-windows", yml);
+        Assert.DoesNotContain("continue-on-error: true", yml);
         string self = File.ReadAllText(Path.Combine(root, "tools", "native-selfhost-handoff.ps1"));
         Assert.Contains("WaitForExit", self);
         Assert.Contains("gen1_sha256", self);

@@ -1,0 +1,7 @@
+define main
+  let i be 0
+  while i < 3000000
+    let i be i + 1
+  end
+  say "ok"
+end

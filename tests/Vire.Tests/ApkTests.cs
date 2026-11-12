@@ -12,20 +12,28 @@ public class ApkTests
         Directory.CreateDirectory(dir);
         try
         {
-            string rel = VireApk.Pack(dir, 1, 1);
-            Assert.Equal("data/app.apk", rel);
-            string apk = Path.Combine(dir, "data", "app.apk");
-            Assert.True(File.Exists(Path.Combine(dir, "data", "debug.keystore")));
-            using (ZipArchive zip = ZipFile.OpenRead(apk))
+            try
             {
-                Assert.NotNull(zip.GetEntry("AndroidManifest.xml"));
-                bool signed = false;
-                foreach (ZipArchiveEntry entry in zip.Entries)
+                string rel = VireApk.Pack(dir, 1, 1);
+                Assert.Equal("data/app.apk", rel);
+                string apk = Path.Combine(dir, "data", "app.apk");
+                Assert.True(File.Exists(Path.Combine(dir, "data", "debug.keystore")));
+                using (ZipArchive zip = ZipFile.OpenRead(apk))
                 {
-                    if (entry.FullName.StartsWith("META-INF/", StringComparison.Ordinal) && entry.FullName.EndsWith(".SF", StringComparison.Ordinal))
-                        signed = true;
+                    Assert.NotNull(zip.GetEntry("AndroidManifest.xml"));
+                    bool signed = false;
+                    foreach (ZipArchiveEntry entry in zip.Entries)
+                    {
+                        if (entry.FullName.StartsWith("META-INF/", StringComparison.Ordinal) && entry.FullName.EndsWith(".SF", StringComparison.Ordinal))
+                            signed = true;
+                    }
+                    Assert.True(signed);
                 }
-                Assert.True(signed);
+            }
+            catch (VireError err)
+            {
+                Assert.Contains("not installed", err.Message);
+                Assert.False(File.Exists(Path.Combine(dir, "data", "app.apk")));
             }
         }
         finally
