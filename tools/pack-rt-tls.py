@@ -531,7 +531,13 @@ def emit_recv(a: Asm) -> None:
     a.u32(SEC_E_INCOMPLETE)
     a.ljcc(0x84, "recv_need")
     a.raw(0x85, 0xC0)
-    a.jcc(0x85, "recv_err")
+    a.ljcc(0x84, "recv_plain")
+    a.lea("rax", "tls_state")
+    a.raw(0x48, 0xC7, 0x80)
+    a.u32(ENCLEN)
+    a.u32(0)
+    a.ljmp("recv_need")
+    a.pin("recv_plain")
     a.raw(0x8B, 0x45, 0xA4, 0x83, 0xF8, 1)
     a.ljcc(0x84, "recv_b1")
     a.raw(0x8B, 0x4D, 0x90, 0x48, 0x8B, 0x55, 0x98)
@@ -690,7 +696,7 @@ NAMES = [
     "rt_tls_b64", "b64_fail", "rt_tls_serve", "serve_done", "rt_tls_hs",
     "hs_loop", "hs_accept", "hs_first", "hs_ctx", "hs_nosend", "hs_cont",
     "hs_ok", "hs_fail", "rt_tls_recv", "recv_have", "recv_min", "recv_need",
-    "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err",
+    "recv_plain", "recv_b1", "recv_copy", "recv_noextra", "recv_raw", "recv_err",
     "rt_tls_send", "send_fit", "send_raw", "send_err", "txt_unisp",
     "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
