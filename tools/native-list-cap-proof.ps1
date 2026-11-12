@@ -101,7 +101,7 @@ Restore-RuntimeFrom $BaseSha
 $before = Compile-Run "list-cap-before" $Src
 Write-Output "before_pe exit=$($before.Exit) out=$($before.Out)"
 if ($before.Exit -eq 0 -and $before.Out -eq "100001") {
-    Write-Output "FAIL_BEFORE at $BaseSha: 100001 pushes succeed"
+    Write-Output "FAIL_BEFORE at ${BaseSha}: 100001 pushes succeed"
 } else {
     throw "fail-before expected PE length 100001 exit 0, got exit=$($before.Exit) out=$($before.Out)"
 }
@@ -122,6 +122,6 @@ if ($hostMsg -ne "list is too large") { throw "pass-after host message $hostMsg"
 $peMsg = Host-Message $(if ($after.Out.Contains("list is too large")) { $after.Out } else { $after.Err })
 if ($hostMsg -ne $peMsg) { throw "host stdout != gen1 PE stdout host=$hostMsg pe=$peMsg" }
 Write-Output "host stdout == gen1 PE stdout"
-Write-Output "PASS_AFTER at $AfterSha: push 100001 rejected same as host"
+Write-Output "PASS_AFTER at ${AfterSha}: push 100001 rejected same as host"
 Write-Output "native list-cap proof ok"
 exit 0
