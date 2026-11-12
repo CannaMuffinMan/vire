@@ -154,15 +154,23 @@ define pg_auth with conn, secret
     end
     if t == "R"
       let kind be pg_u32be with (m at "p"), 0, tab
+      let handled be 0
       if kind == 0
         let method be "trust"
-      else if kind == 3
+        let handled be 1
+      end
+      if kind == 3
         let method be "cleartext"
-        send with h, (pg_msg with "p", (secret + (chr with 0)))
-      else if kind == 10
+        let pw be secret + (chr with 0)
+        let pkt be pg_msg with "p", pw
+        send with h, pkt
+        let handled be 1
+      end
+      if kind == 10
         return "SCRAM-SHA-256 residual (SASL); CI uses trust"
-      else
-        return "unsupported auth " + (text with kind)
+      end
+      if handled == 0
+        return "unsupported auth"
       end
     end
     if t == "Z"
