@@ -115,6 +115,12 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_conn_closed", "that connection is closed"
   pin with labels, "ws2_ready", image
   emitU64 with image, 0
+  pin with labels, "wsa_scratch", image
+  let zi be 0
+  while zi < 512
+    let image be emitU8 with image, 0
+    let zi be zi + 1
+  end
   return image
 end
 
@@ -126,7 +132,8 @@ end
 
 define emitTcpClient with image, fixes, labels
   ~ Guest connect/send/recv/close. Loopback 127.0.0.1 only. No TLS. Check
-  ~ the IPv4 literal before socket+connect. Recv cap 1000000. 5s timeouts.
+  ~ the IPv4 literal before socket+connect. Recv cap 1000000. Host apply
+  ~ 5s timeouts; native connect uses blocking Winsock after WSAStartup.
   pin with labels, "rt_connect", image
   emitPro with image
   emitPop2 with image
@@ -147,7 +154,23 @@ define emitTcpClient with image, fixes, labels
   emitJcc with image, fixes, 133, "conn_notloop"
   emitList with image, [128, 122, 16, 49, 15, 133]
   emitRel with image, fixes, "conn_notloop"
-  emitCallTo with image, fixes, "rt_net_init"
+  ~ WSAStartup into .data, not a heap WSADATA (rt_alloc is a GC object).
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "ws2_ready"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "conn_ws2"
+  emitList with image, [185]
+  emitU32 with image, 514
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "wsa_scratch"
+  let image be emitIat with image, fixes, "iat_wsa"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "conn_fail"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "ws2_ready"
+  pin with labels, "conn_ws2", image
   emitList with image, [185]
   emitU32 with image, 2
   emitList with image, [186]
@@ -162,22 +185,6 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [72, 199, 69, 216, 0, 0, 0, 0, 198, 69, 208, 2]
   emitList with image, [139, 69, 232, 102, 134, 224, 102, 137, 69, 210]
   emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
-  emitList with image, [199, 69, 168]
-  emitU32 with image, 5000
-  emitList with image, [72, 139, 77, 240, 186]
-  emitU32 with image, 65535
-  emitList with image, [65, 184]
-  emitU32 with image, 4102
-  emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
-  emitU32 with image, 4
-  let image be emitIat with image, fixes, "iat_ss"
-  emitList with image, [72, 139, 77, 240, 186]
-  emitU32 with image, 65535
-  emitList with image, [65, 184]
-  emitU32 with image, 4101
-  emitList with image, [76, 141, 77, 168, 199, 68, 36, 32]
-  emitU32 with image, 4
-  let image be emitIat with image, fixes, "iat_ss"
   emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
   emitU32 with image, 16
   let image be emitIat with image, fixes, "iat_cn"
