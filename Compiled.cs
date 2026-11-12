@@ -973,6 +973,12 @@ sealed class CompiledMachine
             VireListen.WithCancel(port, line, root, DispatchRoute, Show, p => ListenPort = p);
             return null;
         }
+        if (name == "ws_listen")
+        {
+            int port = Machine.RequirePort(args[0], line);
+            VireWs.Listen(port, line);
+            return null;
+        }
         if (name == "connect")
         {
             if (args.Count != 2) throw new VireError("connect takes 2 values, got " + args.Count, line, col);

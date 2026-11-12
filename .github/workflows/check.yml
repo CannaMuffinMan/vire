@@ -86,6 +86,7 @@ jobs:
       - run: pwsh -File tools/native-gc-loop-proof.ps1
       - run: pwsh -File tools/schema-prove-windows.ps1
       - run: pwsh -File tools/native-tcp-windows.ps1
+      - run: pwsh -File tools/native-ws-windows.ps1
   native-selfhost-windows:
     runs-on: windows-latest
     steps:

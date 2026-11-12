@@ -1,3 +1,5 @@
+use "rt-ws.vire"
+
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
 ~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe
@@ -67,7 +69,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return (emitTcpClient with image, fixes, labels)
+    return (emitWsRuntime with (emitTcpClient with image, fixes, labels), fixes, labels)
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -117,7 +119,7 @@ define parkNet with image, labels
   emitU64 with image, 0
   pin with labels, "tcp_socks", image
   emitU64 with image, 0
-  return image
+  return (parkWs with image, labels)
 end
 
 define emitIat with image, fixes, name

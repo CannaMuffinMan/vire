@@ -1,0 +1,1281 @@
+~ Guest WebSocket (RFC 6455) plus native PE rt_ws_listen.
+~ Loopback 127.0.0.1 only. No TLS / wss. No permessage-deflate.
+~ Client frames must be masked. Control frames <= 125 and not fragmented.
+
+define ws_ascii_table
+  return " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+end
+
+define ws_ascii_code with ch
+  if ch == "\n"
+    return 10
+  end
+  if ch == "\r"
+    return 13
+  end
+  if ch == "\t"
+    return 9
+  end
+  let p be find with (ws_ascii_table), ch
+  if p < 0
+    return -1
+  end
+  return p + 32
+end
+
+define ws_ascii_bytes with text
+  let out be []
+  let i be 0
+  let n be length with text
+  while i < n
+    let c be ws_ascii_code with (text at i)
+    if c < 0
+      return ["bad", "non-ascii"]
+    end
+    push with out, c
+    let i be i + 1
+  end
+  return ["ok", out]
+end
+
+define ws_ascii_text with buf
+  let table be ws_ascii_table
+  let out be ""
+  let i be 0
+  let n be length with buf
+  while i < n
+    let b be buf at i
+    if b == 10
+      let out be out + "\n"
+    else if b == 13
+      let out be out + "\r"
+    else if b == 9
+      let out be out + "\t"
+    else if b < 32
+      return ["bad", "non-ascii"]
+    else if b > 126
+      return ["bad", "non-ascii"]
+    else
+      let out be out + (table at (b - 32))
+    end
+    let i be i + 1
+  end
+  return ["ok", out]
+end
+
+define ws_b64_table
+  return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+end
+
+define ws_b64_encode with buf
+  let table be ws_b64_table
+  let out be ""
+  let n be length with buf
+  let i be 0
+  while i < n
+    let b0 be buf at i
+    let b1 be 0
+    let b2 be 0
+    let got be 1
+    if (i + 1) < n
+      let b1 be buf at (i + 1)
+      let got be 2
+    end
+    if (i + 2) < n
+      let b2 be buf at (i + 2)
+      let got be 3
+    end
+    let n0 be idiv with b0, 4
+    let n1 be ((b0 % 4) * 16) + (idiv with b1, 16)
+    let n2 be ((b1 % 16) * 4) + (idiv with b2, 64)
+    let n3 be b2 % 64
+    let out be out + (table at n0)
+    let out be out + (table at n1)
+    if got == 1
+      let out be out + "=="
+    end
+    if got == 2
+      let out be out + (table at n2)
+      let out be out + "="
+    end
+    if got == 3
+      let out be out + (table at n2)
+      let out be out + (table at n3)
+    end
+    let i be i + 3
+  end
+  return out
+end
+
+define ws_guid
+  return "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+end
+
+define ws_accept_key with key
+  let raw be ws_ascii_bytes with (key + (ws_guid))
+  if (raw at 0) == "bad"
+    return ["bad", "non-ascii key"]
+  end
+  let dig be sha1_bytes with (raw at 1)
+  return ["ok", (ws_b64_encode with dig)]
+end
+
+define ws_rfc_accept_example
+  let got be ws_accept_key with "dGhlIHNhbXBsZSBub25jZQ=="
+  if (got at 0) == "bad"
+    return got
+  end
+  if (got at 1) != "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    return ["bad", ("want s3pPLMBiTxaQ9kYGzzhZRbK+xOo= got " + (got at 1))]
+  end
+  return ["ok", (got at 1)]
+end
+
+define ws_utf8_cont with b
+  if b < 128
+    return false
+  end
+  if b > 191
+    return false
+  end
+  return true
+end
+
+define ws_utf8_ok with buf
+  let n be length with buf
+  let i be 0
+  while i < n
+    let b be buf at i
+    if b < 0
+      return false
+    end
+    if b > 255
+      return false
+    end
+    if b < 128
+      let i be i + 1
+    else if b < 194
+      return false
+    else if b < 224
+      if (i + 1) >= n
+        return false
+      end
+      if not (ws_utf8_cont with (buf at (i + 1)))
+        return false
+      end
+      let i be i + 2
+    else if b < 240
+      if (i + 2) >= n
+        return false
+      end
+      let c1 be buf at (i + 1)
+      let c2 be buf at (i + 2)
+      if not (ws_utf8_cont with c1)
+        return false
+      end
+      if not (ws_utf8_cont with c2)
+        return false
+      end
+      if b == 224
+        if c1 < 160
+          return false
+        end
+      end
+      if b == 237
+        if c1 > 159
+          return false
+        end
+      end
+      let i be i + 3
+    else if b > 244
+      return false
+    else
+      if (i + 3) >= n
+        return false
+      end
+      let c1 be buf at (i + 1)
+      let c2 be buf at (i + 2)
+      let c3 be buf at (i + 3)
+      if not (ws_utf8_cont with c1)
+        return false
+      end
+      if not (ws_utf8_cont with c2)
+        return false
+      end
+      if not (ws_utf8_cont with c3)
+        return false
+      end
+      if b == 240
+        if c1 < 144
+          return false
+        end
+      end
+      if b == 244
+        if c1 > 143
+          return false
+        end
+      end
+      let i be i + 4
+    end
+  end
+  return true
+end
+
+define ws_be16 with buf, i
+  return ((buf at i) * 256) + (buf at (i + 1))
+end
+
+define ws_be32 with buf, i
+  return (((buf at i) * 16777216) + ((buf at (i + 1)) * 65536)) + (((buf at (i + 2)) * 256) + (buf at (i + 3)))
+end
+
+define ws_mask_apply with buf, start, n, key
+  let i be 0
+  while i < n
+    let p be start + i
+    let k be key at (i % 4)
+    let v be buf at p
+    let x be 0
+    let p2 be 1
+    let a be v
+    let b be k
+    let bit be 0
+    while bit < 8
+      if (a % 2) != (b % 2)
+        let x be x + p2
+      end
+      let a be idiv with a, 2
+      let b be idiv with b, 2
+      let p2 be p2 + p2
+      let bit be bit + 1
+    end
+    put x into buf at p
+    let i be i + 1
+  end
+  return buf
+end
+
+define ws_max_payload
+  return 65536
+end
+
+define ws_parse_frame with buf
+  let n be length with buf
+  if n < 2
+    return ["bad", "short"]
+  end
+  let b0 be buf at 0
+  let b1 be buf at 1
+  let fin be idiv with b0, 128
+  let rsv be (idiv with b0, 16) % 8
+  let op be b0 % 16
+  let masked be idiv with b1, 128
+  let len7 be b1 % 128
+  if rsv != 0
+    return ["bad", "reserved"]
+  end
+  if (op != 0) and (op != 1) and (op != 2) and (op != 8) and (op != 9) and (op != 10)
+    return ["bad", "opcode"]
+  end
+  if masked != 1
+    return ["bad", "unmasked"]
+  end
+  let extra be 2
+  let plen be len7
+  if len7 == 126
+    if n < 4
+      return ["bad", "short"]
+    end
+    let plen be ws_be16 with buf, 2
+    let extra be 4
+  end
+  if len7 == 127
+    if n < 10
+      return ["bad", "short"]
+    end
+    if (ws_be32 with buf, 2) != 0
+      return ["bad", "len64"]
+    end
+    let plen be ws_be32 with buf, 6
+    if plen < 0
+      return ["bad", "len64"]
+    end
+    let extra be 10
+  end
+  if plen > (ws_max_payload)
+    return ["bad", "oversize"]
+  end
+  if op >= 8
+    if fin != 1
+      return ["bad", "frag-ctl"]
+    end
+    if plen > 125
+      return ["bad", "ctl-len"]
+    end
+  end
+  let need be extra + 4 + plen
+  if n < need
+    return ["bad", "short"]
+  end
+  let key be [buf at extra, buf at (extra + 1), buf at (extra + 2), buf at (extra + 3)]
+  let body be []
+  let i be 0
+  while i < plen
+    push with body, (buf at (extra + 4 + i))
+    let i be i + 1
+  end
+  ws_mask_apply with body, 0, plen, key
+  if op == 1
+    if not (ws_utf8_ok with body)
+      return ["bad", "utf8"]
+    end
+  end
+  return ["ok", {"fin": fin, "op": op, "payload": body, "need": need}]
+end
+
+define ws_write_frame with fin, op, payload
+  let n be length with payload
+  if n > (ws_max_payload)
+    return ["bad", "oversize"]
+  end
+  if op >= 8
+    if n > 125
+      return ["bad", "ctl-len"]
+    end
+    if fin != 1
+      return ["bad", "frag-ctl"]
+    end
+  end
+  let b0 be op
+  if fin == 1
+    let b0 be b0 + 128
+  end
+  let out be []
+  push with out, b0
+  if n < 126
+    push with out, n
+  end
+  if (n >= 126) and (n < 65536)
+    push with out, 126
+    push with out, (idiv with n, 256)
+    push with out, (n % 256)
+  end
+  if n >= 65536
+    push with out, 127
+    push with out, 0
+    push with out, 0
+    push with out, 0
+    push with out, 0
+    let x be n
+    push with out, (idiv with x, 16777216)
+    let x be x % 16777216
+    push with out, (idiv with x, 65536)
+    let x be x % 65536
+    push with out, (idiv with x, 256)
+    push with out, (x % 256)
+  end
+  let i be 0
+  while i < n
+    push with out, (payload at i)
+    let i be i + 1
+  end
+  return ["ok", out]
+end
+
+define parkWs with image, labels
+  parkMsg with image, labels, "txt_ws_listen", "listening on 127.0.0.1:"
+  parkMsg with image, labels, "txt_ws_101", "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "
+  parkMsg with image, labels, "txt_ws_crlf2", "\r\n\r\n"
+  parkMsg with image, labels, "txt_ws_guid", "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+  parkMsg with image, labels, "txt_ws_b64", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  parkMsg with image, labels, "txt_ws_upg", "upgrade:"
+  parkMsg with image, labels, "txt_ws_upgtok", "upgrade"
+  parkMsg with image, labels, "txt_ws_sock", "websocket"
+  parkMsg with image, labels, "txt_ws_conn", "connection:"
+  parkMsg with image, labels, "txt_ws_ver", "sec-websocket-version:"
+  parkMsg with image, labels, "txt_ws_key", "sec-websocket-key:"
+  parkMsg with image, labels, "txt_ws_13", "13"
+  parkMsg with image, labels, "txt_ws_400", "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
+  parkMsg with image, labels, "msg_ws_port", "port must be from 1024 to 65535"
+  pin with labels, "ws_sock", image
+  emitU64 with image, 0
+  pin with labels, "ws_cli", image
+  emitU64 with image, 0
+  pin with labels, "ws_hbuf", image
+  emitU64 with image, 0
+  pin with labels, "ws_hlen", image
+  emitU64 with image, 0
+  return image
+end
+
+define emitWsIat with image, fixes, name
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, name
+  return image
+end
+
+define emitSha1Native with image, fixes, labels
+  ~ rcx = src, rdx = len, r8 = 20-byte digest. Win64. No heap.
+  pin with labels, "rt_sha1", image
+  emitList with image, [85, 72, 137, 229, 83, 86, 87, 65, 84, 65, 85, 65, 86, 65, 87]
+  emitList with image, [72, 129, 236, 88, 2, 0, 0]
+  emitList with image, [72, 137, 77, 216, 72, 137, 85, 208, 76, 137, 69, 200]
+  emitList with image, [199, 69, 176, 1, 35, 69, 103]
+  emitList with image, [199, 69, 180, 137, 171, 205, 239]
+  emitList with image, [199, 69, 184, 254, 220, 186, 152]
+  emitList with image, [199, 69, 188, 118, 84, 50, 16]
+  emitList with image, [199, 69, 192, 240, 225, 210, 195]
+  emitList with image, [72, 199, 69, 168, 0, 0, 0, 0]
+  pin with labels, "sha1_full", image
+  emitList with image, [72, 139, 69, 208, 72, 43, 69, 168]
+  emitList with image, [72, 131, 248, 64, 15, 140]
+  emitRel with image, fixes, "sha1_tail"
+  emitList with image, [72, 139, 77, 216, 72, 3, 77, 168]
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [185, 64, 0, 0, 0]
+  pin with labels, "sha1_cpy64", image
+  emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 255, 201, 15, 133]
+  emitRel with image, fixes, "sha1_cpy64"
+  emitCallTo with image, fixes, "sha1_block"
+  emitList with image, [72, 131, 69, 168, 64]
+  emitJmpTo with image, fixes, "sha1_full"
+  pin with labels, "sha1_tail", image
+  emitList with image, [72, 139, 69, 208, 72, 43, 69, 168]
+  emitList with image, [72, 137, 69, 160]
+  emitList with image, [72, 139, 77, 216, 72, 3, 77, 168]
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [139, 77, 160]
+  emitList with image, [133, 201, 15, 132]
+  emitRel with image, fixes, "sha1_pad80"
+  pin with labels, "sha1_cpyrem", image
+  emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 255, 201, 15, 133]
+  emitRel with image, fixes, "sha1_cpyrem"
+  pin with labels, "sha1_pad80", image
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 3, 85, 160]
+  emitList with image, [198, 2, 128]
+  emitList with image, [72, 139, 69, 160]
+  emitList with image, [72, 255, 192]
+  emitList with image, [72, 131, 248, 56, 15, 135]
+  emitRel with image, fixes, "sha1_extra"
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 3, 85, 160]
+  emitList with image, [72, 255, 194]
+  emitList with image, [185, 56, 0, 0, 0]
+  emitList with image, [43, 77, 160]
+  emitList with image, [255, 201]
+  emitList with image, [133, 201, 15, 132]
+  emitRel with image, fixes, "sha1_len64"
+  pin with labels, "sha1_z1", image
+  emitList with image, [198, 2, 0, 72, 255, 194, 255, 201, 15, 133]
+  emitRel with image, fixes, "sha1_z1"
+  emitJmpTo with image, fixes, "sha1_len64"
+  pin with labels, "sha1_extra", image
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 3, 85, 160]
+  emitList with image, [72, 255, 194]
+  emitList with image, [185, 64, 0, 0, 0]
+  emitList with image, [43, 77, 160]
+  emitList with image, [255, 201]
+  pin with labels, "sha1_z2", image
+  emitList with image, [198, 2, 0, 72, 255, 194, 255, 201, 15, 133]
+  emitRel with image, fixes, "sha1_z2"
+  emitCallTo with image, fixes, "sha1_block"
+  emitList with image, [72, 141, 85, 128]
+  emitList with image, [185, 56, 0, 0, 0]
+  pin with labels, "sha1_z3", image
+  emitList with image, [198, 2, 0, 72, 255, 194, 255, 201, 15, 133]
+  emitRel with image, fixes, "sha1_z3"
+  pin with labels, "sha1_len64", image
+  emitList with image, [72, 139, 69, 208, 72, 193, 224, 3]
+  emitList with image, [72, 141, 77, 128]
+  emitList with image, [72, 199, 65, 56, 0, 0, 0, 0]
+  emitList with image, [72, 15, 200]
+  emitList with image, [72, 137, 65, 56]
+  emitCallTo with image, fixes, "sha1_block"
+  emitList with image, [72, 139, 85, 200]
+  emitList with image, [139, 69, 176, 15, 200, 137, 2]
+  emitList with image, [139, 69, 180, 15, 200, 137, 66, 4]
+  emitList with image, [139, 69, 184, 15, 200, 137, 66, 8]
+  emitList with image, [139, 69, 188, 15, 200, 137, 66, 12]
+  emitList with image, [139, 69, 192, 15, 200, 137, 66, 16]
+  emitList with image, [72, 129, 196, 88, 2, 0, 0]
+  emitList with image, [65, 95, 65, 94, 65, 93, 65, 92, 95, 94, 91, 93, 195]
+  pin with labels, "sha1_block", image
+  emitList with image, [83, 86, 87, 65, 84, 65, 85, 65, 86, 65, 87]
+  emitList with image, [49, 201]
+  pin with labels, "sha1_ld", image
+  emitList with image, [139, 84, 141, 128]
+  emitList with image, [15, 201]
+  emitList with image, [137, 148, 141, 120, 254, 255, 255]
+  emitList with image, [255, 193]
+  emitList with image, [131, 249, 16]
+  emitList with image, [15, 140]
+  emitRel with image, fixes, "sha1_ld"
+  emitList with image, [185, 16, 0, 0, 0]
+  pin with labels, "sha1_exp", image
+  emitList with image, [139, 148, 141, 108, 254, 255, 255]
+  emitList with image, [51, 148, 141, 88, 254, 255, 255]
+  emitList with image, [51, 148, 141, 64, 254, 255, 255]
+  emitList with image, [51, 148, 141, 56, 254, 255, 255]
+  emitList with image, [193, 194, 1]
+  emitList with image, [137, 148, 141, 120, 254, 255, 255]
+  emitList with image, [255, 193]
+  emitList with image, [131, 249, 80]
+  emitList with image, [15, 140]
+  emitRel with image, fixes, "sha1_exp"
+  emitList with image, [68, 139, 101, 176]
+  emitList with image, [68, 139, 109, 180]
+  emitList with image, [68, 139, 117, 184]
+  emitList with image, [68, 139, 125, 188]
+  emitList with image, [139, 93, 192]
+  emitList with image, [49, 201]
+  pin with labels, "sha1_rnd", image
+  emitList with image, [131, 249, 20]
+  emitList with image, [15, 141]
+  emitRel with image, fixes, "sha1_r1"
+  emitList with image, [68, 137, 232]
+  emitList with image, [68, 33, 240]
+  emitList with image, [69, 137, 235]
+  emitList with image, [65, 247, 211]
+  emitList with image, [69, 33, 251]
+  emitList with image, [68, 9, 216]
+  emitList with image, [65, 186]
+  emitU32 with image, 1518500249
+  emitJmpTo with image, fixes, "sha1_rf"
+  pin with labels, "sha1_r1", image
+  emitList with image, [131, 249, 40]
+  emitList with image, [15, 141]
+  emitRel with image, fixes, "sha1_r2"
+  emitList with image, [68, 137, 232]
+  emitList with image, [68, 49, 240]
+  emitList with image, [68, 49, 248]
+  emitList with image, [65, 186]
+  emitU32 with image, 1859775393
+  emitJmpTo with image, fixes, "sha1_rf"
+  pin with labels, "sha1_r2", image
+  emitList with image, [131, 249, 60]
+  emitList with image, [15, 141]
+  emitRel with image, fixes, "sha1_r3"
+  emitList with image, [68, 137, 232]
+  emitList with image, [68, 33, 240]
+  emitList with image, [69, 137, 235]
+  emitList with image, [69, 33, 251]
+  emitList with image, [68, 9, 216]
+  emitList with image, [69, 137, 243]
+  emitList with image, [69, 33, 251]
+  emitList with image, [68, 9, 216]
+  emitList with image, [65, 186]
+  emitU32 with image, 2400959708
+  emitJmpTo with image, fixes, "sha1_rf"
+  pin with labels, "sha1_r3", image
+  emitList with image, [68, 137, 232]
+  emitList with image, [68, 49, 240]
+  emitList with image, [68, 49, 248]
+  emitList with image, [65, 186]
+  emitU32 with image, 3395469782
+  pin with labels, "sha1_rf", image
+  emitList with image, [69, 137, 227]
+  emitList with image, [65, 193, 195, 5]
+  emitList with image, [65, 1, 195]
+  emitList with image, [65, 1, 211]
+  emitList with image, [65, 1, 219]
+  emitList with image, [68, 3, 156, 141, 120, 254, 255, 255]
+  emitList with image, [69, 137, 233]
+  emitList with image, [69, 137, 229]
+  emitList with image, [68, 137, 251]
+  emitList with image, [69, 137, 247]
+  emitList with image, [65, 193, 193, 30]
+  emitList with image, [69, 137, 206]
+  emitList with image, [69, 137, 220]
+  emitList with image, [255, 193]
+  emitList with image, [131, 249, 80]
+  emitList with image, [15, 140]
+  emitRel with image, fixes, "sha1_rnd"
+  emitList with image, [68, 1, 101, 176]
+  emitList with image, [68, 1, 109, 180]
+  emitList with image, [68, 1, 117, 184]
+  emitList with image, [68, 1, 125, 188]
+  emitList with image, [1, 93, 192]
+  emitList with image, [65, 95, 65, 94, 65, 93, 65, 92, 95, 94, 91, 195]
+  return image
+end
+
+define emitWsB64 with image, fixes, labels
+  pin with labels, "rt_ws_b64", image
+  emitList with image, [85, 72, 137, 229, 83, 86, 87]
+  emitList with image, [72, 137, 203, 72, 137, 214, 72, 141, 13]
+  emitRel with image, fixes, "txt_ws_b64"
+  emitList with image, [49, 201]
+  pin with labels, "b64_loop", image
+  emitList with image, [131, 249, 18]
+  emitList with image, [15, 141]
+  emitRel with image, fixes, "b64_tail"
+  emitList with image, [15, 182, 20, 11]
+  emitList with image, [193, 226, 16]
+  emitList with image, [15, 182, 68, 11, 1]
+  emitList with image, [193, 224, 8]
+  emitList with image, [9, 194]
+  emitList with image, [15, 182, 68, 11, 2]
+  emitList with image, [9, 194]
+  emitList with image, [137, 208, 193, 232, 18]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [137, 208, 193, 232, 12]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [137, 208, 193, 232, 6]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [137, 208, 131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [131, 193, 3]
+  emitJmpTo with image, fixes, "b64_loop"
+  pin with labels, "b64_tail", image
+  emitList with image, [15, 182, 20, 11]
+  emitList with image, [193, 226, 16]
+  emitList with image, [15, 182, 68, 11, 1]
+  emitList with image, [193, 224, 8]
+  emitList with image, [9, 194]
+  emitList with image, [137, 208, 193, 232, 18]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [137, 208, 193, 232, 12]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [137, 208, 193, 232, 6]
+  emitList with image, [131, 224, 63]
+  emitList with image, [138, 4, 1]
+  emitList with image, [136, 6, 72, 255, 198]
+  emitList with image, [198, 6, 61, 72, 255, 198, 198, 6, 0]
+  emitList with image, [95, 94, 91, 93, 195]
+  return image
+end
+
+define emitWsListen with image, fixes, labels
+  pin with labels, "rt_ws_listen", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "ws_bad_port"
+  emitList with image, [72, 137, 85, 248]
+  emitList with image, [72, 133, 210, 15, 132]
+  emitRel with image, fixes, "ws_port_ok"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 1024
+  emitJcc with image, fixes, 130, "ws_bad_port"
+  emitList with image, [72, 129, 250]
+  emitU32 with image, 65535
+  emitJcc with image, fixes, 135, "ws_bad_port"
+  pin with labels, "ws_port_ok", image
+  emitCallTo with image, fixes, "rt_net_init"
+  emitList with image, [185]
+  emitU32 with image, 2
+  emitList with image, [186]
+  emitU32 with image, 1
+  emitList with image, [65, 184]
+  emitU32 with image, 6
+  let image be emitIat with image, fixes, "iat_sk"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "ws_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "ws_sock"
+  emitList with image, [72, 199, 69, 208, 0, 0, 0, 0]
+  emitList with image, [72, 199, 69, 216, 0, 0, 0, 0]
+  emitList with image, [198, 69, 208, 2]
+  emitList with image, [139, 69, 248, 102, 134, 224, 102, 137, 69, 210]
+  emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_sock"
+  emitList with image, [72, 141, 85, 208]
+  emitList with image, [65, 184]
+  emitU32 with image, 16
+  let image be emitIat with image, fixes, "iat_bd"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "ws_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_sock"
+  emitList with image, [186]
+  emitU32 with image, 1
+  let image be emitIat with image, fixes, "iat_ln"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "ws_fail"
+  emitList with image, [199, 69, 192, 16, 0, 0, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_sock"
+  emitList with image, [72, 141, 85, 208]
+  emitList with image, [76, 141, 69, 192]
+  let image be emitIat with image, fixes, "iat_gn"
+  emitList with image, [15, 183, 69, 210, 102, 134, 224, 15, 183, 192]
+  emitList with image, [72, 137, 194]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 137, 194]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_listen"
+  emitCallTo with image, fixes, "rt_text_cat"
+  emitPushTag with image, 2
+  emitCallTo with image, fixes, "rt_say"
+  pin with labels, "ws_accept", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_sock"
+  emitList with image, [49, 210, 69, 49, 192]
+  let image be emitIat with image, fixes, "iat_ac"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "ws_accept"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 137, 193]
+  emitCallTo with image, fixes, "ws_one"
+  emitJmpTo with image, fixes, "ws_accept"
+  pin with labels, "ws_bad_port", image
+  emitFail with image, fixes, "msg_ws_port"
+  pin with labels, "ws_fail", image
+  emitFail with image, fixes, "msg_net"
+  pin with labels, "ws_one", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 240]
+  emitList with image, [72, 137, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [185]
+  emitU32 with image, 8210
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232]
+  emitList with image, [72, 141, 80, 8]
+  emitList with image, [72, 137, 85, 224]
+  emitList with image, [72, 137, 21]
+  emitRel with image, fixes, "ws_hbuf"
+  emitList with image, [49, 192, 72, 137, 69, 216]
+  pin with labels, "ws_rh", image
+  emitList with image, [72, 139, 69, 216]
+  emitList with image, [72, 61]
+  emitU32 with image, 8192
+  emitJcc with image, fixes, 131, "ws_h400"
+  emitList with image, [72, 139, 77, 240]
+  emitList with image, [72, 139, 85, 224]
+  emitList with image, [72, 3, 85, 216]
+  emitList with image, [65, 184]
+  emitU32 with image, 8192
+  emitList with image, [76, 43, 69, 216]
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_rv"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "ws_hclose"
+  emitList with image, [72, 99, 192]
+  emitList with image, [72, 1, 69, 216]
+  emitList with image, [72, 139, 69, 216]
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "ws_hlen"
+  emitCallTo with image, fixes, "ws_hdrend"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "ws_rh"
+  emitCallTo with image, fixes, "ws_upok"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ws_h400"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_101"
+  emitCallTo with image, fixes, "ws_sendz"
+  emitList with image, [72, 139, 77, 240]
+  emitList with image, [72, 141, 85]
+  emitU8 with image, 128
+  emitList with image, [65, 184]
+  emitU32 with image, 28
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_crlf2"
+  emitCallTo with image, fixes, "ws_sendz"
+  emitCallTo with image, fixes, "ws_echo"
+  emitJmpTo with image, fixes, "ws_hclose"
+  pin with labels, "ws_h400", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_400"
+  emitCallTo with image, fixes, "ws_sendz"
+  pin with labels, "ws_hclose", image
+  emitList with image, [72, 139, 77, 240]
+  let image be emitIat with image, fixes, "iat_cs"
+  emitEpi with image
+
+  pin with labels, "ws_sendz", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248]
+  emitList with image, [72, 137, 202, 49, 192]
+  pin with labels, "ws_zlen", image
+  emitList with image, [128, 60, 2, 0, 15, 132]
+  emitRel with image, fixes, "ws_zgo"
+  emitList with image, [72, 255, 192, 72, 255, 194, 233]
+  emitRel with image, fixes, "ws_zlen"
+  pin with labels, "ws_zgo", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 139, 85, 248]
+  emitList with image, [73, 137, 192]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitEpi with image
+
+  pin with labels, "ws_hdrend", image
+  emitList with image, [72, 139, 85, 224, 72, 139, 77, 216, 49, 192]
+  pin with labels, "ws_he", image
+  emitList with image, [72, 141, 88, 3]
+  emitList with image, [72, 57, 203, 15, 131]
+  emitRel with image, fixes, "ws_heno"
+  emitList with image, [128, 60, 2, 13, 15, 133]
+  emitRel with image, fixes, "ws_hen"
+  emitList with image, [128, 124, 2, 1, 10, 15, 133]
+  emitRel with image, fixes, "ws_hen"
+  emitList with image, [128, 124, 2, 2, 13, 15, 133]
+  emitRel with image, fixes, "ws_hen"
+  emitList with image, [128, 124, 2, 3, 10, 15, 133]
+  emitRel with image, fixes, "ws_hen"
+  emitList with image, [72, 131, 192, 4, 195]
+  pin with labels, "ws_hen", image
+  emitList with image, [72, 255, 192, 233]
+  emitRel with image, fixes, "ws_he"
+  pin with labels, "ws_heno", image
+  emitList with image, [72, 199, 192, 255, 255, 255, 255, 195]
+
+  pin with labels, "ws_upok", image
+  emitPro with image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_upg"
+  emitCallTo with image, fixes, "ws_hget"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_sock"
+  emitCallTo with image, fixes, "ws_has"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_conn"
+  emitCallTo with image, fixes, "ws_hget"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_upgtok"
+  emitCallTo with image, fixes, "ws_has"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_ver"
+  emitCallTo with image, fixes, "ws_hget"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [128, 56, 49, 15, 133]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [128, 120, 1, 51, 15, 133]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_key"
+  emitCallTo with image, fixes, "ws_hget"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ws_upno"
+  emitList with image, [72, 137, 69, 192]
+  emitList with image, [72, 141, 189]
+  emitU8 with image, 128
+  emitList with image, [72, 139, 117, 192]
+  emitList with image, [185, 24, 0, 0, 0]
+  emitList with image, [243, 164]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_guid"
+  emitList with image, [185, 36, 0, 0, 0]
+  emitList with image, [243, 164]
+  emitList with image, [72, 141, 77]
+  emitU8 with image, 128
+  emitList with image, [186, 60, 0, 0, 0]
+  emitList with image, [76, 141, 69, 152]
+  emitCallTo with image, fixes, "rt_sha1"
+  emitList with image, [72, 141, 77, 152]
+  emitList with image, [72, 141, 85]
+  emitU8 with image, 128
+  emitCallTo with image, fixes, "rt_ws_b64"
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "ws_upno", image
+  emitList with image, [49, 192]
+  emitEpi with image
+
+  pin with labels, "ws_hget", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248]
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "ws_hbuf"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_hlen"
+  emitList with image, [73, 137, 209]
+  emitList with image, [77, 141, 20, 10]
+  emitList with image, [72, 139, 117, 248]
+  pin with labels, "ws_hg1", image
+  emitList with image, [77, 57, 209]
+  emitList with image, [15, 131]
+  emitRel with image, fixes, "ws_hgno"
+  emitList with image, [76, 137, 200, 72, 139, 117, 248]
+  pin with labels, "ws_hg2", image
+  emitList with image, [138, 30]
+  emitList with image, [132, 219, 15, 132]
+  emitRel with image, fixes, "ws_hgval"
+  emitList with image, [65, 138, 17]
+  emitList with image, [128, 250, 65, 15, 130]
+  emitRel with image, fixes, "ws_hgc"
+  emitList with image, [128, 250, 90, 15, 135]
+  emitRel with image, fixes, "ws_hgc"
+  emitList with image, [128, 202, 32]
+  pin with labels, "ws_hgc", image
+  emitList with image, [56, 211, 15, 133]
+  emitRel with image, fixes, "ws_hgn"
+  emitList with image, [72, 255, 198, 73, 255, 193]
+  emitJmpTo with image, fixes, "ws_hg2"
+  pin with labels, "ws_hgn", image
+  emitList with image, [73, 255, 193]
+  emitJmpTo with image, fixes, "ws_hg1"
+  pin with labels, "ws_hgval", image
+  pin with labels, "ws_hsp", image
+  emitList with image, [65, 128, 57, 32, 15, 133]
+  emitRel with image, fixes, "ws_hgot"
+  emitList with image, [73, 255, 193]
+  emitJmpTo with image, fixes, "ws_hsp"
+  pin with labels, "ws_hgot", image
+  emitList with image, [76, 137, 200]
+  emitEpi with image
+  pin with labels, "ws_hgno", image
+  emitList with image, [49, 192]
+  emitEpi with image
+
+  pin with labels, "ws_has", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248]
+  emitList with image, [72, 137, 194]
+  pin with labels, "ws_hs1", image
+  emitList with image, [138, 2]
+  emitList with image, [132, 192, 15, 132]
+  emitRel with image, fixes, "ws_hsno"
+  emitList with image, [128, 248, 13, 15, 132]
+  emitRel with image, fixes, "ws_hsno"
+  emitList with image, [72, 139, 117, 248]
+  emitList with image, [72, 137, 211]
+  pin with labels, "ws_hs2", image
+  emitList with image, [138, 14]
+  emitList with image, [132, 201, 15, 132]
+  emitRel with image, fixes, "ws_hsyes"
+  emitList with image, [138, 3]
+  emitList with image, [128, 248, 65, 15, 130]
+  emitRel with image, fixes, "ws_hsc"
+  emitList with image, [128, 248, 90, 15, 135]
+  emitRel with image, fixes, "ws_hsc"
+  emitList with image, [12, 32]
+  pin with labels, "ws_hsc", image
+  emitList with image, [56, 200, 15, 133]
+  emitRel with image, fixes, "ws_hsn"
+  emitList with image, [72, 255, 198, 72, 255, 195]
+  emitJmpTo with image, fixes, "ws_hs2"
+  pin with labels, "ws_hsn", image
+  emitList with image, [72, 255, 194]
+  emitJmpTo with image, fixes, "ws_hs1"
+  pin with labels, "ws_hsyes", image
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "ws_hsno", image
+  emitList with image, [49, 192]
+  emitEpi with image
+
+  pin with labels, "ws_echo", image
+  emitPro with image
+  emitList with image, [72, 199, 69, 200, 255, 255, 255, 255]
+  emitList with image, [185]
+  emitU32 with image, 65552
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 141, 64, 8]
+  emitList with image, [72, 137, 69, 208]
+  emitList with image, [72, 199, 69, 192, 0, 0, 0, 0]
+  pin with labels, "ws_fr", image
+  emitCallTo with image, fixes, "ws_rdfr"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ws_frbad"
+  emitList with image, [15, 182, 69, 176]
+  emitList with image, [131, 248, 8, 15, 132]
+  emitRel with image, fixes, "ws_frcl"
+  emitList with image, [131, 248, 9, 15, 132]
+  emitRel with image, fixes, "ws_frpi"
+  emitList with image, [131, 248, 10, 15, 132]
+  emitRel with image, fixes, "ws_fr"
+  emitList with image, [131, 248, 0, 15, 132]
+  emitRel with image, fixes, "ws_fr0"
+  emitList with image, [131, 248, 1, 15, 132]
+  emitRel with image, fixes, "ws_frd"
+  emitList with image, [131, 248, 2, 15, 132]
+  emitRel with image, fixes, "ws_frd"
+  emitJmpTo with image, fixes, "ws_frbad"
+  pin with labels, "ws_frcl", image
+  emitList with image, [138, 85, 176]
+  emitList with image, [72, 139, 69, 184]
+  emitList with image, [76, 139, 69, 168]
+  emitCallTo with image, fixes, "ws_wrfr"
+  emitEpi with image
+  pin with labels, "ws_frpi", image
+  emitList with image, [178, 10]
+  emitList with image, [72, 139, 69, 184]
+  emitList with image, [76, 139, 69, 168]
+  emitCallTo with image, fixes, "ws_wrfr"
+  emitJmpTo with image, fixes, "ws_fr"
+  pin with labels, "ws_fr0", image
+  emitList with image, [72, 131, 125, 200, 0, 15, 140]
+  emitRel with image, fixes, "ws_frbad"
+  emitList with image, [72, 139, 77, 192]
+  emitList with image, [72, 3, 77, 168]
+  emitList with image, [72, 61]
+  emitU32 with image, 65536
+  emitJcc with image, fixes, 135, "ws_frbad"
+  emitList with image, [72, 139, 125, 208]
+  emitList with image, [72, 3, 125, 192]
+  emitList with image, [72, 139, 117, 184]
+  emitList with image, [72, 139, 77, 168]
+  emitList with image, [243, 164]
+  emitList with image, [72, 139, 69, 168]
+  emitList with image, [72, 1, 69, 192]
+  emitList with image, [15, 182, 69, 177]
+  emitList with image, [132, 192, 15, 132]
+  emitRel with image, fixes, "ws_fr"
+  emitList with image, [138, 85, 200]
+  emitList with image, [72, 139, 69, 208]
+  emitList with image, [76, 139, 69, 192]
+  emitCallTo with image, fixes, "ws_wrfr"
+  emitList with image, [72, 199, 69, 200, 255, 255, 255, 255]
+  emitList with image, [72, 199, 69, 192, 0, 0, 0, 0]
+  emitJmpTo with image, fixes, "ws_fr"
+  pin with labels, "ws_frd", image
+  emitList with image, [72, 131, 125, 200, 0, 15, 141]
+  emitRel with image, fixes, "ws_frbad"
+  emitList with image, [15, 182, 69, 177]
+  emitList with image, [132, 192, 15, 133]
+  emitRel with image, fixes, "ws_frst"
+  emitList with image, [138, 85, 176]
+  emitList with image, [72, 139, 69, 184]
+  emitList with image, [76, 139, 69, 168]
+  emitCallTo with image, fixes, "ws_wrfr"
+  emitJmpTo with image, fixes, "ws_fr"
+  pin with labels, "ws_frst", image
+  emitList with image, [15, 182, 69, 176]
+  emitList with image, [72, 137, 69, 200]
+  emitList with image, [72, 139, 125, 208]
+  emitList with image, [72, 139, 117, 184]
+  emitList with image, [72, 139, 77, 168]
+  emitList with image, [243, 164]
+  emitList with image, [72, 139, 69, 168]
+  emitList with image, [72, 137, 69, 192]
+  emitJmpTo with image, fixes, "ws_fr"
+  pin with labels, "ws_frbad", image
+  emitList with image, [178, 8]
+  emitList with image, [72, 141, 69, 160]
+  emitList with image, [198, 64, 0, 3, 198, 64, 1, 234]
+  emitList with image, [65, 184, 2, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_wrfr"
+  emitEpi with image
+
+  pin with labels, "ws_rdfr", image
+  emitPro with image
+  emitList with image, [72, 141, 85, 150]
+  emitList with image, [185, 2, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_readn"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ws_rd0"
+  emitList with image, [15, 182, 69, 150]
+  emitList with image, [137, 193]
+  emitList with image, [131, 225, 112]
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "ws_rd0"
+  emitList with image, [131, 224, 15]
+  emitList with image, [136, 69, 176]
+  emitList with image, [15, 182, 69, 150]
+  emitList with image, [193, 232, 7]
+  emitList with image, [136, 69, 177]
+  emitList with image, [15, 182, 69, 151]
+  emitList with image, [132, 192, 15, 136]
+  emitRel with image, fixes, "ws_rd0"
+  emitList with image, [15, 182, 69, 151]
+  emitList with image, [36, 127]
+  emitList with image, [136, 69, 178]
+  emitList with image, [72, 199, 69, 168, 0, 0, 0, 0]
+  emitList with image, [15, 182, 69, 178]
+  emitList with image, [72, 137, 69, 168]
+  emitList with image, [60, 126, 15, 133]
+  emitRel with image, fixes, "ws_rd16"
+  emitList with image, [72, 141, 85, 148]
+  emitList with image, [185, 2, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_readn"
+  emitList with image, [15, 182, 69, 148, 193, 224, 8]
+  emitList with image, [15, 182, 77, 149, 9, 200]
+  emitList with image, [72, 137, 69, 168]
+  emitJmpTo with image, fixes, "ws_rdm"
+  pin with labels, "ws_rd16", image
+  emitList with image, [128, 125, 178, 127, 15, 133]
+  emitRel with image, fixes, "ws_rdm"
+  emitList with image, [72, 141, 85, 140]
+  emitList with image, [185, 8, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_readn"
+  emitList with image, [139, 69, 140]
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "ws_rd0"
+  emitList with image, [15, 182, 69, 144, 193, 224, 24]
+  emitList with image, [15, 182, 77, 145, 193, 225, 16, 9, 200]
+  emitList with image, [15, 182, 77, 146, 193, 225, 8, 9, 200]
+  emitList with image, [15, 182, 77, 147, 9, 200]
+  emitList with image, [72, 137, 69, 168]
+  pin with labels, "ws_rdm", image
+  emitList with image, [72, 139, 69, 168]
+  emitList with image, [72, 61]
+  emitU32 with image, 65536
+  emitJcc with image, fixes, 135, "ws_rd0"
+  emitList with image, [15, 182, 69, 176]
+  emitList with image, [131, 248, 8, 15, 130]
+  emitRel with image, fixes, "ws_rdp"
+  emitList with image, [15, 182, 69, 177]
+  emitList with image, [132, 192, 15, 132]
+  emitRel with image, fixes, "ws_rd0"
+  emitList with image, [72, 139, 69, 168]
+  emitList with image, [72, 131, 248, 125, 15, 135]
+  emitRel with image, fixes, "ws_rd0"
+  pin with labels, "ws_rdp", image
+  emitList with image, [72, 141, 85, 136]
+  emitList with image, [185, 4, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_readn"
+  emitList with image, [185]
+  emitU32 with image, 65552
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 141, 64, 8]
+  emitList with image, [72, 137, 69, 184]
+  emitList with image, [72, 139, 77, 168]
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "ws_unm"
+  emitList with image, [72, 137, 202]
+  emitList with image, [72, 139, 77, 240]
+  emitList with image, [72, 139, 85, 184]
+  emitList with image, [76, 139, 69, 168]
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_rv"
+  emitList with image, [72, 99, 192]
+  emitList with image, [72, 59, 69, 168]
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "ws_rd0"
+  pin with labels, "ws_unm", image
+  emitList with image, [49, 201]
+  pin with labels, "ws_unl", image
+  emitList with image, [72, 59, 77, 168]
+  emitList with image, [15, 131]
+  emitRel with image, fixes, "ws_rdfin"
+  emitList with image, [137, 200, 131, 224, 3]
+  emitList with image, [138, 84, 5, 136]
+  emitList with image, [72, 139, 93, 184]
+  emitList with image, [48, 20, 11]
+  emitList with image, [72, 255, 193]
+  emitJmpTo with image, fixes, "ws_unl"
+  pin with labels, "ws_rdfin", image
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "ws_rd0", image
+  emitList with image, [49, 192]
+  emitEpi with image
+
+  pin with labels, "ws_readn", image
+  emitPro with image
+  emitList with image, [72, 137, 85, 248, 72, 137, 77, 240]
+  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "ws_rn", image
+  emitList with image, [72, 139, 69, 232]
+  emitList with image, [72, 59, 69, 240]
+  emitList with image, [15, 131]
+  emitRel with image, fixes, "ws_rny"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 139, 85, 248]
+  emitList with image, [72, 3, 85, 232]
+  emitList with image, [76, 139, 69, 240]
+  emitList with image, [76, 43, 69, 232]
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_rv"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "ws_rnn"
+  emitList with image, [72, 99, 192]
+  emitList with image, [72, 1, 69, 232]
+  emitJmpTo with image, fixes, "ws_rn"
+  pin with labels, "ws_rny", image
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "ws_rnn", image
+  emitList with image, [49, 192]
+  emitEpi with image
+
+  pin with labels, "ws_wrfr", image
+  emitPro with image
+  emitList with image, [136, 85, 248]
+  emitList with image, [72, 137, 69, 240]
+  emitList with image, [76, 137, 69, 232]
+  emitList with image, [128, 77, 248, 128]
+  emitList with image, [72, 139, 69, 232]
+  emitList with image, [72, 131, 248, 126, 15, 141]
+  emitRel with image, fixes, "ws_w16"
+  emitList with image, [138, 69, 248]
+  emitList with image, [136, 69, 176]
+  emitList with image, [138, 69, 232]
+  emitList with image, [136, 69, 177]
+  emitList with image, [72, 141, 85, 176]
+  emitList with image, [185, 2, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_sraw"
+  emitJmpTo with image, fixes, "ws_wpay"
+  pin with labels, "ws_w16", image
+  emitList with image, [72, 61]
+  emitU32 with image, 65536
+  emitJcc with image, fixes, 131, "ws_wbig"
+  emitList with image, [198, 69, 176, 126]
+  emitList with image, [72, 139, 69, 232]
+  emitList with image, [136, 69, 179]
+  emitList with image, [193, 232, 8]
+  emitList with image, [136, 69, 178]
+  emitList with image, [138, 69, 248]
+  emitList with image, [136, 69, 176]
+  emitList with image, [72, 141, 85, 176]
+  emitList with image, [185, 4, 0, 0, 0]
+  emitCallTo with image, fixes, "ws_sraw"
+  emitJmpTo with image, fixes, "ws_wpay"
+  pin with labels, "ws_wbig", image
+  emitEpi with image
+  pin with labels, "ws_wpay", image
+  emitList with image, [72, 139, 85, 240]
+  emitList with image, [72, 139, 77, 232]
+  emitList with image, [72, 137, 202]
+  emitList with image, [72, 139, 77, 232]
+  emitList with image, [133, 201, 15, 132]
+  emitRel with image, fixes, "ws_wdone"
+  emitList with image, [72, 139, 85, 240]
+  emitList with image, [185]
+  emitU32 with image, 0
+  emitList with image, [76, 139, 69, 232]
+  emitCallTo with image, fixes, "ws_sraw"
+  pin with labels, "ws_wdone", image
+  emitEpi with image
+
+  pin with labels, "ws_sraw", image
+  emitPro with image
+  emitList with image, [72, 137, 85, 248]
+  emitList with image, [72, 137, 77, 240]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 139, 85, 248]
+  emitList with image, [76, 139, 69, 240]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitEpi with image
+  return image
+end
+
+define emitWsRuntime with image, fixes, labels
+  let image be emitSha1Native with image, fixes, labels
+  let image be emitWsB64 with image, fixes, labels
+  let image be emitWsListen with image, fixes, labels
+  return image
+end

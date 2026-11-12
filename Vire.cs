@@ -381,7 +381,7 @@ sealed class Machine
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
-        "connect", "send", "recv", "close",
+        "connect", "send", "recv", "close", "ws_listen",
         "start", "wait", "result"
     });
 
@@ -729,6 +729,7 @@ sealed class Machine
             throw new HaltSignal((int)args[0]);
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
+        if (name == "ws_listen") { VireWs.Listen(RequirePort(args[0], line), line); return null; }
         if (name == "connect") return VireNet.ConnectHost(args[0] as string, args[1], tcp, line, col);
         if (name == "send") return VireNet.SendAll(args[0], args[1], tcp, line, col);
         if (name == "recv") return VireNet.RecvBound(args[0], args[1], tcp, line, col);
