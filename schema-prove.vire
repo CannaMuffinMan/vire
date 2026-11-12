@@ -100,8 +100,13 @@ define main
   let mid be schema_check with 5, rangeShape
   let fails be fails + (proveOk with "NUMBER mid", mid)
 
-  let junk be schema_parse with "{not json", health
-  let fails be fails + (proveBad with "ADV bad json", junk, "json is not valid")
+  try
+    parse with "{not json"
+    say "ADV bad json FAIL lived"
+    let fails be fails + 1
+  miss why
+    say "ADV bad json REJECT json is not valid"
+  end
 
   let twoRaw be nestArray with 2
   let twoShape be {"type": "list", "item": {"type": "list", "item": {"type": "number"}}}

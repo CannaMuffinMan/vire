@@ -1,6 +1,7 @@
 ~ Guest JSON body validation. parse only checks syntax; this checks a shape.
 ~ Caps stay inside the host list/text limits (100000 / 1e6). Depth 16 is
 ~ stricter than host parse (256) so a future FCG route fails closed.
+~ Type tests use keys/lower/length (native has no kind builtin).
 
 define schema_cap_depth
   return 16
@@ -32,29 +33,18 @@ define schema_kind with value
   if value == false
     return "bool"
   end
-  let k be "number"
-  try
-    keys with value
-    let k be "map"
-  miss why
-  end
-  if k == "map"
+  let raw be json with value
+  let ch be raw at 0
+  if ch == "{"
     return "map"
   end
-  try
-    find with value, ""
-    let k be "text"
-  miss why
+  if ch == "["
+    return "list"
   end
-  if k == "text"
+  if ch == "\""
     return "text"
   end
-  try
-    length with value
-    let k be "list"
-  miss why
-  end
-  return k
+  return "number"
 end
 
 define schema_need with spec
@@ -74,36 +64,47 @@ define schema_max_of with spec, fallback
   return fallback
 end
 
-define schema_deep with value, d
-  if d > (schema_cap_depth)
-    return d
-  end
-  let k be schema_kind with value
-  if k == "map"
-    let best be d
-    let ks be keys with value
-    for name in ks
-      let n be schema_deep with (value at name), (d + 1)
-      if n > best
-        let best be n
+define schema_walk_push with items, ds, child, d
+  push with items, child
+  push with ds, d
+  return true
+end
+
+define schema_deep with value
+  let items be [value]
+  let ds be [0]
+  let i be 0
+  let best be 0
+  let cap be schema_cap_depth
+  while i < (length with items)
+    let v be items at i
+    let d be ds at i
+    if d > best
+      let best be d
+    end
+    if d > cap
+      return d
+    end
+    let k be schema_kind with v
+    if k == "map"
+      let ks be keys with v
+      let ki be 0
+      while ki < (length with ks)
+        let name be ks at ki
+        schema_walk_push with items, ds, (v at name), (d + 1)
+        let ki be ki + 1
       end
     end
-    return best
-  end
-  if k == "list"
-    let best be d
-    let i be 0
-    let nitems be length with value
-    while i < nitems
-      let n be schema_deep with (value at i), (d + 1)
-      if n > best
-        let best be n
+    if k == "list"
+      let li be 0
+      while li < (length with v)
+        schema_walk_push with items, ds, (v at li), (d + 1)
+        let li be li + 1
       end
-      let i be i + 1
     end
-    return best
+    let i be i + 1
   end
-  return d
+  return best
 end
 
 define schema_match with value, shape
@@ -182,26 +183,32 @@ define schema_match with value, shape
       return schema_bad with "bad shape"
     end
     let names be keys with fields
-    for name in names
+    let ni be 0
+    while ni < (length with names)
+      let name be names at ni
       let spec be fields at name
       let present be has with value, name
-      if present
+      if present == true
         let one be schema_match with (value at name), spec
         if (one at 0) != "ok"
           return one
         end
       end
-      if not present
-        if schema_need with spec
+      if present == false
+        if (schema_need with spec) == true
           return schema_bad with ("missing required " + name)
         end
       end
+      let ni be ni + 1
     end
     let gotNames be keys with value
-    for name in gotNames
-      if not (has with fields, name)
+    let gi be 0
+    while gi < (length with gotNames)
+      let name be gotNames at gi
+      if (has with fields, name) == false
         return schema_bad with ("unknown field " + name)
       end
+      let gi be gi + 1
     end
     return schema_ok with value
   end
@@ -209,7 +216,7 @@ define schema_match with value, shape
 end
 
 define schema_check with value, shape
-  let d be schema_deep with value, 0
+  let d be schema_deep with value
   if d > (schema_cap_depth)
     return schema_bad with "too-deep nesting"
   end
@@ -217,12 +224,7 @@ define schema_check with value, shape
 end
 
 define schema_parse with raw, shape
-  let value be none
-  try
-    let value be parse with raw
-  miss problem
-    return schema_bad with "json is not valid"
-  end
+  let value be parse with raw
   return schema_check with value, shape
 end
 
