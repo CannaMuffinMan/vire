@@ -1,0 +1,294 @@
+~ Guest PostgreSQL frontend/backend protocol v3 on loopback TCP (PR #64).
+~ No TLS. No DNS. Auth: AuthenticationOk (trust) and cleartext PasswordMessage.
+~ SCRAM-SHA-256 is a residual: guest HMAC/SHA-256 exists, but SASL+PBKDF2 at
+~ default 4096 iterations would blow the 5M step cap, so CI uses trust.
+~ Caps stay 32MB / 100000 / 5M.
+
+define pg_tab
+  let s be ""
+  let n be 0
+  while n < 256
+    let s be s + (chr with n)
+    let n be n + 1
+  end
+  return s
+end
+
+define pg_u8 with ch, tab
+  let p be find with tab, ch
+  if p < 0
+    return 255
+  end
+  return p
+end
+
+define pg_be32 with n
+  let b3 be n % 256
+  let n be idiv with n, 256
+  let b2 be n % 256
+  let n be idiv with n, 256
+  let b1 be n % 256
+  let n be idiv with n, 256
+  let b0 be n % 256
+  return (chr with b0) + (chr with b1) + (chr with b2) + (chr with b3)
+end
+
+define pg_be16 with n
+  let b1 be n % 256
+  let b0 be idiv with n, 256
+  let b0 be b0 % 256
+  return (chr with b0) + (chr with b1)
+end
+
+define pg_u16be with raw, i, tab
+  let hi be pg_u8 with (raw at i), tab
+  let lo be pg_u8 with (raw at (i + 1)), tab
+  return (hi * 256) + lo
+end
+
+define pg_u32be with raw, i, tab
+  let a be pg_u8 with (raw at i), tab
+  let b be pg_u8 with (raw at (i + 1)), tab
+  let c be pg_u8 with (raw at (i + 2)), tab
+  let d be pg_u8 with (raw at (i + 3)), tab
+  return (((a * 256) + b) * 256 + c) * 256 + d
+end
+
+define pg_cstr with raw, i
+  let n be length with raw
+  let out be ""
+  while i < n
+    let ch be raw at i
+    if ch == (chr with 0)
+      return [out, i + 1]
+    end
+    let out be out + ch
+    let i be i + 1
+  end
+  return [out, i]
+end
+
+define pg_msg with kind, body
+  return kind + (pg_be32 with ((length with body) + 4)) + body
+end
+
+define pg_fill with conn, want
+  let buf be conn at "buf"
+  let h be conn at "h"
+  while (length with buf) < want
+    let chunk be recv with h, 4096
+    if chunk == ""
+      return false
+    end
+    let buf be buf + chunk
+  end
+  put buf into conn at "buf"
+  return true
+end
+
+define pg_read with conn
+  if not (pg_fill with conn, 5)
+    return none
+  end
+  let buf be conn at "buf"
+  let tab be conn at "tab"
+  let t be buf at 0
+  let ln be pg_u32be with buf, 1, tab
+  if ln < 4
+    return none
+  end
+  let total be ln + 1
+  if not (pg_fill with conn, total)
+    return none
+  end
+  let buf be conn at "buf"
+  let payload be slice with buf, 5, total
+  put (slice with buf, total, (length with buf)) into conn at "buf"
+  return {"t": t, "p": payload}
+end
+
+define pg_err with payload, tab
+  let i be 0
+  let n be length with payload
+  let msg be ""
+  let code be ""
+  while i < n
+    let k be payload at i
+    if k == (chr with 0)
+      stop
+    end
+    let i be i + 1
+    let got be pg_cstr with payload, i
+    let val be got at 0
+    let i be got at 1
+    if k == "M"
+      let msg be val
+    end
+    if k == "C"
+      let code be val
+    end
+  end
+  return code + " " + msg
+end
+
+define pg_startup with user, db
+  let z be chr with 0
+  let body be pg_be32 with 196608
+  let body be body + "user" + z + user + z + "database" + z + db + z + z
+  return (pg_be32 with ((length with body) + 4)) + body
+end
+
+define pg_auth with conn, secret
+  let tab be conn at "tab"
+  let h be conn at "h"
+  let ready be false
+  let method be "none"
+  while not ready
+    let m be pg_read with conn
+    if m == none
+      return "closed before ready"
+    end
+    let t be m at "t"
+    if t == "E"
+      return pg_err with (m at "p"), tab
+    end
+    if t == "R"
+      let kind be pg_u32be with (m at "p"), 0, tab
+      if kind == 0
+        let method be "trust"
+      else if kind == 3
+        let method be "cleartext"
+        send with h, (pg_msg with "p", (secret + (chr with 0)))
+      else if kind == 10
+        return "SCRAM-SHA-256 residual (SASL); CI uses trust"
+      else
+        return "unsupported auth " + (text with kind)
+      end
+    end
+    if t == "Z"
+      let ready be true
+    end
+  end
+  put method into conn at "auth"
+  return "ok"
+end
+
+define pg_open with host, port, user, db, secret
+  let h be connect with host, port
+  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none"}
+  send with h, (pg_startup with user, db)
+  let why be pg_auth with conn, secret
+  if why != "ok"
+    close with h
+    return {"ok": false, "why": why}
+  end
+  return {"ok": true, "conn": conn}
+end
+
+define pg_rows_parse with payload, tab
+  let n be pg_u16be with payload, 0, tab
+  let i be 2
+  let cells be []
+  let k be 0
+  while k < n
+    let a be pg_u8 with (payload at i), tab
+    let b be pg_u8 with (payload at (i + 1)), tab
+    let c be pg_u8 with (payload at (i + 2)), tab
+    let d be pg_u8 with (payload at (i + 3)), tab
+    let i be i + 4
+    if (a == 255) and (b == 255) and (c == 255) and (d == 255)
+      push with cells, none
+    else
+      let ln be (((a * 256) + b) * 256 + c) * 256 + d
+      push with cells, (slice with payload, i, (i + ln))
+      let i be i + ln
+    end
+    let k be k + 1
+  end
+  return cells
+end
+
+define pg_query with conn, sql
+  let h be conn at "h"
+  let tab be conn at "tab"
+  send with h, (pg_msg with "Q", (sql + (chr with 0)))
+  let rows be []
+  let cmd be ""
+  let err be ""
+  let ready be false
+  while not ready
+    let m be pg_read with conn
+    if m == none
+      return {"ok": false, "why": "closed", "rows": rows, "cmd": cmd}
+    end
+    let t be m at "t"
+    if t == "D"
+      push with rows, (pg_rows_parse with (m at "p"), tab)
+    end
+    if t == "C"
+      let got be pg_cstr with (m at "p"), 0
+      let cmd be got at 0
+    end
+    if t == "E"
+      let err be pg_err with (m at "p"), tab
+    end
+    if t == "Z"
+      let ready be true
+    end
+  end
+  if err != ""
+    return {"ok": false, "why": err, "rows": rows, "cmd": cmd}
+  end
+  return {"ok": true, "why": "", "rows": rows, "cmd": cmd}
+end
+
+define pg_bind_body with sql, arg
+  let z be chr with 0
+  let p be pg_msg with "P", (z + sql + z + (pg_be16 with 0))
+  let b be z + z + (pg_be16 with 0) + (pg_be16 with 1) + (pg_be32 with (length with arg)) + arg + (pg_be16 with 0)
+  let b be pg_msg with "B", b
+  let e be pg_msg with "E", (z + (pg_be32 with 0))
+  let s be pg_msg with "S", ""
+  return p + b + e + s
+end
+
+define pg_exec_param with conn, sql, arg
+  let h be conn at "h"
+  let tab be conn at "tab"
+  send with h, (pg_bind_body with sql, arg)
+  let rows be []
+  let cmd be ""
+  let err be ""
+  let ready be false
+  while not ready
+    let m be pg_read with conn
+    if m == none
+      return {"ok": false, "why": "closed", "rows": rows, "cmd": cmd}
+    end
+    let t be m at "t"
+    if t == "D"
+      push with rows, (pg_rows_parse with (m at "p"), tab)
+    end
+    if t == "C"
+      let got be pg_cstr with (m at "p"), 0
+      let cmd be got at 0
+    end
+    if t == "E"
+      let err be pg_err with (m at "p"), tab
+    end
+    if t == "Z"
+      let ready be true
+    end
+  end
+  if err != ""
+    return {"ok": false, "why": err, "rows": rows, "cmd": cmd}
+  end
+  return {"ok": true, "why": "", "rows": rows, "cmd": cmd}
+end
+
+define pg_close with conn
+  let h be conn at "h"
+  send with h, (pg_msg with "X", "")
+  close with h
+  return none
+end
