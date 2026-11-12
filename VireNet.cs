@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -11,6 +12,8 @@ static class VireNet
 {
     const int MaxResponse = 1000000;
     const int MaxRedirects = 3;
+    const int ConnectTimeoutMs = 5000;
+    const int MaxRecv = 1000000;
 
     internal static Func<string, IPAddress[]> ResolveHost = DefaultResolve;
     internal static Func<string, bool> IsTestOrigin = DefaultTestOrigin;
@@ -235,5 +238,134 @@ static class VireNet
             socket.Dispose();
             throw;
         }
+    }
+
+    internal static IPAddress DemandConnectAddress(string host, int line, int column)
+    {
+        if (string.IsNullOrEmpty(host))
+            throw new VireError("that address is not allowed", line, column);
+        IPAddress literal;
+        if (!IPAddress.TryParse(host, out literal))
+            throw new VireError("that address is not allowed", line, column);
+        if (literal.IsIPv4MappedToIPv6) literal = literal.MapToIPv4();
+        if (literal.AddressFamily != AddressFamily.InterNetwork)
+            throw new VireError("that address is not allowed", line, column);
+        byte[] part = literal.GetAddressBytes();
+        if (part.Length == 4 && part[0] == 127 && part[1] == 0 && part[2] == 0 && part[3] == 1)
+            return literal;
+        throw new VireError("connect stays off this machine and private networks", line, column);
+    }
+
+    internal static int ConnectHost(string host, object portObj, VireTcpTable table, int line, int column)
+    {
+        if (host == null)
+            throw new VireError("connect needs a host and a port", line, column);
+        if (!(portObj is int))
+            throw new VireError("connect needs a host and a port", line, column);
+        int port = (int)portObj;
+        if (port < 1 || port > 65535)
+            throw new VireError("connect needs a port from 1 to 65535", line, column);
+        IPAddress pinned = DemandConnectAddress(host, line, column);
+        Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            socket.NoDelay = true;
+            socket.ReceiveTimeout = ConnectTimeoutMs;
+            socket.SendTimeout = ConnectTimeoutMs;
+            IAsyncResult wait = socket.BeginConnect(pinned, port, null, null);
+            if (!wait.AsyncWaitHandle.WaitOne(ConnectTimeoutMs))
+            {
+                try { socket.Close(); } catch (Exception) { }
+                throw new VireError("could not connect", line, column);
+            }
+            socket.EndConnect(wait);
+            return table.Put(socket);
+        }
+        catch (VireError)
+        {
+            socket.Dispose();
+            throw;
+        }
+        catch (Exception)
+        {
+            socket.Dispose();
+            throw new VireError("could not connect", line, column);
+        }
+    }
+
+    internal static int SendAll(object handle, object payload, VireTcpTable table, int line, int column)
+    {
+        Socket socket = table.Need(handle, line, column);
+        string text = payload as string;
+        if (text == null) throw new VireError("send needs a connection and text", line, column);
+        byte[] raw = Encoding.UTF8.GetBytes(text);
+        int off = 0;
+        try
+        {
+            while (off < raw.Length)
+            {
+                int n = socket.Send(raw, off, raw.Length - off, SocketFlags.None);
+                if (n <= 0) throw new VireError("could not connect", line, column);
+                off += n;
+            }
+        }
+        catch (VireError) { throw; }
+        catch (Exception) { throw new VireError("could not connect", line, column); }
+        return raw.Length;
+    }
+
+    internal static string RecvBound(object handle, object maxObj, VireTcpTable table, int line, int column)
+    {
+        Socket socket = table.Need(handle, line, column);
+        if (!(maxObj is int)) throw new VireError("recv needs a connection and a size", line, column);
+        int max = (int)maxObj;
+        if (max < 0) throw new VireError("recv needs a connection and a size", line, column);
+        if (max > MaxRecv) max = MaxRecv;
+        if (max == 0) return "";
+        byte[] buf = new byte[max];
+        try
+        {
+            int n = socket.Receive(buf, 0, max, SocketFlags.None);
+            if (n <= 0) return "";
+            return Encoding.UTF8.GetString(buf, 0, n);
+        }
+        catch (VireError) { throw; }
+        catch (Exception) { throw new VireError("could not connect", line, column); }
+    }
+
+    internal static object CloseHandle(object handle, VireTcpTable table, int line, int column)
+    {
+        table.Close(handle, line, column);
+        return null;
+    }
+}
+
+sealed class VireTcpTable
+{
+    int next = 1;
+    readonly Dictionary<int, Socket> live = new Dictionary<int, Socket>();
+
+    internal int Put(Socket socket)
+    {
+        int id = next++;
+        live[id] = socket;
+        return id;
+    }
+
+    internal Socket Need(object handle, int line, int column)
+    {
+        if (!(handle is int)) throw new VireError("that connection is closed", line, column);
+        Socket socket;
+        if (!live.TryGetValue((int)handle, out socket) || socket == null)
+            throw new VireError("that connection is closed", line, column);
+        return socket;
+    }
+
+    internal void Close(object handle, int line, int column)
+    {
+        Socket socket = Need(handle, line, column);
+        live.Remove((int)handle);
+        try { socket.Close(); }
+        catch (Exception) { throw new VireError("that connection is closed", line, column); }
     }
 }
