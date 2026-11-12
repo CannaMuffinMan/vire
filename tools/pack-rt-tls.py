@@ -12,7 +12,7 @@ SIZES, ENC, ENCLEN, ENCCAP = 56, 80, 88, 96
 PLAIN, PLEN, POFF, SCRATCH = 104, 112, 120, 128
 NPROV, NKEY, SOCK, ATTR, EXPIRY, KPI = 136, 144, 152, 160, 168, 176
 
-ASC_REQ = 0x0001001C
+ASC_REQ = 0x0001011C
 SEC_I_CONTINUE = 0x00090312
 SEC_E_INCOMPLETE = 0x80090318
 SEC_I_COMPLETE_NEEDED = 0x00090313
@@ -363,12 +363,9 @@ def emit_hs(a: Asm) -> None:
     a.raw(0xC7, 0x45, 0xA0, 0, 0, 0, 0)
     a.raw(0xC7, 0x45, 0xA4, 1, 0, 0, 0)
     a.raw(0x48, 0x8D, 0x45, 0xB0, 0x48, 0x89, 0x45, 0xA8)
-    a.raw(0xC7, 0x45, 0xB0, 0x00, 0x40, 0, 0)
+    a.raw(0xC7, 0x45, 0xB0, 0, 0, 0, 0)
     a.raw(0xC7, 0x45, 0xB4, 2, 0, 0, 0)
-    a.lea("rax", "tls_state")
-    a.raw(0x48, 0x8B, 0x80)
-    a.u32(ENC)
-    a.raw(0x48, 0x89, 0x45, 0xB8)
+    a.raw(0x48, 0xC7, 0x45, 0xB8, 0, 0, 0, 0)
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0x8D, 0x89)
     a.u32(CRED)
@@ -410,11 +407,11 @@ def emit_hs(a: Asm) -> None:
     a.lea("rcx", "tls_state")
     a.raw(0x48, 0x8B, 0x89)
     a.u32(SOCK)
-    a.lea("rdx", "tls_state")
-    a.raw(0x48, 0x8B, 0x82)
-    a.u32(ENC)
+    a.raw(0x48, 0x8B, 0x55, 0xB8)
     a.raw(0x44, 0x8B, 0x45, 0xB0)
     a.call("rt_net_sendall")
+    a.raw(0x48, 0x8B, 0x4D, 0xB8)
+    a.call_iat("iat_fcb")
     a.pin("hs_nosend")
     a.raw(0x8B, 0x45, 0xEC, 0x85, 0xC0)
     a.ljcc(0x84, "hs_ok")
@@ -688,7 +685,7 @@ NAMES = [
     "txt_mskey", "txt_pkcs8", "txt_my", "msg_tls", "msg_https", "rt_listen", "rt_fail",
     "rt_net_init", "rt_read", "rt_alloc", "rt_memcpy", "rt_net_client",
     "rt_net_sendall", "tls_recv_slot", "tls_send_slot", "tls_state",
-    "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_cos", "iat_cfd", "iat_ach", "iat_asc",
+    "iat_ccc", "iat_csc", "iat_nop", "iat_nik", "iat_cos", "iat_cfd", "iat_ach", "iat_asc", "iat_fcb",
     "iat_dsc", "iat_qca", "iat_dec", "iat_enc", "iat_c2b", "iat_rv", "iat_sd",
     "msg_tls_b64", "msg_tls_cert", "msg_tls_prov", "msg_tls_key", "msg_tls_prop", "msg_tls_ach",
     "die_tls", "die_b64", "die_cert", "die_prov", "die_key", "die_prop", "die_ach",

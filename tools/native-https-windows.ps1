@@ -123,10 +123,10 @@ function Invoke-CurlHttps([string[]]$Extra, [string]$Url) {
 $want = '{"ok":true,"service":"fcgcpa","payments":false}'
 $verbose = Join-Path $Data "https-curl-verbose.txt"
 $vproc = Start-Process -FilePath "curl.exe" -ArgumentList @("-v", "-sS", "-D", "-", "--max-time", "15", "--http1.1", "--cacert", $ca, "https://127.0.0.1:$hport/health") -NoNewWindow -Wait -PassThru -RedirectStandardOutput (Join-Path $Data "https-health.body.txt") -RedirectStandardError $verbose
-$vtext = Get-Content -Raw $verbose
-$body = Get-Content -Raw (Join-Path $Data "https-health.body.txt")
+$vtext = [string](Get-Content -Raw $verbose -ErrorAction SilentlyContinue)
+$body = [string](Get-Content -Raw (Join-Path $Data "https-health.body.txt") -ErrorAction SilentlyContinue)
 Write-Output ("PASS_AFTER_https_curl_exit " + $vproc.ExitCode)
-Write-Output ("PASS_AFTER_https_verbose " + (($vtext -replace '\s+', ' ').Trim()))
+Write-Output ("PASS_AFTER_https_verbose " + (([string]$vtext -replace '\s+', ' ').Trim()))
 Write-Output ("PASS_AFTER_https_health " + (($body -replace '\s+', ' ').Trim()))
 if ($vproc.ExitCode -ne 0) { throw "HTTPS GET /health failed" }
 if ($body -notmatch "HTTP/1.1 200 ") { throw "https health status not 200" }
