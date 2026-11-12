@@ -235,9 +235,13 @@ define emitTcpClient with image, fixes, labels
   emitRel with image, fixes, "send_closed"
   emitList with image, [72, 139, 85, 240, 76, 139, 2, 72, 141, 82, 8]
   emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "send_fail"
   emitList with image, [72, 139, 85, 240, 72, 139, 18]
   emitPushTag with image, 1
   emitEpi with image
+  pin with labels, "send_fail", image
+  emitFail with image, fixes, "msg_conn_fail"
   pin with labels, "send_bad", image
   emitFail with image, fixes, "msg_send_bad"
   pin with labels, "send_closed", image
