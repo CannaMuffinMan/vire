@@ -63,6 +63,8 @@ jobs:
       - run: pwsh -File tools/native-hello-handoff.ps1
       - run: pwsh -File tools/native-sec-windows.ps1
       - run: pwsh -File tools/native-smoke.ps1
+      - run: pwsh -File tools/native-oom.ps1
+      - run: pwsh -File tools/native-gc-loop-proof.ps1
   native-selfhost-windows:
     runs-on: windows-latest
     steps:

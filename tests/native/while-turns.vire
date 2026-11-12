@@ -1,0 +1,10 @@
+define main
+  let i be 0
+  while i < 2500000
+    let i be i + 1
+    if (i % 100000) == 0
+      let t be ticks
+    end
+  end
+  say "ok"
+end
