@@ -33,6 +33,7 @@ NAMES = [
     "AddVectoredExceptionHandler",
     "SetFilePointerEx",
     "SetEndOfFile",
+    "GetFinalPathNameByHandleA",
 ]
 
 
@@ -57,11 +58,13 @@ def load_pe(path):
 
 
 class Emu:
-    def __init__(self, pe_path, cwd, reparse_names=None, force_nlink=None, cmdline=b"\0"):
+    def __init__(self, pe_path, cwd, reparse_names=None, force_nlink=None, cmdline=b"\0", walk_race=False):
         self.raw, self.image, self.image_size, self.entry, self.headers, self.sections = load_pe(pe_path)
-        self.cwd = cwd
+        self.cwd = os.path.abspath(cwd)
         self.reparse_names = set(reparse_names or [])
         self.force_nlink = force_nlink
+        self.walk_race = walk_race
+        self._raced = False
         self.mu = Uc(UC_ARCH_X86, UC_MODE_64)
         self.out = bytearray()
         self.exit_code = None
@@ -119,8 +122,8 @@ class Emu:
         if not runs:
             raise SystemExit("IAT not found")
         iat = runs[-1]
-        if len(iat) < len(NAMES):
-            raise SystemExit("IAT has %d slots, need %d" % (len(iat), len(NAMES)))
+        if len(iat) < 9:
+            raise SystemExit("IAT has %d slots, need at least 9" % len(iat))
         for slot, name in zip(iat, NAMES):
             self.mu.mem_write(base + slot, struct.pack("<Q", STUB_BASE + NAMES.index(name) * 16))
 
@@ -178,12 +181,21 @@ class Emu:
         rec = self.files.get(handle)
         if rec is not None:
             rec[b"data"] = data
-            path = rec[b"path"]
-            if path:
-                full = os.path.join(self.cwd, path.decode("latin1"))
-                os.makedirs(os.path.dirname(full), exist_ok=True)
-                with open(full, "wb") as f:
-                    f.write(data)
+            full = rec.get(b"final")
+            if not full:
+                path = rec[b"path"]
+                full = os.path.join(self.cwd, path.decode("latin1")) if path else ""
+            if full:
+                try:
+                    if os.path.isdir(full):
+                        self.wr(UC_X86_REG_RAX, 0)
+                        return
+                    os.makedirs(os.path.dirname(full), exist_ok=True)
+                    with open(full, "wb") as f:
+                        f.write(data)
+                except OSError:
+                    self.wr(UC_X86_REG_RAX, 0)
+                    return
         elif handle != 2:
             self.out += data
         written = self.rd(UC_X86_REG_R9)
@@ -198,7 +210,8 @@ class Emu:
         flags = struct.unpack_from("<I", self.mu.mem_read(self.rd(UC_X86_REG_RSP) + 0x30, 4))[0]
         rel = path.decode("latin1")
         full = os.path.join(self.cwd, rel)
-        self.creates.append((rel, access, disp, flags))
+        if rel not in (".", "./"):
+            self.creates.append((rel, access, disp, flags))
         exists = os.path.exists(full)
         if disp == 3 and not exists:
             self.wr(UC_X86_REG_RAX, 0xFFFFFFFFFFFFFFFF)
@@ -215,10 +228,11 @@ class Emu:
         if self.force_nlink is not None and os.path.exists(full):
             nlink = self.force_nlink
         data = b""
-        if os.path.exists(full):
+        if os.path.isfile(full):
             with open(full, "rb") as f:
                 data = f.read()
-        self.files[handle] = {b"path": path, b"data": data, b"nlink": nlink}
+        final = os.path.realpath(full) if os.path.lexists(full) or os.path.exists(full) else os.path.realpath(os.path.dirname(full) or self.cwd)
+        self.files[handle] = {b"path": path, b"data": data, b"nlink": nlink, b"final": final}
         self.wr(UC_X86_REG_RAX, handle)
 
     def api_ReadFile(self):
@@ -266,6 +280,17 @@ class Emu:
             attr = 0x10
         self.gfa.append((path, attr))
         self.wr(UC_X86_REG_RAX, attr)
+        if self.walk_race and not self._raced and path.replace("\\", "/") == "data/note.txt" and attr != 0xFFFFFFFF:
+            self._raced = True
+            data = os.path.join(self.cwd, "data")
+            real = os.path.join(self.cwd, "data.real")
+            outside = os.path.join(self.cwd, "outside")
+            os.makedirs(outside, exist_ok=True)
+            if not os.path.exists(os.path.join(outside, "note.txt")):
+                with open(os.path.join(outside, "note.txt"), "wb") as f:
+                    f.write(b"SECRET-KEEP-ME-LONG")
+            os.rename(data, real)
+            os.symlink(os.path.abspath(outside), data)
 
     def api_GetFileInformationByHandle(self):
         rec = self.files.get(self.rd(UC_X86_REG_RCX))
@@ -286,15 +311,29 @@ class Emu:
     def api_SetFilePointerEx(self):
         self.wr(UC_X86_REG_RAX, 1)
 
+    def api_GetFinalPathNameByHandleA(self):
+        rec = self.files.get(self.rd(UC_X86_REG_RCX))
+        buf = self.rd(UC_X86_REG_RDX)
+        n = self.rd(UC_X86_REG_R8) & 0xFFFFFFFF
+        if rec is None or n == 0:
+            self.wr(UC_X86_REG_RAX, 0)
+            return
+        final = rec.get(b"final") or self.cwd
+        text = (final + "\0").encode("utf-8")
+        take = text[:n]
+        self.mu.mem_write(buf, take)
+        self.wr(UC_X86_REG_RAX, max(len(take) - 1, 0))
+
     def api_SetEndOfFile(self):
         rec = self.files.get(self.rd(UC_X86_REG_RCX))
         if rec is not None:
             rec[b"data"] = b""
-            path = rec[b"path"]
-            if path:
-                full = os.path.join(self.cwd, path.decode("latin1"))
-                if os.path.exists(full):
-                    open(full, "wb").close()
+            full = rec.get(b"final")
+            if not full:
+                path = rec[b"path"]
+                full = os.path.join(self.cwd, path.decode("latin1")) if path else ""
+            if full and os.path.exists(full):
+                open(full, "wb").close()
         self.wr(UC_X86_REG_RAX, 1)
 
     def run(self):
@@ -310,7 +349,7 @@ def main():
     reparse = ["data"] if mode == "reparse-parent" else []
     nlink = 2 if mode == "nlink2" else None
     cmdline = (sys.argv[4] + "\0").encode("ascii") if len(sys.argv) > 4 else b"\0"
-    emu = Emu(pe, cwd, reparse_names=reparse, force_nlink=nlink, cmdline=cmdline)
+    emu = Emu(pe, cwd, reparse_names=reparse, force_nlink=nlink, cmdline=cmdline, walk_race=(mode == "walk-open-race"))
     code, out, gfa, creates, faults, heap = emu.run()
     print("EXIT", code)
     print("STDOUT", out)

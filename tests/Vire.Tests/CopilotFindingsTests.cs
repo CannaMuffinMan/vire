@@ -73,6 +73,28 @@ public class CopilotFindingsTests
         Assert.DoesNotContain("crash_path", slice);
         Assert.DoesNotContain("iat_cf", slice);
         Assert.Contains("iat_gs", slice);
+        Assert.DoesNotContain("crash-rip.txt", rt);
+    }
+
+    [Fact]
+    public void F4_F5_F6_WindowsOsRecipesArePresent()
+    {
+        string ps1 = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-sec-windows.ps1"));
+        Assert.Contains("f4_double_read", ps1);
+        Assert.Contains("f4_intern_section", ps1);
+        Assert.Contains("f5_two_process_race", ps1);
+        Assert.Contains("0/0 is a failed gate", ps1);
+        Assert.Contains("Apply-SecWiden", ps1);
+        Assert.Contains("iat_sl", ps1);
+        Assert.Contains("3d9fc58", ps1);
+        Assert.Contains("f5-slot.txt", ps1);
+        Assert.Contains("Invoke-WidenJunctionRace", ps1);
+        Assert.Contains("GetFinalPathNameByHandle", ps1);
+        Assert.Contains("f_walk_then_open", ps1);
+        Assert.Contains("f6_crash_pe", ps1);
+        Assert.Contains("mklink /H", ps1);
+        Assert.Contains("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", ps1);
+        Assert.Contains("do not let that become the function output", ps1);
     }
 
     [Fact]
@@ -84,15 +106,26 @@ public class CopilotFindingsTests
     }
 
     [Fact]
-    public void F8_EmitU8WrapsAboveInt32Max()
+    public void F8_EmitU8WrapsToAnd255()
     {
-        List<object> got = (List<object>)Program.ExtendList(
-            new List<object>(),
-            new List<object> { 2147483648.0 },
-            100000,
-            1,
-            1);
-        Assert.Equal(0, Convert.ToInt32(got[0]));
+        object[] nums = { 2147483648.0, 549755813888.0, 2147483649.0 };
+        int[] want = { 0, 0, 1 };
+        for (int i = 0; i < nums.Length; i++)
+        {
+            List<object> got = (List<object>)Program.ExtendList(
+                new List<object>(),
+                new List<object> { nums[i] },
+                100000,
+                1,
+                1);
+            Assert.Equal(want[i], Convert.ToInt32(got[0]));
+            Console.WriteLine("f8_host_pass_after " + nums[i] + " -> " + Convert.ToInt32(got[0]));
+        }
+        Console.WriteLine("f8_host_pass_after list=[0, 0, 1]");
+        string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
+        Assert.Contains("emitOp with gen, [72, 185]", native);
+        Assert.Contains("emitU64 with (gen at \"image\"), (expr at 1)", native);
+        Assert.DoesNotContain("emitOp with gen, [72, 199, 193]", native);
     }
 
     [Fact]
@@ -135,8 +168,52 @@ public class CopilotFindingsTests
     [Fact]
     public void F13_ArenaCheckUsesOneMegHeaderReserves()
     {
-        string sh = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-arena-check.sh"));
+        string root = DualMode.FindRoot();
+        string sh = File.ReadAllText(Path.Combine(root, "tools", "native-arena-check.sh"));
         Assert.Contains("poke32 with head, 224, 1048576", sh);
+        Assert.Contains("poke32 with head, 240, 1048576", sh);
         Assert.Contains("! grep -q 'poke32 with head, 224, 33554432'", sh);
+        Assert.Contains("! grep -q 'poke32 with head, 240, 33554432'", sh);
+        string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
+        Assert.Contains("native-arena-check.sh", yml);
+        Assert.Contains("HardLinkCannotRewriteDepsLock", yml);
+        Assert.Contains("HostCheckThenOpenToctouFailBeforePassAfter", yml);
+        Assert.Contains("native-sec-emu-check.sh", yml);
+        Assert.Contains("fetch-depth: 0", yml);
+        string emu = File.ReadAllText(Path.Combine(root, "tools", "native-sec-emu-check.sh"));
+        Assert.Contains("pip install --user -q unicorn", emu);
+        string plantedRoot = Path.Combine(root, "data", "arena-plant-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(plantedRoot, "src"));
+        Directory.CreateDirectory(Path.Combine(plantedRoot, "tools"));
+        File.Copy(Path.Combine(root, "src", "rt.vire"), Path.Combine(plantedRoot, "src", "rt.vire"));
+        File.Copy(Path.Combine(root, "src", "rt-more.vire"), Path.Combine(plantedRoot, "src", "rt-more.vire"));
+        File.Copy(Path.Combine(root, "compile-native.vire"), Path.Combine(plantedRoot, "compile-native.vire"));
+        File.Copy(Path.Combine(root, "tools", "native-arena-check.sh"), Path.Combine(plantedRoot, "tools", "native-arena-check.sh"));
+        string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        Assert.DoesNotContain("poke32 with head, 240, 33554432", pe);
+        File.WriteAllText(Path.Combine(plantedRoot, "src", "pe.vire"),
+            pe.Replace("poke32 with head, 240, 1048576", "poke32 with head, 240, 33554432"));
+        try
+        {
+            System.Diagnostics.ProcessStartInfo info = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "bash",
+                WorkingDirectory = plantedRoot,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            info.Environment["NATIVE_ARENA_ROOT"] = plantedRoot;
+            info.ArgumentList.Add(Path.Combine(root, "tools", "native-arena-check.sh"));
+            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(info);
+            proc.WaitForExit(30000);
+            Console.WriteLine("f13_fail_before planted_240_exit=" + proc.ExitCode);
+            Assert.NotEqual(0, proc.ExitCode);
+            Console.WriteLine("f13_pass_after check_forbids_240_33554432");
+        }
+        finally
+        {
+            try { Directory.Delete(plantedRoot, true); } catch (IOException) { }
+        }
     }
 }

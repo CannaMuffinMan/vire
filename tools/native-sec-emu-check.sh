@@ -11,6 +11,7 @@ fi
 work=data/sec-emu
 rm -rf "$work"
 mkdir -p "$work/data"
+python3 -m pip install --user -q unicorn
 python3 - <<'PY' > /dev/null
 import unicorn
 PY
@@ -18,6 +19,7 @@ PY
 printf 'define main\n  say "hello from vire"\nend\n' > "$work/hello.vire"
 printf 'define main\n  say (read with "data/note.txt")\nend\n' > "$work/read.vire"
 printf 'define main\n  write with "data/note.txt", "hacked"\nend\n' > "$work/write.vire"
+printf 'define main\n  say (extend with [], [2147483648, 549755813888, 2147483649])\nend\n' > "$work/wrap.vire"
 printf 'define boom with n\n  if n > 0\n    boom with (n - 1)\n  end\nend\ndefine main\n  boom with 65\n  say "survived"\nend\n' > "$work/deep.vire"
 printf 'TRUNCATED' > "$work/data/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 printf 'FULL' > "$work/data/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbSECRET"
@@ -25,12 +27,13 @@ printf 'SECRET' > "$work/data/note.txt"
 
 compile() {
   local src=$1 hex=$2
-  dotnet exec "$dll" compile-native.vire "$src" "$hex"
+  VIRE_BUDGET= dotnet exec "$dll" --compiler compile-native.vire "$src" "$hex"
 }
 
 compile "$work/hello.vire" "$work/hello.hex"
 compile "$work/read.vire" "$work/read.hex"
 compile "$work/write.vire" "$work/write.hex"
+compile "$work/wrap.vire" "$work/wrap.hex"
 compile "$work/deep.vire" "$work/deep.hex"
 
 emu() {
@@ -42,6 +45,11 @@ echo "$hello"
 echo "$hello" | grep -F -q 'EXIT 0'
 echo "$hello" | grep -F -q "b'hello from vire"
 echo "$hello" | grep -F -q 'HEAP_SIZE 0x2000000'
+
+wrap=$(emu "$work/wrap.hex" "$work" plain)
+echo "$wrap"
+echo "$wrap" | grep -F -q 'EXIT 0'
+echo "$wrap" | grep -F -q '[0, 0, 1]'
 
 # Long sibling names: parent GFA must be exactly "data", not a 47-byte prefix.
 printf 'define main\n  say (read with "data/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbSECRET")\nend\n' > "$work/longread.vire"
@@ -103,5 +111,70 @@ plink=$(emu "$work/parentlink.hex" "$work" plain)
 echo "$plink"
 echo "$plink" | grep -F -q 'files stay inside the program folder'
 echo "$plink" | grep -F -q 'CREATE []'
+
+printf 'define main\n  write with "data/payload.bat.", "pwn"\nend\n' > "$work/dotbat.vire"
+compile "$work/dotbat.vire" "$work/dotbat.hex"
+dotbat=$(emu "$work/dotbat.hex" "$work" plain)
+echo "$dotbat"
+echo "$dotbat" | grep -F -q 'files stay inside the program folder'
+echo "$dotbat" | grep -F -q 'CREATE []'
+test ! -e "$work/data/payload.bat."
+test ! -e "$work/data/payload.bat"
+
+printf 'SECRET-KEEP-ME-LONG' > "$work/data/note.txt"
+mkdir -p "$work/outside"
+printf 'SECRET-KEEP-ME-LONG' > "$work/outside/note.txt"
+race=$(emu "$work/write.hex" "$work" walk-open-race)
+echo "$race"
+echo "$race" | grep -F -q 'files stay inside the program folder'
+test "$(cat "$work/outside/note.txt")" = "SECRET-KEEP-ME-LONG"
+if [[ -f $work/data.real/note.txt ]]; then
+  test "$(cat "$work/data.real/note.txt")" = "SECRET-KEEP-ME-LONG"
+fi
+if echo "$race" | grep -F -q "b'hacked'"; then
+  echo 'walk-open-race wrote hacked'
+  exit 1
+fi
+
+vuln_sha=7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867
+vuln_dir=$(mktemp -d)
+git cat-file -e "$vuln_sha^{commit}"
+git archive "$vuln_sha" compile-native.vire src data/src data/compile-native.vire | tar -C "$vuln_dir" -xf -
+if [[ -f $vuln_dir/compile-native.vire ]]; then
+  mkdir -p "$vuln_dir/data"
+  cp "$work/wrap.vire" "$vuln_dir/data/wrap.vire"
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/wrap.vire data/wrap-vuln.hex)
+  wrap_v=$(emu "$vuln_dir/data/wrap-vuln.hex" "$work" plain)
+  echo "$wrap_v"
+  echo "$wrap_v" | grep -F -q '[0, 0, 1]' && { echo 'F8 fail-before expected wrap mismatch'; exit 1; }
+  echo F8_fail_before_native_not_001
+  cp "$work/dotbat.vire" "$vuln_dir/data/dotbat.vire"
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/dotbat.vire data/dotbat-vuln.hex)
+  rm -f "$work/data/payload.bat" "$work/data/payload.bat."
+  dotbat_v=$(emu "$vuln_dir/data/dotbat-vuln.hex" "$work" plain)
+  echo "$dotbat_v"
+  if [[ -e $work/data/payload.bat || -e $work/data/payload.bat. ]]; then
+    echo trailing_dot_fail_before_created
+  else
+    echo trailing_dot_fail_before_emu_may_not_strip
+  fi
+  rm -f "$work/data/payload.bat" "$work/data/payload.bat."
+
+  rm -rf "$work/data" "$work/data.real" "$work/outside"
+  mkdir -p "$work/data" "$work/outside" "$vuln_dir/data"
+  printf 'SECRET-KEEP-ME-LONG' > "$work/data/note.txt"
+  printf 'SECRET-KEEP-ME-LONG' > "$work/outside/note.txt"
+  cp "$work/write.vire" "$vuln_dir/data/write.vire"
+  (cd "$vuln_dir" && VIRE_BUDGET= dotnet exec "$root/$dll" --compiler compile-native.vire data/write.vire data/write-vuln.hex)
+  cp "$vuln_dir/data/write-vuln.hex" "$work/write-vuln.hex"
+  race_v=$(emu "$work/write-vuln.hex" "$work" walk-open-race)
+  echo "$race_v"
+  test "$(cat "$work/outside/note.txt")" = "hacked"
+  test "$(cat "$work/data.real/note.txt")" = "SECRET-KEEP-ME-LONG"
+else
+  echo 'walk-open-race fail-before skipped (no 7c7c8ea tree)'
+  exit 1
+fi
+rm -rf "$vuln_dir"
 
 echo native sec emu check ok

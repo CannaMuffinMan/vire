@@ -18,12 +18,22 @@ function Invoke-Vire {
     # PowerShell function otherwise returns stdout mixed with LASTEXITCODE,
     # so `$code -ne 0` is true after a successful compile that printed
     # "compiled". Read LASTEXITCODE before Write-Host.
+    $leaf = [IO.Path]::GetFileName($Args[0])
+    $savedBudget = $env:VIRE_BUDGET
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+        $Args = @("--compiler") + $Args
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    }
+    try {
     if (Test-Path $VireExe) { $out = & $VireExe @Args }
     else { $out = & dotnet exec $VireDll @Args }
     $code = $LASTEXITCODE
     if ($null -ne $out) { $out | Write-Host }
     if ($null -eq $code) { return 0 }
     return [int]$code
+    } finally {
+        if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
+    }
 }
 
 $programs = @(
