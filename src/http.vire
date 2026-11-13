@@ -241,7 +241,7 @@ define http_match with pattern, path
   while i < (length with a)
     let p be a at i
     let g be b at i
-    if begins with p, ":"
+    if (begins with p, ":")
       let name be slice with p, 1, (length with p)
       put g into params at name
     else
@@ -256,7 +256,7 @@ end
 
 define http_auth_ok with query, headers
   let tok be none
-  if has with query, "token"
+  if (has with query, "token")
     let tok be query at "token"
   end
   let hdr be http_header_get with headers, "x-fcg-token"
@@ -294,13 +294,13 @@ define http_app with method, path, body
   let p be t at "path"
   let q be t at "query"
   let headers be {}
-  if has with q, "cookie"
+  if (has with q, "cookie")
     put (q at "cookie") into headers at "cookie"
   end
-  if has with q, "origin"
+  if (has with q, "origin")
     put (q at "origin") into headers at "origin"
   end
-  if has with q, "token"
+  if (has with q, "token")
     put (q at "token") into headers at "x-fcg-token"
   end
   let cookies be http_parse_cookies with (http_header_get with headers, "cookie")
@@ -326,14 +326,14 @@ define http_app with method, path, body
     end
     if p == "/api/search"
       let term be ""
-      if has with q, "q"
+      if (has with q, "q")
         let term be q at "q"
       end
       return "{\"ok\":true,\"q\":" + (json with term) + "}"
     end
     if p == "/api/who"
       let sid be ""
-      if has with cookies, "sid"
+      if (has with cookies, "sid")
         let sid be cookies at "sid"
       end
       return "{\"ok\":true,\"sid\":" + (json with sid) + "}"
