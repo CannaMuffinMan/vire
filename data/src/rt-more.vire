@@ -24,6 +24,15 @@ define emitLeaf with image
   return image
 end
 
+define emitZeroQwords with image, n
+  ~ rax=payload. Wipe n qwords so later GC scans do not chase leftover heap
+  ~ words from a compacted bump. push rdi / stosq / pop.
+  emitList with image, [87, 72, 137, 199, 80, 49, 192, 185]
+  emitU32 with image, n
+  emitList with image, [243, 72, 171, 88, 95]
+  return image
+end
+
 define emitJcc with image, fixes, op, name
   let image be emitU8 with image, 15
   let image be emitU8 with image, op
@@ -1328,7 +1337,10 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 69, 240, 72, 137, 193, 72, 193, 225, 4]
   emitJcc with image, fixes, 130, "grow_oom"
   emitCallTo with image, fixes, "rt_alloc"
-  emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 73, 193, 224, 4, 72, 139, 77, 232]
+  ~ New list slots are pointer-scanned. Zero the whole buffer before memcpy
+  ~ so compacted leftover words are not chased as heap pointers.
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 240, 72, 193, 225, 1, 87, 72, 137, 199, 80, 49, 192, 243, 72, 171, 88, 95]
+  emitList with image, [72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 73, 193, 224, 4, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
   emitEpi with image
@@ -1424,6 +1436,7 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 69, 248, 72, 199, 0, 0, 0, 0, 0, 72, 199, 64, 8, 4, 0, 0, 0, 185]
   emitU32 with image, 128
   emitCallTo with image, fixes, "rt_alloc"
+  emitZeroQwords with image, 16
   emitList with image, [72, 139, 77, 248, 72, 137, 65, 16, 72, 137, 202, 73, 199, 69, 0]
   emitU32 with image, 5
   emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
@@ -1436,7 +1449,8 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 69, 240, 72, 137, 193, 72, 193, 225, 5]
   emitJcc with image, fixes, 130, "grow_map_oom"
   emitCallTo with image, fixes, "rt_alloc"
-  emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 65, 8, 73, 193, 224, 5, 72, 139, 77, 232]
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 240, 72, 193, 225, 2, 87, 72, 137, 199, 80, 49, 192, 243, 72, 171, 88, 95]
+  emitList with image, [72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 65, 8, 73, 193, 224, 5, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
   emitEpi with image
@@ -1684,9 +1698,11 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 77, 248, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
   emitList with image, [72, 137, 69, 240, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
   emitList with image, [72, 137, 69, 232, 72, 141, 13]
   emitRel with image, fixes, "dot_path"
   emitList with image, [186]
@@ -1902,6 +1918,7 @@ define emitMore with image, fixes, labels
   emitU32 with image, 64
   emitList with image, [232]
   emitRel with image, fixes, "rt_alloc"
+  emitLeaf with image
   emitList with image, [72, 137, 69, 192, 72, 139, 77, 216, 72, 137, 194, 255, 21]
   emitRel with image, fixes, "iat_fi"
   emitList with image, [133, 192, 15, 132]

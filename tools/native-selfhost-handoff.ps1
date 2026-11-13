@@ -172,6 +172,8 @@ $r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 2400 -FilePath $g1 -Argument
     "data/compile-native.vire", "data/gen2.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen2_native missing compiled" }
+Write-Output ("gen1_hex_bytes " + (Get-Item $gen1Hex).Length)
+Write-Output ("gen2_hex_bytes " + (Get-Item $gen2Hex).Length)
 $h1 = (Get-FileHash -Algorithm SHA256 $gen1Hex).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
