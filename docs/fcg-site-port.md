@@ -36,7 +36,7 @@ Skipped: AdSense `ads.txt`, Google site-verification HTML, 7MB watermark, PNG/JP
 - GET/HEAD only for files. Other methods on an existing file → 405 HTML.
 - `..`, `%`, `\`, NUL, `:` → 404. Encoded `%2e%2e` is refused before it becomes `..`.
 - Allowlisted MIME, `ETag` (SHA-256 of served bytes on the host), `Last-Modified`, `Cache-Control: public, max-age=60`, 304 on `If-None-Match` / `If-Modified-Since`.
-- Native PE: hooking `rt_net_client`'s `fn_route` call crashed gen2 compile-native and GET `/health`. `emitSiteRuntime` is currently a no-op so gen1=gen2 and JSON health stay intact. Host `VireSite` is the proven static path.
+- Native PE: capture packed `rt_net_client` **before** the leaf re-pin, then extra-fix blob `+1455` (`call fn_route` rel32) to `rt_site_gate`. Last-wins vs the packed dest is deterministic. Leaf-tagged ctx/buf allocs stop GC from chasing the SOCKET (same class of crash as lane 3 / #72, without that mux). Host `VireSite` still exists; Windows proof is gen1 PE vs `data/site`.
 
 ## Proof
 

@@ -11,17 +11,17 @@ $Data = Join-Path $Root "data"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
 
-$BaseSha = "6fbb705"
+$BaseSha = "7fd41b8"
 Write-Output "fail_before_sha $BaseSha"
-Write-Output "FAIL_BEFORE at ${BaseSha}: no ETag/304/declared-root native site gate; host TrySite had no SHA-256 ETag"
+Write-Output "FAIL_BEFORE at ${BaseSha}: packed fn_route reloc not captured before leaf re-pin; SOCKET allocs were not leaves"
 
 $siteSrc = Join-Path $Root "sites/landing/site"
-$siteDsts = @((Join-Path $Root "site"), (Join-Path $Data "site"))
-foreach ($siteDst in $siteDsts) {
-    New-Item -ItemType Directory -Force -Path $siteDst | Out-Null
-    Copy-Item (Join-Path $siteSrc "*") $siteDst -Force
+$siteDsts = @((Join-Path $Data "site"), (Join-Path $Root "site"))
+foreach ($d in $siteDsts) {
+    New-Item -ItemType Directory -Force -Path $d | Out-Null
+    Copy-Item (Join-Path $siteSrc "*") $d -Force
 }
-$siteDst = $siteDsts[0]
+$siteDst = Join-Path $Data "site"
 $files = Get-ChildItem -File $siteDst | Sort-Object Name
 if ($files.Count -lt 2) { throw "missing vendored landing files" }
 
@@ -95,6 +95,12 @@ function Serve-And-Check([string]$Name, [scriptblock]$Start) {
             if ($shaWant -ne $shaGot) { throw "$Name $($f.Name) body sha mismatch want $shaWant got $shaGot" }
             if ($got.Head -notmatch "(?i)etag:") { throw "$Name missing ETag" }
             if ($got.Head -notmatch "(?i)cache-control:") { throw "$Name missing Cache-Control" }
+            $ext = $f.Extension.ToLowerInvariant()
+            if ($ext -eq ".html" -and $got.Head -notmatch "(?i)content-type:\s*text/html") { throw "$Name $($f.Name) Content-Type" }
+            if ($ext -eq ".css" -and $got.Head -notmatch "(?i)content-type:\s*text/css") { throw "$Name $($f.Name) Content-Type" }
+            if ($ext -eq ".svg" -and $got.Head -notmatch "(?i)content-type:\s*image/svg") { throw "$Name $($f.Name) Content-Type" }
+            if ($ext -eq ".json" -and $got.Head -notmatch "(?i)content-type:\s*application/json") { throw "$Name $($f.Name) Content-Type" }
+            if ($ext -eq ".txt" -and $got.Head -notmatch "(?i)content-type:\s*text/plain") { throw "$Name $($f.Name) Content-Type" }
             $etag = ([regex]::Match($got.Head, "(?i)etag:\s*(.+)")).Groups[1].Value.Trim()
             $raw304 = Get-Http $port $rel "GET" @{ "If-None-Match" = $etag }
             $g304 = Split-Http $raw304
@@ -116,6 +122,14 @@ function Serve-And-Check([string]$Name, [scriptblock]$Start) {
         $g405 = Split-Http $raw405
         Write-Output ("${Name}_post_index " + $g405.Status)
         if ($g405.Status -ne "405") { throw "$Name POST index $($g405.Status)" }
+        if ($Name -eq "gen1") {
+            $hraw = Get-Http $port "/health"
+            $hgot = Split-Http $hraw
+            Write-Output ("gen1_health " + $hgot.Status)
+            if ($hgot.Status -ne "200") { throw "GET /health $($hgot.Status)" }
+            $hbody = [Text.Encoding]::UTF8.GetString($hgot.Body)
+            if ($hbody -notmatch "fcgcpa") { throw "health body $hbody" }
+        }
         Write-Output ("${Name}_site_ok")
     } finally {
         if ($job.Proc -and -not $job.Proc.HasExited) { try { $job.Proc.Kill($true) } catch { } }
@@ -123,38 +137,7 @@ function Serve-And-Check([string]$Name, [scriptblock]$Start) {
 }
 
 Write-VireHostInfo
-
-$serveSrc = @"
-define route with method, path, body
-  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
-end
-define main
-  listen with 0
-end
-"@
-$serveFile = Join-Path $Root "data/guest-site-host.vire"
-Set-Content -Path $serveFile -Value $serveSrc
-
-function Start-HostListen {
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = "dotnet"
-    $psi.Arguments = "exec `"$VireDll`" `"$serveFile`""
-    $psi.WorkingDirectory = $Root
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.UseShellExecute = $false
-    $p = New-Object System.Diagnostics.Process
-    $p.StartInfo = $psi
-    $null = $p.Start()
-    $line = $p.StandardOutput.ReadLine()
-    if ($line -notmatch "listening on 127.0.0.1:(\d+)") {
-        try { $p.Kill($true) } catch { }
-        throw "host did not listen: $line"
-    }
-    return @{ Proc = $p; Port = [int]$Matches[1] }
-}
-
-Serve-And-Check "host" { Start-HostListen }
+Write-Output "host_stage copied sites/landing/site to data/site (C# host does not serve the proof)"
 
 Copy-Item (Join-Path $Root "guest-landing.vire") (Join-Path $Data "guest-landing.vire") -Force
 $gen1 = Join-Path $Data "gen1.exe"
@@ -191,12 +174,7 @@ function Start-PeListen {
     return @{ Proc = $p; Port = $port }
 }
 
-try {
-    Serve-And-Check "gen1" { Start-PeListen }
-} catch {
-    Write-Output "NATIVE_PE_SITE residual: $($_.Exception.Message)"
-    Write-Output "NATIVE_PE_SITE: relocating fn_route crashed gen2 and /health; host VireSite is the proven path"
-}
+Serve-And-Check "gen1" { Start-PeListen }
 
 $h1 = (Get-FileHash -Algorithm SHA256 (Join-Path $Data "gen1.hex")).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 (Join-Path $Data "gen2.hex")).Hash.ToLowerInvariant()
@@ -204,5 +182,5 @@ Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
 if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
 $AfterSha = (git -C $Root rev-parse HEAD).Trim()
-Write-Output "PASS_AFTER at ${AfterSha}: host landing bodies sha256-identical; traversal 404; gen1=gen2"
+Write-Output "PASS_AFTER at ${AfterSha}: gen1 PE landing bodies sha256-identical to data/site; /health 200; gen1=gen2"
 Write-Output "native site proof ok"
