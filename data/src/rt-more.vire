@@ -1862,7 +1862,7 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_write", image
   emitPro with image
   emitPop2 with image
-  emitList with image, [76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 2, 15, 133]
+  emitList with image, [72, 199, 69, 216, 255, 255, 255, 255, 72, 199, 69, 184, 0, 0, 0, 0, 76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "write_pathbad"
   emitList with image, [72, 137, 85, 232, 72, 137, 209]
   emitCallTo with image, fixes, "rt_check_path"
@@ -1976,8 +1976,11 @@ define emitMore with image, fixes, labels
   pin with labels, "write_fail", image
   emitFail with image, fixes, "msg_write"
   pin with labels, "write_close_path", image
-  emitList with image, [72, 139, 77, 216, 255, 21]
+  emitList with image, [72, 139, 77, 216, 72, 131, 249, 255, 15, 132]
+  emitRel with image, fixes, "write_close_skip"
+  emitList with image, [255, 21]
   emitRel with image, fixes, "iat_ch"
+  pin with labels, "write_close_skip", image
   emitFail with image, fixes, "msg_path"
 
   pin with labels, "rt_args", image
