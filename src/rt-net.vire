@@ -1,5 +1,3 @@
-use "src/rt-ws.vire"
-
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
 ~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe

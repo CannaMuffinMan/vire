@@ -29,7 +29,7 @@ function Invoke-Vire {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
     $leaf = [IO.Path]::GetFileName($Args[0])
     $savedBudget = $env:VIRE_BUDGET
-    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compile-ws.vire" -or $leaf -eq "compiler.vire") {
         $Args = @("--compiler") + $Args
         Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
     }
@@ -276,7 +276,11 @@ if (-not $hostEcho.Proc.HasExited) { try { $hostEcho.Proc.Kill($true) } catch { 
 
 $echoHex = "data/ws-echo.hex"
 if (Test-Path (Join-Path $Root $echoHex)) { Remove-Item -Force (Join-Path $Root $echoHex) }
-$compileEcho = Invoke-Vire compile-native.vire "data/ws-echo.vire" $echoHex
+$cn = Get-Content -Raw (Join-Path $Root "compile-native.vire")
+if ($cn -notmatch "(?s)~ ws-stub-begin.*?~ ws-stub-end") { throw "compile-native.vire missing ws stubs" }
+$cn = [regex]::Replace($cn, "(?s)~ ws-stub-begin.*?~ ws-stub-end", "use `"src/rt-ws.vire`"")
+Set-Content -Path (Join-Path $Root "data/compile-ws.vire") -Value $cn -NoNewline
+$compileEcho = Invoke-Vire data/compile-ws.vire "data/ws-echo.vire" $echoHex
 if ($compileEcho -ne 0) { throw "compile-native ws-echo exit $compileEcho" }
 $echoExe = Join-Path $Data "ws-echo.exe"
 Convert-HexToExe (Join-Path $Root $echoHex) $echoExe
