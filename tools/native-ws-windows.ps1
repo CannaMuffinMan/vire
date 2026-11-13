@@ -290,6 +290,8 @@ if (-not $peEcho.Port) {
 }
 Write-Output "ws_pe_listen 127.0.0.1:$($peEcho.Port)"
 Invoke-WsRawProbe $peEcho.Port "ws_pe"
+$peEchoed = Invoke-WsEcho $peEcho.Port
+Write-Output "ws_pe_echo $peEchoed"
 Invoke-WsAdversary $peEcho.Port
 Write-Output "ws_pe_adversary ok"
 if (-not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
