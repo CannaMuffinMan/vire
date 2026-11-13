@@ -243,7 +243,12 @@ function Apply-SecWiden([string]$Tree) {
         if (-not (Test-Path -LiteralPath $pe)) { continue }
         $t = [IO.File]::ReadAllText($pe)
         if ($t.Contains('"Sleep"')) { continue }
-        if ($t.Contains("GetFinalPathNameByHandleA")) {
+        if ($t.Contains('"MoveFileExA"]')) {
+            $t = $t.Replace('"MoveFileExA"]', '"MoveFileExA", "Sleep"]')
+            $t = $t.Replace('"ilt_mv"]', '"ilt_mv", "ilt_sl"]')
+            $t = $t.Replace('"iat_mv"]', '"iat_mv", "iat_sl"]')
+            $t = $t.Replace('"hint_mv"]', '"hint_mv", "hint_sl"]')
+        } elseif ($t.Contains("GetFinalPathNameByHandleA")) {
             $t = $t.Replace('"GetFinalPathNameByHandleA"]', '"GetFinalPathNameByHandleA", "Sleep"]')
             $t = $t.Replace('"ilt_fp"]', '"ilt_fp", "ilt_sl"]')
             $t = $t.Replace('"iat_fp"]', '"iat_fp", "iat_sl"]')
@@ -482,6 +487,7 @@ function Invoke-F6Crash([string]$HelloExe, [string]$Tag) {
     $crashDir = Join-Path $Work ("crash-" + $Tag)
     if (Test-Path $crashDir) { Remove-Item -Recurse -Force $crashDir }
     New-Item -ItemType Directory -Force -Path $crashDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $crashDir "data") | Out-Null
     $crashExe = Join-Path $crashDir "crash.exe"
     Set-CrashEntry $HelloExe $crashExe
     $keep = Join-Path $crashDir "keep.txt"
@@ -492,8 +498,10 @@ function Invoke-F6Crash([string]$HelloExe, [string]$Tag) {
     $run = Invoke-NativeExe -ExePath $crashExe -WorkingDirectory $crashDir
     $kept = [IO.File]::ReadAllText($keep)
     $ripText = if (Test-Path -LiteralPath $rip) { [IO.File]::ReadAllText($rip) } else { "" }
-    Write-Host ("f6_crash_pe " + $Tag + " code=" + $run.Code + " KEEP=" + $kept + " rip=" + ($ripText -replace '\s+', ' ') + " stdout=" + (([string]$run.Output) -replace '\s+', ' '))
-    return @{ Run = $run; Keep = $kept; RipText = $ripText }
+    $logPath = Join-Path $crashDir "data\crash.log"
+    $logText = if (Test-Path -LiteralPath $logPath) { [IO.File]::ReadAllText($logPath) } else { "" }
+    Write-Host ("f6_crash_pe " + $Tag + " code=" + $run.Code + " KEEP=" + $kept + " rip=" + ($ripText -replace '\s+', ' ') + " log=" + ($logText -replace '\s+', ' ') + " stdout=" + (([string]$run.Output) -replace '\s+', ' '))
+    return @{ Run = $run; Keep = $kept; RipText = $ripText; Log = $logText }
 }
 
 $f6vuln = Invoke-F6Crash -HelloExe (Join-Path $Work "hello-vuln.exe") -Tag "vuln"
@@ -507,7 +515,13 @@ if ($f6fix.Run.Blocked) { throw "Defender blocked F6 fixed crash PE" }
 if ($f6fix.Keep -ne "KEEP") { throw "f6 pass-after failed: fixed PE modified KEEP=$($f6fix.Keep)" }
 if ($f6fix.RipText -ne "KEEP") { throw "f6 pass-after failed: fixed PE changed crash-rip.txt hardlink" }
 if (-not ([string]$f6fix.Run.Output).Contains("crash rip=")) { throw "f6 pass-after missing crash rip= stdout: $($f6fix.Run.Output)" }
-Write-Host "f6_crash_pe fixed KEEP intact and stdout crash rip="
+if (-not ([string]$f6fix.Run.Output).Contains("crash code=")) { throw "f6 pass-after missing crash code= stdout" }
+if (-not ([string]$f6fix.Run.Output).Contains("crash off=")) { throw "f6 pass-after missing crash off= stdout" }
+if (-not $f6fix.Log.Contains("crash code=") -or -not $f6fix.Log.Contains("crash rip=") -or -not $f6fix.Log.Contains("crash off=")) {
+    throw "f6 pass-after missing dedicated data/crash.log contents: $($f6fix.Log)"
+}
+if ($f6vuln.Log.Contains("crash code=")) { Write-Host "f6_crash_log vuln unexpectedly wrote crash.log" }
+Write-Host "f6_crash_pe fixed KEEP intact stdout+data/crash.log crash code/rip/off"
 
 # Widened F5 + walk: same Sleep inserted in 3d9fc58 and HEAD worktrees only.
 $RaceVuln = [string](Get-ShaTree "3d9fc58c80629f1fd6ac11b3576831f5c869087d")

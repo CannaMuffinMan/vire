@@ -34,6 +34,8 @@ NAMES = [
     "SetFilePointerEx",
     "SetEndOfFile",
     "GetFinalPathNameByHandleA",
+    "VirtualQuery",
+    "MoveFileExA",
 ]
 
 
@@ -231,7 +233,12 @@ class Emu:
         if os.path.isfile(full):
             with open(full, "rb") as f:
                 data = f.read()
-        final = os.path.realpath(full) if os.path.lexists(full) or os.path.exists(full) else os.path.realpath(os.path.dirname(full) or self.cwd)
+        parent = os.path.dirname(full) or self.cwd
+        base = os.path.basename(full)
+        if os.path.lexists(full) or os.path.exists(full):
+            final = os.path.realpath(full)
+        else:
+            final = os.path.join(os.path.realpath(parent), base)
         self.files[handle] = {b"path": path, b"data": data, b"nlink": nlink, b"final": final}
         self.wr(UC_X86_REG_RAX, handle)
 
@@ -310,6 +317,35 @@ class Emu:
 
     def api_SetFilePointerEx(self):
         self.wr(UC_X86_REG_RAX, 1)
+
+    def api_VirtualQuery(self):
+        addr = self.rd(UC_X86_REG_RCX)
+        buf = self.rd(UC_X86_REG_RDX)
+        prot = 0x20
+        rva = addr - self.image
+        data_va = max((s[0] for s in self.sections), default=0x3000)
+        if rva >= data_va:
+            prot = 0x04
+        mbi = bytearray(48)
+        struct.pack_into("<Q", mbi, 0, addr)
+        struct.pack_into("<Q", mbi, 8, self.image)
+        struct.pack_into("<I", mbi, 16, prot)
+        struct.pack_into("<Q", mbi, 24, 0x1000)
+        struct.pack_into("<I", mbi, 32, 0x1000)
+        struct.pack_into("<I", mbi, 36, prot)
+        struct.pack_into("<I", mbi, 40, 0x1000000)
+        if buf:
+            self.mu.mem_write(buf, bytes(mbi))
+        self.wr(UC_X86_REG_RAX, 48)
+
+    def api_MoveFileExA(self):
+        src = self.cstr(self.rd(UC_X86_REG_RCX)).decode("latin1")
+        dst = self.cstr(self.rd(UC_X86_REG_RDX)).decode("latin1")
+        try:
+            os.replace(os.path.join(self.cwd, src), os.path.join(self.cwd, dst))
+            self.wr(UC_X86_REG_RAX, 1)
+        except OSError:
+            self.wr(UC_X86_REG_RAX, 0)
 
     def api_GetFinalPathNameByHandleA(self):
         rec = self.files.get(self.rd(UC_X86_REG_RCX))

@@ -22,6 +22,13 @@ These are the current strengths, not a claim that the process cannot be abused:
 - JSON read/write is depth-capped. `say` of a cyclic list or map does not hang the process. `Main` turns unexpected exceptions into exit 3 without a stack trace unless `VIRE_DEBUG=1`.
 - Static `listen` GET of `site/` is allowlisted, GET-only, no directory listing, no symlinks, no `.vire` sources.
 
+Native Windows x64 PE (this tree, proven in `native-security.yml` / Windows jobs — not a substitute for the host interpreter list above):
+
+- Emitted `.text` is execute+read, `.data`/`.idata` read+write (W^X section characteristics). Entry calls `VirtualQuery` and exits if a code page is writable+executable or a data page is executable.
+- Guest `write` of compiler output under `data/` uses a sibling `.tmp` plus `MoveFileExA(REPLACE_EXISTING)` after dest nlink==1 (hardlinks still refuse). Host `VireFiles.WriteAllText` already used tmp+`File.Move`.
+- Native faults go to stdout as `crash code=` / `crash rip=` / `crash off=` (RIP minus `0x140000000`) and to `data/crash.log` only via exclusive `CREATE_NEW` plus bind/nlink. `crash-rip.txt` is not created.
+- Seeded HTTP (`HttpWire`) and JSON (`parse` / `src/rt-schema`) fuzz: host and PE must not AV/hang. There are no WebSocket frame or Postgres/Redis reply parsers on `native-compiler`.
+
 ## Non-guarantees
 
 - There is no TLS server, no authorization on `POST /block`, and no public internet hardening beyond loopback-by-default plus an optional token when `VIRE_BIND` is `public`.
