@@ -142,4 +142,4 @@ Throwaway Postgres + Redis on Ubuntu. Windows uses a loopback RESP2 PING/GET/SET
 
 FAIL_BEFORE host SHA: `9ea4561d12236f7f2f44858f137d7c948836df65` (`GET /api/waitlist/count` → 404 from `api/fcgcpa.vire` on that pin).
 
-FAIL_BEFORE PE SHA: `3946d1c6c4f3fc12e4a486da600bba354ad60c64` (`src/rt-net.vire` at the native-compiler tip before `emitClientLeaf`). PASS_AFTER compiles the same guest with `emitClientLeaf` and requires the PE to answer the documented bodies with `Host` + `Connection: close`; a `crash rip=` line fails the job.
+FAIL_BEFORE PE SHA: `3946d1c6c4f3fc12e4a486da600bba354ad60c64` (`src/rt-net.vire` without `emitClientLeaf`). First Host-only GET can return `/health`; a later route still prints `crash rip=0000000140008af2`. This branch adds `emitClientLeaf` and restores the guest `fn_route` pin; the packed client still dies at that RIP, so `fcg-api-windows` fails until #76/#72 land. Do not treat `crash rip=` as PASS.
