@@ -147,6 +147,7 @@ function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
     $c = New-Object System.Net.Sockets.TcpClient
     $c.ReceiveTimeout = 3000
     $c.SendTimeout = 3000
+    $c.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
     try {
         $c.Connect("127.0.0.1", $Port)
         Write-Output "${Tag}_raw_tcp_ok"
@@ -169,6 +170,7 @@ function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
         if ($ascii -notmatch [regex]::Escape($expect)) { throw "$Tag Sec-WebSocket-Accept mismatch" }
         if ($ascii -notmatch "`r`n`r`n") { throw "$Tag handshake missing CRLFCRLF" }
         Write-Output "${Tag}_raw_101_ok"
+        try { $c.Client.Shutdown([System.Net.Sockets.SocketShutdown]::Both) } catch { }
     } finally {
         try { $c.Close() } catch { }
     }
