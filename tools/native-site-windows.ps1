@@ -65,6 +65,7 @@ function Get-Http([int]$Port, [string]$Path, [string]$Method = "GET", [hashtable
 }
 
 function Split-Http([byte[]]$raw) {
+    if ($null -eq $raw -or $raw.Length -eq 0) { throw "empty HTTP response (native PE likely crashed)" }
     $text = [Text.Encoding]::ASCII.GetString($raw)
     $split = $text.IndexOf("`r`n`r`n")
     if ($split -lt 0) { throw "no header split" }

@@ -53,7 +53,7 @@ define emitSiteRuntime with image, fixes, labels
   pin with labels, "rt_site_gate", image
   emitList with image, [72, 129, 236, 128, 0, 0, 0]
   emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
-  emitList with image, [73, 139, 85, 232]
+  emitList with image, [73, 139, 85, 216]
   emitList with image, [72, 133, 210, 15, 132]
   emitRel with image, fixes, "site_fall"
   emitList with image, [72, 141, 13]
@@ -61,7 +61,7 @@ define emitSiteRuntime with image, fixes, labels
   emitCallTo with image, fixes, "rt_texteq"
   emitList with image, [72, 133, 192, 15, 133]
   emitRel with image, fixes, "site_is_get"
-  emitList with image, [73, 139, 85, 232]
+  emitList with image, [73, 139, 85, 216]
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_HEAD"
   emitCallTo with image, fixes, "rt_texteq"
@@ -75,7 +75,7 @@ define emitSiteRuntime with image, fixes, labels
   pin with labels, "site_is_get", image
   emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
   pin with labels, "site_have_method", image
-  emitList with image, [73, 139, 85, 248]
+  emitList with image, [73, 139, 85, 232]
   emitList with image, [72, 133, 210, 15, 132]
   emitRel with image, fixes, "site_fall"
   emitList with image, [72, 139, 10]
