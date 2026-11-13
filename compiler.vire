@@ -913,17 +913,78 @@ define parseLoopBlock with state
   return body
 end
 
+define elseFitsPending with state
+  let toks be state at "toks"
+  let j be state at "i"
+  let n be length with toks
+  let net be 0
+  let afterElse be false
+  while j < n
+    let k be (toks at j) at 0
+    if k == "end"
+      let net be net + 1
+      let afterElse be false
+    end
+    if k == "if"
+      if not afterElse
+        let net be net - 1
+      end
+      let afterElse be false
+    end
+    if k == "else"
+      let afterElse be true
+    end
+    if k == "while" or k == "for" or k == "try" or k == "define"
+      let net be net - 1
+      let afterElse be false
+    end
+    if k != "end" and k != "if" and k != "else" and k != "while" and k != "for" and k != "try" and k != "define"
+      let afterElse be false
+    end
+    let j be j + 1
+  end
+  return net >= (state at "pendingEnd")
+end
+
 define parseIf with state, close
   let line be tokLine with (peek with state)
   let col be tokCol with (peek with state)
   bump with state
+  if close
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
+    put ((state at "ifDepth") + 1) into state at "ifDepth"
+  end
   let test be parseExpr with state
   let yes be parseBlock with state
   let no be []
   let follow be ""
+  let ownEnd be close
+  let take be false
   if (tokenKind with state) == "else"
+    if not close
+      let take be true
+    end
+    if close
+      if (state at "ifDepth") == 1
+        let take be true
+      end
+      if (state at "ifDepth") != 1
+        if elseFitsPending with state
+          let take be true
+        end
+      end
+    end
+  end
+  if take
     bump with state
     let follow be tokenKind with state
+  end
+  if not take
+    if close
+      if (tokenKind with state) == "else"
+        let ownEnd be false
+      end
+    end
   end
   if follow == "if"
     push with no, (parseIf with state, false)
@@ -933,8 +994,12 @@ define parseIf with state, close
       let no be parseBlock with state
     end
   end
-  if close
+  if ownEnd
     eat with state, "end"
+  end
+  if close
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
+    put ((state at "ifDepth") - 1) into state at "ifDepth"
   end
   return ["if", test, yes, no, line, col]
 end
@@ -980,23 +1045,28 @@ define parseStmt with state
   end
   if k == "while"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     let test be parseExpr with state
     let body be parseLoopBlock with state
     eat with state, "end"
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["while", test, body, line, col]
   end
   if k == "for"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     let name be spelling with state
     bump with state
     eat with state, "in"
     let seq be parseExpr with state
     let body be parseLoopBlock with state
     eat with state, "end"
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["for", name, seq, body, line, col]
   end
   if k == "try"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     let body be parseBlock with state
     let caught be none
     let handler be none
@@ -1009,6 +1079,7 @@ define parseStmt with state
       let handler be parseBlock with state
     end
     eat with state, "end"
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["try", body, caught, handler, line, col]
   end
   if k == "name"
@@ -1045,8 +1116,10 @@ define parseDefine with state
       bump with state
     end
   end
+  put ((state at "pendingEnd") + 1) into state at "pendingEnd"
   let body be parseBlock with state
   eat with state, "end"
+  put ((state at "pendingEnd") - 1) into state at "pendingEnd"
   return {"name": name, "params": params, "body": body}
 end
 
@@ -1114,7 +1187,7 @@ define compileUnit with path, seen, state
     let source be read with path
   end
   let tokens be tokenize with source
-  let inner be {"i": 0, "toks": tokens, "bad": false}
+  let inner be {"i": 0, "toks": tokens, "bad": false, "pendingEnd": 0, "ifDepth": 0}
   let funcs be []
   let folder be dirOf with path
   if not (has with state, "root")
@@ -1238,7 +1311,7 @@ define compileUnit with path, seen, state
 end
 
 define assemble with tokens
-  let state be {"i": 0, "toks": tokens, "bad": false}
+  let state be {"i": 0, "toks": tokens, "bad": false, "pendingEnd": 0, "ifDepth": 0}
   let funcs be []
   while not ((tokenKind with state) == "eof")
     if (tokenKind with state) == "bad"

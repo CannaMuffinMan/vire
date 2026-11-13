@@ -454,15 +454,76 @@ define parseBlock with state, func
   return body
 end
 
+define elseFitsPending with state
+  let ks be state at "ks"
+  let j be state at "i"
+  let n be length with ks
+  let net be 0
+  let afterElse be false
+  while j < n
+    let k be ks at j
+    if k == "end"
+      let net be net + 1
+      let afterElse be false
+    end
+    if k == "if"
+      if not afterElse
+        let net be net - 1
+      end
+      let afterElse be false
+    end
+    if k == "else"
+      let afterElse be true
+    end
+    if k == "while" or k == "for" or k == "try" or k == "define"
+      let net be net - 1
+      let afterElse be false
+    end
+    if k != "end" and k != "if" and k != "else" and k != "while" and k != "for" and k != "try" and k != "define"
+      let afterElse be false
+    end
+    let j be j + 1
+  end
+  return net >= (state at "pendingEnd")
+end
+
 define parseIf with state, func, close
   bump with state
+  if close
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
+    put ((state at "ifDepth") + 1) into state at "ifDepth"
+  end
   let test be parseExpr with state, func
   let yes be parseBlock with state, func
   let no be []
   let follow be ""
+  let ownEnd be close
+  let take be false
   if (form with state) == "else"
+    if not close
+      let take be true
+    end
+    if close
+      if (state at "ifDepth") == 1
+        let take be true
+      end
+      if (state at "ifDepth") != 1
+        if elseFitsPending with state
+          let take be true
+        end
+      end
+    end
+  end
+  if take
     bump with state
     let follow be form with state
+  end
+  if not take
+    if close
+      if (form with state) == "else"
+        let ownEnd be false
+      end
+    end
   end
   if follow == "if"
     push with no, (parseIf with state, func, false)
@@ -470,11 +531,15 @@ define parseIf with state, func, close
   if follow != "" and follow != "if"
     let no be parseBlock with state, func
   end
-  if close
+  if ownEnd
     if (form with state) != "end"
       return markBad with state, "the program needs end"
     end
     bump with state
+  end
+  if close
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
+    put ((state at "ifDepth") - 1) into state at "ifDepth"
   end
   return ["if", test, yes, no]
 end
@@ -523,16 +588,19 @@ define parseStmt with state, func
   end
   if k == "while"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     let test be parseExpr with state, func
     let body be parseLoop with state, func
     if (form with state) != "end"
       return markBad with state, "the program needs end"
     end
     bump with state
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["while", test, body]
   end
   if k == "for"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     if (form with state) != "name"
       return markBad with state, "for needs a name"
     end
@@ -548,10 +616,12 @@ define parseStmt with state, func
       return markBad with state, "the program needs end"
     end
     bump with state
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["for", (bind with func, nm), seq, body]
   end
   if k == "try"
     bump with state
+    put ((state at "pendingEnd") + 1) into state at "pendingEnd"
     let body be parseBlock with state, func
     let caught be none
     let handler be none
@@ -567,6 +637,7 @@ define parseStmt with state, func
       return markBad with state, "the program needs end"
     end
     bump with state
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return ["try", body, caught, handler]
   end
   if k == "stop"
@@ -658,15 +729,19 @@ define parseDefine with state
     end
   end
   let func be {"name": nm, "params": params, "nparams": n, "locals": locals, "n": n, "body": []}
+  put ((state at "pendingEnd") + 1) into state at "pendingEnd"
   let body be parseBlock with state, func
   if state at "bad"
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return {"bad": true}
   end
   if (form with state) != "end"
     markBad with state, "the program needs end"
+    put ((state at "pendingEnd") - 1) into state at "pendingEnd"
     return {"bad": true}
   end
   bump with state
+  put ((state at "pendingEnd") - 1) into state at "pendingEnd"
   put body into func at "body"
   return func
 end
@@ -697,7 +772,7 @@ define noteNeed with state, nm
 end
 
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false, "pendingEnd": 0, "ifDepth": 0}
   let funcs be []
   let uses be []
   let needs be []

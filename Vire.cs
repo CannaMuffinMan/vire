@@ -1892,6 +1892,8 @@ sealed class Parser
     int i;
     int nest;
     int blockNest;
+    int pendingEnd;
+    int ifDepth;
     static readonly HashSet<string> Stoppers = new HashSet<string>(new string[] { "end", "else", "miss", "eof" });
 
     public Parser(List<Token> tokens) { this.tokens = tokens; }
@@ -1955,9 +1957,11 @@ sealed class Parser
                 func.Params.Add((string)Eat("name").Value);
             }
         }
+        pendingEnd++;
         func.Body = Block();
         func.Body.Insert(0, name);
         Eat("end");
+        pendingEnd--;
         return func;
     }
 
@@ -2012,25 +2016,30 @@ sealed class Parser
         if (tok.Kind == "while")
         {
             Eat("while");
+            pendingEnd++;
             object test = Expression();
             List<object> body = LoopBody();
             Eat("end");
+            pendingEnd--;
             return new object[] { "while", test, body, tok.Line, tok.Column };
         }
         if (tok.Kind == "for")
         {
             Eat("for");
+            pendingEnd++;
             string name = (string)Eat("name").Value;
             Eat("in");
             object seq = Expression();
             List<object> body = LoopBody();
             Eat("end");
+            pendingEnd--;
             return new object[] { "for", name, seq, body, tok.Line, tok.Column };
         }
         if (tok.Kind == "if") return IfStmt(tok.Line, tok.Column, true);
         if (tok.Kind == "try")
         {
             Eat("try");
+            pendingEnd++;
             List<object> body = Block();
             object caught = null;
             object handler = null;
@@ -2041,6 +2050,7 @@ sealed class Parser
                 handler = Block();
             }
             Eat("end");
+            pendingEnd--;
             return new object[] { "try", body, caught, handler, tok.Line, tok.Column };
         }
         if (tok.Kind == "name")
@@ -2051,13 +2061,44 @@ sealed class Parser
         throw new VireError("line does not start a statement", tok.Line, tok.Column);
     }
 
+    bool ElseFitsPending()
+    {
+        int net = 0;
+        bool afterElse = false;
+        for (int j = i; j < tokens.Count; j++)
+        {
+            string k = tokens[j].Kind;
+            if (k == "end") { net++; afterElse = false; }
+            else if (k == "if")
+            {
+                if (!afterElse) net--;
+                afterElse = false;
+            }
+            else if (k == "else") afterElse = true;
+            else if (k == "while" || k == "for" || k == "try" || k == "define")
+            {
+                net--;
+                afterElse = false;
+            }
+            else afterElse = false;
+        }
+        return net >= pendingEnd;
+    }
+
     object IfStmt(int line, int col, bool close)
     {
         Eat("if");
+        if (close)
+        {
+            pendingEnd++;
+            ifDepth++;
+        }
         object test = Expression();
         List<object> body = Block();
         object other = null;
-        if (At("else"))
+        bool ownEnd = close;
+        bool takeElse = At("else") && (!close || ifDepth == 1 || ElseFitsPending());
+        if (takeElse)
         {
             Eat("else");
             if (At("if"))
@@ -2068,7 +2109,13 @@ sealed class Parser
             }
             else other = Block();
         }
-        if (close) Eat("end");
+        else if (At("else") && close) ownEnd = false;
+        if (ownEnd) Eat("end");
+        if (close)
+        {
+            pendingEnd--;
+            ifDepth--;
+        }
         return new object[] { "if", test, body, other, line, col };
     }
 

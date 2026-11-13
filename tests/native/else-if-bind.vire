@@ -1,0 +1,45 @@
+~ Nested if inside else-if must not steal the chain else / define end.
+define decode with n
+  if n == 1
+    return "one"
+  else if n == 2
+    if n == 2
+      return "two"
+  else
+    return "params"
+  end
+  return "after"
+end
+
+define nest with n
+  if n > 0
+    if n == 1
+      return "one"
+    else
+      return "big"
+    end
+  else
+    return "zero"
+  end
+end
+
+define chain with n
+  if n == 1
+    return "one"
+  else if n == 2
+    return "two"
+  else
+    return "other"
+  end
+end
+
+define main
+  say decode with 3
+  say decode with 2
+  say decode with 1
+  say nest with 0
+  say nest with 1
+  say nest with 5
+  say chain with 2
+  say chain with 9
+end
