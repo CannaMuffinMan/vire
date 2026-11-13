@@ -129,7 +129,15 @@ if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin native-compiler }
 
 $Snap = Join-Path $Data "native-server-snap"
 New-Item -ItemType Directory -Force -Path $Snap | Out-Null
-foreach ($rel in @("src/pe.vire", "src/rt-net.vire", "src/rt-server.vire", "compile-native.vire", "data/src/pe.vire", "data/src/rt-net.vire", "data/src/rt-server.vire", "data/compile-native.vire")) {
+$SnapFiles = @(
+    "src/pe.vire", "src/rt-net.vire", "src/rt-server.vire", "compile-native.vire",
+    "src/rt-net-blob.txt", "src/rt-net-pins.txt", "src/rt-net-fixes.txt",
+    "src/rt-net-json-blob.txt", "src/rt-net-json-pins.txt", "src/rt-net-json-fixes.txt",
+    "data/src/pe.vire", "data/src/rt-net.vire", "data/src/rt-server.vire", "data/compile-native.vire",
+    "data/src/rt-net-blob.txt", "data/src/rt-net-pins.txt", "data/src/rt-net-fixes.txt",
+    "data/src/rt-net-json-blob.txt", "data/src/rt-net-json-pins.txt", "data/src/rt-net-json-fixes.txt"
+)
+foreach ($rel in $SnapFiles) {
     $src = Join-Path $Root $rel
     if (Test-Path $src) {
         $dest = Join-Path $Snap $rel
@@ -139,7 +147,7 @@ foreach ($rel in @("src/pe.vire", "src/rt-net.vire", "src/rt-server.vire", "comp
 }
 
 Write-Output "phase fail-before $BaseSha"
-git checkout $BaseSha -- src/pe.vire src/rt-net.vire compile-native.vire data/src/pe.vire data/src/rt-net.vire data/compile-native.vire
+git checkout $BaseSha -- src/pe.vire src/rt-net.vire compile-native.vire data/src/pe.vire data/src/rt-net.vire data/compile-native.vire src/rt-net-blob.txt src/rt-net-pins.txt src/rt-net-fixes.txt src/rt-net-json-blob.txt src/rt-net-json-pins.txt src/rt-net-json-fixes.txt data/src/rt-net-blob.txt data/src/rt-net-pins.txt data/src/rt-net-fixes.txt data/src/rt-net-json-blob.txt data/src/rt-net-json-pins.txt data/src/rt-net-json-fixes.txt
 if (Test-Path (Join-Path $Root "src/rt-server.vire")) { Remove-Item (Join-Path $Root "src/rt-server.vire") -Force }
 if (Test-Path (Join-Path $Root "data/src/rt-server.vire")) { Remove-Item (Join-Path $Root "data/src/rt-server.vire") -Force }
 $beforeExe = Compile-Health
@@ -175,14 +183,10 @@ try { $before.Proc.Kill() } catch { }
 if ($blocked.Ok) { throw "FAIL_BEFORE expected hang to stall overlapping /health" }
 Write-Output "FAIL_BEFORE at $BaseSha overlapping /health stalled while a client hung"
 
-foreach ($rel in @("src/pe.vire", "src/rt-net.vire", "src/rt-server.vire", "compile-native.vire", "data/src/pe.vire", "data/src/rt-net.vire", "data/src/rt-server.vire", "data/compile-native.vire")) {
+foreach ($rel in $SnapFiles) {
     $src = Join-Path $Snap $rel
     if (Test-Path $src) { Copy-Item $src (Join-Path $Root $rel) -Force }
 }
-Copy-Item (Join-Path $Root "compile-native.vire") (Join-Path $Root "data/compile-native.vire") -Force
-Copy-Item (Join-Path $Root "src/rt-server.vire") (Join-Path $Root "data/src/rt-server.vire") -Force
-Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Root "data/src/rt-net.vire") -Force
-Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Root "data/src/pe.vire") -Force
 
 Write-Output "phase pass-after $AfterSha"
 $afterExe = Compile-Health
