@@ -15,8 +15,8 @@ public class ListenSecurityTests
         using (ListenHost host = ListenHost.Start(OkRoute(), port))
         {
             Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nContent-Length: 5\r\n\r\nhello"));
-            Assert.Equal(501, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding : chunked\r\nContent-Length: 5\r\n\r\nhello"));
-            Assert.Equal(501, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding\t: chunked\r\nContent-Length: 5\r\n\r\nhello"));
+            Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding : chunked\r\nContent-Length: 5\r\n\r\nhello"));
+            Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding\t: chunked\r\nContent-Length: 5\r\n\r\nhello"));
             Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n\r\nhello"));
             Assert.Equal(400, Status(host.Port, "POST / HTTP/1.1\r\nHost: x\r\n Foo: bar\r\nContent-Length: 5\r\n\r\nhello"));
             Assert.Equal(400, Status(host.Port, "GET / HTTP/1.1\rHost: x\r\n\r\n"));
@@ -29,6 +29,10 @@ public class ListenSecurityTests
             byte[] ok = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: x\r\nX-Foo: bar\r\nSet-Cookie: stolen\r\n\r\n");
             Assert.False(HttpWire.HeaderBytesUnsafe(ok, HttpWire.HeaderEnd(ok, ok.Length)));
             Assert.Equal(0, HttpWire.ParseComplete(ok, ok.Length).Status);
+            byte[] query = Encoding.ASCII.GetBytes("GET /api/search?q=hello%20world HTTP/1.1\r\nHost: x\r\n\r\n");
+            HttpWire.Result kept = HttpWire.ParseComplete(query, query.Length);
+            Assert.Equal(0, kept.Status);
+            Assert.Equal("/api/search?q=hello%20world", kept.Path);
         }
     }
 
