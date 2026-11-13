@@ -42,29 +42,18 @@ define emitServerRuntime with image, fixes, labels
   pin with labels, "step_fail", image
   emitFail with image, fixes, "msg_step"
 
-  ~ Re-pin rt_net_client: blob ctx/buf allocs were not leaves, so GC followed
-  ~ the SOCKET integer and smashed the heap (connect/close crash, extra
-  ~ headers became empty). Same cl_hdr parse; recv 0/timeout still 408/return.
-  pin with labels, "rt_net_client", image
+  ~ Blob rt_net_client calls rt_alloc twice without emitLeaf, so GC scanned
+  ~ the SOCKET and recv buffer. Keep the blob entry; retarget those calls.
+  pin with labels, "rt_alloc_leaf", image
   emitPro with image
-  emitList with image, [72, 137, 77, 240, 185]
-  emitU32 with image, 128
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
-  emitList with image, [72, 133, 192, 15, 132]
-  emitRel with image, fixes, "ncli_fail"
-  emitList with image, [72, 137, 69, 248, 72, 139, 85, 240, 72, 137, 16]
-  let image be emitIat with image, fixes, "iat_gt"
-  emitList with image, [72, 139, 77, 248, 137, 65, 32, 185]
-  emitU32 with image, 82048
-  emitCallTo with image, fixes, "rt_alloc"
-  emitLeaf with image
-  emitList with image, [72, 133, 192, 15, 132]
-  emitRel with image, fixes, "ncli_fail"
-  emitList with image, [72, 139, 77, 248, 72, 137, 65, 8, 72, 199, 65, 16, 0, 0, 0, 0]
-  emitJmpTo with image, fixes, "cl_hdr"
-  pin with labels, "ncli_fail", image
   emitEpi with image
+  let clientAt be labels at "rt_net_client"
+  let leafA be clientAt + 21
+  let leafB be clientAt + 93
+  push with fixes, {"at": leafA, "to": "rt_alloc_leaf"}
+  push with fixes, {"at": leafB, "to": "rt_alloc_leaf"}
   return emitListenMux with image, fixes, labels
 end
 
@@ -256,7 +245,7 @@ define emitListenMux with image, fixes, labels
   emitU32 with image, 2
   let image be emitIat with image, fixes, "iat_rv"
   emitList with image, [72, 131, 248, 255, 15, 132]
-  emitRel with image, fixes, "srv_drop"
+  emitRel with image, fixes, "srv_cn"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "srv_drop"
   emitList with image, [72, 137, 194, 72, 139, 13]

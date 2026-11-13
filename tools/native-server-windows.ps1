@@ -198,6 +198,13 @@ if ($after.Proc.HasExited) {
     $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
     throw "server exited $($after.Proc.ExitCode) after listen out=$so err=$se"
 }
+$warm = Get-Health $after.Port 2000
+if (-not $warm.Ok) {
+    $so = if (Test-Path $after.Out) { Get-Content -Raw $after.Out } else { "" }
+    $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
+    throw "warmup /health failed out=$so err=$se text=$($warm.Text)"
+}
+Write-Output "PASS_AFTER warmup /health 200"
 $idle2 = New-V4Client 2000
 $idle2.Connect([Net.IPAddress]::Loopback, $after.Port)
 $idle2.Close()
