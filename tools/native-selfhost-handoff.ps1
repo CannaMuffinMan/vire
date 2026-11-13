@@ -91,7 +91,7 @@ Copy-Item (Join-Path $Root "src/rt-tls.vire") (Join-Path $Src "rt-tls.vire") -Fo
 foreach ($blob in @(
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt",
-    "rt-tls-blob.txt", "rt-tls-pins.txt", "rt-tls-fixes.txt"
+    "rt-tls-blob.txt", "rt-tls-pins.txt", "rt-tls-fixes.txt", "rt-tls-names.txt"
 )) {
     Copy-Item (Join-Path $Root "src/$blob") (Join-Path $Src $blob) -Force
 }
@@ -107,6 +107,7 @@ $pairs = @(
     @("src/rt-tls-blob.txt", "data/src/rt-tls-blob.txt"),
     @("src/rt-tls-pins.txt", "data/src/rt-tls-pins.txt"),
     @("src/rt-tls-fixes.txt", "data/src/rt-tls-fixes.txt"),
+    @("src/rt-tls-names.txt", "data/src/rt-tls-names.txt"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
     @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),
