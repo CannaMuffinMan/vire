@@ -138,7 +138,7 @@ WebSocket `/ws/kick` (Node) waits on PR #68.
 
 ## CI proof
 
-Throwaway Postgres + Redis on Ubuntu. Windows uses a loopback RESP2 PING/GET/SET fixture (test-only). Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into `waitlist:count`. Host interpreter must return the **Expected body** column. Packed `compile-native` of the listen guest must print `compiled`. The gen1 PE must answer those routes with a normal request header set (`Host` plus `Connection: close`; POST also sends `Content-Length`). Payments stay off. Caps unchanged.
+Throwaway Postgres + Redis on Ubuntu. Windows uses a loopback RESP2 PING/GET/SET fixture (test-only). Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into `waitlist:count`. Host interpreter must return the **Expected body** column. Packed `compile-native` of the listen guest must print `compiled`. The gen1 PE must answer those routes with the native-net request shape (`Host` on GET; POST adds `Content-Length`). Extra client headers empty the socket on this packed listener. Payments stay off. Caps unchanged.
 
 FAIL_BEFORE host SHA: `9ea4561d12236f7f2f44858f137d7c948836df65` (`GET /api/waitlist/count` → 404 from `api/fcgcpa.vire` on that pin).
 

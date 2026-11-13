@@ -316,7 +316,13 @@ if (-not $peProcInfo.SawListen) {
 }
 if ($peProcInfo.Crash) { throw "PASS_AFTER PE crashed $($peProcInfo.Crash)" }
 Start-Sleep -Milliseconds 200
-$peLogin = Assert-Routes $ListenPe "pe"
+try {
+    $peLogin = Assert-Routes $ListenPe "pe" -HostOnly
+} catch {
+    Write-Output ("pe_out " + (Get-Content -Raw $peProcInfo.Out -ErrorAction SilentlyContinue))
+    Write-Output ("pe_err " + (Get-Content -Raw $peProcInfo.Err -ErrorAction SilentlyContinue))
+    throw
+}
 if ($hostLogin -ne $peLogin) { throw "host/PE honeypot bodies differ" }
 Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
 
