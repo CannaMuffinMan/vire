@@ -1681,7 +1681,8 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_bind_path", image
   emitPro with image
-  emitList with image, [72, 137, 77, 248, 185]
+  ~ rsi/rdi are Win64 nonvolatile; the prefix loop uses them.
+  emitList with image, [72, 137, 77, 248, 72, 137, 117, 216, 72, 137, 125, 208, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
   ~ Path bytes are not heap pointers. Leaving them unmarked rewrote gen2 PE.
@@ -1747,14 +1748,14 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "bind_ok"
   emitJmpTo with image, fixes, "bind_fail"
   pin with labels, "bind_ok", image
-  emitList with image, [184]
+  emitList with image, [72, 139, 117, 216, 72, 139, 125, 208, 184]
   emitU32 with image, 1
   emitEpi with image
   pin with labels, "bind_fail_close", image
   emitList with image, [72, 139, 77, 224, 255, 21]
   emitRel with image, fixes, "iat_ch"
   pin with labels, "bind_fail", image
-  emitList with image, [49, 192]
+  emitList with image, [72, 139, 117, 216, 72, 139, 125, 208, 49, 192]
   emitEpi with image
 
   pin with labels, "rt_check_path", image
