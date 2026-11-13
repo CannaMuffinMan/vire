@@ -90,7 +90,16 @@ define formatCaps with caps
     end
     let i be i + 1
   end
-  return join with labels, ", "
+  let out be ""
+  let k be 0
+  while k < (length with labels)
+    if k > 0
+      let out be out + ", "
+    end
+    let out be out + (labels at k)
+    let k be k + 1
+  end
+  return out
 end
 
 define textLess with a, b
