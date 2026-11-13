@@ -74,10 +74,11 @@ if ($beforeOut -notmatch "there is no definition named ws_listen") {
 Write-Output "FAIL_BEFORE at $BaseSha showing ws_listen is unavailable"
 
 $lib1 = Get-Content -Raw (Join-Path $Root "src/rt-sha1.vire")
-$lib2 = Get-Content -Raw (Join-Path $Root "src/rt-ws.vire")
-$proto = $lib2 -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
+$proto = Get-Content -Raw (Join-Path $Root "src/rt-ws-proto.vire")
+$proto = $proto -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
 $prove = Get-Content -Raw (Join-Path $Root "tests/native/ws-prove.vire")
 $prove = $prove -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
+$prove = $prove -replace '(?m)^use "src/rt-ws-proto.vire"\s*', ''
 $prove = $prove -replace '(?m)^use "src/rt-ws.vire"\s*', ''
 Set-Content -Path (Join-Path $Data "ws-prove.vire") -Value ($lib1 + "`n" + $proto + "`n" + $prove) -NoNewline
 

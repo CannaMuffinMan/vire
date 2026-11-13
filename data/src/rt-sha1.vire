@@ -41,12 +41,40 @@ define sha1BitXor16 with a, b
   return r
 end
 
+define sha1BitOr16 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 16
+    if ((x % 2) == 1) or ((y % 2) == 1)
+      let r be r + p
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
 define sha1And with a, b
-  return [sha1BitAnd16 with (a at 0), (b at 0), sha1BitAnd16 with (a at 1), (b at 1)]
+  let hi be sha1BitAnd16 with (a at 0), (b at 0)
+  let lo be sha1BitAnd16 with (a at 1), (b at 1)
+  return [hi, lo]
 end
 
 define sha1Xor with a, b
-  return [sha1BitXor16 with (a at 0), (b at 0), sha1BitXor16 with (a at 1), (b at 1)]
+  let hi be sha1BitXor16 with (a at 0), (b at 0)
+  let lo be sha1BitXor16 with (a at 1), (b at 1)
+  return [hi, lo]
+end
+
+define sha1Or with a, b
+  let hi be sha1BitOr16 with (a at 0), (b at 0)
+  let lo be sha1BitOr16 with (a at 1), (b at 1)
+  return [hi, lo]
 end
 
 define sha1Not with a
@@ -94,7 +122,8 @@ define sha1Shr1 with w
   if (hi % 2) == 1
     let lo2 be lo2 + 32768
   end
-  return [idiv with hi, 2, lo2]
+  let hi2 be idiv with hi, 2
+  return [hi2, lo2]
 end
 
 define sha1ShlN with w, n
@@ -134,9 +163,9 @@ define sha1LoadWord with buf, i
 end
 
 define sha1StoreWord with out, w
-  push with out, idiv with (w at 0), 256
+  push with out, (idiv with (w at 0), 256)
   push with out, (w at 0) % 256
-  push with out, idiv with (w at 1), 256
+  push with out, (idiv with (w at 1), 256)
   push with out, (w at 1) % 256
   return out
 end
@@ -158,7 +187,7 @@ define sha1K3
 end
 
 define sha1Iv
-  return [[26437, 8961], [61453, 43913], [39098, 56574], [4146, 21622], [50130, 57840]]
+  return [[26437, 8961], [61389, 43913], [39098, 56574], [4146, 21622], [50130, 57840]]
 end
 
 define sha1Compress with state, block
@@ -185,7 +214,7 @@ define sha1Compress with state, block
     let f be a
     let k be sha1K0
     if t < 20
-      let f be sha1Xor with (sha1And with b, c), (sha1And with (sha1Not with b), d)
+      let f be sha1Or with (sha1And with b, c), (sha1And with (sha1Not with b), d)
       let k be sha1K0
     end
     if (t >= 20) and (t < 40)
@@ -193,7 +222,7 @@ define sha1Compress with state, block
       let k be sha1K1
     end
     if (t >= 40) and (t < 60)
-      let f be sha1Xor with (sha1Xor with (sha1And with b, c), (sha1And with b, d)), (sha1And with c, d)
+      let f be sha1Or with (sha1Or with (sha1And with b, c), (sha1And with b, d)), (sha1And with c, d)
       let k be sha1K2
     end
     if t >= 60
