@@ -1712,13 +1712,22 @@ define main
   end
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
+  let wantElf be linux
+  if (length with files) > 2
+    if (files at 2) == "pe"
+      let wantElf be false
+    end
+    if (files at 2) == "elf"
+      let wantElf be true
+    end
+  end
   let opened be openImage
-  if linux
+  if wantElf
     let opened be openElfImage
   end
   if hits at "net"
     let opened be openNetImage
-    if linux
+    if wantElf
       let opened be openElfNetImage
     end
   end
@@ -1759,7 +1768,7 @@ define main
     put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
-  if linux
+  if wantElf
     put (finishElfImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
     let exe be buildElf with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base")
     write with (files at 1), (hex with exe)

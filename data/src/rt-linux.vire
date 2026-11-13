@@ -34,7 +34,7 @@ end
 define emitSysNeg1 with image
   ~ cmp rax, -4096; jb ok; mov rax, -1
   let image be emitList with image, [72, 61]
-  let image be emitU32 with image, 4294963200
+  let image be emitU32 with image, -4096
   let image be emitList with image, [114, 7, 72, 199, 192, 255, 255, 255, 255]
   return image
 end
@@ -125,11 +125,11 @@ end
 define emitLinuxStubs with image, fixes, labels
   pin with labels, "stub_gs", image
   let image be emitList with image, [129, 249]
-  let image be emitU32 with image, 4294967285
+  let image be emitU32 with image, -11
   let image be emitList with image, [15, 132]
   let image be emitRel with image, fixes, "gs_out"
   let image be emitList with image, [129, 249]
-  let image be emitU32 with image, 4294967284
+  let image be emitU32 with image, -12
   let image be emitList with image, [15, 132]
   let image be emitRel with image, fixes, "gs_err"
   let image be emitList with image, [49, 192, 195]
@@ -155,7 +155,7 @@ define emitLinuxStubs with image, fixes, labels
   let image be emitList with image, [73, 199, 192, 255, 255, 255, 255, 77, 49, 201]
   let image be emitSys with image, 9
   let image be emitList with image, [72, 61]
-  let image be emitU32 with image, 4294963200
+  let image be emitU32 with image, -4096
   let image be emitList with image, [114, 2, 49, 192, 72, 131, 196, 8, 91, 65, 94, 65, 95, 93, 195]
 
   pin with labels, "stub_wf", image
@@ -265,7 +265,7 @@ define emitLinuxStubs with image, fixes, labels
   pin with labels, "stub_sz", image
   let image be emitSaveRbx with image, fixes
   let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, 4294967136
+  let image be emitU32 with image, -160
   let image be emitSys with image, 5
   let image be emitList with image, [72, 133, 192, 15, 136]
   let image be emitRel with image, fixes, "sz_fail"
@@ -280,12 +280,12 @@ define emitLinuxStubs with image, fixes, labels
   pin with labels, "stub_ga", image
   let image be emitSaveRbx with image, fixes
   let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 192, 0, 0, 0, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, 4294967136
+  let image be emitU32 with image, -160
   let image be emitSys with image, 4
   let image be emitList with image, [72, 133, 192, 15, 136]
   let image be emitRel with image, fixes, "ga_fail"
   let image be emitList with image, [139, 133]
-  let image be emitU32 with image, 4294967160
+  let image be emitU32 with image, -136
   let image be emitList with image, [37]
   let image be emitU32 with image, 61440
   let image be emitList with image, [61]
@@ -309,12 +309,12 @@ define emitLinuxStubs with image, fixes, labels
   pin with labels, "stub_fi", image
   let image be emitSaveRbx with image, fixes
   let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, 4294967136
+  let image be emitU32 with image, -160
   let image be emitSys with image, 5
   let image be emitList with image, [72, 133, 192, 15, 136]
   let image be emitRel with image, fixes, "fi_fail"
   let image be emitList with image, [199, 3, 128, 0, 0, 0, 139, 133]
-  let image be emitU32 with image, 4294967160
+  let image be emitU32 with image, -136
   let image be emitList with image, [37]
   let image be emitU32 with image, 61440
   let image be emitList with image, [61]
@@ -323,7 +323,7 @@ define emitLinuxStubs with image, fixes, labels
   let image be emitU8 with image, 6
   let image be emitList with image, [199, 3, 16, 0, 0, 0]
   let image be emitList with image, [72, 139, 133]
-  let image be emitU32 with image, 4294967152
+  let image be emitU32 with image, -144
   let image be emitList with image, [137, 67, 40, 72, 139, 69, 144, 137, 67, 36, 72, 193, 232, 32, 137, 67, 32, 184]
   let image be emitU32 with image, 1
   let image be emitList with image, [72, 141, 101, 248, 91, 201]
