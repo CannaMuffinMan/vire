@@ -533,7 +533,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "ws_hlen"
   emitList with image, [73, 137, 209]
-  emitList with image, [77, 141, 20, 10]
+  emitList with image, [76, 141, 20, 10]
   emitList with image, [72, 139, 117, 248]
   pin with labels, "ws_hg1", image
   emitList with image, [77, 57, 209]
