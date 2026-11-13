@@ -104,11 +104,10 @@ static class VireNet
         {
             if (literal.IsIPv4MappedToIPv6) literal = literal.MapToIPv4();
             byte[] part = literal.GetAddressBytes();
-            if (literal.AddressFamily == AddressFamily.InterNetwork && part.Length == 4
+            if (parsed.Scheme == "https"
+                && literal.AddressFamily == AddressFamily.InterNetwork && part.Length == 4
                 && part[0] == 127 && part[1] == 0 && part[2] == 0 && part[3] == 1)
             {
-                if (parsed.Scheme != "https")
-                    throw new VireError("fetch allows https only", line, column);
                 return literal;
             }
         }
