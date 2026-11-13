@@ -9,8 +9,11 @@ if [[ ! -f "$VireDll" ]]; then
   echo "missing $VireDll" >&2
   exit 1
 fi
-BaseSha=$(git rev-parse origin/native-compiler)
+BaseSha=3946d1c6c4f3fc12e4a486da600bba354ad60c64
 AfterSha=$(git rev-parse HEAD)
+if ! git cat-file -t "$BaseSha" >/dev/null 2>&1; then
+  git fetch origin "$BaseSha"
+fi
 python3 -m pip install --user -q unicorn
 mkdir -p data
 cp tests/native/at-map.vire data/at-map.vire
@@ -30,6 +33,11 @@ set -e
 echo "$before"
 if [[ "$before" == *$Want* && "$before_code" -eq 0 ]]; then
   echo "FAIL expected base PE to miss string-keyed at after split" >&2
+  git worktree remove --force "$Work"
+  exit 1
+fi
+if [[ "$before" != *"an index must be a whole number"* ]]; then
+  echo "FAIL expected FAIL_BEFORE at $BaseSha to print an index must be a whole number" >&2
   git worktree remove --force "$Work"
   exit 1
 fi
@@ -74,5 +82,6 @@ if [[ "$emu_none" != *"at needs a list, text, or map"* ]]; then
   exit 1
 fi
 
+echo "host_pe_match at-map"
 echo "PASS_AFTER at $AfterSha: host and gen1 PE (emu) identical for map at \"name\"/\"id\"; none-at same error"
 echo "at-map linux check ok"
