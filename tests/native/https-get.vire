@@ -1,0 +1,6 @@
+~ CI rewrites the port. Native fetch TLS is 127.0.0.1 only.
+define main
+  let page be fetch with "https://127.0.0.1:9/"
+  say "status 200"
+  say (hash with page)
+end

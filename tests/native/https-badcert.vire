@@ -1,0 +1,5 @@
+~ CI rewrites to an untrusted loopback TLS port.
+define main
+  fetch with "https://127.0.0.1:9/"
+  say "opened"
+end

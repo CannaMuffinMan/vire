@@ -1,0 +1,123 @@
+~ Native outbound HTTPS via Windows Schannel (secur32). Opt-in needTls only.
+~ connect stays 127.0.0.1. fetch/post TLS is the same loopback pin; no public DNS.
+~ DecryptMessage uses four SecBuffers (DATA + EMPTY*3) and copies SECBUFFER_EXTRA;
+~ PR #59's 0x80090330 was incomplete-record / leftover framing.
+~ Guest TLS bytes live in rt-tls-blob.txt so compile-native stays small (gen1=gen2).
+
+define tlsNames
+  return split with (read with "data/src/rt-tls-names.txt"), "|"
+end
+
+define emitTlsRuntime with image, fixes, labels
+  let base be length with image
+  let names be tlsNames
+  let image be emitHex with image, (read with "data/src/rt-tls-blob.txt")
+  applyPackedPins with labels, base, (read with "data/src/rt-tls-pins.txt"), names
+  applyPackedFixes with fixes, base, (read with "data/src/rt-tls-fixes.txt"), names
+  return image
+end
+
+define emitPad with image, n
+  let i be 0
+  while i < n
+    let image be emitU8 with image, 0
+    let i be i + 1
+  end
+  return image
+end
+
+define parkTls with image, labels
+  let image be parkMsg with image, labels, "msg_tls_need", "fetch needs an http or https address"
+  let image be parkMsg with image, labels, "msg_tls_postneed", "post needs an http or https address"
+  let image be parkMsg with image, labels, "msg_tls_addr", "that address is not allowed"
+  let image be parkMsg with image, labels, "msg_tls_priv", "fetch stays off this machine and private networks"
+  let image be parkMsg with image, labels, "msg_tls_https", "fetch allows https only"
+  let image be parkMsg with image, labels, "msg_tls_check", "could not check that address"
+  let image be parkMsg with image, labels, "msg_tls_reach", "could not reach that address"
+  let image be parkMsg with image, labels, "msg_tls_big", "the response is too large"
+  let image be parkMsg with image, labels, "msg_tls_sendbig", "text is too large to send"
+  let image be parkMsg with image, labels, "msg_tls_ret", "the address returned "
+  let image be parkMsg with image, labels, "txt_tls_pkg", "Microsoft Unified Security Protocol Provider"
+  let image be parkMsg with image, labels, "txt_tls_get", "GET "
+  let image be parkMsg with image, labels, "txt_tls_post", "POST "
+  let image be parkMsg with image, labels, "txt_tls_mid", " HTTP/1.1\r\nHost: "
+  let image be parkMsg with image, labels, "txt_tls_cl", "\r\nContent-Length: "
+  let image be parkMsg with image, labels, "txt_tls_ct", "\r\nContent-Type: text/plain; charset=utf-8"
+  let image be parkMsg with image, labels, "txt_tls_end", "\r\nConnection: close\r\n\r\n"
+  let image be parkMsg with image, labels, "txt_tls_443", "443"
+  let image be parkMsg with image, labels, "txt_tls_slash", "/"
+  pin with labels, "tls_wsa", image
+  let image be emitPad with image, 512
+  pin with labels, "tls_cred", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_ctx", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_sizes", image
+  let image be emitPad with image, 32
+  pin with labels, "tls_sch", image
+  let image be emitPad with image, 80
+  pin with labels, "tls_attr", image
+  let image be emitPad with image, 8
+  pin with labels, "tls_ts", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_inb", image
+  let image be emitPad with image, 64
+  pin with labels, "tls_outb", image
+  let image be emitPad with image, 64
+  pin with labels, "tls_ind", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_outd", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_hints", image
+  let image be emitPad with image, 48
+  pin with labels, "tls_aip", image
+  let image be emitPad with image, 8
+  pin with labels, "tls_host", image
+  let image be emitPad with image, 256
+  pin with labels, "tls_path", image
+  let image be emitPad with image, 1024
+  pin with labels, "tls_portstr", image
+  let image be emitPad with image, 16
+  pin with labels, "tls_sock", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_io", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ion", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ioc", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_pt", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ptn", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ptc", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_port", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_meth", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_body", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_bodyn", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_have", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_tick", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_encp", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_reqp", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_reqn", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_code", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_clen", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_hdr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_wsok", image
+  let image be emitU64 with image, 0
+  return image
+end
+

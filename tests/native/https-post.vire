@@ -1,0 +1,6 @@
+~ CI rewrites the port. Native post TLS is 127.0.0.1 only.
+define main
+  let page be post with "https://127.0.0.1:9/", "hello"
+  say "status 200"
+  say (hash with page)
+end
