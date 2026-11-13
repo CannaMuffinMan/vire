@@ -1116,11 +1116,20 @@ define emitOp with gen, bytes
 end
 
 define emitFix with gen, name
-  ~ Runtime labels are pinned in openImage/openElfImage before any user
-  ~ function. Patch those rel32s now so `fixes` stays under the 100000 cap.
-  ~ Do not use `has` here: a missing fn_* must stay deferred, and `has` on
-  ~ the fat labels map AVd native PE (`an index must be a whole number`).
-  if begins with name, "rt_"
+  ~ Runtime labels from emitRuntime/emitMore are pinned before user code.
+  ~ Net/JSON packed labels land later in emitNetRuntime — those stay deferred.
+  ~ Patch the early rt_* rel32s now so `fixes` stays under the 100000 cap.
+  let later be false
+  if begins with name, "rt_net"
+    let later be true
+  end
+  if begins with name, "rt_json"
+    let later be true
+  end
+  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
+    let later be true
+  end
+  if (begins with name, "rt_") and (later == false)
     let buf be gen at "image"
     let pos be length with buf
     put (emitU32 with buf, (((gen at "labels") at name) - (pos + 4))) into gen at "image"
