@@ -10,7 +10,12 @@ define main
   say (t at "path")
   say ((t at "query") at "q")
   let u be http_match with "/api/users/:id", "/api/users/42"
-  say (u at "id")
+  if u == none
+    say "no-id"
+  end
+  if u != none
+    say (u at "id")
+  end
   let unmatched be http_match with "/api/users/:id", "/api/posts/42"
   if unmatched == none
     say "unmatched"
