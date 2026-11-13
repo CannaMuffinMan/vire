@@ -187,6 +187,26 @@ if ($h1 -ne $h2) {
         Write-Output ("gen1_at_diff " + $s1.Substring($a, $b - $a))
         Write-Output ("gen2_at_diff " + $s2.Substring($a, $b - $a))
     }
+    $ndiff = 0
+    $shown = 0
+    for ($j = 0; $j -lt $n; $j++) {
+        if ($s1[$j] -ne $s2[$j]) {
+            $ndiff++
+            if ($shown -lt 8) {
+                Write-Output ("gen_hex_diff_at " + $j)
+                $shown++
+            }
+        }
+    }
+    Write-Output ("gen_hex_ndiff " + $ndiff)
+    $k = 1024
+    while ($k -lt $n -and $s1[$k] -eq $s2[$k]) { $k++ }
+    Write-Output ("gen_hex_first_body_diff " + $k)
+    if ($s1.Length -ge 440 -and $s2.Length -ge 440) {
+        $t1 = $s1.Remove(432, 8).Insert(432, "00000000")
+        $t2 = $s2.Remove(432, 8).Insert(432, "00000000")
+        Write-Output ("gen_hex_checksum_stripped_equal " + ($t1 -eq $t2))
+    }
     throw "gen1/gen2 SHA-256 differ"
 }
 Write-Output "native selfhost handoff ok"
