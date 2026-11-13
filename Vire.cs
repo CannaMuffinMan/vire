@@ -406,6 +406,9 @@ sealed class Machine
     {
         itemCap = 1000000;
         textCap = 2000000;
+        // Guest MaxCalls stays 64. Compiler parseClimb is one frame per nest
+        // plus parseAtom; depth-20 `(1+(1+…))` needs more than 64 host calls.
+        budget.MaxCalls = 256;
         compilerProgress = true;
         compilerBeatMs = Environment.TickCount64;
     }
