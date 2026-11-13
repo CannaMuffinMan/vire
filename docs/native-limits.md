@@ -53,6 +53,12 @@ FIPS 1M SHA (`crypto-mb.vire` / `tests/native/million-hash.vire`) builds a 1_000
 
 Net recv 1000000 (`src/rt-net.vire`), listen body 1MB, intern table 128 (`src/rt-more.vire:1211`), trap slots 384, `MaxRuns` 8. Unchanged.
 
+### Gen2 crash after #73 (GC unused slots)
+
+`parseClimb` is already a same-precedence loop (`prec + 1` only for the right operand). The iterative `emitExpr` stack used a **map** per frame (`e`/`p`/`i`/`no`/`yes`/`done`). `rt_map_new` allocates cap 4 (128 bytes) and does not zero unused pairs. List grow copies only `length` then leaves the rest of `cap` untouched. GC mark-compact walks the whole allocation (non-leaf). After the first compact, leftover from-space bytes in those holes look like heap pointers, get relocated, and the gen1 PE ACCESS_VIOLATIONs while emitting gen2 once the runtime image is large enough (#66, #71). Tip-sized gen1 can miss the first GC.
+
+**Fix:** `rt_bzero` on `rt_map_new` pair storage and on the new tail of `rt_grow_list` / `rt_grow_map`. `emitExpr` frames are 6-slot lists. Guest MaxCalls stays 64. Caps unchanged.
+
 ## Proof
 
 `tools/native-limits-check.sh` (Linux) and `tools/native-limits-windows.ps1` (Windows) print `FAIL_BEFORE at <base SHA>` by actually running `git show` of `compile-native.vire` at `origin/native-compiler`, then `PASS_AFTER` on HEAD. Windows also runs the gen1 PE and requires host stdout = PE stdout.

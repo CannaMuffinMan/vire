@@ -379,6 +379,18 @@ define emitMore with image, fixes, labels
   pin with labels, "memcpy_done", image
   emitList with image, [195]
 
+  ~ Unused list/map capacity is not a leaf. GC scans the whole allocation, so
+  ~ leftover from-space bytes there look like heap pointers after the first
+  ~ compact and rewrite gen2 PE / crash (ACCESS_VIOLATION). Zero new slots.
+  pin with labels, "rt_bzero", image
+  emitList with image, [72, 133, 210, 15, 132]
+  emitRel with image, fixes, "bzero_done"
+  pin with labels, "bzero_loop", image
+  emitList with image, [198, 1, 0, 72, 255, 193, 72, 255, 202, 15, 133]
+  emitRel with image, fixes, "bzero_loop"
+  pin with labels, "bzero_done", image
+  emitList with image, [195]
+
   pin with labels, "rt_texteq", image
   emitList with image, [76, 139, 1, 76, 59, 2, 15, 133]
   emitRel with image, fixes, "texteq_no"
@@ -1330,6 +1342,8 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 73, 193, 224, 4, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 248, 72, 139, 17, 72, 193, 226, 4, 72, 1, 208, 72, 139, 77, 240, 72, 193, 225, 4, 72, 41, 209, 72, 137, 202, 72, 137, 193]
+  emitCallTo with image, fixes, "rt_bzero"
   emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
   emitEpi with image
   pin with labels, "grow_oom", image
@@ -1424,7 +1438,10 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 69, 248, 72, 199, 0, 0, 0, 0, 0, 72, 199, 64, 8, 4, 0, 0, 0, 185]
   emitU32 with image, 128
   emitCallTo with image, fixes, "rt_alloc"
-  emitList with image, [72, 139, 77, 248, 72, 137, 65, 16, 72, 137, 202, 73, 199, 69, 0]
+  emitList with image, [72, 137, 69, 240, 72, 137, 193, 186]
+  emitU32 with image, 128
+  emitCallTo with image, fixes, "rt_bzero"
+  emitList with image, [72, 139, 69, 240, 72, 139, 77, 248, 72, 137, 65, 16, 72, 137, 202, 73, 199, 69, 0]
   emitU32 with image, 5
   emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
   emitEpi with image
@@ -1438,6 +1455,8 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 65, 8, 73, 193, 224, 5, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 240, 72, 209, 233, 72, 193, 225, 5, 72, 1, 200, 72, 139, 85, 240, 72, 193, 226, 5, 72, 41, 202, 72, 137, 193]
+  emitCallTo with image, fixes, "rt_bzero"
   emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
   emitEpi with image
   pin with labels, "grow_map_oom", image
