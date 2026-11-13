@@ -234,92 +234,81 @@ define markBad with state, why
   return ["none"]
 end
 
+define precOf with k
+  if k == "or"
+    return 1
+  end
+  if k == "and"
+    return 2
+  end
+  if k == "==" or k == "!=" or k == "<" or k == ">" or k == "<=" or k == ">="
+    return 3
+  end
+  if k == "+" or k == "-"
+    return 4
+  end
+  if k == "*" or k == "/" or k == "%"
+    return 5
+  end
+  return 0
+end
+
+~ One recursive climb instead of parseOr..parseAtom (8 frames per nest).
+~ Depth 6 used to hit MaxCalls 64; one frame per nest leaves room for depth 20.
 define parseExpr with state, func
-  return parseOr with state, func
+  return parseClimb with state, func, 0
 end
 
-define parseOr with state, func
-  let left be parseAnd with state, func
-  while (form with state) == "or"
-    bump with state
-    let left be ["or", left, parseAnd with state, func]
+define parseClimb with state, func, minP
+  let prefs be []
+  while true
+    if state at "bad"
+      stop
+    end
+    let fk be form with state
+    if fk == "not" or fk == "-"
+      push with prefs, fk
+      bump with state
+    end
+    if fk != "not" and fk != "-"
+      stop
+    end
   end
-  return left
-end
-
-define parseAnd with state, func
-  let left be parseCmp with state, func
-  while (form with state) == "and"
+  let left be parseAtom with state, func
+  while (form with state) == "at"
+    if state at "bad"
+      stop
+    end
     bump with state
-    let left be ["and", left, parseCmp with state, func]
+    let left be ["at", left, parseAtom with state, func]
   end
-  return left
-end
-
-define parseCmp with state, func
-  let left be parseSum with state, func
+  let npref be length with prefs
+  while npref > 0
+    let npref be npref - 1
+    let pk be prefs at npref
+    if pk == "not"
+      let left be ["not", left]
+    end
+    if pk == "-"
+      let left be ["neg", left]
+    end
+  end
   while true
     if state at "bad"
       stop
     end
     let k be form with state
-    if k == "==" or k == "!=" or k == "<" or k == ">" or k == "<=" or k == ">="
-      bump with state
-      let left be [k, left, parseSum with state, func]
-    end
-    if k != "==" and k != "!=" and k != "<" and k != ">" and k != "<=" and k != ">="
+    let prec be precOf with k
+    if prec == 0
       stop
     end
-  end
-  return left
-end
-
-define parseSum with state, func
-  let left be parseProduct with state, func
-  while true
-    if state at "bad"
+    if prec < minP
       stop
     end
-    let k be form with state
-    if k == "+" or k == "-"
-      bump with state
-      let left be [k, left, parseProduct with state, func]
-    end
-    if k != "+" and k != "-"
-      stop
-    end
-  end
-  return left
-end
-
-define parseProduct with state, func
-  let left be parseUnary with state, func
-  while true
-    if state at "bad"
-      stop
-    end
-    let k be form with state
-    if k == "*" or k == "/" or k == "%"
-      bump with state
-      let left be [k, left, parseUnary with state, func]
-    end
-    if k != "*" and k != "/" and k != "%"
-      stop
-    end
-  end
-  return left
-end
-
-define parseUnary with state, func
-  if (form with state) == "not"
     bump with state
-    return ["not", parseUnary with state, func]
+    let left be [k, left, parseClimb with state, func, (prec + 1)]
   end
-  if (form with state) == "-"
-    bump with state
-    return ["neg", parseUnary with state, func]
-  end
-  return parsePrimary with state, func
+  return left
 end
 
 define parseAtom with state, func
@@ -358,10 +347,10 @@ define parseAtom with state, func
         return markBad with state, "that call is missing a value"
       end
       let args be []
-      push with args, (parseProduct with state, func)
+      push with args, (parseClimb with state, func, 5)
       while (form with state) == ","
         bump with state
-        push with args, (parseProduct with state, func)
+        push with args, (parseClimb with state, func, 5)
       end
       noteNeed with state, nm
       return ["call", nm, args]
@@ -370,7 +359,7 @@ define parseAtom with state, func
   end
   if k == "("
     bump with state
-    let inner be parseExpr with state, func
+    let inner be parseClimb with state, func, 0
     if (form with state) != ")"
       return markBad with state, "that expression is not ready"
     end
@@ -378,19 +367,20 @@ define parseAtom with state, func
     return inner
   end
   if k == "["
+    ~ list elements always parseExpr with state, func
     bump with state
     let items be []
     if (form with state) == "]"
       bump with state
       return ["list", items]
     end
-    push with items, (parseExpr with state, func)
+    push with items, (parseClimb with state, func, 0)
     while (form with state) == ","
       bump with state
       if (form with state) == "]"
         stop
       end
-      push with items, (parseExpr with state, func)
+      push with items, (parseClimb with state, func, 0)
     end
     if (form with state) != "]"
       return markBad with state, "that expression is not ready"
@@ -405,24 +395,24 @@ define parseAtom with state, func
       bump with state
       return ["map", pairs]
     end
-    let key be parseExpr with state, func
+    let key be parseClimb with state, func, 0
     if (form with state) != ":"
       return markBad with state, "that expression is not ready"
     end
     bump with state
-    let val be parseExpr with state, func
+    let val be parseClimb with state, func, 0
     push with pairs, ["pair", key, val]
     while (form with state) == ","
       bump with state
       if (form with state) == "}"
         stop
       end
-      let key be parseExpr with state, func
+      let key be parseClimb with state, func, 0
       if (form with state) != ":"
         return markBad with state, "that expression is not ready"
       end
       bump with state
-      let val be parseExpr with state, func
+      let val be parseClimb with state, func, 0
       push with pairs, ["pair", key, val]
     end
     if (form with state) != "}"
@@ -432,18 +422,6 @@ define parseAtom with state, func
     return ["map", pairs]
   end
   return markBad with state, "that expression is not ready"
-end
-
-define parsePrimary with state, func
-  let left be parseAtom with state, func
-  while (form with state) == "at"
-    if state at "bad"
-      stop
-    end
-    bump with state
-    let left be ["at", left, parseAtom with state, func]
-  end
-  return left
 end
 
 define parseLoop with state, func
@@ -1276,7 +1254,7 @@ define jumpLoop with gen, word, edge
   return true
 end
 
-define emitExpr with gen, funcs, func, expr
+define emitAtom with gen, funcs, func, expr
   if gen at "bad"
     return true
   end
@@ -1348,177 +1326,279 @@ define emitExpr with gen, funcs, func, expr
     put (nm + " has no value") into gen at "why"
     return true
   end
-  if k == "call"
-    let nm be expr at 1
-    let args be expr at 2
-    let arity be builtinArity with nm
-    if arity >= 0
-      if (length with args) != arity
-        put true into gen at "bad"
-        put (nm + " takes " + (text with arity) + " values, got " + (text with (length with args))) into gen at "why"
-        return true
-      end
-      let i be 0
-      while i < (length with args)
-        emitExpr with gen, funcs, func, (args at i)
-        let i be i + 1
-      end
-      if nm == "drop"
-        emitCall with gen, "rt_list_drop"
-      end
-      if nm != "drop"
-        emitCall with gen, ("rt_" + nm)
-      end
-      return true
-    end
-    let found be findFunc with funcs, nm
-    if not (found at "ok")
-      put true into gen at "bad"
-      put ("there is no definition named " + nm) into gen at "why"
-      return true
-    end
-    if ((found at "func") at "nparams") != (length with args)
-      put true into gen at "bad"
-      put (nm + " takes " + (text with ((found at "func") at "nparams")) + " values, got " + (text with (length with args))) into gen at "why"
-      return true
-    end
-    emitCall with gen, "rt_save_frame"
-    let i be 0
-    while i < (length with args)
-      emitExpr with gen, funcs, func, (args at i)
-      let i be i + 1
-    end
-    emitCall with gen, ("fn_" + nm)
-    emitCall with gen, "rt_restore_frame"
-    return true
-  end
-  if k == "not"
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitCall with gen, "rt_not"
-    return true
-  end
-  if k == "and"
-    let no be fresh with gen
-    let done be fresh with gen
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitCall with gen, "rt_truth"
-    emitOp with gen, [133, 192]
-    emitJz with gen, no
-    emitExpr with gen, funcs, func, (expr at 2)
-    emitCall with gen, "rt_truth"
-    emitBoolAcc with gen
-    emitJmp with gen, done
-    pinHere with gen, no
-    put (emitU8 with (gen at "image"), 185) into gen at "image"
-    put (emitU32 with (gen at "image"), 0) into gen at "image"
-    emitCall with gen, "rt_push_bool"
-    pinHere with gen, done
-    return true
-  end
-  if k == "or"
-    let yes be fresh with gen
-    let done be fresh with gen
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitCall with gen, "rt_truth"
-    emitOp with gen, [133, 192]
-    put (emitU8 with (gen at "image"), 15) into gen at "image"
-    put (emitU8 with (gen at "image"), 133) into gen at "image"
-    put (emitRel with (gen at "image"), (gen at "fixes"), yes) into gen at "image"
-    emitExpr with gen, funcs, func, (expr at 2)
-    emitCall with gen, "rt_truth"
-    emitBoolAcc with gen
-    emitJmp with gen, done
-    pinHere with gen, yes
-    put (emitU8 with (gen at "image"), 185) into gen at "image"
-    put (emitU32 with (gen at "image"), 1) into gen at "image"
-    emitCall with gen, "rt_push_bool"
-    pinHere with gen, done
-    return true
-  end
-  if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">="
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitExpr with gen, funcs, func, (expr at 2)
-    let op be 0
-    if k == "!="
-      let op be 1
-    end
-    if k == "<"
-      let op be 2
-    end
-    if k == "<="
-      let op be 3
-    end
-    if k == ">"
-      let op be 4
-    end
-    if k == ">="
-      let op be 5
-    end
-    put (emitU8 with (gen at "image"), 185) into gen at "image"
-    put (emitU32 with (gen at "image"), op) into gen at "image"
-    emitCall with gen, "rt_cmp"
-    return true
-  end
-  if k == "neg"
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitCall with gen, "rt_neg"
-    return true
-  end
-  if k == "+" or k == "-" or k == "*" or k == "/" or k == "%" or k == "at"
-    emitExpr with gen, funcs, func, (expr at 1)
-    emitExpr with gen, funcs, func, (expr at 2)
-    if k == "+"
-      emitCall with gen, "rt_add"
-    end
-    if k == "-"
-      emitCall with gen, "rt_sub"
-    end
-    if k == "*"
-      emitCall with gen, "rt_mul"
-    end
-    if k == "/"
-      emitCall with gen, "rt_div"
-    end
-    if k == "%"
-      emitCall with gen, "rt_mod"
-    end
-    if k == "at"
-      emitCall with gen, "rt_at"
-    end
-    return true
-  end
-  if k == "list"
-    emitCall with gen, "rt_list_new"
-    let items be expr at 1
-    let i be 0
-    while i < (length with items)
-      try
-        emitExpr with gen, funcs, func, (items at i)
-      miss unused
-        emitOp with gen, [72, 185]
-        put (emitU64 with (gen at "image"), (items at i)) into gen at "image"
-        emitCall with gen, "rt_push_int"
-      end
-      emitCall with gen, "rt_push"
-      let i be i + 1
-    end
-    return true
-  end
-  if k == "map"
-    emitCall with gen, "rt_map_new"
-    let pairs be expr at 1
-    let i be 0
-    while i < (length with pairs)
-      let pair be pairs at i
-      emitExpr with gen, funcs, func, (pair at 1)
-      emitExpr with gen, funcs, func, (pair at 2)
-      emitCall with gen, "rt_map_put"
-      let i be i + 1
-    end
-    return true
-  end
   put true into gen at "bad"
   put "that expression is not ready" into gen at "why"
+  return true
+end
+
+define emitExpr with gen, funcs, func, root
+  if gen at "bad"
+    return true
+  end
+  let stack be []
+  push with stack, {"e": root, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+  while (length with stack) > 0
+    if gen at "bad"
+      stop
+    end
+    let si be (length with stack) - 1
+    let fr be stack at si
+    let expr be fr at "e"
+    let p be fr at "p"
+    let k be expr at 0
+    if k == "num" or k == "text" or k == "bool" or k == "none" or k == "name"
+      emitAtom with gen, funcs, func, expr
+      drop with stack
+    end
+    if k == "not" or k == "neg"
+      if p == 0
+        put 1 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 1
+        if k == "not"
+          emitCall with gen, "rt_not"
+        end
+        if k == "neg"
+          emitCall with gen, "rt_neg"
+        end
+        drop with stack
+      end
+    end
+    if k == "call"
+      let nm be expr at 1
+      let args be expr at 2
+      let arity be builtinArity with nm
+      let user be 0
+      if arity < 0
+        let user be 1
+        let found be findFunc with funcs, nm
+        if not (found at "ok")
+          put true into gen at "bad"
+          put ("there is no definition named " + nm) into gen at "why"
+          stop
+        end
+        if ((found at "func") at "nparams") != (length with args)
+          put true into gen at "bad"
+          put (nm + " takes " + (text with ((found at "func") at "nparams")) + " values, got " + (text with (length with args))) into gen at "why"
+          stop
+        end
+      end
+      if arity >= 0
+        if (length with args) != arity
+          put true into gen at "bad"
+          put (nm + " takes " + (text with arity) + " values, got " + (text with (length with args))) into gen at "why"
+          stop
+        end
+      end
+      if p == 0
+        if user == 1
+          emitCall with gen, "rt_save_frame"
+        end
+        put 1 into fr at "p"
+        put 0 into fr at "i"
+        put fr into stack at si
+      end
+      if p == 1
+        let i be fr at "i"
+        if i < (length with args)
+          put (i + 1) into fr at "i"
+          put fr into stack at si
+          push with stack, {"e": args at i, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        end
+        if i >= (length with args)
+          if user == 0
+            if nm == "drop"
+              emitCall with gen, "rt_list_drop"
+            end
+            if nm != "drop"
+              emitCall with gen, ("rt_" + nm)
+            end
+          end
+          if user == 1
+            emitCall with gen, ("fn_" + nm)
+            emitCall with gen, "rt_restore_frame"
+          end
+          drop with stack
+        end
+      end
+    end
+    if k == "and"
+      if p == 0
+        let no be fresh with gen
+        let done be fresh with gen
+        put no into fr at "no"
+        put done into fr at "done"
+        put 1 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 1
+        emitCall with gen, "rt_truth"
+        emitOp with gen, [133, 192]
+        emitJz with gen, (fr at "no")
+        put 2 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 2
+        emitCall with gen, "rt_truth"
+        emitBoolAcc with gen
+        emitJmp with gen, (fr at "done")
+        pinHere with gen, (fr at "no")
+        put (emitU8 with (gen at "image"), 185) into gen at "image"
+        put (emitU32 with (gen at "image"), 0) into gen at "image"
+        emitCall with gen, "rt_push_bool"
+        pinHere with gen, (fr at "done")
+        drop with stack
+      end
+    end
+    if k == "or"
+      if p == 0
+        let yes be fresh with gen
+        let done be fresh with gen
+        put yes into fr at "yes"
+        put done into fr at "done"
+        put 1 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 1
+        emitCall with gen, "rt_truth"
+        emitOp with gen, [133, 192]
+        put (emitU8 with (gen at "image"), 15) into gen at "image"
+        put (emitU8 with (gen at "image"), 133) into gen at "image"
+        put (emitRel with (gen at "image"), (gen at "fixes"), (fr at "yes")) into gen at "image"
+        put 2 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 2
+        emitCall with gen, "rt_truth"
+        emitBoolAcc with gen
+        emitJmp with gen, (fr at "done")
+        pinHere with gen, (fr at "yes")
+        put (emitU8 with (gen at "image"), 185) into gen at "image"
+        put (emitU32 with (gen at "image"), 1) into gen at "image"
+        emitCall with gen, "rt_push_bool"
+        pinHere with gen, (fr at "done")
+        drop with stack
+      end
+    end
+    if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">=" or k == "+" or k == "-" or k == "*" or k == "/" or k == "%" or k == "at"
+      if p == 0
+        put 1 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 1
+        put 2 into fr at "p"
+        put fr into stack at si
+        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 2
+        if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">="
+          let op be 0
+          if k == "!="
+            let op be 1
+          end
+          if k == "<"
+            let op be 2
+          end
+          if k == "<="
+            let op be 3
+          end
+          if k == ">"
+            let op be 4
+          end
+          if k == ">="
+            let op be 5
+          end
+          put (emitU8 with (gen at "image"), 185) into gen at "image"
+          put (emitU32 with (gen at "image"), op) into gen at "image"
+          emitCall with gen, "rt_cmp"
+        end
+        if k == "+"
+          emitCall with gen, "rt_add"
+        end
+        if k == "-"
+          emitCall with gen, "rt_sub"
+        end
+        if k == "*"
+          emitCall with gen, "rt_mul"
+        end
+        if k == "/"
+          emitCall with gen, "rt_div"
+        end
+        if k == "%"
+          emitCall with gen, "rt_mod"
+        end
+        if k == "at"
+          emitCall with gen, "rt_at"
+        end
+        drop with stack
+      end
+    end
+    if k == "list"
+      if p == 0
+        emitCall with gen, "rt_list_new"
+        put 1 into fr at "p"
+        put 0 into fr at "i"
+        put fr into stack at si
+      end
+      if p == 1
+        let items be expr at 1
+        let i be fr at "i"
+        if i < (length with items)
+          put 2 into fr at "p"
+          put fr into stack at si
+          push with stack, {"e": items at i, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        end
+        if i >= (length with items)
+          drop with stack
+        end
+      end
+      if p == 2
+        emitCall with gen, "rt_push"
+        put 1 into fr at "p"
+        put ((fr at "i") + 1) into fr at "i"
+        put fr into stack at si
+      end
+    end
+    if k == "map"
+      if p == 0
+        emitCall with gen, "rt_map_new"
+        put 1 into fr at "p"
+        put 0 into fr at "i"
+        put fr into stack at si
+      end
+      if p == 1
+        let pairs be expr at 1
+        let i be fr at "i"
+        if i < (length with pairs)
+          put 2 into fr at "p"
+          put fr into stack at si
+          push with stack, {"e": (pairs at i) at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        end
+        if i >= (length with pairs)
+          drop with stack
+        end
+      end
+      if p == 2
+        put 3 into fr at "p"
+        put fr into stack at si
+        let pair be (expr at 1) at (fr at "i")
+        push with stack, {"e": pair at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+      end
+      if p == 3
+        emitCall with gen, "rt_map_put"
+        put 1 into fr at "p"
+        put ((fr at "i") + 1) into fr at "i"
+        put fr into stack at si
+      end
+    end
+  end
   return true
 end
 
