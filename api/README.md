@@ -10,9 +10,19 @@ The chain address is `forevercouchgang.blockchain`. Each downloaded app is its o
 
 Railway sets `PORT`. `listen` uses that port and binds all interfaces when `PORT` is set. On a laptop, with `PORT` unset, it binds `127.0.0.1:8080`.
 
+Phase-0 file listen (no Redis):
+
 ```text
 dotnet run -c Release -- api/fcgcpa.vire
 ```
+
+FCG port with loopback Redis. Entry is `fcg-api.vire` at the repo root so `use` can see `api/`:
+
+```text
+dotnet exec bin/Release/net10.0/vire.dll fcg-api.vire 18080 6379
+```
+
+Port map: `docs/fcg-api-port.md`. Payments stay off.
 
 If `FCG_API_TOKEN` is set, every path except `/health` requires header `X-FCG-Token`. The process never prints the token.
 

@@ -1,0 +1,121 @@
+~ FCG Node routes ported to Vire. Payments stay off. Redis over loopback.
+
+define loadCfg
+  try
+    let row be parse with (read with "data/fcg-cfg.json")
+    return row
+  miss problem
+    return {"redisPort": 6379}
+  end
+end
+
+define redisPort
+  let cfg be loadCfg
+  return cfg at "redisPort"
+end
+
+define waitlistCountBody with n
+  return "{\"count\":" + (text with n) + ",\"max\":null,\"spotsLeft\":null,\"full\":false,\"registrationClosed\":false}"
+end
+
+define capabilitiesBody
+  return "{\"payments\":false,\"mint\":false,\"email\":false,\"ipReputation\":false,\"eventSub\":false,\"tokenPrice\":false,\"oauth\":{\"kick\":false,\"twitch\":false,\"x\":false,\"youtube\":false,\"discord\":false,\"reddit\":false,\"instagram\":false,\"tiktok\":false,\"meta\":false}}"
+end
+
+define couchyInfoBody
+  return "{\"name\":\"Couchy\",\"status\":\"operational\",\"version\":\"2.0.0\",\"description\":\"Forever Couch Gang AI Assistant - powered by Couchy ollama-assist-service\",\"capabilities\":[\"error-diagnosis\",\"code-review\",\"debug-help\",\"documentation\",\"best-practices\",\"architecture\"],\"backend\":\"local\",\"accessRequirements\":\"Valid developer session token\"}"
+end
+
+define paymentsOff
+  return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\",\"payments\":false}"
+end
+
+define healthBody
+  return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+end
+
+define infoBody
+  return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"local\",\"chainId\":\"local-demo\",\"mining\":\"local\",\"miningNetwork\":false,\"payments\":false}"
+end
+
+define connectBody
+  return "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
+end
+
+define waitlistReply
+  try
+    let raw be redisGet with redisPort, "waitlist:count"
+    if raw == none
+      return "{\"ok\":false,\"status\":503,\"error\":\"waitlist count missing\"}"
+    end
+    return waitlistCountBody with (number with raw)
+  miss problem
+    return "{\"ok\":false,\"status\":503,\"error\":\"redis unavailable\"}"
+  end
+end
+
+define redisHealth
+  try
+    let pong be redisPing with redisPort
+    if pong == "PONG"
+      return "{\"ok\":true,\"redis\":\"PONG\",\"payments\":false}"
+    end
+    return "{\"ok\":false,\"status\":503,\"error\":\"redis ping failed\"}"
+  miss problem
+    return "{\"ok\":false,\"status\":503,\"error\":\"redis unavailable\"}"
+  end
+end
+
+define route with method, path, body
+  if path == "/health"
+    return healthBody
+  end
+  if path == "/api/health"
+    return healthBody
+  end
+  if path == "/api/health/redis"
+    if method == "GET"
+      return redisHealth
+    end
+  end
+  if path == "/payments"
+    return paymentsOff
+  end
+  if path == "/api/payment/catalog"
+    return paymentsOff
+  end
+  if path == "/api/payment/intent"
+    return paymentsOff
+  end
+  if path == "/info"
+    return infoBody
+  end
+  if path == "/api/info"
+    return infoBody
+  end
+  if path == "/connect"
+    return connectBody
+  end
+  if path == "/api/capabilities"
+    if method == "GET"
+      return capabilitiesBody
+    end
+  end
+  if path == "/api/couchy/info"
+    if method == "GET"
+      return couchyInfoBody
+    end
+  end
+  if path == "/api/waitlist/count"
+    if method == "GET"
+      return waitlistReply
+    end
+  end
+  if path == "/mine"
+    return "{\"ok\":false,\"status\":403,\"error\":\"mining stays inside the app\"}"
+  end
+  if path == "/api/login"
+    return "{\"ok\":false,\"status\":404,\"error\":\"Endpoint not found\"}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end

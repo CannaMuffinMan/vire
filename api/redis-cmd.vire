@@ -1,0 +1,61 @@
+~ RESP2 over loopback TCP (PR #64 connect). Not a copy of src/rt-redis.vire.
+
+define crlf
+  return (chr with 13) + (chr with 10)
+end
+
+define bulk with s
+  return "$" + (text with (length with s)) + crlf + s + crlf
+end
+
+define redisOpen with port
+  return connect with "127.0.0.1", port
+end
+
+define redisCall with port, payload
+  let sock be redisOpen with port
+  send with sock, payload
+  let got be recv with sock, 65536
+  close with sock
+  return got
+end
+
+define redisPing with port
+  let msg be "*1" + crlf + (bulk with "PING")
+  let got be redisCall with port, msg
+  if begins with got, "+PONG"
+    return "PONG"
+  end
+  return "bad"
+end
+
+define redisGet with port, key
+  let msg be "*2" + crlf + (bulk with "GET") + (bulk with key)
+  let got be redisCall with port, msg
+  if begins with got, "$-1"
+    return none
+  end
+  if not (begins with got, "$")
+    return none
+  end
+  let rest be slice with got, 1, (length with got)
+  let nl be find with rest, crlf
+  if nl < 0
+    return none
+  end
+  let n be number with (slice with rest, 0, nl)
+  if n < 0
+    return none
+  end
+  let start be nl + 2
+  return slice with rest, start, (start + n)
+end
+
+define redisSet with port, key, value
+  let msg be "*3" + crlf + (bulk with "SET") + (bulk with key) + (bulk with value)
+  let got be redisCall with port, msg
+  if begins with got, "+OK"
+    return true
+  end
+  return false
+end

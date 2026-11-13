@@ -314,14 +314,23 @@ define route with method, path, body
   if path == "/health"
     return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
   end
+  if path == "/api/health"
+    return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+  end
   if path == "/payments"
-    return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\"}"
+    return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\",\"payments\":false}"
+  end
+  if path == "/api/payment/catalog"
+    return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\",\"payments\":false}"
   end
   if path == "/info"
     return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"local\",\"chainId\":\"local-demo\",\"mining\":\"local\",\"miningNetwork\":false,\"payments\":false}"
   end
   if path == "/connect"
     return "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
+  end
+  if path == "/api/login"
+    return "{\"ok\":false,\"status\":404,\"error\":\"Endpoint not found\"}"
   end
   if path == "/chain"
     if method == "GET"
