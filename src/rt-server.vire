@@ -138,8 +138,7 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_zero", image
   emitList with image, [72, 141, 21]
   emitRel with image, fixes, "srv_slots"
-  emitList with image, [72, 199, 4, 202, 0, 0, 0, 0, 255, 193, 131, 249]
-  emitU32 with image, 64
+  emitList with image, [72, 199, 4, 202, 0, 0, 0, 0, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_zero"
 
   pin with labels, "srv_mux", image
@@ -161,8 +160,7 @@ define emitListenMux with image, fixes, labels
   emitList with image, [72, 137, 193]
   emitCallTo with image, fixes, "rt_fd_add"
   pin with labels, "srv_addn", image
-  emitList with image, [139, 77, 168, 255, 193, 131, 249]
-  emitU32 with image, 64
+  emitList with image, [139, 77, 168, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_addc"
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "srv_tv"
@@ -202,8 +200,7 @@ define emitListenMux with image, fixes, labels
   emitList with image, [137, 4, 138, 233]
   emitRel with image, fixes, "srv_clients"
   pin with labels, "srv_findn", image
-  emitList with image, [255, 193, 131, 249]
-  emitU32 with image, 64
+  emitList with image, [255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_find"
   emitList with image, [72, 139, 77, 184]
   let image be emitIat with image, fixes, "iat_cs"
@@ -261,8 +258,7 @@ define emitListenMux with image, fixes, labels
   emitRel with image, fixes, "srv_slots"
   emitList with image, [72, 199, 4, 202, 0, 0, 0, 0]
   pin with labels, "srv_cn", image
-  emitList with image, [139, 77, 172, 255, 193, 131, 249]
-  emitU32 with image, 64
+  emitList with image, [139, 77, 172, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_ci"
   emitJmpTo with image, fixes, "srv_mux"
 

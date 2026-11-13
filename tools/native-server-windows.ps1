@@ -12,6 +12,7 @@ $BaseSha = "9ea4561d12236f7f2f44858f137d7c948836df65"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
+if ($env:GITHUB_SHA) { Write-Output "pass_after_github_sha $($env:GITHUB_SHA)" }
 
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -152,6 +153,11 @@ Write-Output "health_pe_iat select SO_RCVTIMEO/SO_SNDTIMEO mux"
 
 $after = Start-HealthExe $afterExe
 Write-Output "health_listen 127.0.0.1:$($after.Port)"
+if ($after.Proc.HasExited) {
+    $so = if (Test-Path $after.Out) { Get-Content -Raw $after.Out } else { "" }
+    $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
+    throw "server exited $($after.Proc.ExitCode) after listen out=$so err=$se"
+}
 $hang2 = New-Object System.Net.Sockets.TcpClient
 $hang2.Connect("127.0.0.1", $after.Port)
 $hs2 = $hang2.GetStream()
