@@ -1,4 +1,5 @@
 ~ Native PE health clone of FCG GET /health and GET /api/health.
+~ capability: server (listen). Per-request step/while budget reset; 5M cap unchanged.
 ~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
 ~ to this token). Both paths are unauthenticated in the Node inventory.
 
@@ -15,5 +16,6 @@ define route with method, path, body
 end
 
 define main
+  ~ explicit server capability: listen resets the 5M step unit per request
   listen with 18080
 end

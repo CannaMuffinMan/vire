@@ -1,4 +1,6 @@
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
+
+use "src/rt-server.vire"
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
 ~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe
 ~ returns unsafe (client answers 400 and closes) for NUL, bare LF, lone CR,
@@ -67,7 +69,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return (emitTcpClient with image, fixes, labels)
+    return (emitServerRuntime with (emitTcpClient with image, fixes, labels), fixes, labels)
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -117,6 +119,40 @@ define parkNet with image, labels
   emitU64 with image, 0
   pin with labels, "tcp_socks", image
   emitU64 with image, 0
+  pin with labels, "step_cell", image
+  emitU64 with image, 0
+  pin with labels, "server_cap", image
+  emitU64 with image, 0
+  pin with labels, "srv_listen", image
+  emitU64 with image, 0
+  pin with labels, "srv_tv", image
+  emitU64 with image, 0
+  parkMsg with image, labels, "msg_step", "program ran too long and was stopped"
+  pin with labels, "srv_born", image
+  let bi be 0
+  while bi < 64
+    emitU32 with image, 0
+    let bi be bi + 1
+  end
+  pin with labels, "srv_slots", image
+  let si be 0
+  while si < 64
+    emitU64 with image, 0
+    let si be si + 1
+  end
+  pin with labels, "srv_fdset", image
+  emitU64 with image, 0
+  let fi be 0
+  while fi < 64
+    emitU64 with image, 0
+    let fi be fi + 1
+  end
+  pin with labels, "srv_peek", image
+  let pi be 0
+  while pi < 16384
+    emitU8 with image, 0
+    let pi be pi + 1
+  end
   return image
 end
 
@@ -171,6 +207,8 @@ define emitTcpClient with image, fixes, labels
   let image be emitIat with image, fixes, "iat_cn"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "conn_close"
+  emitList with image, [72, 139, 77, 240]
+  emitCallTo with image, fixes, "rt_sock_timeouts"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "tcp_socks"
   emitList with image, [72, 139, 85, 240, 72, 137, 17, 186]

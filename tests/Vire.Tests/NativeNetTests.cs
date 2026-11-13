@@ -16,6 +16,10 @@ public class NativeNetTests
         Assert.Equal(net, staged);
         Assert.Contains("emitNetRuntime", net);
         Assert.Contains("rt_listen", net);
+        Assert.Contains("emitServerRuntime", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
+        Assert.Contains("rt_server_reset", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
+        Assert.Contains("rt_sock_timeouts", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
+        Assert.Contains("select", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
@@ -79,6 +83,8 @@ public class NativeNetTests
             Assert.Contains("\r\nConnection: close\r\n", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
+            Assert.Contains("select", imports);
+            Assert.Contains("setsockopt", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);
             Assert.DoesNotContain("GetProcAddress", imports);
             Assert.DoesNotContain("CreateProcessA", imports);
