@@ -23,3 +23,37 @@ jobs:
         run: bash tools/native-elf-tcp.sh
       - name: selfhost gen1=gen2
         run: bash tools/native-elf-selfhost.sh
+
+  native-elf-windows-hello:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release --nologo
+      - name: Windows PE gen1 emits Linux ELF hello
+        run: pwsh -File tools/native-elf-win-hello.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: win-linux-hello
+          path: data/win-linux-hello.hex
+
+  native-elf-cross:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: native-elf-windows-hello
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: win-linux-hello
+          path: data
+      - name: Windows ELF hello matches Linux and runs
+        run: bash tools/native-elf-cross.sh data/win-linux-hello.hex

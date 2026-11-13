@@ -1,77 +1,77 @@
 ~ Linux x86-64 syscall shims. Win64 callers, raw syscalls, no libc.
 
 define emitLeaRdi with image, fixes, name
-  let image be emitList with image, [72, 141, 61]
+  let image be emitHex with image, "488d3d"
   let image be emitRel with image, fixes, name
   return image
 end
 
 define emitLeaRax with image, fixes, name
-  let image be emitList with image, [72, 141, 5]
+  let image be emitHex with image, "488d05"
   let image be emitRel with image, fixes, name
   return image
 end
 
 define emitSaveRbx with image, fixes
-  let image be emitList with image, [72, 137, 29]
+  let image be emitHex with image, "48891d"
   let image be emitRel with image, fixes, "saved_rbx"
   return image
 end
 
 define emitLoadRbx with image, fixes
-  let image be emitList with image, [72, 139, 29]
+  let image be emitHex with image, "488b1d"
   let image be emitRel with image, fixes, "saved_rbx"
   return image
 end
 
 define emitSys with image, n
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, n
-  let image be emitList with image, [15, 5]
+  let image be emitHex with image, "0f05"
   return image
 end
 
 define emitSysNeg1 with image
   ~ cmp rax, -4096; jb ok; mov rax, -1
-  let image be emitList with image, [72, 61]
-  let image be emitU32 with image, -4096
-  let image be emitList with image, [114, 7, 72, 199, 192, 255, 255, 255, 255]
+  let image be emitHex with image, "483d"
+  let image be emitU32 with image, 4294963200
+  let image be emitHex with image, "720748c7c0ffffffff"
   return image
 end
 
 define emitLinuxStart with image, fixes, labels
   pin with labels, "linux_start", image
-  let image be emitList with image, [49, 237, 76, 139, 36, 36, 76, 141, 108, 36, 8, 72, 131, 228, 240]
+  let image be emitHex with image, "31ed4c8b24244c8d6c24084883e4f0"
   let image be emitLeaRdi with image, fixes, "cmdline_buf"
-  let image be emitList with image, [73, 137, 254, 69, 49, 255]
+  let image be emitHex with image, "4989fe4531ff"
   pin with labels, "ls_arg", image
-  let image be emitList with image, [77, 57, 252, 15, 142]
+  let image be emitHex with image, "4d39fc0f8e"
   let image be emitRel with image, fixes, "ls_done"
-  let image be emitList with image, [75, 139, 116, 253, 0]
+  let image be emitHex with image, "4b8b74fd00"
   pin with labels, "ls_copy", image
-  let image be emitList with image, [138, 6, 136, 7, 72, 255, 198, 72, 255, 199, 132, 192, 15, 133]
+  let image be emitHex with image, "8a06880748ffc648ffc784c00f85"
   let image be emitRel with image, fixes, "ls_copy"
-  let image be emitList with image, [72, 255, 207, 198, 7, 32, 72, 255, 199, 73, 255, 199, 233]
+  let image be emitHex with image, "48ffcfc6072048ffc749ffc7e9"
   let image be emitRel with image, fixes, "ls_arg"
   pin with labels, "ls_done", image
-  let image be emitList with image, [76, 57, 247, 15, 132]
+  let image be emitHex with image, "4c39f70f84"
   let image be emitRel with image, fixes, "ls_nul"
-  let image be emitList with image, [72, 255, 207]
+  let image be emitHex with image, "48ffcf"
   pin with labels, "ls_nul", image
-  let image be emitList with image, [198, 7, 0]
+  let image be emitHex with image, "c60700"
   let image be emitLeaRax with image, fixes, "cmdline_buf"
-  let image be emitList with image, [72, 137, 5]
+  let image be emitHex with image, "488905"
   let image be emitRel with image, fixes, "cmdline_ptr"
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "code"
   return image
 end
 
 define emitIatThunk with image, fixes, labels, thunk, stub
   pin with labels, thunk, image
-  let image be emitList with image, [83, 232]
+  let image be emitHex with image, "53e8"
   let image be emitRel with image, fixes, stub
-  let image be emitList with image, [91, 195]
+  let image be emitHex with image, "5bc3"
   return image
 end
 
@@ -114,371 +114,372 @@ end
 
 define emitLinuxRtLinux with image, fixes, labels
   pin with labels, "rt_linux", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 185]
+  let image be emitHex with image, "554889e54881ec80000000b9"
   let image be emitU32 with image, 1
-  let image be emitList with image, [232]
+  let image be emitHex with image, "e8"
   let image be emitRel with image, fixes, "rt_push_bool"
-  let image be emitList with image, [201, 195]
+  let image be emitHex with image, "c9c3"
   return image
 end
 
 define emitLinuxStubs with image, fixes, labels
   pin with labels, "stub_gs", image
-  let image be emitList with image, [129, 249]
-  let image be emitU32 with image, -11
-  let image be emitList with image, [15, 132]
+  let image be emitHex with image, "81f9"
+  let image be emitU32 with image, 4294967285
+  let image be emitHex with image, "0f84"
   let image be emitRel with image, fixes, "gs_out"
-  let image be emitList with image, [129, 249]
-  let image be emitU32 with image, -12
-  let image be emitList with image, [15, 132]
+  let image be emitHex with image, "81f9"
+  let image be emitU32 with image, 4294967284
+  let image be emitHex with image, "0f84"
   let image be emitRel with image, fixes, "gs_err"
-  let image be emitList with image, [49, 192, 195]
+  let image be emitHex with image, "31c0c3"
   pin with labels, "gs_out", image
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   pin with labels, "gs_err", image
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 2
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_ep", image
-  let image be emitList with image, [137, 207]
+  let image be emitHex with image, "89cf"
   let image be emitSys with image, 60
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_va", image
-  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 49, 255, 72, 137, 214, 186]
+  let image be emitHex with image, "554889e541574156534883ec0831ff4889d6ba"
   let image be emitU32 with image, 3
-  let image be emitList with image, [65, 186]
+  let image be emitHex with image, "41ba"
   let image be emitU32 with image, 34
-  let image be emitList with image, [73, 199, 192, 255, 255, 255, 255, 77, 49, 201]
+  let image be emitHex with image, "49c7c0ffffffff4d31c9"
   let image be emitSys with image, 9
-  let image be emitList with image, [72, 61]
-  let image be emitU32 with image, -4096
-  let image be emitList with image, [114, 2, 49, 192, 72, 131, 196, 8, 91, 65, 94, 65, 95, 93, 195]
+  let image be emitHex with image, "483d"
+  let image be emitU32 with image, 4294963200
+  let image be emitHex with image, "720231c04883c4085b415e415f5dc3"
 
   pin with labels, "stub_wf", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 76, 137, 203, 72, 137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitHex with image, "554889e541574156534883ec084c89cb4889cf4889d64c89c2"
   let image be emitSys with image, 1
   let image be emitSysNeg1 with image
-  let image be emitList with image, [72, 133, 219, 116, 3, 72, 137, 3, 72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885db74034889034885c00f88"
   let image be emitRel with image, fixes, "wf_fail"
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "wf_done"
   pin with labels, "wf_fail", image
-  let image be emitList with image, [49, 192]
+  let image be emitHex with image, "31c0"
   pin with labels, "wf_done", image
-  let image be emitList with image, [72, 131, 196, 8, 91, 65, 94, 65, 95, 93]
+  let image be emitHex with image, "4883c4085b415e415f5d"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_rf", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 76, 137, 203, 72, 137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitHex with image, "554889e541574156534883ec084c89cb4889cf4889d64c89c2"
   let image be emitSys with image, 0
   let image be emitSysNeg1 with image
-  let image be emitList with image, [72, 133, 219, 116, 3, 72, 137, 3, 72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885db74034889034885c00f88"
   let image be emitRel with image, fixes, "rf_fail"
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "rf_done"
   pin with labels, "rf_fail", image
-  let image be emitList with image, [49, 192]
+  let image be emitHex with image, "31c0"
   pin with labels, "rf_done", image
-  let image be emitList with image, [72, 131, 196, 8, 91, 65, 94, 65, 95, 93]
+  let image be emitHex with image, "4883c4085b415e415f5d"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_ch", image
-  let image be emitList with image, [83, 72, 137, 207]
+  let image be emitHex with image, "534889cf"
   let image be emitSys with image, 3
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [91, 195]
+  let image be emitHex with image, "5bc3"
 
   pin with labels, "stub_cl", image
   let image be emitLeaRax with image, fixes, "cmdline_ptr"
-  let image be emitList with image, [72, 139, 0, 195]
+  let image be emitHex with image, "488b00c3"
 
   pin with labels, "stub_ue", image
-  let image be emitList with image, [49, 192, 195]
+  let image be emitHex with image, "31c0c3"
   pin with labels, "stub_vh", image
-  let image be emitList with image, [49, 192, 195]
+  let image be emitHex with image, "31c0c3"
 
   pin with labels, "stub_cf", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 83, 72, 131, 236, 16, 72, 137, 203, 139, 69, 48, 137, 69, 248, 49, 246, 247, 194]
+  let image be emitHex with image, "554889e5534883ec104889cb8b45308945f831f6f7c2"
   let image be emitU32 with image, 1073741824
-  let image be emitList with image, [15, 132]
+  let image be emitHex with image, "0f84"
   let image be emitRel with image, fixes, "cf_nw"
-  let image be emitList with image, [190]
+  let image be emitHex with image, "be"
   let image be emitU32 with image, 1
   pin with labels, "cf_nw", image
-  let image be emitList with image, [247, 194]
+  let image be emitHex with image, "f7c2"
   let image be emitU32 with image, 2147483648
-  let image be emitList with image, [15, 132]
+  let image be emitHex with image, "0f84"
   let image be emitRel with image, fixes, "cf_disp"
-  let image be emitList with image, [131, 254, 1, 15, 133]
+  let image be emitHex with image, "83fe010f85"
   let image be emitRel with image, fixes, "cf_disp"
-  let image be emitList with image, [190]
+  let image be emitHex with image, "be"
   let image be emitU32 with image, 2
   pin with labels, "cf_disp", image
-  let image be emitList with image, [131, 125, 248, 1, 15, 133]
+  let image be emitHex with image, "837df8010f85"
   let image be emitRel with image, fixes, "cf_d2"
-  let image be emitList with image, [129, 206]
+  let image be emitHex with image, "81ce"
   let image be emitU32 with image, 192
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "cf_open"
   pin with labels, "cf_d2", image
-  let image be emitList with image, [131, 125, 248, 2, 15, 133]
+  let image be emitHex with image, "837df8020f85"
   let image be emitRel with image, fixes, "cf_d4"
-  let image be emitList with image, [129, 206]
+  let image be emitHex with image, "81ce"
   let image be emitU32 with image, 576
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "cf_open"
   pin with labels, "cf_d4", image
-  let image be emitList with image, [131, 125, 248, 4, 15, 133]
+  let image be emitHex with image, "837df8040f85"
   let image be emitRel with image, fixes, "cf_d5"
-  let image be emitList with image, [129, 206]
+  let image be emitHex with image, "81ce"
   let image be emitU32 with image, 64
-  let image be emitList with image, [233]
+  let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "cf_open"
   pin with labels, "cf_d5", image
-  let image be emitList with image, [131, 125, 248, 5, 15, 133]
+  let image be emitHex with image, "837df8050f85"
   let image be emitRel with image, fixes, "cf_open"
-  let image be emitList with image, [129, 206]
+  let image be emitHex with image, "81ce"
   let image be emitU32 with image, 512
   pin with labels, "cf_open", image
-  let image be emitList with image, [72, 137, 223, 186]
+  let image be emitHex with image, "4889dfba"
   let image be emitU32 with image, 420
   let image be emitSys with image, 2
   let image be emitSysNeg1 with image
-  let image be emitList with image, [72, 141, 101, 248, 91, 201]
+  let image be emitHex with image, "488d65f85bc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_sz", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, -160
+  let image be emitHex with image, "554889e5534881ecc00000004889d34889cf488db5"
+  let image be emitU32 with image, 4294967136
   let image be emitSys with image, 5
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "sz_fail"
-  let image be emitList with image, [72, 139, 69, 144, 72, 133, 219, 116, 6, 72, 137, 194, 72, 193, 234, 32, 137, 19, 72, 141, 101, 248, 91, 201]
+  let image be emitHex with image, "488b45904885db74064889c248c1ea208913488d65f85bc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   pin with labels, "sz_fail", image
-  let image be emitList with image, [184, 255, 255, 255, 255, 72, 141, 101, 248, 91, 201]
+  let image be emitHex with image, "b8ffffffff488d65f85bc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_ga", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 192, 0, 0, 0, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, -160
+  let image be emitHex with image, "554889e54881ecc00000004889cf488db5"
+  let image be emitU32 with image, 4294967136
   let image be emitSys with image, 4
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "ga_fail"
-  let image be emitList with image, [139, 133]
-  let image be emitU32 with image, -136
-  let image be emitList with image, [37]
+  let image be emitHex with image, "8b85"
+  let image be emitU32 with image, 4294967160
+  let image be emitHex with image, "25"
   let image be emitU32 with image, 61440
-  let image be emitList with image, [61]
+  let image be emitHex with image, "3d"
   let image be emitU32 with image, 16384
-  let image be emitList with image, [117]
+  let image be emitHex with image, "75"
   let image be emitU8 with image, 14
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 16
-  let image be emitList with image, [201]
+  let image be emitHex with image, "c9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195, 184]
+  let image be emitHex with image, "c3b8"
   let image be emitU32 with image, 128
-  let image be emitList with image, [201]
+  let image be emitHex with image, "c9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   pin with labels, "ga_fail", image
-  let image be emitList with image, [184, 255, 255, 255, 255, 201]
+  let image be emitHex with image, "b8ffffffffc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_fi", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
-  let image be emitU32 with image, -160
+  let image be emitHex with image, "554889e5534881ecc00000004889d34889cf488db5"
+  let image be emitU32 with image, 4294967136
   let image be emitSys with image, 5
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "fi_fail"
-  let image be emitList with image, [199, 3, 128, 0, 0, 0, 139, 133]
-  let image be emitU32 with image, -136
-  let image be emitList with image, [37]
+  let image be emitHex with image, "c703800000008b85"
+  let image be emitU32 with image, 4294967160
+  let image be emitHex with image, "25"
   let image be emitU32 with image, 61440
-  let image be emitList with image, [61]
+  let image be emitHex with image, "3d"
   let image be emitU32 with image, 16384
-  let image be emitList with image, [117]
+  let image be emitHex with image, "75"
   let image be emitU8 with image, 6
-  let image be emitList with image, [199, 3, 16, 0, 0, 0]
-  let image be emitList with image, [72, 139, 133]
-  let image be emitU32 with image, -144
-  let image be emitList with image, [137, 67, 40, 72, 139, 69, 144, 137, 67, 36, 72, 193, 232, 32, 137, 67, 32, 184]
+  let image be emitHex with image, "c70310000000"
+  let image be emitHex with image, "488b85"
+  let image be emitU32 with image, 4294967152
+  let image be emitHex with image, "894328488b459089432448c1e820894320b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [72, 141, 101, 248, 91, 201]
+  let image be emitHex with image, "488d65f85bc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   pin with labels, "fi_fail", image
-  let image be emitList with image, [49, 192, 72, 141, 101, 248, 91, 201]
+  let image be emitHex with image, "31c0488d65f85bc9"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_sp", image
-  let image be emitList with image, [85, 72, 137, 229, 65, 87, 72, 137, 207, 72, 137, 214, 77, 137, 199, 68, 137, 202]
+  let image be emitHex with image, "554889e541574889cf4889d64d89c74489ca"
   let image be emitSys with image, 8
   let image be emitSysNeg1 with image
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "sp_fail"
-  let image be emitList with image, [77, 133, 255, 116, 3, 73, 137, 7, 184]
+  let image be emitHex with image, "4d85ff7403498907b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [65, 95, 93, 195]
+  let image be emitHex with image, "415f5dc3"
   pin with labels, "sp_fail", image
-  let image be emitList with image, [49, 192, 65, 95, 93, 195]
+  let image be emitHex with image, "31c0415f5dc3"
 
   pin with labels, "stub_se", image
-  let image be emitList with image, [85, 72, 137, 229, 83, 72, 137, 203, 72, 137, 207, 49, 246, 186]
+  ~ SetEndOfFile: ftruncate(fd, lseek(fd, 0, SEEK_CUR)). Keep fd in rbx; rax is the size.
+  let image be emitHex with image, "554889e5534889cb4889cf31f6ba"
   let image be emitU32 with image, 1
   let image be emitSys with image, 8
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "se_fail"
-  let image be emitList with image, [72, 137, 195, 72, 137, 199, 72, 137, 198]
+  let image be emitHex with image, "4889c64889df"
   let image be emitSys with image, 77
-  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitHex with image, "4885c00f88"
   let image be emitRel with image, fixes, "se_fail"
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 1
-  let image be emitList with image, [91, 93, 195]
+  let image be emitHex with image, "5b5dc3"
   pin with labels, "se_fail", image
-  let image be emitList with image, [49, 192, 91, 93, 195]
+  let image be emitHex with image, "31c05b5dc3"
 
   pin with labels, "stub_fp", image
   let image be emitSaveRbx with image, fixes
-  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 128, 0, 0, 0, 72, 137, 203, 72, 137, 85, 232, 76, 137, 69, 224]
+  let image be emitHex with image, "554889e5534881ec800000004889cb488955e84c8945e0"
   let image be emitLeaRax with image, fixes, "proc_fd"
-  let image be emitList with image, [72, 141, 125, 176, 72, 137, 198]
+  let image be emitHex with image, "488d7db04889c6"
   pin with labels, "fp_cp", image
-  let image be emitList with image, [138, 6, 136, 7, 72, 255, 198, 72, 255, 199, 132, 192, 15, 133]
+  let image be emitHex with image, "8a06880748ffc648ffc784c00f85"
   let image be emitRel with image, fixes, "fp_cp"
-  let image be emitList with image, [72, 255, 207, 137, 216, 49, 201]
+  let image be emitHex with image, "48ffcf89d831c9"
   pin with labels, "fp_dig", image
-  let image be emitList with image, [49, 210, 65, 187]
+  let image be emitHex with image, "31d241bb"
   let image be emitU32 with image, 10
-  let image be emitList with image, [65, 247, 243, 128, 194, 48, 136, 84, 13, 160, 72, 255, 193, 133, 192, 15, 133]
+  let image be emitHex with image, "41f7f380c23088540da048ffc185c00f85"
   let image be emitRel with image, fixes, "fp_dig"
   pin with labels, "fp_rev", image
-  let image be emitList with image, [72, 133, 201, 15, 132]
+  let image be emitHex with image, "4885c90f84"
   let image be emitRel with image, fixes, "fp_go"
-  let image be emitList with image, [72, 255, 201, 138, 68, 13, 160, 136, 7, 72, 255, 199, 233]
+  let image be emitHex with image, "48ffc98a440da0880748ffc7e9"
   let image be emitRel with image, fixes, "fp_rev"
   pin with labels, "fp_go", image
-  let image be emitList with image, [198, 7, 0, 72, 141, 125, 176, 72, 139, 117, 232, 72, 139, 85, 224]
+  let image be emitHex with image, "c60700488d7db0488b75e8488b55e0"
   let image be emitSys with image, 89
-  let image be emitList with image, [72, 133, 192, 15, 142]
+  let image be emitHex with image, "4885c00f8e"
   let image be emitRel with image, fixes, "fp_fail"
-  let image be emitList with image, [72, 139, 85, 232, 198, 4, 2, 0, 72, 129, 196, 128, 0, 0, 0, 91, 93]
+  let image be emitHex with image, "488b55e8c60402004881c4800000005b5d"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   pin with labels, "fp_fail", image
-  let image be emitList with image, [49, 192, 72, 129, 196, 128, 0, 0, 0, 91, 93]
+  let image be emitHex with image, "31c04881c4800000005b5d"
   let image be emitLoadRbx with image, fixes
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_gt", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 32, 191]
+  let image be emitHex with image, "554889e54883ec20bf"
   let image be emitU32 with image, 1
-  let image be emitList with image, [72, 141, 117, 240]
+  let image be emitHex with image, "488d75f0"
   let image be emitSys with image, 228
-  let image be emitList with image, [72, 139, 69, 248, 49, 210, 72, 185]
+  let image be emitHex with image, "488b45f831d248b9"
   let image be emitU64 with image, 1000000
-  let image be emitList with image, [72, 247, 241, 72, 139, 85, 240, 72, 105, 210, 232, 3, 0, 0, 72, 1, 208, 201, 195]
+  let image be emitHex with image, "48f7f1488b55f04869d2e80300004801d0c9c3"
 
   return image
 end
 
 define emitLinuxNetStubs with image, fixes, labels
   pin with labels, "stub_wsa", image
-  let image be emitList with image, [49, 192, 195]
+  let image be emitHex with image, "31c0c3"
 
   pin with labels, "stub_sk", image
-  let image be emitList with image, [137, 207, 137, 214, 68, 137, 194]
+  let image be emitHex with image, "89cf89d64489c2"
   let image be emitSys with image, 41
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_bd", image
-  let image be emitList with image, [137, 207, 72, 137, 214, 68, 137, 194]
+  let image be emitHex with image, "89cf4889d64489c2"
   let image be emitSys with image, 49
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_ln", image
-  let image be emitList with image, [137, 207, 137, 214]
+  let image be emitHex with image, "89cf89d6"
   let image be emitSys with image, 50
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_ac", image
-  let image be emitList with image, [137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitHex with image, "89cf4889d64c89c2"
   let image be emitSys with image, 43
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_rv", image
-  let image be emitList with image, [85, 72, 137, 229, 137, 207, 72, 137, 214, 68, 137, 194, 77, 137, 202]
-  let image be emitList with image, [77, 49, 192, 77, 49, 201]
+  let image be emitHex with image, "554889e589cf4889d64489c24d89ca"
+  let image be emitHex with image, "4d31c04d31c9"
   let image be emitSys with image, 45
   let image be emitSysNeg1 with image
-  let image be emitList with image, [93, 195]
+  let image be emitHex with image, "5dc3"
 
   pin with labels, "stub_sd", image
-  let image be emitList with image, [85, 72, 137, 229, 137, 207, 72, 137, 214, 68, 137, 194, 77, 137, 202]
-  let image be emitList with image, [77, 49, 192, 77, 49, 201]
+  let image be emitHex with image, "554889e589cf4889d64489c24d89ca"
+  let image be emitHex with image, "4d31c04d31c9"
   let image be emitSys with image, 44
   let image be emitSysNeg1 with image
-  let image be emitList with image, [93, 195]
+  let image be emitHex with image, "5dc3"
 
   pin with labels, "stub_cs", image
-  let image be emitList with image, [137, 207]
+  let image be emitHex with image, "89cf"
   let image be emitSys with image, 3
-  let image be emitList with image, [49, 192, 195]
+  let image be emitHex with image, "31c0c3"
 
   pin with labels, "stub_ss", image
-  let image be emitList with image, [85, 72, 137, 229, 137, 207, 137, 214, 68, 137, 192, 76, 137, 203]
+  let image be emitHex with image, "554889e589cf89d64489c04c89cb"
   ~ Win SOL_SOCKET 0xFFFF -> 1, SO_REUSEADDR 4 -> 2
-  let image be emitList with image, [129, 250, 255, 255, 0, 0, 117]
+  let image be emitHex with image, "81faffff000075"
   let image be emitU8 with image, 5
-  let image be emitList with image, [190]
+  let image be emitHex with image, "be"
   let image be emitU32 with image, 1
-  let image be emitList with image, [131, 248, 4, 117]
+  let image be emitHex with image, "83f80475"
   let image be emitU8 with image, 5
-  let image be emitList with image, [184]
+  let image be emitHex with image, "b8"
   let image be emitU32 with image, 2
-  let image be emitList with image, [137, 194, 139, 69, 48, 73, 137, 194, 65, 137, 192]
+  let image be emitHex with image, "89c28b45304989c24189c0"
   let image be emitSys with image, 54
   let image be emitSysNeg1 with image
-  let image be emitList with image, [93, 195]
+  let image be emitHex with image, "5dc3"
 
   pin with labels, "stub_gn", image
-  let image be emitList with image, [137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitHex with image, "89cf4889d64c89c2"
   let image be emitSys with image, 51
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
 
   pin with labels, "stub_cn", image
-  let image be emitList with image, [137, 207, 72, 137, 214, 68, 137, 194]
+  let image be emitHex with image, "89cf4889d64489c2"
   let image be emitSys with image, 42
   let image be emitSysNeg1 with image
-  let image be emitList with image, [195]
+  let image be emitHex with image, "c3"
   return image
 end
