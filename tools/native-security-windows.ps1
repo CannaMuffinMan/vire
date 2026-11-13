@@ -4,7 +4,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
-$BaseSha = "9ea4561d12236f7f2f44858f137d7c948836df65"
+$BaseSha = "6fbb705097938ce032c29cddfff947ccb12c3d5a"
 $HeadSha = ([string](& git rev-parse HEAD)).Trim()
 Write-Host "FAIL_BEFORE_SHA $BaseSha"
 Write-Host "PASS_AFTER_SHA $HeadSha"
@@ -301,8 +301,38 @@ function Invoke-FuzzJson([int]$Seed, [int]$Iters) {
     Write-Host "fuzz_json seed=$Seed iters=$Iters disagree=$disagree"
 }
 
+$pgLib = Get-Content -Raw (Join-Path $Root "src/rt-pg.vire")
+$pgGuest = @"
+define main
+  let raw be read with `"data/fuzz-in.txt`"
+  try
+    say (pg_rows_parse with raw, (pg_tab))
+  miss
+    say `"BAD`"
+  end
+end
+"@
+Set-Content (Join-Path $Work "pgfuzz.vire") ($pgLib + "`n" + $pgGuest)
+$code = Invoke-Vire compile-native.vire "data/native-security/pgfuzz.vire" "data/native-security/pgfuzz.hex"
+if ($code -ne 0) { throw "pgfuzz compile $code" }
+Convert-HexToExe (Join-Path $Work "pgfuzz.hex") (Join-Path $Work "pgfuzz.exe")
+
+function Invoke-FuzzPg([int]$Seed, [int]$Iters) {
+    $rng = New-Object Random $Seed
+    for ($n = 0; $n -lt $Iters; $n++) {
+        $chars = New-Object char[] ($rng.Next(0, 64))
+        for ($i = 0; $i -lt $chars.Length; $i++) { $chars[$i] = [char]$rng.Next(1, 127) }
+        [IO.File]::WriteAllText((Join-Path $Root "data\fuzz-in.txt"), (-join $chars))
+        $null = & dotnet exec $VireDll "data/native-security/pgfuzz.vire" 2>&1
+        $pe = Start-Process -FilePath (Join-Path $Work "pgfuzz.exe") -WorkingDirectory $Root -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $Work "p.out") -RedirectStandardError (Join-Path $Work "p.err")
+        if ($pe.ExitCode -eq -1073741819) { throw "PG PE AV iter $n" }
+    }
+    Write-Host "fuzz_pg seed=$Seed iters=$Iters"
+}
+
 Invoke-FuzzJson -Seed 20261113 -Iters 40
-Write-Host "PASS_AFTER json+schema host/PE fuzz (seed 20261113)"
+Invoke-FuzzPg -Seed 20261113 -Iters 30
+Write-Host "PASS_AFTER json+schema+pg host/PE fuzz (seed 20261113)"
 
 # HTTP: compile listen guest, send seeded requests, compare HttpWire-ish status class.
 $httpGuest = @"
@@ -375,5 +405,5 @@ for ($n = 0; $n -lt $httpIters; $n++) {
 }
 if ($server.HasExited) { throw "http fuzz server died" }
 Stop-Process -Id $server.Id -Force
-Write-Host "PASS_AFTER http fuzz seed=20261113 iters=$httpIters PE alive (no WS/Postgres/Redis parsers on this branch)"
+Write-Host "PASS_AFTER http fuzz seed=20261113 iters=$httpIters PE alive (no WS/Redis parsers; pg_rows_parse fuzzed)"
 Write-Host "native_security_windows ok"

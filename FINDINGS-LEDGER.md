@@ -147,14 +147,14 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 ## F4 W^X (this lane)
 
 - Status: **implemented**; Windows `VirtualQuery` after `SEC_IMAGE` map plus in-process `rt_wx_check`
-- FAIL_BEFORE: `9ea4561` IAT has no `VirtualQuery`
+- FAIL_BEFORE: `6fbb705` IAT has no `VirtualQuery`
 - PASS_AFTER: this SHA IAT includes `VirtualQuery`; hello PE `.text` not writable, `.data` not executable; hello still prints `hello from vire`
 - Residual: `SEC_IMAGE` mapping is the loader's section protect, not a second running process's `VirtualQueryEx`
 
 ## F5 atomic replace (this lane)
 
 - Status: **implemented** in native `rt_write`
-- FAIL_BEFORE: `9ea4561` had no `MoveFileExA`; dest was truncated in place
+- FAIL_BEFORE: `6fbb705` had no `MoveFileExA`; dest was truncated in place
 - PASS_AFTER: dest nlink==1, write `dest.tmp`, `MoveFileExA`; two-process reader must not see mixed OLD/NEW
 - Residual: empty reads during create of a brand-new name are possible before the first successful replace
 

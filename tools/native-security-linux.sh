@@ -3,7 +3,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 export PATH="${DOTNET_ROOT:-$HOME/.dotnet}:$PATH"
-BASE_SHA=9ea4561d12236f7f2f44858f137d7c948836df65
+BASE_SHA=6fbb705097938ce032c29cddfff947ccb12c3d5a
 HEAD_SHA=$(git rev-parse HEAD)
 echo "FAIL_BEFORE_SHA $BASE_SHA"
 echo "PASS_AFTER_SHA $HEAD_SHA"
@@ -39,9 +39,12 @@ dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo \
   --filter "FullyQualifiedName~FuzzTests|FullyQualifiedName~NativeParserFuzzTests" \
   --logger "console;verbosity=detailed"
 
-if grep -RniE 'websocket|postgres|redis' src compile-native.vire >/dev/null 2>&1; then
-  echo "unexpected WS/PG/Redis parser present"
+if [[ -f src/rt-pg.vire ]]; then
+  echo "postgres parser present (pg_rows_parse/pg_err fuzzed on Windows)"
+fi
+if grep -RniE 'websocket|redis' src compile-native.vire >/dev/null 2>&1; then
+  echo "unexpected WebSocket/Redis parser present"
   exit 1
 fi
-echo "residual: no WebSocket frame or Postgres/Redis reply parsers on native-compiler"
+echo "residual: no WebSocket frame or Redis reply parsers on native-compiler"
 echo "native_security_linux ok"
