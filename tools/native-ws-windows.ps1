@@ -140,6 +140,40 @@ function Start-WsGuest([string]$FilePath, [string[]]$ArgumentList) {
     return @{ Proc = $p; Port = $port; OutFile = $outFile; ErrFile = $errFile }
 }
 
+function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
+    $key = "dGhlIHNhbXBsZSBub25jZQ=="
+    $expect = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    $req = [Text.Encoding]::ASCII.GetBytes("GET /ws/kick HTTP/1.1`r`nHost: 127.0.0.1`r`nUpgrade: websocket`r`nConnection: Upgrade`r`nSec-WebSocket-Version: 13`r`nSec-WebSocket-Key: $key`r`n`r`n")
+    $c = New-Object System.Net.Sockets.TcpClient
+    $c.ReceiveTimeout = 3000
+    $c.SendTimeout = 3000
+    try {
+        $c.Connect("127.0.0.1", $Port)
+        Write-Output "${Tag}_raw_tcp_ok"
+        $s = $c.GetStream()
+        $s.Write($req, 0, $req.Length)
+        $buf = New-Object byte[] 512
+        $n = 0
+        try { $n = $s.Read($buf, 0, $buf.Length) } catch {
+            Write-Output "${Tag}_raw_read_err $($_.Exception.Message)"
+            throw
+        }
+        if ($n -lt 0) { $n = 0 }
+        $hex = if ($n -gt 0) { [BitConverter]::ToString($buf, 0, $n) } else { "" }
+        $ascii = if ($n -gt 0) { [Text.Encoding]::ASCII.GetString($buf, 0, $n) } else { "" }
+        Write-Output "${Tag}_raw_n $n"
+        Write-Output "${Tag}_raw_hex $hex"
+        Write-Output "${Tag}_raw_ascii $ascii"
+        if ($n -le 0) { throw "$Tag websocket handshake returned 0 bytes" }
+        if ($ascii -notmatch "HTTP/1.1 101 Switching Protocols") { throw "$Tag handshake not 101" }
+        if ($ascii -notmatch [regex]::Escape($expect)) { throw "$Tag Sec-WebSocket-Accept mismatch" }
+        if ($ascii -notmatch "`r`n`r`n") { throw "$Tag handshake missing CRLFCRLF" }
+        Write-Output "${Tag}_raw_101_ok"
+    } finally {
+        try { $c.Close() } catch { }
+    }
+}
+
 function Invoke-WsEcho([int]$Port) {
     $ws = New-Object System.Net.WebSockets.ClientWebSocket
     $uri = [Uri]"ws://127.0.0.1:$Port/ws/kick"
@@ -200,6 +234,7 @@ if (-not $hostEcho.Port) {
     throw "host ws-echo did not print listening port"
 }
 Write-Output "ws_host_listen 127.0.0.1:$($hostEcho.Port)"
+Invoke-WsRawProbe $hostEcho.Port "ws_host"
 $echoed = Invoke-WsEcho $hostEcho.Port
 Write-Output "ws_host_echo $echoed"
 Invoke-WsAdversary $hostEcho.Port
@@ -222,6 +257,7 @@ if (-not $peEcho.Port) {
     throw "PE ws-echo did not print listening port out=$out err=$err"
 }
 Write-Output "ws_pe_listen 127.0.0.1:$($peEcho.Port)"
+Invoke-WsRawProbe $peEcho.Port "ws_pe"
 $peEchoed = Invoke-WsEcho $peEcho.Port
 Write-Output "ws_pe_echo $peEchoed"
 Invoke-WsAdversary $peEcho.Port
