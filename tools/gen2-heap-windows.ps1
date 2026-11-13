@@ -36,7 +36,7 @@ if (Test-Path $PassDir) { git worktree remove --force $PassDir 2>$null; Remove-I
 git worktree add --detach $PassDir HEAD
 Push-Location $PassDir
 try {
-    git merge --no-edit $BulkSha
+    git -c user.name=vire-ci -c user.email=vire-ci@local merge --no-edit $BulkSha
     if ($LASTEXITCODE -ne 0) { throw "PASS_AFTER merge of $BulkSha failed" }
     $passCode = Invoke-Handoff $PassDir
     if ($passCode -ne 0) { throw "PASS_AFTER handoff exit $passCode" }

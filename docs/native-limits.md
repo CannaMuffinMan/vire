@@ -59,6 +59,8 @@ Net recv 1000000 (`src/rt-net.vire`), listen body 1MB, intern table 128 (`src/rt
 
 **Fix:** `rt_bzero` on `rt_map_new` pair storage and on the new tail of `rt_grow_list` / `rt_grow_map`. `emitExpr` frames are 6-slot lists. Guest MaxCalls stays 64. Caps unchanged.
 
+Windows prove (`tools/gen2-heap-windows.ps1`): FAIL_BEFORE is `#71` `5ae87794` (gen2 `c0000005` or hang). PASS_AFTER merges that SHA into this branch using `git -c user.name` so GitHub Actions has a committer identity, then runs the same handoff. Job timeout 90 min because FAIL_BEFORE gen2 can wait up to 2400s.
+
 ## Proof
 
 `tools/native-limits-check.sh` (Linux) and `tools/native-limits-windows.ps1` (Windows) print `FAIL_BEFORE at <base SHA>` by actually running `git show` of `compile-native.vire` at `origin/native-compiler`, then `PASS_AFTER` on HEAD. Windows also runs the gen1 PE and requires host stdout = PE stdout.
