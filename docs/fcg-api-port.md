@@ -138,6 +138,8 @@ WebSocket `/ws/kick` (Node) waits on PR #68.
 
 ## CI proof
 
-Throwaway Postgres + Redis on Ubuntu. Windows uses a loopback RESP2 PING/GET/SET fixture. Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into `waitlist:count`. Host interpreter must return the **Expected body** column. Packed `compile-native` of the listen guest must print `compiled`. Running that gen1 PE currently crashes (`crash rip=0000000140008af2`) on the first HTTP GET after `listening on` — residual until native listen+connect in one image is stable; do not copy `rt-net` here.
+Throwaway Postgres + Redis on Ubuntu. Windows uses a loopback RESP2 PING/GET/SET fixture (test-only). Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into `waitlist:count`. Host interpreter must return the **Expected body** column. Packed `compile-native` of the listen guest must print `compiled`. The gen1 PE must answer those routes with a normal request header set (`Host` plus `Connection: close`; POST also sends `Content-Length`). Payments stay off. Caps unchanged.
 
-FAIL_BEFORE SHA: `9ea4561d12236f7f2f44858f137d7c948836df65` (`GET /api/waitlist/count` → 404 from `api/fcgcpa.vire` on that pin).
+FAIL_BEFORE host SHA: `9ea4561d12236f7f2f44858f137d7c948836df65` (`GET /api/waitlist/count` → 404 from `api/fcgcpa.vire` on that pin).
+
+FAIL_BEFORE PE SHA: `3946d1c6c4f3fc12e4a486da600bba354ad60c64` (`src/rt-net.vire` at the native-compiler tip before `emitClientLeaf`; packed listen client ctx/buf allocs are not leaf, so the first GET crashes). PASS_AFTER is this branch: the same guest compiled with `emitClientLeaf` answers the documented bodies.

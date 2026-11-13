@@ -10,8 +10,10 @@ New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
 $BaseSha = "9ea4561d12236f7f2f44858f137d7c948836df65"
+$FailPeSha = "3946d1c6c4f3fc12e4a486da600bba354ad60c64"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
+Write-Output "fail_before_pe_sha $FailPeSha"
 Write-Output "pass_after_sha $AfterSha"
 
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
@@ -31,9 +33,9 @@ function Invoke-Http([string]$Method, [string]$Url, [string]$Body) {
         if ($null -eq $Body) { $Body = "" }
         $payload = $Body
     }
-    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`n"
+    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n"
     if ($Method -eq "POST") {
-        $req += "Content-Length: $($payload.Length)`r`n"
+        $req += "Content-Length: $($payload.Length)`r`nContent-Type: application/json`r`n"
     }
     $req += "`r`n" + $payload
     $c = New-Object Net.Sockets.TcpClient
@@ -189,6 +191,8 @@ Write-Output "redis_seed_ok"
 
 git cat-file -e "$BaseSha^{commit}" 2>$null
 if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin $BaseSha }
+git cat-file -e "$FailPeSha^{commit}" 2>$null
+if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin $FailPeSha }
 $oldSrc = Join-Path $Data "fcgcpa-fail-before.vire"
 $utf8 = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($oldSrc, ((& git show "${BaseSha}:api/fcgcpa.vire") -join "`n") + "`n", $utf8)
@@ -235,54 +239,80 @@ $parts = @(
 [IO.File]::WriteAllText($pack, ($parts -join "`n`n") + "`n")
 Write-Output "packed data/fcg-api-guest.vire"
 
-$hexRel = "data/fcg-api.hex"
-Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
-$compileOut = & dotnet exec $VireDll --compiler compile-native.vire data/fcg-api-guest.vire $hexRel
-$compileCode = $LASTEXITCODE
-$env:VIRE_BUDGET = "5000000"
-Write-Output $compileOut
-if ($compileCode -ne 0) { throw "compile-native fcg-api exit $compileCode" }
-if ("$compileOut" -notmatch "compiled") { throw "compile-native missing compiled" }
-$exe = Join-Path $Data "fcg-api.exe"
-Convert-HexToExe (Join-Path $Root $hexRel) $exe
-$peOut = Join-Path $Data "pe-listen.out"
-$peErr = Join-Path $Data "pe-listen.err"
-$peProc = Start-Process -FilePath $exe -ArgumentList @("$ListenPe", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $peOut -RedirectStandardError $peErr -WorkingDirectory $Root
-$deadline = (Get-Date).AddSeconds(20)
-$sawListen = $false
-while ((Get-Date) -lt $deadline) {
-    if (Test-Path $peOut) {
-        $txt = Get-Content -Raw $peOut
-        if ($txt -match "listening on 127.0.0.1:$ListenPe") { $sawListen = $true; break }
-        if ($txt -match "crash rip=") { break }
-    }
-    if ($peProc.HasExited) { break }
-    Start-Sleep -Milliseconds 50
+function Compile-Guest([string]$HexRel) {
+    Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    $compileOut = & dotnet exec $VireDll --compiler compile-native.vire data/fcg-api-guest.vire $HexRel
+    $compileCode = $LASTEXITCODE
+    $env:VIRE_BUDGET = "5000000"
+    Write-Output $compileOut
+    if ($compileCode -ne 0) { throw "compile-native fcg-api exit $compileCode" }
+    if ("$compileOut" -notmatch "compiled") { throw "compile-native missing compiled" }
 }
-if (-not $sawListen) {
-    Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
-    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
+
+function Start-Pe([string]$ExePath, [int]$Port, [string]$OutPath, [string]$ErrPath) {
+    $proc = Start-Process -FilePath $ExePath -ArgumentList @("$Port", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $OutPath -RedirectStandardError $ErrPath -WorkingDirectory $Root
+    $deadline = (Get-Date).AddSeconds(20)
+    $sawListen = $false
+    $crash = ""
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path $OutPath) {
+            $txt = Get-Content -Raw $OutPath
+            if ($txt -match "listening on 127.0.0.1:$Port") { $sawListen = $true; break }
+            if ($txt -match "crash rip=[0-9A-Fa-fx]+") { $crash = $Matches[0]; break }
+        }
+        if ($proc.HasExited) { break }
+        Start-Sleep -Milliseconds 50
+    }
+    return @{ Proc = $proc; SawListen = $sawListen; Crash = $crash; Out = $OutPath; Err = $ErrPath }
+}
+
+$leafNet = Get-Content -Raw (Join-Path $Root "src/rt-net.vire")
+$utf8 = New-Object System.Text.UTF8Encoding $false
+$oldNet = ((& git show "${FailPeSha}:src/rt-net.vire") -join "`n") + "`n"
+if ($oldNet -match "emitClientLeaf") { throw "FAIL_BEFORE $FailPeSha already has emitClientLeaf" }
+[System.IO.File]::WriteAllText((Join-Path $Root "src/rt-net.vire"), $oldNet, $utf8)
+Compile-Guest "data/fcg-api-fail.hex"
+$failExe = Join-Path $Data "fcg-api-fail.exe"
+Convert-HexToExe (Join-Path $Root "data/fcg-api-fail.hex") $failExe
+$failPe = Start-Pe $failExe 18084 (Join-Path $Data "pe-fail.out") (Join-Path $Data "pe-fail.err")
+Start-Sleep -Milliseconds 200
+$failCrash = $failPe.Crash
+if (-not $failCrash) {
+    try {
+        Invoke-Http "GET" "http://127.0.0.1:18084/health" $null | Out-Null
+    } catch { }
+    Start-Sleep -Milliseconds 400
+    if (Test-Path $failPe.Out) {
+        $ftxt = Get-Content -Raw $failPe.Out
+        if ($ftxt -match "crash rip=[0-9A-Fa-fx]+") { $failCrash = $Matches[0] }
+    }
+}
+Write-Output ("pe_fail_out " + (Get-Content -Raw $failPe.Out -ErrorAction SilentlyContinue))
+Write-Output ("pe_fail_err " + (Get-Content -Raw $failPe.Err -ErrorAction SilentlyContinue))
+if (-not $failCrash) {
+    try { $failPe.Proc.Kill() } catch { }
+    throw "FAIL_BEFORE PE at $FailPeSha did not crash"
+}
+Write-Output "FAIL_BEFORE at $FailPeSha gen1 PE FCG listen $failCrash"
+try { $failPe.Proc.Kill() } catch { }
+
+[System.IO.File]::WriteAllText((Join-Path $Root "src/rt-net.vire"), $leafNet, $utf8)
+Compile-Guest "data/fcg-api.hex"
+$exe = Join-Path $Data "fcg-api.exe"
+Convert-HexToExe (Join-Path $Root "data/fcg-api.hex") $exe
+$peProcInfo = Start-Pe $exe $ListenPe (Join-Path $Data "pe-listen.out") (Join-Path $Data "pe-listen.err")
+$peProc = $peProcInfo.Proc
+if (-not $peProcInfo.SawListen) {
+    Write-Output ("pe_out " + (Get-Content -Raw $peProcInfo.Out -ErrorAction SilentlyContinue))
+    Write-Output ("pe_err " + (Get-Content -Raw $peProcInfo.Err -ErrorAction SilentlyContinue))
     Write-Output ("pe_exited " + $peProc.HasExited)
     throw "pe did not print listening"
 }
+if ($peProcInfo.Crash) { throw "PASS_AFTER PE crashed $($peProcInfo.Crash)" }
 Start-Sleep -Milliseconds 200
-try {
-    $peLogin = Assert-Routes $ListenPe "pe"
-    if ($hostLogin -ne $peLogin) { throw "host/PE honeypot bodies differ" }
-    Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
-} catch {
-    $txt = ""
-    if (Test-Path $peOut) { $txt = Get-Content -Raw $peOut }
-    Write-Output ("pe_out " + $txt)
-    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
-    Write-Output ("pe_exited " + $peProc.HasExited)
-    if ($txt -match "crash rip=") {
-        Write-Output "RESIDUAL gen1 PE FCG listen crashed ($($Matches[0])); host bodies proven; packed compile succeeded"
-        Write-Output "PASS_AFTER at $AfterSha host FCG API; PE listen residual"
-    } else {
-        throw
-    }
-}
+$peLogin = Assert-Routes $ListenPe "pe"
+if ($hostLogin -ne $peLogin) { throw "host/PE honeypot bodies differ" }
+Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
 
 try { $hostProc.Kill() } catch { }
 try { $peProc.Kill() } catch { }

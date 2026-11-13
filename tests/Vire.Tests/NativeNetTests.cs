@@ -15,6 +15,8 @@ public class NativeNetTests
         string staged = File.ReadAllText(Path.Combine(root, "data", "src", "rt-net.vire"));
         Assert.Equal(net, staged);
         Assert.Contains("emitNetRuntime", net);
+        Assert.Contains("emitClientLeaf", net);
+        Assert.Contains("return emitClientLeaf with image, fixes, labels", net);
         Assert.Contains("rt_listen", net);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
