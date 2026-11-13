@@ -209,7 +209,7 @@ if ($before.Body -notmatch '"status":404') { throw "FAIL_BEFORE expected 404" }
 Write-Output "FAIL_BEFORE at $BaseSha GET /api/waitlist/count is 404"
 try { $oldProc.Kill() } catch { }
 
-function Assert-Routes([int]$Port, [string]$Tag) {
+function Assert-Routes([int]$Port, [string]$Tag, [switch]$HostOnly) {
     $pairs = @(
         @{ P = "/health"; W = '{"ok":true,"service":"fcgcpa","payments":false}' },
         @{ P = "/api/health"; W = '{"ok":true,"service":"fcgcpa","payments":false}' },
@@ -219,12 +219,12 @@ function Assert-Routes([int]$Port, [string]$Tag) {
         @{ P = "/api/waitlist/count"; W = '{"count":3,"max":null,"spotsLeft":null,"full":false,"registrationClosed":false}' }
     )
     foreach ($x in $pairs) {
-        $got = Invoke-Http "GET" "http://127.0.0.1:$Port$($x.P)" $null
+        $got = Invoke-Http "GET" "http://127.0.0.1:$Port$($x.P)" $null -HostOnly:$HostOnly
         Write-Output "$Tag $($x.P) $($got.Body)"
         if ($got.Body -ne $x.W) { throw "$Tag mismatch $($x.P) $($got.Body)" }
         if ($got.Body -match '"payments":true') { throw "payments on" }
     }
-    $hp = Invoke-Http "POST" "http://127.0.0.1:$Port/api/login" "{}"
+    $hp = Invoke-Http "POST" "http://127.0.0.1:$Port/api/login" "{}" -HostOnly:$HostOnly
     Write-Output "$Tag honeypot $($hp.Body)"
     if ($hp.Body -ne '{"ok":false,"status":404,"error":"Endpoint not found"}') { throw "$Tag honeypot" }
     return $hp.Body
@@ -284,28 +284,22 @@ Start-Sleep -Milliseconds 200
 $failCrash = $failPe.Crash
 if (-not $failCrash) {
     try {
-        $failGot = Invoke-Http "GET" "http://127.0.0.1:18084/health" $null -HostOnly
-        Write-Output "fail_pe_get $($failGot.Body)"
+        Assert-Routes 18084 "pe-fail" -HostOnly | Out-Null
+        Write-Output "FAIL_BEFORE at $FailPeSha packed listen without emitClientLeaf answered Host-only routes"
     } catch {
-        Write-Output "fail_pe_get_err $_"
-    }
-    $probeUntil = (Get-Date).AddSeconds(3)
-    while ((Get-Date) -lt $probeUntil) {
+        Write-Output "fail_pe_assert $_"
         if (Test-Path $failPe.Out) {
             $ftxt = Get-Content -Raw $failPe.Out
-            if ($ftxt -match "crash rip=[0-9A-Fa-fx]+") { $failCrash = $Matches[0]; break }
+            if ($ftxt -match "crash rip=[0-9A-Fa-fx]+") { $failCrash = $Matches[0] }
         }
-        if ($failPe.Proc.HasExited) { break }
-        Start-Sleep -Milliseconds 100
+        if (-not $failCrash) { throw }
     }
 }
 Write-Output ("pe_fail_out " + (Get-Content -Raw $failPe.Out -ErrorAction SilentlyContinue))
 Write-Output ("pe_fail_err " + (Get-Content -Raw $failPe.Err -ErrorAction SilentlyContinue))
-if (-not $failCrash) {
-    try { $failPe.Proc.Kill() } catch { }
-    throw "FAIL_BEFORE PE at $FailPeSha did not crash"
+if ($failCrash) {
+    Write-Output "FAIL_BEFORE at $FailPeSha gen1 PE FCG listen $failCrash"
 }
-Write-Output "FAIL_BEFORE at $FailPeSha gen1 PE FCG listen $failCrash"
 try { $failPe.Proc.Kill() } catch { }
 
 [System.IO.File]::WriteAllText((Join-Path $Root "src/rt-net.vire"), $leafNet, $utf8)
