@@ -1,5 +1,5 @@
 use "src/rt-sha1.vire"
-use "src/rt-ws.vire"
+use "src/rt-ws-proto.vire"
 
 define showBad with name, got
   if (got at 0) == "ok"
@@ -25,6 +25,9 @@ define main
   end
   let acc be ws_rfc_accept_example
   let nfail be nfail + (showBad with "rfc6455 1.3", acc)
+  if (acc at 0) == "ok"
+    say (acc at 1)
+  end
   let hi be ws_ascii_bytes with "hi"
   let payload be hi at 1
   let fr be ws_write_frame with 1, 1, payload
