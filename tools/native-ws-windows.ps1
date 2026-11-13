@@ -73,16 +73,6 @@ if ($beforeOut -notmatch "there is no definition named ws_listen") {
 }
 Write-Output "FAIL_BEFORE at $BaseSha showing ws_listen is unavailable"
 
-Write-Output "ws_host_prove_start"
-$hostProve = & dotnet exec $VireDll (Join-Path $Root "tests/native/ws-prove.vire")
-$hostProveCode = $LASTEXITCODE
-Write-Output $hostProve
-Write-Output "ws_host_prove_exit $hostProveCode"
-if ($hostProveCode -ne 0) { throw "host ws-prove exit $hostProveCode" }
-if ("$hostProve" -notmatch "WS PROVE pass") { throw "host ws-prove missing pass" }
-if ("$hostProve" -notmatch "s3pPLMBiTxaQ9kYGzzhZRbK\+xOo=") { throw "host missing RFC 6455 accept" }
-
-$lib1 = Get-Content -Raw (Join-Path $Root "src/rt-sha1.vire")
 $lib2 = Get-Content -Raw (Join-Path $Root "src/rt-ws.vire")
 $cut = $lib2.IndexOf("define parkWs")
 if ($cut -lt 0) { throw "rt-ws.vire missing parkWs split" }
@@ -90,7 +80,17 @@ $proto = $lib2.Substring(0, $cut)
 $prove = Get-Content -Raw (Join-Path $Root "tests/native/ws-prove.vire")
 $prove = $prove -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
 $prove = $prove -replace '(?m)^use "src/rt-ws.vire"\s*', ''
-Set-Content -Path (Join-Path $Data "ws-prove.vire") -Value ($lib1 + "`n" + $proto + "`n" + $prove) -NoNewline
+Set-Content -Path (Join-Path $Data "ws-prove.vire") -Value ($proto + "`n" + $prove) -NoNewline
+
+Write-Output "ws_host_prove_start"
+$hostProve = & dotnet exec $VireDll (Join-Path $Root "data/ws-prove.vire")
+$hostProveCode = $LASTEXITCODE
+Write-Output $hostProve
+Write-Output "ws_host_prove_exit $hostProveCode"
+if ($hostProveCode -ne 0) { throw "host ws-prove exit $hostProveCode" }
+if ("$hostProve" -notmatch "WS PROVE pass") { throw "host ws-prove missing pass" }
+if ("$hostProve" -notmatch "s3pPLMBiTxaQ9kYGzzhZRbK\+xOo=") { throw "host missing RFC 6455 accept" }
+
 $hexRel = "data/ws-prove.hex"
 if (Test-Path (Join-Path $Root $hexRel)) { Remove-Item -Force (Join-Path $Root $hexRel) }
 $compileCode = Invoke-Vire compile-native.vire "data/ws-prove.vire" $hexRel

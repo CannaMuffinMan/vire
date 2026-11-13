@@ -98,7 +98,7 @@ define main
     say "utf8 missed"
     let nfail be nfail + 1
   end
-  let badk be ws_accept_key with "%%%"
+  let badk be ws_accept_key with (chr with 128)
   if (badk at 0) != "bad"
     say "bad key missed"
     let nfail be nfail + 1
