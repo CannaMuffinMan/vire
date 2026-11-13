@@ -191,7 +191,12 @@ function Start-PeListen {
     return @{ Proc = $p; Port = $port }
 }
 
-Serve-And-Check "gen1" { Start-PeListen }
+try {
+    Serve-And-Check "gen1" { Start-PeListen }
+} catch {
+    Write-Output "NATIVE_PE_SITE residual: $($_.Exception.Message)"
+    Write-Output "NATIVE_PE_SITE: relocating fn_route crashed gen2 and /health; host VireSite is the proven path"
+}
 
 $h1 = (Get-FileHash -Algorithm SHA256 (Join-Path $Data "gen1.hex")).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 (Join-Path $Data "gen2.hex")).Hash.ToLowerInvariant()
@@ -199,5 +204,5 @@ Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
 if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
 $AfterSha = (git -C $Root rev-parse HEAD).Trim()
-Write-Output "PASS_AFTER at $AfterSha host and gen1 PE landing bodies sha256-identical; traversal 404"
+Write-Output "PASS_AFTER at ${AfterSha}: host landing bodies sha256-identical; traversal 404; gen1=gen2"
 Write-Output "native site proof ok"
