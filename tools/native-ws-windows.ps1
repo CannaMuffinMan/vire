@@ -282,7 +282,7 @@ if ($cn -notmatch 'use "src/rt-net.vire"') { throw "compile-native.vire missing 
 $cn = $cn.Replace('use "src/rt-net.vire"', "use `"src/rt-net.vire`"`nuse `"src/rt-ws.vire`"")
 $cn = $cn.Replace(
     "  let hits be {`"net`": loaded at `"needNet`", `"json`": loaded at `"needJson`"}`n  say `"needs-ok`"",
-    "  let hits be {`"net`": loaded at `"needNet`", `"json`": loaded at `"needJson`"}`n  let wantWs be true`n  say `"needs-ok`"")
+    "  let hits be {`"net`": true, `"json`": loaded at `"needJson`"}`n  let wantWs be true`n  say `"needs-ok`"")
 $cn = $cn.Replace(
     "    put (emitNetRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`"), hasRoute, (hits at `"net`")) into gen at `"image`"`n  end`n  put (parkRuntime",
     "    put (emitNetRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`"), hasRoute, (hits at `"net`")) into gen at `"image`"`n  end`n  if wantWs`n    put (emitWsRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`")) into gen at `"image`"`n  end`n  put (parkRuntime")

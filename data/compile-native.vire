@@ -675,6 +675,9 @@ define noteNeed with state, nm
   if nm == "listen"
     put true into state at "needNet"
   end
+  if nm == "ws_listen"
+    put true into state at "needNet"
+  end
   if nm == "connect"
     put true into state at "needNet"
   end
