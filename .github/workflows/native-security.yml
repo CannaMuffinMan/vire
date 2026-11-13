@@ -31,5 +31,4 @@ jobs:
       - run: dotnet build vire.csproj -c Release
       - run: pwsh -File tools/native-hello-handoff.ps1
       - run: pwsh -File tools/native-security-windows.ps1
-      - run: pwsh -File tools/native-selfhost-handoff.ps1
       - run: pwsh -File tools/native-sec-windows.ps1
