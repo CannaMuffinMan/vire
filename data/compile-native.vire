@@ -2,6 +2,7 @@
 
 use "src/pe.vire"
 use "src/rt-net.vire"
+use "src/rt-tls.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -693,11 +694,17 @@ define noteNeed with state, nm
   if nm == "parse"
     put true into state at "needJson"
   end
+  if nm == "fetch"
+    put true into state at "needTls"
+  end
+  if nm == "post"
+    put true into state at "needTls"
+  end
   return true
 end
 
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false, "needTls": false}
   let funcs be []
   let uses be []
   let needs be []
@@ -743,7 +750,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson"}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson", "needTls": state at "needTls"}
 end
 
 define normPath with path
@@ -982,7 +989,7 @@ define loadUnit with path, folder, seen
     let missing be true
   end
   if missing
-    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false}
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false, "needTls": false}
   end
   return loadText with path, source, folder, seen
 end
@@ -1012,6 +1019,7 @@ define loadText with path, source, folder, seen
   let uses be parsed at "uses"
   let needNet be parsed at "needNet"
   let needJson be parsed at "needJson"
+  let needTls be parsed at "needTls"
   let ui be 0
   while ui < (length with uses)
     let rel be uses at ui
@@ -1041,6 +1049,9 @@ define loadText with path, source, folder, seen
     end
     if extra at "needJson"
       let needJson be true
+    end
+    if extra at "needTls"
+      let needTls be true
     end
     let ui be ui + 1
   end
@@ -1103,10 +1114,13 @@ define loadText with path, source, folder, seen
     if extra at "needJson"
       let needJson be true
     end
+    if extra at "needTls"
+      let needTls be true
+    end
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson, "needTls": needTls}
 end
 
 define emitOp with gen, bytes
@@ -1202,7 +1216,7 @@ define builtinArity with nm
   if nm == "args" or nm == "ticks"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen" or nm == "fetch"
     return 1
   end
   if nm == "close"
@@ -1211,7 +1225,7 @@ define builtinArity with nm
   if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
     return 2
   end
-  if nm == "connect" or nm == "send" or nm == "recv"
+  if nm == "connect" or nm == "send" or nm == "recv" or nm == "post"
     return 2
   end
   if nm == "slice" or nm == "replace"
@@ -1785,11 +1799,14 @@ define main
     say "compile failed"
     halt with 1
   end
-  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
+  let hits be {"net": loaded at "needNet", "json": loaded at "needJson", "tls": loaded at "needTls"}
   say "needs-ok"
   let opened be openImage
   if hits at "net"
     let opened be openNetImage
+  end
+  if hits at "tls"
+    let opened be openTlsImage
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
@@ -1821,11 +1838,17 @@ define main
   if (hits at "net") or (hits at "json")
     put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"
   end
+  if hits at "tls"
+    put (emitTlsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels")) into gen at "image"
+  end
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
   ~ Pool strings must follow frame_base so they land in RW .data, not RX .text.
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   if (hits at "net") or (hits at "json")
     put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
+  end
+  if hits at "tls"
+    put (parkTls with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"

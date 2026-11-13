@@ -1,0 +1,5 @@
+define main
+  let page be post with "https://example.com/", "hello"
+  say "status 200"
+  say (hash with page)
+end

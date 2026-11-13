@@ -1,0 +1,4 @@
+define main
+  fetch with "https://expired.badssl.com/"
+  say "opened"
+end

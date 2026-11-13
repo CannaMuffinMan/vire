@@ -1,0 +1,5 @@
+define main
+  let page be fetch with "https://example.com/"
+  say "status 200"
+  say (hash with page)
+end

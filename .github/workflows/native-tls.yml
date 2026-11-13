@@ -1,0 +1,20 @@
+name: native-tls
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native-tls-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - run: pwsh -File tools/native-selfhost-handoff.ps1
+      - run: pwsh -File tools/native-tls-windows.ps1
