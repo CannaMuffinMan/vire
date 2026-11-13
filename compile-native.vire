@@ -3,19 +3,6 @@
 use "src/pe.vire"
 use "src/rt-net.vire"
 
-~ ws-stub-begin
-~ Real emit lives in src/rt-ws.vire. compile-native self-host keeps these
-~ no-ops so gen1/gen2 PE hashes stay stable. The WS prove job swaps this
-~ block for `use "src/rt-ws.vire"` before compiling ws-echo / ws-prove.
-define emitWsRuntime with image, fixes, labels
-  return image
-end
-
-define parkWs with image, labels
-  return image
-end
-~ ws-stub-end
-
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
   if (find with letters, ch) >= 0
@@ -1860,4 +1847,17 @@ define main
   write with (files at 1), (hex with exe)
   say "compiled"
 end
+
+~ ws-stub-begin
+~ Real emit lives in src/rt-ws.vire. compile-native self-host keeps these
+~ no-ops so gen1/gen2 PE hashes stay stable. The WS prove job swaps this
+~ block for `use "src/rt-ws.vire"` before compiling ws-echo / ws-prove.
+define emitWsRuntime with image, fixes, labels
+  return image
+end
+
+define parkWs with image, labels
+  return image
+end
+~ ws-stub-end
 
