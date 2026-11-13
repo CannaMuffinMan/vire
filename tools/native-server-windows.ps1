@@ -8,7 +8,7 @@ $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$BaseSha = "9ea4561d12236f7f2f44858f137d7c948836df65"
+$BaseSha = "7fd41b8814442a4348478c409c7720ad2b925dd9"
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
@@ -70,13 +70,18 @@ function Start-HealthExe([string]$Exe) {
     return @{ Proc = $p; Port = $port; Out = $outFile; Err = $errFile }
 }
 
-function Get-Health([int]$Port, [int]$WaitMs) {
-    $c = New-Object System.Net.Sockets.TcpClient
+function New-V4Client([int]$WaitMs) {
+    $c = New-Object System.Net.Sockets.TcpClient([Net.Sockets.AddressFamily]::InterNetwork)
     $c.ReceiveTimeout = $WaitMs
     $c.SendTimeout = $WaitMs
+    return $c
+}
+
+function Get-Health([int]$Port, [int]$WaitMs) {
+    $c = New-V4Client $WaitMs
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        $c.Connect("127.0.0.1", $Port)
+        $c.Connect([Net.IPAddress]::Loopback, $Port)
         $s = $c.GetStream()
         $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
         $s.Write($req, 0, $req.Length)
@@ -86,6 +91,23 @@ function Get-Health([int]$Port, [int]$WaitMs) {
         $sw.Stop()
         $txt = if ($n -gt 0) { [Text.Encoding]::ASCII.GetString($buf, 0, $n) } else { "" }
         return @{ Ok = ($txt -match "HTTP/1.1 200 "); Ms = $sw.ElapsedMilliseconds; Text = $txt }
+    } finally {
+        try { $c.Close() } catch { }
+    }
+}
+
+function Get-BrowserHealth([int]$Port, [int]$WaitMs) {
+    $c = New-V4Client $WaitMs
+    try {
+        $c.Connect([Net.IPAddress]::Loopback, $Port)
+        $s = $c.GetStream()
+        $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)`r`nAccept: text/html,application/json`r`nContent-Type: text/plain`r`nContent-Length: 0`r`n`r`n")
+        $s.Write($req, 0, $req.Length)
+        $buf = New-Object byte[] 4096
+        $n = 0
+        try { $n = $s.Read($buf, 0, $buf.Length) } catch { $n = 0 }
+        $txt = if ($n -gt 0) { [Text.Encoding]::ASCII.GetString($buf, 0, $n) } else { "" }
+        return @{ Ok = ($txt -match "HTTP/1.1 200 "); Text = $txt }
     } finally {
         try { $c.Close() } catch { }
     }
@@ -103,7 +125,7 @@ function Compile-Health {
 }
 
 git cat-file -e "$BaseSha^{commit}" 2>$null
-if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin $BaseSha }
+if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin native-compiler }
 
 $Snap = Join-Path $Data "native-server-snap"
 New-Item -ItemType Directory -Force -Path $Snap | Out-Null
@@ -122,8 +144,26 @@ if (Test-Path (Join-Path $Root "src/rt-server.vire")) { Remove-Item (Join-Path $
 if (Test-Path (Join-Path $Root "data/src/rt-server.vire")) { Remove-Item (Join-Path $Root "data/src/rt-server.vire") -Force }
 $beforeExe = Compile-Health
 $before = Start-HealthExe $beforeExe
-$hang = New-Object System.Net.Sockets.TcpClient
-$hang.Connect("127.0.0.1", $before.Port)
+$idle = New-V4Client 2000
+$idle.Connect([Net.IPAddress]::Loopback, $before.Port)
+$idle.Close()
+Start-Sleep -Milliseconds 400
+$idleHealth = @{ Ok = $false; Text = "" }
+if (-not $before.Proc.HasExited) { $idleHealth = Get-Health $before.Port 1500 }
+Write-Output ("fail_before_idle_close exited={0} health_ok={1}" -f $before.Proc.HasExited, $idleHealth.Ok)
+if (-not $before.Proc.HasExited -and $idleHealth.Ok) {
+    $br = Get-BrowserHealth $before.Port 2000
+    Write-Output ("fail_before_browser_headers ok={0}" -f $br.Ok)
+    if (-not $br.Ok) { Write-Output "FAIL_BEFORE at $BaseSha extra headers returned empty or non-200" }
+}
+if ($before.Proc.HasExited -or -not $idleHealth.Ok) {
+    Write-Output "FAIL_BEFORE at $BaseSha connect-then-close crashed or silenced the PE"
+}
+if (-not $before.Proc.HasExited) { try { $before.Proc.Kill() } catch { } }
+
+$before = Start-HealthExe $beforeExe
+$hang = New-V4Client 800
+$hang.Connect([Net.IPAddress]::Loopback, $before.Port)
 $hs = $hang.GetStream()
 $partial = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`n")
 $hs.Write($partial, 0, $partial.Length)
@@ -158,8 +198,25 @@ if ($after.Proc.HasExited) {
     $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
     throw "server exited $($after.Proc.ExitCode) after listen out=$so err=$se"
 }
-$hang2 = New-Object System.Net.Sockets.TcpClient
-$hang2.Connect("127.0.0.1", $after.Port)
+$idle2 = New-V4Client 2000
+$idle2.Connect([Net.IPAddress]::Loopback, $after.Port)
+$idle2.Close()
+Start-Sleep -Milliseconds 200
+if ($after.Proc.HasExited) { throw "connect-then-close killed the server" }
+$afterIdle = Get-Health $after.Port 2000
+if (-not $afterIdle.Ok) { throw "server silent after connect-then-close" }
+Write-Output "PASS_AFTER connect-then-close still serves"
+
+$hold = New-V4Client 5000
+$hold.Connect([Net.IPAddress]::Loopback, $after.Port)
+Start-Sleep -Milliseconds 150
+$afterHold = Get-Health $after.Port 2000
+if (-not $afterHold.Ok) { throw "idle connect stalled others" }
+Write-Output "PASS_AFTER idle connect does not stall /health"
+try { $hold.Close() } catch { }
+
+$hang2 = New-V4Client 5000
+$hang2.Connect([Net.IPAddress]::Loopback, $after.Port)
 $hs2 = $hang2.GetStream()
 $hs2.Write($partial, 0, $partial.Length)
 Start-Sleep -Milliseconds 100
@@ -169,6 +226,10 @@ if (-not $live.Ok) { throw "hanging client stalled /health" }
 if ($live.Ms -gt 1500) { throw "overlapping /health too slow $($live.Ms)ms" }
 Write-Output "PASS_AFTER hang isolation /health while slowloris held"
 
+$brOk = Get-BrowserHealth $after.Port 2000
+if (-not $brOk.Ok) { throw "browser headers got empty or non-200: $($brOk.Text)" }
+Write-Output "PASS_AFTER full browser header set /health 200"
+
 $ok = 0
 $loadSw = [Diagnostics.Stopwatch]::StartNew()
 $jobs = @()
@@ -177,9 +238,9 @@ $jobs = @()
         param($Port)
         $n = 0
         for ($i = 0; $i -lt 2500; $i++) {
-            $c = New-Object System.Net.Sockets.TcpClient
+            $c = New-Object System.Net.Sockets.TcpClient([Net.Sockets.AddressFamily]::InterNetwork)
             $c.ReceiveTimeout = 5000
-            $c.Connect("127.0.0.1", $Port)
+            $c.Connect([Net.IPAddress]::Loopback, $Port)
             $s = $c.GetStream()
             $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`n`r`n")
             $s.Write($req, 0, $req.Length)
@@ -201,8 +262,8 @@ if ($after.Proc.HasExited) { throw "server died during load exit $($after.Proc.E
 Write-Output "PASS_AFTER 20000 /health requests at $AfterSha"
 
 try { $hang2.Close() } catch { }
-$disc = New-Object System.Net.Sockets.TcpClient
-$disc.Connect("127.0.0.1", $after.Port)
+$disc = New-V4Client 2000
+$disc.Connect([Net.IPAddress]::Loopback, $after.Port)
 $ds = $disc.GetStream()
 $ds.Write($partial, 0, $partial.Length)
 $disc.Close()

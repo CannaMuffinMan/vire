@@ -19,6 +19,8 @@ public class NativeNetTests
         Assert.Contains("emitServerRuntime", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
         Assert.Contains("rt_server_reset", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
         Assert.Contains("rt_sock_timeouts", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
+        Assert.Contains("ncli_fail", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
+        Assert.Contains("emitLeaf with image", File.ReadAllText(Path.Combine(root, "src", "rt-server.vire")));
         Assert.Contains("select", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);

@@ -120,6 +120,20 @@ public class FuzzTests
 
         byte[] noLen = Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nHost: x\r\n\r\n");
         Assert.Equal(411, HttpWire.ParseComplete(noLen, noLen.Length).Status);
+
+        byte[] empty = new byte[0];
+        Assert.Equal(408, HttpWire.ParseComplete(empty, 0).Status);
+
+        byte[] idle = Encoding.ASCII.GetBytes("GET /health HTTP/1.1\r\n");
+        Assert.Equal(408, HttpWire.ParseComplete(idle, idle.Length).Status);
+
+        byte[] browser = Encoding.ASCII.GetBytes(
+            "GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nAccept: text/html,application/json\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n");
+        HttpWire.Result browserParsed = HttpWire.ParseComplete(browser, browser.Length);
+        Assert.Equal(0, browserParsed.Status);
+        Assert.Equal("GET", browserParsed.Method);
+        Assert.Equal("/health", browserParsed.Path);
+        Assert.Equal(0, browserParsed.ContentLength);
     }
 
     [Fact]
