@@ -1128,6 +1128,9 @@ define emitFix with gen, name
   if begins with name, "rt_json"
     let later be true
   end
+  if begins with name, "rt_ws"
+    let later be true
+  end
   if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
     let later be true
   end
