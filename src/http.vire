@@ -238,12 +238,15 @@ define http_match with pattern, path
   while i < (length with a)
     let p be a at i
     let g be b at i
-    let flag be begins with p, ":"
-    if flag
+    let first be ""
+    if (length with p) > 0
+      let first be p at 0
+    end
+    if first == ":"
       let name be slice with p, 1, (length with p)
       put g into params at name
     end
-    if flag == false
+    if first != ":"
       if p != g
         return none
       end
