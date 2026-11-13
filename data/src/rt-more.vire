@@ -1716,21 +1716,21 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "bind_fail_close"
   emitList with image, [72, 139, 77, 224, 255, 21]
   emitRel with image, fixes, "iat_ch"
-  emitList with image, [72, 139, 77, 240, 72, 139, 85, 232]
+  emitList with image, [72, 139, 117, 240, 72, 139, 125, 232]
   pin with labels, "bind_loop", image
-  emitList with image, [138, 1, 132, 192, 15, 132]
+  emitList with image, [15, 182, 6, 133, 192, 15, 132]
   emitRel with image, fixes, "bind_tail"
-  emitList with image, [58, 2, 15, 133]
+  emitList with image, [58, 7, 15, 133]
   emitRel with image, fixes, "bind_fail"
-  emitList with image, [72, 255, 193, 72, 255, 194, 233]
+  emitList with image, [72, 255, 198, 72, 255, 199, 233]
   emitRel with image, fixes, "bind_loop"
   pin with labels, "bind_tail", image
-  emitList with image, [138, 2, 60, 92, 15, 132]
+  emitList with image, [138, 7, 60, 92, 15, 132]
   emitRel with image, fixes, "bind_folder"
   emitList with image, [60, 47, 15, 133]
   emitRel with image, fixes, "bind_fail"
   pin with labels, "bind_folder", image
-  emitList with image, [72, 255, 194, 139, 2, 13, 32, 32, 32, 32, 61]
+  emitList with image, [72, 255, 199, 139, 7, 13, 32, 32, 32, 32, 61]
   emitU32 with image, 1635017060
   emitList with image, [15, 132]
   emitRel with image, fixes, "bind_sep"
@@ -1739,7 +1739,7 @@ define emitMore with image, fixes, labels
   emitList with image, [15, 133]
   emitRel with image, fixes, "bind_fail"
   pin with labels, "bind_sep", image
-  emitList with image, [138, 66, 4, 60, 92, 15, 132]
+  emitList with image, [138, 71, 4, 60, 92, 15, 132]
   emitRel with image, fixes, "bind_ok"
   emitList with image, [60, 47, 15, 132]
   emitRel with image, fixes, "bind_ok"
