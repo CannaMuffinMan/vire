@@ -1,8 +1,16 @@
+~ Keep every allocation live so GC cannot reclaim. Stay under the 100000
+~ list cap on each list; the 32MB arena must still fail closed.
 define main
-  let xs be []
+  let bag be []
   let i be 0
-  while i < 2500000
-    let xs be push with xs, i
+  while i < 4000
+    let xs be []
+    let j be 0
+    while j < 800
+      let xs be push with xs, j
+      let j be j + 1
+    end
+    let bag be push with bag, xs
     let i be i + 1
   end
   say "ok"
