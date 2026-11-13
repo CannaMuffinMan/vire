@@ -1821,7 +1821,8 @@ define main
     say "compile failed"
     halt with 1
   end
-  let hits be {"net": loaded at "needNet", "json": loaded at "needJson", "ws": loaded at "needWs"}
+  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
+  let wantWs be loaded at "needWs"
   say "needs-ok"
   let opened be openImage
   if hits at "net"
@@ -1855,13 +1856,19 @@ define main
     halt with 1
   end
   if (hits at "net") or (hits at "json")
-    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net"), (hits at "ws")) into gen at "image"
+    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"
+  end
+  if wantWs
+    put (emitWsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels")) into gen at "image"
   end
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
   ~ Pool strings must follow frame_base so they land in RW .data, not RX .text.
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
   if (hits at "net") or (hits at "json")
-    put (parkNet with (gen at "image"), (gen at "labels"), (hits at "ws")) into gen at "image"
+    put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
+  end
+  if wantWs
+    put (parkWs with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
