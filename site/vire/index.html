@@ -143,8 +143,8 @@ end
 </code></pre>
           </article>
           <article class="code-card">
-            <header><span>control.vire → two, 1, 3</span><button class="copy" type="button" data-copy="#ex-control">Copy</button></header>
-            <pre class="code" data-src="examples/control.vire" id="ex-control"><code>~ Tour: else if, for, skip.
+            <header><span>control.vire → two</span><button class="copy" type="button" data-copy="#ex-control">Copy</button></header>
+            <pre class="code" data-src="examples/control.vire" id="ex-control"><code>~ Tour: if / else if / else. Native for-in still disagrees with the host.
 define main
   let n be 2
   if n == 1
@@ -153,12 +153,6 @@ define main
     say "two"
   else
     say "other"
-  end
-  for item in [1, 2, 3]
-    if item == 2
-      skip
-    end
-    say item
   end
 end
 </code></pre>

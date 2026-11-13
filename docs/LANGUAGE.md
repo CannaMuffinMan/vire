@@ -68,7 +68,7 @@ itself uses `+`. Unary minus in a call argument is not a statement; bind it firs
 `skip` and `stop` are valid only inside `while` or `for`.
 
 ```vire
-~ Tour: else if, for, skip.
+~ Tour: if / else if / else. Native for-in still disagrees with the host.
 define main
   let n be 2
   if n == 1
@@ -78,22 +78,12 @@ define main
   else
     say "other"
   end
-  for item in [1, 2, 3]
-    if item == 2
-      skip
-    end
-    say item
-  end
 end
 ```
 
-Source: [`control.vire`](../site/vire/examples/control.vire). Output:
+Source: [`control.vire`](../site/vire/examples/control.vire). Output: `two`.
 
-```
-two
-1
-3
-```
+`for` / `skip` / `stop` parse on both compilers. The host interpreter runs them as in [GUIDE.md](../GUIDE.md). Native PE `for` over a number list currently yields `none` on an extra pass (measured on `site-vire` Windows). Do not treat native `for` as matching the host until that is fixed. Loops that must match today use `while` ([`count.vire`](../site/vire/examples/count.vire)).
 
 ### 2.4 Definitions
 
