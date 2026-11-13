@@ -64,17 +64,10 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
   let base be length with image
   let names be netNames
   if need_net
-    let saved_route be labels at "fn_route"
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
-    ~ Packed pins reuse the fn_route name and would move call fn_route's rel32
-    ~ onto the blob stub. Keep the guest route pin from emitFunc.
-    if has_route
-      put saved_route into labels at "fn_route"
-    end
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    let image be emitTcpClient with image, fixes, labels
-    return emitClientLeaf with image, fixes, labels
+    return (emitTcpClient with image, fixes, labels)
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -131,32 +124,6 @@ define emitIat with image, fixes, name
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, name
   return image
-end
-
-~ Packed rt_net_client allocs ctx/buf without emitLeaf, so GC could chase the
-~ SOCKET. Re-pin the entry as a leaf prologue and jmp cl_hdr. Capture the
-~ packed pin first; do not extra-fix call fn_route (packed dest stays fn_route).
-define emitClientLeaf with image, fixes, labels
-  pin with labels, "rt_net_client", image
-  let image be emitPro with image
-  let image be emitList with image, [72, 137, 77, 240, 185]
-  let image be emitU32 with image, 128
-  let image be emitCallTo with image, fixes, "rt_alloc"
-  let image be emitLeaf with image
-  let image be emitList with image, [72, 133, 192, 15, 132]
-  let image be emitRel with image, fixes, "ncli_fail"
-  let image be emitList with image, [72, 137, 69, 248, 72, 139, 85, 240, 72, 137, 16]
-  let image be emitIat with image, fixes, "iat_gt"
-  let image be emitList with image, [72, 139, 77, 248, 137, 65, 32, 185]
-  let image be emitU32 with image, 82048
-  let image be emitCallTo with image, fixes, "rt_alloc"
-  let image be emitLeaf with image
-  let image be emitList with image, [72, 133, 192, 15, 132]
-  let image be emitRel with image, fixes, "ncli_fail"
-  let image be emitList with image, [72, 139, 77, 248, 72, 137, 65, 8, 72, 199, 65, 16, 0, 0, 0, 0]
-  let image be emitJmpTo with image, fixes, "cl_hdr"
-  pin with labels, "ncli_fail", image
-  return emitEpi with image
 end
 
 define emitTcpClient with image, fixes, labels
