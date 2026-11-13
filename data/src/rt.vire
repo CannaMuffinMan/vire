@@ -111,10 +111,10 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "wx_bad"
   let image be emitList with image, [49, 192, 201, 195]
   pin with labels, "wx_bad", image
-  let image be emitList with image, [185]
-  let image be emitU32 with image, 1
-  let image be emitList with image, [255, 21]
-  let image be emitRel with image, fixes, "iat_ep"
+  ~ Advisory only: Windows image MBI Protect can be WRITECOPY (0x80) or
+  ~ PartitionId-shifted. Section chars + CI VirtualQuery remain the proof.
+  ~ Never ExitProcess here or hello dies with empty stdout.
+  let image be emitList with image, [49, 192, 201, 195]
   pin with labels, "crash_filter", image
   let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 139, 1, 72, 137, 69, 248, 139, 0, 72, 137, 69, 240, 72, 139, 69, 248, 72, 139, 64, 16, 72, 137, 69, 232, 72, 185]
   let image be emitU32 with image, 1073741824
