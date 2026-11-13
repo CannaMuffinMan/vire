@@ -59,7 +59,7 @@ Net recv 1000000 (`src/rt-net.vire`), listen body 1MB, intern table 128 (`src/rt
 
 **Fix:** `rt_bzero` on `rt_map_new` pair storage and on the new tail of `rt_grow_list` / `rt_grow_map`. `emitExpr` frames are 6-slot lists. Guest MaxCalls stays 64. Caps unchanged.
 
-Windows prove (`tools/gen2-heap-windows.ps1`): FAIL_BEFORE is `#71` `5ae87794` (gen2 `c0000005` or hang). PASS_AFTER merges that SHA into this branch using `git -c user.name` so GitHub Actions has a committer identity, then runs the same handoff. Job timeout 90 min because FAIL_BEFORE gen2 can wait up to 2400s.
+Windows prove (`tools/gen2-heap-windows.ps1`): FAIL_BEFORE is tip `04724f2c` (`#85`). gen1 hex is always `09fc0afb…`; gen2 from the same source has been `09fc0afb…`, `abc6c092…` (native-net-windows **132147041715**, #86 native-selfhost **132169879533**), and `1db10b7a…` (native-selfhost-windows **132147042612**). PASS_AFTER runs `native-selfhost-handoff.ps1` then `native-net-windows.ps1` three times on this tree; every run must print the same `gen1_sha256` = `gen2_sha256`.
 
 ## Proof
 
