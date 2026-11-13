@@ -247,21 +247,25 @@ $exe = Join-Path $Data "fcg-api.exe"
 Convert-HexToExe (Join-Path $Root $hexRel) $exe
 $peOut = Join-Path $Data "pe-listen.out"
 $peErr = Join-Path $Data "pe-listen.err"
-$peProc = Start-Process -FilePath $exe -ArgumentList @("$ListenPe", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $peOut -RedirectStandardError $peErr
-try {
-    Wait-Port $ListenPe
-} catch {
+$peProc = Start-Process -FilePath $exe -ArgumentList @("$ListenPe", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $peOut -RedirectStandardError $peErr -WorkingDirectory $Root
+$deadline = (Get-Date).AddSeconds(20)
+$sawListen = $false
+while ((Get-Date) -lt $deadline) {
+    if (Test-Path $peOut) {
+        $txt = Get-Content -Raw $peOut
+        if ($txt -match "listening on 127.0.0.1:$ListenPe") { $sawListen = $true; break }
+        if ($txt -match "crash rip=") { break }
+    }
+    if ($peProc.HasExited) { break }
+    Start-Sleep -Milliseconds 50
+}
+if (-not $sawListen) {
     Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
     Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
     Write-Output ("pe_exited " + $peProc.HasExited)
-    throw
+    throw "pe did not print listening"
 }
-if ($peProc.HasExited) {
-    Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
-    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
-    throw "pe exited before routes"
-}
-Start-Sleep -Milliseconds 400
+Start-Sleep -Milliseconds 200
 try {
     $peLogin = Assert-Routes $ListenPe "pe"
 } catch {
