@@ -399,18 +399,6 @@ define emitWsListen with image, fixes, labels
   emitCallTo with image, fixes, "ws_upok"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "ws_h400"
-  emitList with image, [72, 141, 13]
-  emitRel with image, fixes, "txt_ws_101"
-  emitCallTo with image, fixes, "ws_sendz"
-  emitList with image, [72, 139, 77, 240]
-  emitList with image, [72, 141, 85]
-  emitU8 with image, 128
-  emitList with image, [65, 184]
-  emitU32 with image, 28
-  emitCallTo with image, fixes, "rt_net_sendall"
-  emitList with image, [72, 141, 13]
-  emitRel with image, fixes, "txt_ws_crlf2"
-  emitCallTo with image, fixes, "ws_sendz"
   emitCallTo with image, fixes, "ws_echo"
   emitJmpTo with image, fixes, "ws_hclose"
   pin with labels, "ws_h400", image
@@ -523,6 +511,19 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 141, 85]
   emitU8 with image, 128
   emitCallTo with image, fixes, "rt_ws_b64"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_101"
+  emitCallTo with image, fixes, "ws_sendz"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 141, 85]
+  emitU8 with image, 128
+  emitList with image, [65, 184]
+  emitU32 with image, 28
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_ws_crlf2"
+  emitCallTo with image, fixes, "ws_sendz"
   emitList with image, [184, 1, 0, 0, 0]
   emitEpi with image
   pin with labels, "ws_upno", image
