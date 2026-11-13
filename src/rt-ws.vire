@@ -704,7 +704,6 @@ define emitWsListen with image, fixes, labels
   emitEpi with image
 
   pin with labels, "ws_rdfr", image
-  emitPro with image
   emitList with image, [72, 141, 85, 150]
   emitList with image, [185, 2, 0, 0, 0]
   emitCallTo with image, fixes, "ws_readn"
@@ -721,7 +720,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [193, 232, 7]
   emitList with image, [136, 69, 177]
   emitList with image, [15, 182, 69, 151]
-  emitList with image, [132, 192, 15, 136]
+  emitList with image, [132, 192, 15, 137]
   emitRel with image, fixes, "ws_rd0"
   emitList with image, [15, 182, 69, 151]
   emitList with image, [36, 127]
@@ -780,7 +779,8 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 133, 201, 15, 132]
   emitRel with image, fixes, "ws_unm"
   emitList with image, [72, 137, 202]
-  emitList with image, [72, 139, 77, 240]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "ws_cli"
   emitList with image, [72, 139, 85, 184]
   emitList with image, [76, 139, 69, 168]
   emitList with image, [69, 49, 201]
@@ -803,10 +803,10 @@ define emitWsListen with image, fixes, labels
   emitJmpTo with image, fixes, "ws_unl"
   pin with labels, "ws_rdfin", image
   emitList with image, [184, 1, 0, 0, 0]
-  emitEpi with image
+  emitList with image, [195]
   pin with labels, "ws_rd0", image
   emitList with image, [49, 192]
-  emitEpi with image
+  emitList with image, [195]
 
   pin with labels, "ws_readn", image
   emitPro with image
