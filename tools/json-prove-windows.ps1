@@ -50,7 +50,7 @@ try {
     Pop-Location
     git worktree remove --force $wt
 }
-Write-Output "FAIL_BEFORE at $BaseSha: builtin parse accepted [01]; src/rt-json.vire absent"
+Write-Output "FAIL_BEFORE at ${BaseSha}: builtin parse accepted [01]; src/rt-json.vire absent"
 
 Write-Output "json_host_start"
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
