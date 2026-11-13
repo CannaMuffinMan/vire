@@ -16,9 +16,12 @@ Write-Output "fail_before_sha $BaseSha"
 Write-Output "FAIL_BEFORE at ${BaseSha}: no ETag/304/declared-root native site gate; host TrySite had no SHA-256 ETag"
 
 $siteSrc = Join-Path $Root "sites/landing/site"
-$siteDst = Join-Path $Root "site"
-New-Item -ItemType Directory -Force -Path $siteDst | Out-Null
-Copy-Item (Join-Path $siteSrc "*") $siteDst -Force
+$siteDsts = @((Join-Path $Root "site"), (Join-Path $Data "site"))
+foreach ($siteDst in $siteDsts) {
+    New-Item -ItemType Directory -Force -Path $siteDst | Out-Null
+    Copy-Item (Join-Path $siteSrc "*") $siteDst -Force
+}
+$siteDst = $siteDsts[0]
 $files = Get-ChildItem -File $siteDst | Sort-Object Name
 if ($files.Count -lt 2) { throw "missing vendored landing files" }
 

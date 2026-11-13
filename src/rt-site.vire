@@ -23,6 +23,9 @@ define emitSiteRuntime with image, fixes, labels
   parkMsg with image, labels, "txt_site_mbody", "<html>method not allowed</html>"
   parkMsg with image, labels, "txt_site_idx", "index.html"
   pin with labels, "rt_site_gate", image
+  ~ Call-hooked: tail into fn_route so /health JSON still runs. File
+  ~ serving below is reached only after a later patch; do not sub rsp first.
+  emitJmpTo with image, fixes, "fn_route"
   emitList with image, [72, 129, 236, 128, 0, 0, 0]
   emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
   emitList with image, [73, 139, 85, 232]
