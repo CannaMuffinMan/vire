@@ -1,0 +1,21 @@
+~ Tour: definitions, return, nested if.
+define area with w, h
+  return w * h
+end
+
+define clamp with n, low, high
+  if n < low
+    return low
+  end
+  if n > high
+    return high
+  end
+  return n
+end
+
+define main
+  say area with 3, 4
+  say clamp with 20, 0, 10
+  let low be 0 - 4
+  say clamp with low, 0, 10
+end

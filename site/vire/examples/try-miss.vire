@@ -1,0 +1,9 @@
+~ Tour: try / miss on a failing conversion.
+define main
+  try
+    say number with "nope"
+  miss problem
+    say "caught"
+  end
+  say number with "12"
+end

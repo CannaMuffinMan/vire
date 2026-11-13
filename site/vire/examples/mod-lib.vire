@@ -1,0 +1,4 @@
+~ Loaded by mod-main.vire via use. No main here.
+define helper
+  return 9
+end

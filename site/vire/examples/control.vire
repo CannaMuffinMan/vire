@@ -1,0 +1,22 @@
+~ Tour: else if, for, skip, stop.
+define main
+  let n be 2
+  if n == 1
+    say "one"
+  else if n == 2
+    say "two"
+  else
+    say "other"
+  end
+  let total be 0
+  for item in [1, 2, 3, 4]
+    if item == 2
+      skip
+    end
+    if item == 4
+      stop
+    end
+    let total be total + item
+  end
+  say total
+end

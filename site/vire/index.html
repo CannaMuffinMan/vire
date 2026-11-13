@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#070b0c">
+  <meta name="description" content="Vire is a self-hosted programming language that compiles itself to native Windows PE, with sandboxed guests, path capabilities, and optional types still growing in.">
+  <title>Vire — a language that compiles itself</title>
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/vire.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap nav">
+      <a class="brand" href="#top">
+        <img src="img/mark.svg" width="36" height="36" alt="">
+        Vire
+      </a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="#why">Why</a></li>
+        <li><a href="#tour">Tour</a></li>
+        <li><a href="#start">Start</a></li>
+        <li><a href="#proof">Proof</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="../../docs/LANGUAGE.md">Language</a></li>
+        <li><a href="https://github.com/CannaMuffinMan/vire">GitHub</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <p class="kicker">A new primary coding language</p>
+        <h1>Write Vire. Compile Vire. Run native.</h1>
+        <p class="lede">
+          Vire is a small, readable language whose compiler is written in Vire.
+          On Windows, that compiler emits a PE image with no outside C toolchain
+          in the emit path. Guests run in a sandbox. Capabilities are enforced
+          by the runtime today; a <code>can</code> declaration line is not in the grammar yet.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#start">Get started</a>
+          <a class="btn btn-ghost" href="https://github.com/CannaMuffinMan/vire">View the repository</a>
+        </div>
+        <p class="sub">The sample below is the real file <a href="examples/hello.vire"><code>examples/hello.vire</code></a>. CI interprets it and compiles it to a Windows PE.</p>
+        <div class="hero-grid">
+          <article class="code-card" aria-label="Hello Vire program">
+            <header>
+              <span>examples/hello.vire</span>
+              <button class="copy" type="button" data-copy="#hero-code">Copy</button>
+            </header>
+            <pre class="code" data-src="examples/hello.vire" id="hero-code"><code>~ Hero sample: a complete Vire program.
+define greet with who
+  return "hello, " + who
+end
+
+define main
+  say greet with "vire"
+end
+</code></pre>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="why">
+      <div class="wrap">
+        <h2>Why Vire</h2>
+        <p class="sub">These are properties of the tree in this repository, not slogans.</p>
+        <div class="cards">
+          <article class="card">
+            <h3>Self-hosting compiler</h3>
+            <p><code>compile-native.vire</code> is Vire. CI on Windows builds gen1, then gen1 compiles the compiler to gen2, and the hex files match. That job is <a href="../../.github/workflows/check.yml"><code>native-selfhost-windows</code></a>.</p>
+          </article>
+          <article class="card">
+            <h3>Native output, no extra compiler</h3>
+            <p>The emit path writes a Windows x64 PE from Vire sources. It does not shell out to cl, gcc, or rustc. The bootstrap host is still the .NET 10 runner in this repo.</p>
+          </article>
+          <article class="card">
+            <h3>Capability-shaped sandbox</h3>
+            <p>Guests cannot wander the disk. <code>read</code>/<code>write</code> stay under <code>data/</code> and <code>site/</code>. Native images import a fixed allowlist (no <code>LoadLibraryA</code>, no <code>CreateProcess</code>). There is no <code>can listen</code> syntax yet — policy is implicit.</p>
+          </article>
+          <article class="card">
+            <h3>Sandboxed guests</h3>
+            <p>Compiled programs run with a 32&nbsp;MB arena, a 100,000 item list cap, and a step budget. Path, junction, and hardlink checks live in CI (<a href="../../.github/workflows/check.yml"><code>native-windows</code></a>, <code>native-sec-emu-check.sh</code>).</p>
+          </article>
+          <article class="card">
+            <h3>Gradual types, honestly</h3>
+            <p>Values are dynamic: number, text, list, map, bool, none. There are no type annotations in the grammar today. Host <code>kind</code> and map-shaped schema checks exist as libraries, not as a type checker.</p>
+          </article>
+          <article class="card">
+            <h3>Networking on the native path</h3>
+            <p>HTTP <code>listen</code> (loopback), loopback TCP <code>connect</code>/<code>send</code>/<code>recv</code>, and a Postgres client are landing. TLS for that client is still in progress. See <a href="../../.github/workflows/native-net.yml"><code>native-net.yml</code></a>.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="tour">
+      <div class="wrap">
+        <h2>A short tour</h2>
+        <p class="sub">Six programs from <a href="examples/manifest.txt"><code>site/vire/examples/</code></a>. Each one is interpreted and compiled in <a href="../../.github/workflows/site-vire.yml"><code>site-vire.yml</code></a>.</p>
+        <div class="tour-grid">
+          <article class="code-card">
+            <header><span>count.vire → 1..5</span><button class="copy" type="button" data-copy="#ex-count">Copy</button></header>
+            <pre class="code" data-src="examples/count.vire" id="ex-count"><code>~ Tour: while loops and integer arithmetic.
+define main
+  let n be 1
+  while n <= 5
+    say n
+    let n be n + 1
+  end
+end
+</code></pre>
+          </article>
+          <article class="code-card">
+            <header><span>defs.vire → 12, 10, 0</span><button class="copy" type="button" data-copy="#ex-defs">Copy</button></header>
+            <pre class="code" data-src="examples/defs.vire" id="ex-defs"><code>~ Tour: definitions, return, nested if.
+define area with w, h
+  return w * h
+end
+
+define clamp with n, low, high
+  if n &lt; low
+    return low
+  end
+  if n &gt; high
+    return high
+  end
+  return n
+end
+
+define main
+  say area with 3, 4
+  say clamp with 20, 0, 10
+  let low be 0 - 4
+  say clamp with low, 0, 10
+end
+</code></pre>
+          </article>
+          <article class="code-card">
+            <header><span>control.vire → two, 4</span><button class="copy" type="button" data-copy="#ex-control">Copy</button></header>
+            <pre class="code" data-src="examples/control.vire" id="ex-control"><code>~ Tour: else if, for, skip, stop.
+define main
+  let n be 2
+  if n == 1
+    say "one"
+  else if n == 2
+    say "two"
+  else
+    say "other"
+  end
+  let total be 0
+  for item in [1, 2, 3, 4]
+    if item == 2
+      skip
+    end
+    if item == 4
+      stop
+    end
+    let total be total + item
+  end
+  say total
+end
+</code></pre>
+          </article>
+          <article class="code-card">
+            <header><span>lists.vire</span><button class="copy" type="button" data-copy="#ex-lists">Copy</button></header>
+            <pre class="code" data-src="examples/lists.vire" id="ex-lists"><code>~ Tour: lists, maps, join, put.
+define main
+  let nums be [9, 2, 3]
+  push with nums, 4
+  put 1 into nums at 0
+  say nums at 0
+  say length with nums
+  say join with ["9", "2", "3", "4"], ","
+  let person be {"name": "ada", "year": 1815}
+  say person at "name"
+  say has with person, "year"
+end
+</code></pre>
+          </article>
+          <article class="code-card">
+            <header><span>text.vire</span><button class="copy" type="button" data-copy="#ex-text">Copy</button></header>
+            <pre class="code" data-src="examples/text.vire" id="ex-text"><code>~ Tour: text builtins the native compiler emits.
+define main
+  let word be "Vire"
+  say lower with word
+  say begins with word, "Vi"
+  say ends with word, "re"
+  say replace with word, "i", "y"
+  say find with word, "r"
+  say word at 0
+end
+</code></pre>
+          </article>
+          <article class="code-card">
+            <header><span>try-miss.vire → caught, 12</span><button class="copy" type="button" data-copy="#ex-try">Copy</button></header>
+            <pre class="code" data-src="examples/try-miss.vire" id="ex-try"><code>~ Tour: try / miss on a failing conversion.
+define main
+  try
+    say number with "nope"
+  miss problem
+    say "caught"
+  end
+  say number with "12"
+end
+</code></pre>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="start">
+      <div class="wrap">
+        <h2>Getting started</h2>
+        <p class="sub">You need the .NET 10 SDK. Binaries are not stored in git. These commands are the ones this repo’s CI uses.</p>
+        <div class="steps">
+          <article class="step">
+            <h3>Build the host runner</h3>
+            <p>From the repository root:</p>
+            <pre><code>dotnet build vire.csproj -c Release</code></pre>
+          </article>
+          <article class="step">
+            <h3>Run a program (interpreter)</h3>
+            <pre><code>dotnet exec bin/Release/net10.0/vire.dll site/vire/examples/hello.vire</code></pre>
+            <p>Stdout is <code>hello, vire</code>.</p>
+          </article>
+          <article class="step">
+            <h3>Compile to a Windows PE</h3>
+            <p>On Windows, after the same build. Paths use forward slashes. The guest file must be readable by the sandbox (<code>data/</code> is the usual staging folder):</p>
+            <pre><code>dotnet exec bin/Release/net10.0/vire.dll --compiler compile-native.vire data/guest-hello.vire data/guest-hello.hex</code></pre>
+            <p>Turn the hex into an <code>.exe</code> (two hex digits per byte) and run it. CI does this in <a href="../../tools/native-selfhost-handoff.ps1"><code>tools/native-selfhost-handoff.ps1</code></a>.</p>
+          </article>
+          <article class="step">
+            <h3>Language reference</h3>
+            <p>What the compilers accept today: <a href="../../docs/LANGUAGE.md">docs/LANGUAGE.md</a>. The narrative guide is still <a href="../../GUIDE.md">GUIDE.md</a>.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="proof">
+      <div class="wrap">
+        <h2>Proof, not promises</h2>
+        <p class="sub">If a claim is not in this table, this site does not make it. There are no timing benchmarks here.</p>
+        <table class="proof-table">
+          <thead>
+            <tr><th>Claim</th><th>What CI actually runs</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Host runner builds and tests</td>
+              <td><a href="../../.github/workflows/check.yml">check.yml</a> jobs <code>build</code>, <code>test</code></td>
+            </tr>
+            <tr>
+              <td>Interpreter compiler self-host (unsealed payload match)</td>
+              <td>check.yml <code>selfhost</code> / <code>selfhost-windows</code> → <code>tools/selfhost-check.sh</code></td>
+            </tr>
+            <tr>
+              <td>Native gen1 hex == gen2 hex</td>
+              <td>check.yml <code>native-selfhost-windows</code> → <code>tools/native-selfhost-handoff.ps1</code></td>
+            </tr>
+            <tr>
+              <td>Native hello PE prints <code>hello from stage</code></td>
+              <td>Same handoff, plus <code>native-windows</code> / <code>tools/native-hello-handoff.ps1</code></td>
+            </tr>
+            <tr>
+              <td>Loopback TCP and HTTP listen</td>
+              <td><a href="../../.github/workflows/native-net.yml">native-net.yml</a>, check.yml <code>native-windows</code> TCP smoke</td>
+            </tr>
+            <tr>
+              <td>Loopback Postgres client</td>
+              <td>check.yml <code>native-pg-windows</code> (trust/cleartext; TLS residual)</td>
+            </tr>
+            <tr>
+              <td>These homepage samples</td>
+              <td><a href="../../.github/workflows/site-vire.yml">site-vire.yml</a> host interpret, host emit, Windows PE run</td>
+            </tr>
+            <tr>
+              <td>Crypto KATs</td>
+              <td><a href="../../.github/workflows/crypto.yml">crypto.yml</a></td>
+            </tr>
+            <tr>
+              <td>Scheduled fuzz</td>
+              <td><a href="../../.github/workflows/fuzz.yml">fuzz.yml</a> (cron / workflow_dispatch)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="note">The C# host is still required to emit the first native compiler image. Linux ELF is not a shipped target. Do not treat a local hex file as a release.</p>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="wrap">
+        <h2>Roadmap</h2>
+        <p class="sub">Marked as the tree stands, not as a launch plan.</p>
+        <ul class="roadmap">
+          <li><span class="tag tag-done">now</span><div><strong>Windows PE self-host.</strong> gen1 = gen2 is the native-compiler proof.</div></li>
+          <li><span class="tag tag-done">now</span><div><strong>Loopback HTTP listen and TCP.</strong> Bind stays on 127.0.0.1 unless a documented env gate says otherwise.</div></li>
+          <li><span class="tag tag-wip">in progress</span><div><strong>Postgres client TLS / SCRAM.</strong> Loopback trust/cleartext is what CI proves. SCRAM and TLS are residuals under the 5M step cap.</div></li>
+          <li><span class="tag tag-wip">in progress</span><div><strong>Linux ELF.</strong> Not emitted. Unicorn emulation is used in some checks; it is not a Linux product binary.</div></li>
+          <li><span class="tag tag-wip">in progress</span><div><strong><code>can</code> capability lines.</strong> Not parsed. Security is sandbox + import allowlist + caps.</div></li>
+          <li><span class="tag tag-wip">in progress</span><div><strong>Optional type annotations.</strong> Not in the grammar. Values stay dynamic.</div></li>
+          <li><span class="tag tag-no">out</span><div><strong>Public internet hardening, TLS server, package index, driver loading, FCG testnet.</strong> Not this site, not this PR.</div></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <nav aria-label="Footer">
+        <a href="https://github.com/CannaMuffinMan/vire">Repository</a>
+        <a href="../../LICENSE">MIT license</a>
+        <a href="../../docs/LANGUAGE.md">Language reference</a>
+        <a href="../../README.md">README</a>
+        <a href="../../SECURITY.md">Security</a>
+      </nav>
+      <p>Vire. MIT. No trackers, no CDN fonts, no analytics on this page.</p>
+    </div>
+  </footer>
+  <script src="js/vire.js"></script>
+</body>
+</html>
