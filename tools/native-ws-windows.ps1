@@ -75,10 +75,7 @@ Write-Output "FAIL_BEFORE at $BaseSha showing ws_listen is unavailable"
 
 $lib1 = Get-Content -Raw (Join-Path $Root "src/rt-sha1.vire")
 $lib2 = Get-Content -Raw (Join-Path $Root "src/rt-ws.vire")
-$cut = $lib2.IndexOf("define parkWs")
-if ($cut -lt 0) { throw "rt-ws.vire missing parkWs split" }
-$proto = $lib2.Substring(0, $cut)
-$proto = $proto -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
+$proto = $lib2 -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
 $prove = Get-Content -Raw (Join-Path $Root "tests/native/ws-prove.vire")
 $prove = $prove -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
 $prove = $prove -replace '(?m)^use "src/rt-ws.vire"\s*', ''

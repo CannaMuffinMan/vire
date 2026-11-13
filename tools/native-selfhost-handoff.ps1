@@ -88,6 +88,7 @@ Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-ws.vire") (Join-Path $Src "rt-ws.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-ws-emit.vire") (Join-Path $Src "rt-ws-emit.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-sha1.vire") (Join-Path $Src "rt-sha1.vire") -Force
 foreach ($blob in @(
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
@@ -104,6 +105,7 @@ $pairs = @(
     @("src/rt-more.vire", "data/src/rt-more.vire"),
     @("src/rt-net.vire", "data/src/rt-net.vire"),
     @("src/rt-ws.vire", "data/src/rt-ws.vire"),
+    @("src/rt-ws-emit.vire", "data/src/rt-ws-emit.vire"),
     @("src/rt-sha1.vire", "data/src/rt-sha1.vire"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),

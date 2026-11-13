@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/data/src"
 cp "$ROOT/compile-native.vire" "$ROOT/data/compile-native.vire"
-cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/src/rt-net.vire" "$ROOT/src/rt-ws.vire" "$ROOT/src/rt-sha1.vire" \
+cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/src/rt-net.vire" "$ROOT/src/rt-ws.vire" "$ROOT/src/rt-ws-emit.vire" "$ROOT/src/rt-sha1.vire" \
   "$ROOT/src/rt-net-blob.txt" "$ROOT/src/rt-net-pins.txt" "$ROOT/src/rt-net-fixes.txt" \
   "$ROOT/src/rt-net-json-blob.txt" "$ROOT/src/rt-net-json-pins.txt" "$ROOT/src/rt-net-json-fixes.txt" \
   "$ROOT/data/src/"
@@ -18,6 +18,7 @@ pairs = [
     ("src/rt-more.vire", "data/src/rt-more.vire"),
     ("src/rt-net.vire", "data/src/rt-net.vire"),
     ("src/rt-ws.vire", "data/src/rt-ws.vire"),
+    ("src/rt-ws-emit.vire", "data/src/rt-ws-emit.vire"),
     ("src/rt-sha1.vire", "data/src/rt-sha1.vire"),
     ("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     ("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
