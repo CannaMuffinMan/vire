@@ -281,8 +281,12 @@ if ($cn -match "emitWsRuntime") { throw "compile-native.vire must not name emitW
 if ($cn -notmatch 'use "src/rt-net.vire"') { throw "compile-native.vire missing rt-net use" }
 $cn = $cn.Replace('use "src/rt-net.vire"', "use `"src/rt-net.vire`"`nuse `"src/rt-ws.vire`"")
 $cn = $cn.Replace(
+    "  if nm == `"close`"`n    return 1`n  end",
+    "  if nm == `"close`" or nm == `"ws_listen`"`n    return 1`n  end")
+$cn = $cn.Replace(
     "  let hits be {`"net`": loaded at `"needNet`", `"json`": loaded at `"needJson`"}`n  say `"needs-ok`"",
     "  let hits be {`"net`": true, `"json`": loaded at `"needJson`"}`n  let wantWs be true`n  say `"needs-ok`"")
+if ($cn -notmatch "ws_listen") { throw "compile-ws.vire missing ws_listen arity graft" }
 $cn = $cn.Replace(
     "    put (emitNetRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`"), hasRoute, (hits at `"net`")) into gen at `"image`"`n  end`n  put (parkRuntime",
     "    put (emitNetRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`"), hasRoute, (hits at `"net`")) into gen at `"image`"`n  end`n  if wantWs`n    put (emitWsRuntime with (gen at `"image`"), (gen at `"fixes`"), (gen at `"labels`")) into gen at `"image`"`n  end`n  put (parkRuntime")

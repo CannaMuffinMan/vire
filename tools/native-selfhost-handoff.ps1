@@ -172,5 +172,21 @@ $h1 = (Get-FileHash -Algorithm SHA256 $gen1Hex).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
-if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
+if ($h1 -ne $h2) {
+    $s1 = [System.IO.File]::ReadAllText($gen1Hex).Trim()
+    $s2 = [System.IO.File]::ReadAllText($gen2Hex).Trim()
+    Write-Output ("gen1_hex_chars " + $s1.Length)
+    Write-Output ("gen2_hex_chars " + $s2.Length)
+    $n = [Math]::Min($s1.Length, $s2.Length)
+    $i = 0
+    while ($i -lt $n -and $s1[$i] -eq $s2[$i]) { $i++ }
+    Write-Output ("gen_hex_first_diff " + $i)
+    if ($i -lt $n) {
+        $a = [Math]::Max(0, $i - 16)
+        $b = [Math]::Min($n, $i + 16)
+        Write-Output ("gen1_at_diff " + $s1.Substring($a, $b - $a))
+        Write-Output ("gen2_at_diff " + $s2.Substring($a, $b - $a))
+    }
+    throw "gen1/gen2 SHA-256 differ"
+}
 Write-Output "native selfhost handoff ok"
