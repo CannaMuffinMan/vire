@@ -416,7 +416,7 @@ define emitWsListen with image, fixes, labels
   pin with labels, "ws_zlen", image
   emitList with image, [128, 60, 2, 0, 15, 132]
   emitRel with image, fixes, "ws_zgo"
-  emitList with image, [72, 255, 192, 72, 255, 194, 233]
+  emitList with image, [72, 255, 192, 233]
   emitRel with image, fixes, "ws_zlen"
   pin with labels, "ws_zgo", image
   emitList with image, [72, 139, 13]
@@ -491,13 +491,13 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 137, 69, 192]
-  emitList with image, [72, 141, 125, 128]
+  emitList with image, [252, 72, 141, 125, 128]
   emitList with image, [72, 139, 117, 192]
   emitList with image, [185, 24, 0, 0, 0]
   emitList with image, [243, 164]
-  emitList with image, [72, 141, 13]
+  emitList with image, [72, 141, 53]
   emitRel with image, fixes, "txt_ws_guid"
-  emitList with image, [72, 131, 193, 8]
+  emitList with image, [72, 131, 198, 8]
   emitList with image, [185, 36, 0, 0, 0]
   emitList with image, [243, 164]
   emitList with image, [72, 141, 77]
