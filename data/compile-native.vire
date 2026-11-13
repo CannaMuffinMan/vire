@@ -1115,21 +1115,35 @@ define emitOp with gen, bytes
   return true
 end
 
+define emitFix with gen, name
+  ~ Known labels (runtime, already-emitted fns, backward jumps) patch now so
+  ~ the deferred fixes list stays under the 100000 cap on a full self-compile.
+  let buf be gen at "image"
+  let labels be gen at "labels"
+  if has with labels, name
+    let pos be length with buf
+    put (emitU32 with buf, ((labels at name) - (pos + 4))) into gen at "image"
+    return true
+  end
+  put (emitRel with buf, (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
 define emitCall with gen, name
   put (emitU8 with (gen at "image"), 232) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitJmp with gen, name
   put (emitU8 with (gen at "image"), 233) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitLeaRcx with gen, name
   emitOp with gen, [72, 141, 13]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1148,7 +1162,7 @@ end
 
 define emitJz with gen, name
   emitOp with gen, [15, 132]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1272,7 +1286,7 @@ define emitAtom with gen, funcs, func, expr
       return true
     end
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+    emitFix with gen, name
     emitCall with gen, "rt_push_text"
     return true
   end
@@ -1466,7 +1480,7 @@ define emitExpr with gen, funcs, func, root
         emitOp with gen, [133, 192]
         put (emitU8 with (gen at "image"), 15) into gen at "image"
         put (emitU8 with (gen at "image"), 133) into gen at "image"
-        put (emitRel with (gen at "image"), (gen at "fixes"), (fr at "yes")) into gen at "image"
+        emitFix with gen, (fr at "yes")
         put 2 into fr at "p"
         put fr into stack at si
         push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
@@ -1658,7 +1672,7 @@ define emitStmt with gen, funcs, func, stmt
     emitOp with gen, [133, 192]
     emitJz with gen, done
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
+    emitFix with gen, ctr
     emitCall with gen, "rt_loop_tick"
     emitBlock with gen, funcs, func, (stmt at 2)
     emitJmp with gen, head
@@ -1684,7 +1698,7 @@ define emitStmt with gen, funcs, func, stmt
     put (emitU32 with (gen at "image"), (stmt at 1)) into gen at "image"
     emitCall with gen, "rt_store"
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
+    emitFix with gen, ctr
     emitCall with gen, "rt_loop_tick"
     emitBlock with gen, funcs, func, (stmt at 3)
     emitJmp with gen, head
@@ -1799,9 +1813,6 @@ define main
     if (files at 2) == "elf"
       let wantElf be true
     end
-  end
-  if not wantElf
-    let sink be openElfImage
   end
   let opened be openImage
   if wantElf
