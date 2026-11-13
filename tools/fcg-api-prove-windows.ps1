@@ -26,16 +26,21 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
 
-function Invoke-Http([string]$Method, [string]$Url, [string]$Body) {
+function Invoke-Http([string]$Method, [string]$Url, [string]$Body, [switch]$HostOnly) {
     $u = [Uri]$Url
     $payload = ""
     if ($Method -eq "POST") {
         if ($null -eq $Body) { $Body = "" }
         $payload = $Body
     }
-    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n"
-    if ($Method -eq "POST") {
-        $req += "Content-Length: $($payload.Length)`r`nContent-Type: application/json`r`n"
+    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`n"
+    if (-not $HostOnly) {
+        $req += "Connection: close`r`n"
+        if ($Method -eq "POST") {
+            $req += "Content-Length: $($payload.Length)`r`nContent-Type: application/json`r`n"
+        }
+    } elseif ($Method -eq "POST") {
+        $req += "Content-Length: $($payload.Length)`r`n"
     }
     $req += "`r`n" + $payload
     $c = New-Object Net.Sockets.TcpClient
@@ -279,12 +284,19 @@ Start-Sleep -Milliseconds 200
 $failCrash = $failPe.Crash
 if (-not $failCrash) {
     try {
-        Invoke-Http "GET" "http://127.0.0.1:18084/health" $null | Out-Null
-    } catch { }
-    Start-Sleep -Milliseconds 400
-    if (Test-Path $failPe.Out) {
-        $ftxt = Get-Content -Raw $failPe.Out
-        if ($ftxt -match "crash rip=[0-9A-Fa-fx]+") { $failCrash = $Matches[0] }
+        $failGot = Invoke-Http "GET" "http://127.0.0.1:18084/health" $null -HostOnly
+        Write-Output "fail_pe_get $($failGot.Body)"
+    } catch {
+        Write-Output "fail_pe_get_err $_"
+    }
+    $probeUntil = (Get-Date).AddSeconds(3)
+    while ((Get-Date) -lt $probeUntil) {
+        if (Test-Path $failPe.Out) {
+            $ftxt = Get-Content -Raw $failPe.Out
+            if ($ftxt -match "crash rip=[0-9A-Fa-fx]+") { $failCrash = $Matches[0]; break }
+        }
+        if ($failPe.Proc.HasExited) { break }
+        Start-Sleep -Milliseconds 100
     }
 }
 Write-Output ("pe_fail_out " + (Get-Content -Raw $failPe.Out -ErrorAction SilentlyContinue))
