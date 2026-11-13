@@ -490,13 +490,13 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 137, 69, 192]
-  emitList with image, [72, 141, 125, 128]
+  emitList with image, [252, 72, 141, 125, 128]
   emitList with image, [72, 139, 117, 192]
   emitList with image, [185, 24, 0, 0, 0]
   emitList with image, [243, 164]
-  emitList with image, [72, 141, 13]
+  emitList with image, [72, 141, 53]
   emitRel with image, fixes, "txt_ws_guid"
-  emitList with image, [72, 131, 193, 8]
+  emitList with image, [72, 131, 198, 8]
   emitList with image, [185, 36, 0, 0, 0]
   emitList with image, [243, 164]
   emitList with image, [72, 141, 77]
