@@ -25,7 +25,7 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
 }
 
 git show "${BaseSha}:compile-native.vire" | Set-Content -Path (Join-Path $Root "compile-native.base.vire") -Encoding utf8
-$before = & dotnet exec $VireDll compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1 | Out-String
+$before = & dotnet exec $VireDll --compiler compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1 | Out-String
 Write-Output $before
 if ($before -notmatch "definitions called too deeply") {
     throw "expected base parser MaxCalls miss"
