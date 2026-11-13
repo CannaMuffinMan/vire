@@ -505,8 +505,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 137, 69, 192]
-  emitList with image, [72, 141, 189]
-  emitU8 with image, 128
+  emitList with image, [72, 141, 125, 128]
   emitList with image, [72, 139, 117, 192]
   emitList with image, [185, 24, 0, 0, 0]
   emitList with image, [243, 164]
