@@ -159,16 +159,17 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [133, 192, 15, 132]
   let image be emitRel with image, fixes, "crash_prep_close"
   let image be emitList with image, [61]
-  let image be emitU32 with image, 1000
+  let image be emitU32 with image, 989
   let image be emitList with image, [15, 131]
   let image be emitRel with image, fixes, "crash_prep_close"
-  let image be emitList with image, [72, 141, 53]
-  let image be emitRel with image, fixes, "crash_suffix"
-  let image be emitList with image, [72, 141, 61]
+  let image be emitList with image, [72, 141, 21]
   let image be emitRel with image, fixes, "crash_abs"
-  let image be emitList with image, [72, 1, 199, 185]
-  let image be emitU32 with image, 11
-  let image be emitList with image, [252, 243, 164, 72, 141, 5]
+  let image be emitList with image, [72, 1, 194, 72, 141, 13]
+  let image be emitRel with image, fixes, "crash_suffix"
+  pin with labels, "crash_prep_cat", image
+  let image be emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 132, 192, 15, 133]
+  let image be emitRel with image, fixes, "crash_prep_cat"
+  let image be emitList with image, [72, 141, 5]
   let image be emitRel with image, fixes, "crash_ready"
   let image be emitList with image, [72, 199, 0, 1, 0, 0, 0]
   pin with labels, "crash_prep_close", image
