@@ -160,6 +160,14 @@ define emitIat with image, fixes, name
 end
 
 define emitTcpClient with image, fixes, labels
+  ~ Blob rt_net_client allocs were not leaves; GC scanned the SOCKET.
+  pin with labels, "rt_alloc_leaf", image
+  emitPro with image
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitEpi with image
+  push with fixes, {"at": ((labels at "rt_net_client") + 21), "to": "rt_alloc_leaf"}
+  push with fixes, {"at": ((labels at "rt_net_client") + 93), "to": "rt_alloc_leaf"}
   ~ Guest connect/send/recv/close. Loopback 127.0.0.1 only. No TLS. Check
   ~ the IPv4 literal before socket+connect. Recv cap 1000000.
   ~ WSAStartup via rt_net_init (same as listen). Send via rt_net_sendall.

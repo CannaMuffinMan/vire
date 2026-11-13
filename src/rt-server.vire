@@ -41,19 +41,6 @@ define emitServerRuntime with image, fixes, labels
   emitList with image, [195]
   pin with labels, "step_fail", image
   emitFail with image, fixes, "msg_step"
-
-  ~ Blob rt_net_client calls rt_alloc twice without emitLeaf, so GC scanned
-  ~ the SOCKET and recv buffer. Keep the blob entry; retarget those calls.
-  pin with labels, "rt_alloc_leaf", image
-  emitPro with image
-  emitCallTo with image, fixes, "rt_alloc"
-  emitLeaf with image
-  emitEpi with image
-  let clientAt be labels at "rt_net_client"
-  let leafA be clientAt + 21
-  let leafB be clientAt + 93
-  push with fixes, {"at": leafA, "to": "rt_alloc_leaf"}
-  push with fixes, {"at": leafB, "to": "rt_alloc_leaf"}
   return emitListenMux with image, fixes, labels
 end
 
