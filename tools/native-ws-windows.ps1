@@ -277,8 +277,20 @@ if (-not $hostEcho.Proc.HasExited) { try { $hostEcho.Proc.Kill($true) } catch { 
 $echoHex = "data/ws-echo.hex"
 if (Test-Path (Join-Path $Root $echoHex)) { Remove-Item -Force (Join-Path $Root $echoHex) }
 $cn = Get-Content -Raw (Join-Path $Root "compile-native.vire")
-if ($cn -notmatch "(?s)~ ws-stub-begin.*?~ ws-stub-end") { throw "compile-native.vire missing ws stubs" }
-$cn = [regex]::Replace($cn, "(?s)~ ws-stub-begin.*?~ ws-stub-end", "use `"src/rt-ws.vire`"")
+if ($cn -match "emitWsRuntime") { throw "compile-native.vire must not name emitWsRuntime (self-host layout)" }
+if ($cn -notmatch 'use "src/rt-net.vire"') { throw "compile-native.vire missing rt-net use" }
+$cn = $cn.Replace('use "src/rt-net.vire"', "use `"src/rt-net.vire`"`nuse `"src/rt-ws.vire`"")
+$cn = $cn.Replace(
+    '  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}' + "`n" + '  say "needs-ok"',
+    '  let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}' + "`n" + '  let wantWs be loaded at "needWs"' + "`n" + '  say "needs-ok"')
+$cn = $cn.Replace(
+    '    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"' + "`n" + '  end' + "`n" + '  put (parkRuntime',
+    '    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, (hits at "net")) into gen at "image"' + "`n" + '  end' + "`n" + '  if wantWs' + "`n" + '    put (emitWsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels")) into gen at "image"' + "`n" + '  end' + "`n" + '  put (parkRuntime')
+$cn = $cn.Replace(
+    '    put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"' + "`n" + '  end' + "`n" + '  put (parkCounters',
+    '    put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"' + "`n" + '  end' + "`n" + '  if wantWs' + "`n" + '    put (parkWs with (gen at "image"), (gen at "labels")) into gen at "image"' + "`n" + '  end' + "`n" + '  put (parkCounters')
+if ($cn -notmatch "emitWsRuntime") { throw "compile-ws.vire missing emitWsRuntime graft" }
+if ($cn -notmatch "parkWs") { throw "compile-ws.vire missing parkWs graft" }
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $wsCompiler = Join-Path $Root "compile-ws.vire"
 [System.IO.File]::WriteAllText($wsCompiler, $cn, $utf8)
