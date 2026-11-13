@@ -143,7 +143,7 @@ function Start-WsGuest([string]$FilePath, [string[]]$ArgumentList) {
 function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
     $key = "dGhlIHNhbXBsZSBub25jZQ=="
     $expect = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
-    $req = [Text.Encoding]::ASCII.GetBytes("GET /ws/kick HTTP/1.1`r`nHost: 127.0.0.1`r`nUpgrade: websocket`r`nConnection: Upgrade`r`nSec-WebSocket-Version: 13`r`nSec-WebSocket-Key: $key`r`n`r`n")
+    $req = [Text.Encoding]::ASCII.GetBytes("GET /ws/kick HTTP/1.1`r`nHost: 127.0.0.1:$Port`r`nUpgrade: websocket`r`nConnection: Upgrade`r`nSec-WebSocket-Version: 13`r`nSec-WebSocket-Key: $key`r`nOrigin: http://127.0.0.1`r`n`r`n")
     $c = New-Object System.Net.Sockets.TcpClient
     $c.ReceiveTimeout = 3000
     $c.SendTimeout = 3000
@@ -260,6 +260,14 @@ if (-not $peEcho.Port) {
 }
 Write-Output "ws_pe_listen 127.0.0.1:$($peEcho.Port)"
 Invoke-WsRawProbe $peEcho.Port "ws_pe"
+if (-not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
+Write-Output "ws_pe_echo_relisten"
+$peEcho = Start-WsGuest $echoExe @()
+if (-not $peEcho.Port) {
+    if ($peEcho.Proc -and -not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
+    throw "PE ws-echo did not print listening port after 101 probe"
+}
+Write-Output "ws_pe_listen2 127.0.0.1:$($peEcho.Port)"
 $peEchoed = Invoke-WsEcho $peEcho.Port
 Write-Output "ws_pe_echo $peEchoed"
 Invoke-WsAdversary $peEcho.Port
