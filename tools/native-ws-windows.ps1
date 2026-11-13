@@ -170,6 +170,28 @@ function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
         if ($ascii -notmatch [regex]::Escape($expect)) { throw "$Tag Sec-WebSocket-Accept mismatch" }
         if ($ascii -notmatch "`r`n`r`n") { throw "$Tag handshake missing CRLFCRLF" }
         Write-Output "${Tag}_raw_101_ok"
+        $mask = [byte[]](1, 2, 3, 4)
+        $plain = [Text.Encoding]::ASCII.GetBytes("ping")
+        $masked = New-Object byte[] 4
+        for ($i = 0; $i -lt 4; $i++) { $masked[$i] = $plain[$i] -bxor $mask[$i] }
+        $frame = New-Object byte[] 10
+        $frame[0] = 0x81
+        $frame[1] = 0x84
+        [Array]::Copy($mask, 0, $frame, 2, 4)
+        [Array]::Copy($masked, 0, $frame, 6, 4)
+        $s.Write($frame, 0, $frame.Length)
+        $n2 = 0
+        try { $n2 = $s.Read($buf, 0, $buf.Length) } catch {
+            throw "$Tag masked echo read failed $($_.Exception.Message)"
+        }
+        Write-Output "${Tag}_raw_echo_n $n2"
+        if ($n2 -ge 1) { Write-Output "${Tag}_raw_echo_hex $([BitConverter]::ToString($buf, 0, $n2))" }
+        if ($n2 -lt 6) { throw "$Tag masked echo short n=$n2" }
+        if ($buf[0] -ne 0x81) { throw "$Tag echo opcode byte $($buf[0])" }
+        if ($buf[1] -ne 0x04) { throw "$Tag echo len byte $($buf[1])" }
+        $got = [Text.Encoding]::ASCII.GetString($buf, 2, 4)
+        if ($got -ne "ping") { throw "$Tag echo payload '$got'" }
+        Write-Output "${Tag}_raw_echo_ok"
         try { $c.Client.Shutdown([System.Net.Sockets.SocketShutdown]::Both) } catch { }
     } finally {
         try { $c.Close() } catch { }
@@ -178,6 +200,7 @@ function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
 
 function Invoke-WsEcho([int]$Port) {
     $ws = New-Object System.Net.WebSockets.ClientWebSocket
+    $ws.Options.KeepAliveInterval = [TimeSpan]::Zero
     $uri = [Uri]"ws://127.0.0.1:$Port/ws/kick"
     $cts = New-Object System.Threading.CancellationTokenSource
     $cts.CancelAfter(10000)
@@ -259,8 +282,6 @@ if (-not $peEcho.Port) {
     throw "PE ws-echo did not print listening port out=$out err=$err"
 }
 Write-Output "ws_pe_listen 127.0.0.1:$($peEcho.Port)"
-$peEchoed = Invoke-WsEcho $peEcho.Port
-Write-Output "ws_pe_echo $peEchoed"
 Invoke-WsRawProbe $peEcho.Port "ws_pe"
 Invoke-WsAdversary $peEcho.Port
 Write-Output "ws_pe_adversary ok"
