@@ -226,6 +226,8 @@ define emitWsB64 with image, fixes, labels
   emitList with image, [85, 72, 137, 229, 83, 86, 87]
   emitList with image, [72, 137, 203, 72, 137, 214, 72, 141, 13]
   emitRel with image, fixes, "txt_ws_b64"
+  emitList with image, [76, 141, 1]
+  emitList with image, [73, 131, 192, 8]
   emitList with image, [49, 201]
   pin with labels, "b64_loop", image
   emitList with image, [131, 249, 18]
@@ -240,18 +242,18 @@ define emitWsB64 with image, fixes, labels
   emitList with image, [9, 194]
   emitList with image, [137, 208, 193, 232, 18]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [137, 208, 193, 232, 12]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [137, 208, 193, 232, 6]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [137, 208, 131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [131, 193, 3]
   emitJmpTo with image, fixes, "b64_loop"
@@ -263,15 +265,15 @@ define emitWsB64 with image, fixes, labels
   emitList with image, [9, 194]
   emitList with image, [137, 208, 193, 232, 18]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [137, 208, 193, 232, 12]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [137, 208, 193, 232, 6]
   emitList with image, [131, 224, 63]
-  emitList with image, [138, 4, 1]
+  emitList with image, [65, 138, 4, 0]
   emitList with image, [136, 6, 72, 255, 198]
   emitList with image, [198, 6, 61, 72, 255, 198, 198, 6, 0]
   emitList with image, [95, 94, 91, 93, 195]
@@ -338,6 +340,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_listen"
   emitCallTo with image, fixes, "rt_text_cat"
+  emitList with image, [72, 137, 194]
   emitPushTag with image, 2
   emitCallTo with image, fixes, "rt_say"
   pin with labels, "ws_accept", image
@@ -423,6 +426,7 @@ define emitWsListen with image, fixes, labels
   pin with labels, "ws_sendz", image
   emitPro with image
   emitList with image, [72, 137, 77, 248]
+  emitList with image, [72, 131, 193, 8]
   emitList with image, [72, 137, 202, 49, 192]
   pin with labels, "ws_zlen", image
   emitList with image, [128, 60, 2, 0, 15, 132]
@@ -462,26 +466,31 @@ define emitWsListen with image, fixes, labels
   emitPro with image
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_upg"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_hget"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_sock"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_has"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_conn"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_hget"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_upgtok"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_has"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_ver"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_hget"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
@@ -491,6 +500,7 @@ define emitWsListen with image, fixes, labels
   emitRel with image, fixes, "ws_upno"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_key"
+  emitList with image, [72, 131, 193, 8]
   emitCallTo with image, fixes, "ws_hget"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "ws_upno"
@@ -502,6 +512,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [243, 164]
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_guid"
+  emitList with image, [72, 131, 193, 8]
   emitList with image, [185, 36, 0, 0, 0]
   emitList with image, [243, 164]
   emitList with image, [72, 141, 77]
