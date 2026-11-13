@@ -23,8 +23,13 @@ define main
   let hdrs be http_parse_headers with "GET /x HTTP/1.1\r\nHost: x\r\nX-Foo: Bar\r\nCookie: sid=abc; k=v\r\n\r\n"
   say (http_header_get with hdrs, "x-foo")
   say (http_header_get with hdrs, "HOST")
-  let jar be http_parse_cookies with (hdrs at "cookie")
-  say (jar at "sid")
+  let jar be http_parse_cookies with (http_header_get with hdrs, "cookie")
+  if (has with jar, "sid")
+    say (jar at "sid")
+  end
+  if not (has with jar, "sid")
+    say "none"
+  end
   say (http_set_cookie with "sid", "abc")
   let cors be http_cors with "https://example.com"
   say (cors at "allowOrigin")
