@@ -33,7 +33,7 @@ function Invoke-Vire {
         $hostArgs = @("--compiler") + $Args
         Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
     }
-    & dotnet exec $VireDll @hostArgs
+    & dotnet exec $VireDll @hostArgs | Write-Host
     $code = $LASTEXITCODE
     if ($saved) { $env:VIRE_BUDGET = $saved }
     if ($null -eq $code) { return 0 }

@@ -851,18 +851,8 @@ define parkRuntime with image, labels
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 99, 111, 100, 101, 61]
   pin with labels, "crash_off_msg", image
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 111, 102, 102, 61]
-  pin with labels, "crash_code_hex", image
-  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0]
-  pin with labels, "crash_off_hex", image
-  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   pin with labels, "crash_log_path", image
   let image be emitList with image, [100, 97, 116, 97, 47, 99, 114, 97, 115, 104, 46, 108, 111, 103, 0]
-  pin with labels, "wx_mbi", image
-  let wxI be 0
-  while wxI < 48
-    let image be emitU8 with image, 0
-    let wxI be wxI + 1
-  end
   pin with labels, "lit_true", image
   let image be emitList with image, [116, 114, 117, 101]
   pin with labels, "lit_false", image
@@ -914,6 +904,16 @@ define parkRuntime with image, labels
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 114, 105, 112, 61]
   pin with labels, "crash_hex", image
   let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "crash_code_hex", image
+  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "crash_off_hex", image
+  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "wx_mbi", image
+  let wxI be 0
+  while wxI < 48
+    let image be emitU8 with image, 0
+    let wxI be wxI + 1
+  end
   pin with labels, "intern_tab", image
   let internI be 0
   while internI < 128
