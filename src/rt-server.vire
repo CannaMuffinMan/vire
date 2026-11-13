@@ -41,7 +41,10 @@ define emitServerRuntime with image, fixes, labels
   emitList with image, [195]
   pin with labels, "step_fail", image
   emitFail with image, fixes, "msg_step"
+  return (emitListenMux with image, fixes, labels)
+end
 
+define emitListenMux with image, fixes, labels
   pin with labels, "rt_listen", image
   emitPro with image
   emitPop1 with image
@@ -118,6 +121,15 @@ define emitServerRuntime with image, fixes, labels
   emitRel with image, fixes, "server_cap"
   emitList with image, [72, 199, 0]
   emitU32 with image, 1
+  emitList with image, [185]
+  emitU32 with image, 16400
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "srv_fail"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "srv_peek"
+  emitList with image, [72, 137, 1]
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "srv_listen"
   emitList with image, [72, 139, 77, 240, 72, 137, 8]
@@ -161,7 +173,7 @@ define emitServerRuntime with image, fixes, labels
   emitList with image, [77, 49, 192, 77, 49, 201, 72, 141, 5]
   emitRel with image, fixes, "srv_tv"
   emitList with image, [72, 137, 68, 36, 32]
-  let image be emitIat with image, fixes, "iat_sl"
+  let image be emitIat with image, fixes, "iat_sel"
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "srv_listen"
   emitCallTo with image, fixes, "rt_fd_has"
@@ -215,7 +227,7 @@ define emitServerRuntime with image, fixes, labels
   emitCallTo with image, fixes, "rt_fd_has"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "srv_cn"
-  emitList with image, [72, 139, 77, 176, 72, 141, 21]
+  emitList with image, [72, 139, 77, 176, 72, 139, 21]
   emitRel with image, fixes, "srv_peek"
   emitList with image, [65, 184]
   emitU32 with image, 16384
@@ -226,7 +238,7 @@ define emitServerRuntime with image, fixes, labels
   emitRel with image, fixes, "srv_drop"
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "srv_drop"
-  emitList with image, [72, 137, 194, 72, 141, 13]
+  emitList with image, [72, 137, 194, 72, 139, 13]
   emitRel with image, fixes, "srv_peek"
   emitCallTo with image, fixes, "rt_net_hdrend"
   emitList with image, [72, 131, 248, 255, 15, 132]
