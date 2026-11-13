@@ -213,7 +213,9 @@ class Emu:
         rel = path.decode("latin1")
         full = os.path.join(self.cwd, rel)
         if rel not in (".", "./"):
-            self.creates.append((rel, access, disp, flags))
+            # Startup rt_crash_prepare opens the data directory read-only with BACKUP_SEMANTICS.
+            if not (rel in ("data", "data/") and access == 0x80000000 and flags == 33554432):
+                self.creates.append((rel, access, disp, flags))
         exists = os.path.exists(full)
         if disp == 3 and not exists:
             self.wr(UC_X86_REG_RAX, 0xFFFFFFFFFFFFFFFF)
