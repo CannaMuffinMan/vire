@@ -24,6 +24,9 @@ public class PgTests
         Assert.Contains("5000000", ps);
         Assert.Contains("127.0.0.1", ps);
         Assert.Contains("ThrowawayVireCi1", ps);
+        Assert.Contains("worktree add", ps);
+        Assert.Contains("FAIL_BEFORE at", ps);
+        Assert.Contains("5b10ea5fa5eea46859f17a52b36037d9d088c01d", ps);
         Assert.DoesNotContain("Set-MpPreference", ps);
         Assert.DoesNotContain("Add-MpPreference", ps);
         string guest = File.ReadAllText(Path.Combine(root, "tests", "native", "pg-client.vire"));

@@ -18,6 +18,64 @@ Write-Output "pg_pin $PinSha"
 Write-Output "pg_residual no TLS; SCRAM-SHA-256 not used (5M cap); auth trust"
 Write-VireHostInfo
 
+function Ensure-PinCommit {
+    git cat-file -e "$PinSha^{commit}" 2>$null
+    if ($LASTEXITCODE -eq 0) { return }
+    git fetch --depth 1 origin $PinSha
+    git cat-file -e "$PinSha^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "missing pin commit $PinSha" }
+}
+
+function Invoke-FailBeforePinBuild {
+    Ensure-PinCommit
+    $pinDir = Join-Path ([System.IO.Path]::GetTempPath()) ("vire-pg-fail-before-" + $PinSha.Substring(0, 12))
+    git worktree list | Write-Output
+    if (Test-Path $pinDir) {
+        git worktree remove --force $pinDir 2>$null
+        if (Test-Path $pinDir) { Remove-Item -Recurse -Force $pinDir }
+    }
+    git worktree add --detach $pinDir $PinSha
+    if ($LASTEXITCODE -ne 0) { throw "git worktree add pin $PinSha failed" }
+    $prev = Get-Location
+    try {
+        Set-Location -LiteralPath $pinDir
+        & dotnet build (Join-Path $pinDir "vire.csproj") -c Release
+        if ($LASTEXITCODE -ne 0) { throw "pin $PinSha dotnet build failed" }
+        $pinDll = Join-Path $pinDir "bin/Release/net10.0/vire.dll"
+        if (-not (Test-Path $pinDll)) { throw "pin build missing $pinDll" }
+        if (Test-Path (Join-Path $pinDir "src/rt-pg.vire")) {
+            throw "pin $PinSha unexpectedly has src/rt-pg.vire"
+        }
+        $guest = [System.IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-client.vire"))
+        $guest = $guest -replace "PORT_PLACEHOLDER", "55432"
+        $guest = $guest -replace "PGUSER_PLACEHOLDER", "vire"
+        $guest = $guest -replace "PGDB_PLACEHOLDER", "vire"
+        $guest = $guest -replace "PGSECRET_PLACEHOLDER", ""
+        $pinData = Join-Path $pinDir "data"
+        New-Item -ItemType Directory -Force -Path $pinData | Out-Null
+        $guestPath = Join-Path $pinData "pg-fail-before.vire"
+        $utf8nb = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($guestPath, $guest, $utf8nb)
+        Write-Output "pg_fail_before_pin_dll $pinDll"
+        $beforeOut = & dotnet exec $pinDll "data/pg-fail-before.vire" 2>&1 | Out-String
+        $beforeCode = $LASTEXITCODE
+        Write-Output $beforeOut.TrimEnd()
+        Write-Output "fail_before_host_exit $beforeCode"
+        if ($beforeCode -eq 0) { throw "FAIL_BEFORE unexpectedly passed at $PinSha" }
+        if ($beforeOut -notmatch "there is no definition named pg_open") {
+            throw "FAIL_BEFORE expected missing pg_open at pin, got $beforeOut"
+        }
+        $captured = (($beforeOut -replace "`r", "").Trim() -replace "`n", " | ")
+        Write-Output "FAIL_BEFORE at $PinSha pin worktree build+run of tests/native/pg-client.vire: $captured"
+    } finally {
+        Set-Location -LiteralPath $prev
+        git worktree remove --force $pinDir
+        if (Test-Path $pinDir) { Remove-Item -Recurse -Force $pinDir }
+    }
+}
+
+Invoke-FailBeforePinBuild
+
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
     if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { throw "bad hex $HexPath" }

@@ -10,6 +10,55 @@ echo "pg_pin $PIN"
 echo "pass_after_sha $(git rev-parse HEAD)"
 echo "pg_residual no TLS; SCRAM-SHA-256 not used (5M cap); auth trust"
 
+if ! git cat-file -e "${PIN}^{commit}" 2>/dev/null; then
+  git fetch --depth 1 origin "$PIN"
+fi
+PINDIR="$(mktemp -d "${TMPDIR:-/tmp}/vire-pg-fail-before.XXXXXX")"
+rmdir "$PINDIR"
+git worktree add --detach "$PINDIR" "$PIN"
+cleanup_pin() { git worktree remove --force "$PINDIR" >/dev/null 2>&1 || rm -rf "$PINDIR"; }
+trap cleanup_pin EXIT
+dotnet build "$PINDIR/vire.csproj" -c Release
+PIN_DLL="$PINDIR/bin/Release/net10.0/vire.dll"
+if [[ ! -f "$PIN_DLL" ]]; then
+  echo "pin build missing $PIN_DLL" >&2
+  exit 1
+fi
+if [[ -f "$PINDIR/src/rt-pg.vire" ]]; then
+  echo "pin $PIN unexpectedly has src/rt-pg.vire" >&2
+  exit 1
+fi
+mkdir -p "$PINDIR/data"
+python3 - <<PY
+from pathlib import Path
+root = Path("$ROOT")
+guest = (root / "tests/native/pg-client.vire").read_text()
+guest = guest.replace("PORT_PLACEHOLDER", "55432")
+guest = guest.replace("PGUSER_PLACEHOLDER", "vire")
+guest = guest.replace("PGDB_PLACEHOLDER", "vire")
+guest = guest.replace("PGSECRET_PLACEHOLDER", "")
+Path("$PINDIR/data/pg-fail-before.vire").write_text(guest)
+PY
+echo "pg_fail_before_pin_dll $PIN_DLL"
+set +e
+before_out="$(cd "$PINDIR" && dotnet exec "$PIN_DLL" data/pg-fail-before.vire 2>&1)"
+before_code=$?
+set -e
+printf '%s\n' "$before_out"
+echo "fail_before_host_exit $before_code"
+if [[ "$before_code" == "0" ]]; then
+  echo "FAIL_BEFORE unexpectedly passed at $PIN" >&2
+  exit 1
+fi
+if ! grep -Fq "there is no definition named pg_open" <<<"$before_out"; then
+  echo "FAIL_BEFORE expected missing pg_open at pin" >&2
+  exit 1
+fi
+captured="$(printf '%s' "$before_out" | tr '\n' '|' )"
+echo "FAIL_BEFORE at $PIN pin worktree build+run of tests/native/pg-client.vire: $captured"
+cleanup_pin
+trap - EXIT
+
 INITDB="${PGBIN:-/usr/lib/postgresql/16/bin}/initdb"
 PGCTL="${PGBIN:-/usr/lib/postgresql/16/bin}/pg_ctl"
 CREATEDB="${PGBIN:-/usr/lib/postgresql/16/bin}/createdb"

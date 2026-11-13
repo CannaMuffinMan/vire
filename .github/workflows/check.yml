@@ -111,6 +111,8 @@ jobs:
       - run: dotnet build vire.csproj -c Release
       - name: loopback PostgreSQL 16 host+PE prove
         run: pwsh -File tools/pg-prove-windows.ps1
+      - name: pin 5b10ea5f reachable for FAIL_BEFORE worktree
+        run: git merge-base --is-ancestor 5b10ea5fa5eea46859f17a52b36037d9d088c01d HEAD
   publish:
     runs-on: ubuntu-latest
     steps:
