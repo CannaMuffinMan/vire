@@ -1116,16 +1116,17 @@ define emitOp with gen, bytes
 end
 
 define emitFix with gen, name
-  ~ Known labels (runtime, already-emitted fns, backward jumps) patch now so
-  ~ the deferred fixes list stays under the 100000 cap on a full self-compile.
-  let buf be gen at "image"
-  let labels be gen at "labels"
-  if has with labels, name
+  ~ Runtime labels are pinned in openImage/openElfImage before any user
+  ~ function. Patch those rel32s now so `fixes` stays under the 100000 cap.
+  ~ Do not use `has` here: a missing fn_* must stay deferred, and `has` on
+  ~ the fat labels map AVd native PE (`an index must be a whole number`).
+  if begins with name, "rt_"
+    let buf be gen at "image"
     let pos be length with buf
-    put (emitU32 with buf, ((labels at name) - (pos + 4))) into gen at "image"
+    put (emitU32 with buf, (((gen at "labels") at name) - (pos + 4))) into gen at "image"
     return true
   end
-  put (emitRel with buf, (gen at "fixes"), name) into gen at "image"
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
   return true
 end
 
