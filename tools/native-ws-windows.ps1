@@ -181,12 +181,19 @@ function Invoke-WsRawProbe([int]$Port, [string]$Tag) {
         [Array]::Copy($masked, 0, $frame, 6, 4)
         $s.Write($frame, 0, $frame.Length)
         $n2 = 0
-        try { $n2 = $s.Read($buf, 0, $buf.Length) } catch {
-            throw "$Tag masked echo read failed $($_.Exception.Message)"
+        $deadline = [DateTime]::UtcNow.AddMilliseconds($c.ReceiveTimeout)
+        while ($n2 -lt 6 -and [DateTime]::UtcNow -lt $deadline) {
+            try {
+                $got = $s.Read($buf, $n2, $buf.Length - $n2)
+            } catch {
+                throw "$Tag masked echo read failed $($_.Exception.Message)"
+            }
+            if ($got -le 0) { break }
+            $n2 += $got
         }
         Write-Output "${Tag}_raw_echo_n $n2"
         if ($n2 -ge 1) { Write-Output "${Tag}_raw_echo_hex $([BitConverter]::ToString($buf, 0, $n2))" }
-        if ($n2 -lt 6) { throw "$Tag masked echo short n=$n2" }
+        if ($n2 -lt 6) { throw "$Tag masked echo short n=$n2 (PE sends header then payload)" }
         if ($buf[0] -ne 0x81) { throw "$Tag echo opcode byte $($buf[0])" }
         if ($buf[1] -ne 0x04) { throw "$Tag echo len byte $($buf[1])" }
         $got = [Text.Encoding]::ASCII.GetString($buf, 2, 4)
