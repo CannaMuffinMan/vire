@@ -1,9 +1,44 @@
-# FAIL_BEFORE: gen2 SHA drift at tip 04724f2c (#85). PASS_AFTER: this GC fix, 3× same SHA.
+# FAIL_BEFORE: list cap fail-open (5b10ea5f) + gen2 SHA drift (04724f2c).
+# PASS_AFTER: fail-closed 100000 + emitFix so gen2 finishes; 3× same SHA.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $FailSha = "04724f2c9a9d26c352ec31b62e0402d3503d199c"
+$CapSha = "5b10ea5fa5eea46859f17a52b36037d9d088c01d"
 Write-Output "fail_before_sha $FailSha"
+Write-Output "fail_before_cap_sha $CapSha"
+
+function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
+    $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
+    if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { throw "bad hex $HexPath" }
+    $bytes = New-Object byte[] ($hex.Length / 2)
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+        $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)
+    }
+    [System.IO.File]::WriteAllBytes($ExePath, $bytes)
+}
+
+function Invoke-ListCapPe([string]$Tree, [string]$Src) {
+    Push-Location -LiteralPath $Tree
+    try {
+        if (-not (Test-Path "bin/Release/net10.0/vire.dll")) {
+            dotnet build vire.csproj -c Release | Out-Host
+        }
+        New-Item -ItemType Directory -Force -Path "data" | Out-Null
+        Copy-Item $Src "data/list-cap-corrupt.vire" -Force
+        $saved = $env:VIRE_BUDGET
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+        $env:VIRE_HEADLESS = "1"
+        & dotnet exec "bin/Release/net10.0/vire.dll" --compiler compile-native.vire data/list-cap-corrupt.vire data/list-cap-corrupt.hex
+        if ($saved) { $env:VIRE_BUDGET = $saved }
+        Convert-HexToExe (Join-Path $Tree "data/list-cap-corrupt.hex") (Join-Path $Tree "data/list-cap-corrupt.exe")
+        $out = & (Join-Path $Tree "data/list-cap-corrupt.exe") 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        return [pscustomobject]@{ Code = $code; Out = $out }
+    } finally {
+        Pop-Location
+    }
+}
 
 function Get-HandoffSha([string]$Text, [string]$Kind) {
     $m = [regex]::Match($Text, [regex]::Escape($Kind) + " ([0-9a-f]{64})")
@@ -32,7 +67,19 @@ function Invoke-HandoffCapture([string]$Tree) {
 }
 
 git cat-file -t $FailSha 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) { git fetch origin $FailSha 2>&1 | Out-Host }
+if ($LASTEXITCODE -ne 0) { git fetch origin $FailSha $CapSha 2>&1 | Out-Host }
+git cat-file -t $CapSha 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) { git fetch origin $CapSha 2>&1 | Out-Host }
+
+$CapDir = Join-Path $Root "data/fail-before-list-cap"
+if (Test-Path $CapDir) { git worktree remove --force $CapDir 2>$null; Remove-Item -Recurse -Force $CapDir -ErrorAction SilentlyContinue }
+git worktree add --detach $CapDir $CapSha
+$cap = Invoke-ListCapPe $CapDir (Join-Path $Root "tests/native/list-cap-corrupt.vire")
+Write-Output $cap.Out
+Write-Output "FAIL_BEFORE list-cap exit $($cap.Code)"
+if ($cap.Out -match "list is too large") { throw "FAIL_BEFORE at $CapSha unexpectedly fail-closed" }
+Write-Output "FAIL_BEFORE at $CapSha: 100001 pushes did not raise list is too large (exit $($cap.Code)); at `"id`" intern/rt_at path"
+git worktree remove --force $CapDir
 
 $FailDir = Join-Path $Root "data/fail-before-gen2"
 if (Test-Path $FailDir) { git worktree remove --force $FailDir 2>$null; Remove-Item -Recurse -Force $FailDir -ErrorAction SilentlyContinue }
@@ -40,7 +87,7 @@ git worktree add --detach $FailDir $FailSha
 
 $saw = $false
 $gen2Seen = New-Object "System.Collections.Generic.HashSet[string]"
-for ($i = 1; $i -le 8; $i++) {
+for ($i = 1; $i -le 3; $i++) {
     $r = Invoke-HandoffCapture $FailDir
     Write-Output "FAIL_BEFORE run $i exit $($r.Code) gen1=$($r.Gen1) gen2=$($r.Gen2)"
     if ($r.Gen1 -and $r.Gen2 -and ($r.Gen1 -ne $r.Gen2)) { $saw = $true; break }
@@ -53,6 +100,12 @@ if (-not $saw) {
 }
 Write-Output "FAIL_BEFORE at $FailSha: gen2 SHA not deterministic vs gen1 09fc0afb (native-net 132147041715, native-selfhost 132147042612 / 132169879533)"
 git worktree remove --force $FailDir
+
+$afterCap = Invoke-ListCapPe $Root (Join-Path $Root "tests/native/list-cap-corrupt.vire")
+Write-Output $afterCap.Out
+if ($afterCap.Out -notmatch "list is too large") { throw "PASS_AFTER list-cap expected list is too large, got $($afterCap.Out)" }
+if ($afterCap.Out -match "crash ") { throw "PASS_AFTER list-cap crashed" }
+Write-Output "PASS_AFTER list cap fail-closed"
 
 $passShas = New-Object System.Collections.Generic.List[string]
 for ($i = 1; $i -le 3; $i++) {

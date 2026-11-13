@@ -629,7 +629,12 @@ define emitMore with image, fixes, labels
 
   pin with labels, "rt_list_cat", image
   emitPro with image
-  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 3, 2, 72, 137, 69, 232, 185]
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 139, 1, 72, 3, 2]
+  emitJcc with image, fixes, 130, "cat_big"
+  emitList with image, [72, 61]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 135, "cat_big"
+  emitList with image, [72, 137, 69, 232, 185]
   emitU32 with image, 24
   emitCallTo with image, fixes, "rt_alloc"
   emitList with image, [72, 137, 69, 224, 72, 139, 85, 232, 72, 137, 16, 72, 137, 80, 8, 72, 139, 77, 232, 72, 193, 225, 4]
@@ -640,6 +645,8 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 85, 224]
   emitEpi with image
+  pin with labels, "cat_big", image
+  emitFail with image, fixes, "msg_biglist"
 
   pin with labels, "rt_add", image
   emitPro with image
@@ -1336,6 +1343,11 @@ define emitMore with image, fixes, labels
   pin with labels, "grow_dbl", image
   emitList with image, [72, 209, 224]
   emitJcc with image, fixes, 130, "grow_oom"
+  emitList with image, [72, 61]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 134, "grow_cap"
+  emitList with image, [184]
+  emitU32 with image, 100000
   pin with labels, "grow_cap", image
   emitList with image, [72, 137, 69, 240, 72, 137, 193, 72, 193, 225, 4]
   emitJcc with image, fixes, 130, "grow_oom"
@@ -1387,7 +1399,12 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_grow_list"
   emitList with image, [72, 137, 69, 232]
   pin with labels, "push_room", image
-  emitList with image, [72, 139, 85, 232, 72, 139, 10, 72, 193, 225, 4, 72, 139, 66, 16, 72, 1, 200, 76, 139, 69, 248, 76, 137, 0, 76, 139, 77, 240, 76, 137, 72, 8, 72, 255, 2, 73, 199, 69, 0]
+  emitList with image, [72, 139, 85, 232, 72, 139, 10, 72, 129, 249]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 131, "push_big"
+  emitList with image, [72, 139, 66, 8, 72, 57, 193]
+  emitJcc with image, fixes, 131, "push_big"
+  emitList with image, [72, 193, 225, 4, 72, 139, 66, 16, 72, 1, 200, 76, 139, 69, 248, 76, 137, 0, 76, 139, 77, 240, 76, 137, 72, 8, 72, 255, 2, 73, 199, 69, 0]
   emitU32 with image, 4
   emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
   emitEpi with image
@@ -1491,7 +1508,10 @@ define emitMore with image, fixes, labels
   emitList with image, [76, 139, 77, 248, 77, 137, 72, 16, 76, 139, 77, 240, 77, 137, 72, 24, 233]
   emitRel with image, fixes, "map_put_done"
   pin with labels, "map_put_new", image
-  emitList with image, [72, 139, 85, 232, 72, 139, 10, 72, 59, 74, 8, 15, 130]
+  emitList with image, [72, 139, 85, 232, 72, 139, 10, 72, 129, 249]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 131, "map_put_big"
+  emitList with image, [72, 59, 74, 8, 15, 130]
   emitRel with image, fixes, "map_put_room"
   emitList with image, [72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_grow_map"
@@ -1509,6 +1529,8 @@ define emitMore with image, fixes, labels
   emitFail with image, fixes, "msg_put"
   pin with labels, "map_put_keybad", image
   emitFail with image, fixes, "msg_mapkey"
+  pin with labels, "map_put_big", image
+  emitFail with image, fixes, "msg_biglist"
 
   pin with labels, "rt_set_slot", image
   emitPro with image

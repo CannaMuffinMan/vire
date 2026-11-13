@@ -1114,21 +1114,45 @@ define emitOp with gen, bytes
   return true
 end
 
+define emitFix with gen, name
+  ~ Runtime labels from emitRuntime/emitMore are pinned before user code.
+  ~ Net/JSON packed labels land later — those stay deferred.
+  ~ Patch early rt_* rel32 now so `fixes` stays under the 100000 cap.
+  let later be false
+  if begins with name, "rt_net"
+    let later be true
+  end
+  if begins with name, "rt_json"
+    let later be true
+  end
+  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
+    let later be true
+  end
+  if (begins with name, "rt_") and (later == false)
+    let buf be gen at "image"
+    let pos be length with buf
+    put (emitU32 with buf, (((gen at "labels") at name) - (pos + 4))) into gen at "image"
+    return true
+  end
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
 define emitCall with gen, name
   put (emitU8 with (gen at "image"), 232) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitJmp with gen, name
   put (emitU8 with (gen at "image"), 233) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitLeaRcx with gen, name
   emitOp with gen, [72, 141, 13]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1147,7 +1171,7 @@ end
 
 define emitJz with gen, name
   emitOp with gen, [15, 132]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 

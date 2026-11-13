@@ -57,9 +57,13 @@ Net recv 1000000 (`src/rt-net.vire`), listen body 1MB, intern table 128 (`src/rt
 
 `parseClimb` is already a same-precedence loop (`prec + 1` only for the right operand). The iterative `emitExpr` stack used a **map** per frame (`e`/`p`/`i`/`no`/`yes`/`done`). `rt_map_new` allocates cap 4 (128 bytes) and does not zero unused pairs. List grow copies only `length` then leaves the rest of `cap` untouched. GC mark-compact walks the whole allocation (non-leaf). After the first compact, leftover from-space bytes in those holes look like heap pointers, get relocated, and the gen1 PE ACCESS_VIOLATIONs while emitting gen2 once the runtime image is large enough (#66, #71). Tip-sized gen1 can miss the first GC.
 
-**Fix:** `rt_bzero` on `rt_map_new` pair storage and on the new tail of `rt_grow_list` / `rt_grow_map`. `emitExpr` frames are 6-slot lists. Guest MaxCalls stays 64. Caps unchanged.
+**Fix (cap, this PR):** hitting 100000 must `rt_fail` `list is too large` — re-check after grow, clamp grow to 100000, same gate on `rt_map_put` / `rt_list_cat`. Do not raise the cap. Unchecked overflow smashed intern (bit 32) and faulted `rt_at` / `rt_texteq` (Windows `0x140004695`, Linux `0x4035eb`).
 
-Windows prove (`tools/gen2-heap-windows.ps1`): FAIL_BEFORE is tip `04724f2c` (`#85`). gen1 hex is always `09fc0afb…`; gen2 from the same source has been `09fc0afb…`, `abc6c092…` (native-net-windows **132147041715**, #86 native-selfhost **132169879533**), and `1db10b7a…` (native-selfhost-windows **132147042612**). PASS_AFTER runs `native-selfhost-handoff.ps1` then `native-net-windows.ps1` three times on this tree; every run must print the same `gen1_sha256` = `gen2_sha256`.
+**Lane 1 `emitFix` (needed here):** deferred `fixes` (one map per call/jmp/lea) is what hits the cap during gen2. #82 includes #78's early rt_* rel32 patch so gen2 can finish *under* 100000. It is a size fix, not a cap raise. ELF backend stays in #78.
+
+**Also:** `rt_bzero` on unused list/map slots; `emitExpr` 6-slot list frames. MaxCalls 64.
+
+Windows prove: FAIL_BEFORE list at `5b10ea5f` (100001 pushes, no `list is too large`); FAIL_BEFORE SHA at `04724f2c`. PASS_AFTER fail-closed plus 3× `native-selfhost-handoff` + `native-net-windows` with one SHA.
 
 ## Proof
 
