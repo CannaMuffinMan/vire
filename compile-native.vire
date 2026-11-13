@@ -1666,7 +1666,31 @@ define emitStmt with gen, funcs, func, stmt
   return true
 end
 
+define skipElfEmit with nm
+  if linux
+    return false
+  end
+  if begins with nm, "elf" or begins with nm, "openElf" or begins with nm, "finishElf" or begins with nm, "emitLinux"
+    return true
+  end
+  if nm == "poke64" or nm == "pokePhdr" or nm == "emitIatSlots" or nm == "buildElf"
+    return true
+  end
+  if nm == "emitLeaRdi" or nm == "emitLeaRax" or nm == "emitSaveRbx" or nm == "emitLoadRbx"
+    return true
+  end
+  if nm == "emitSys" or nm == "emitSysNeg1" or nm == "emitIatThunk"
+    return true
+  end
+  return false
+end
+
 define emitFunc with gen, funcs, func
+  if skipElfEmit with (func at "name")
+    pinHere with gen, ("fn_" + (func at "name"))
+    emitOp with gen, [195]
+    return true
+  end
   pinHere with gen, ("fn_" + (func at "name"))
   emitOp with gen, [72, 131, 236, 40]
   put (emitU8 with (gen at "image"), 185) into gen at "image"
