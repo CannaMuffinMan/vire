@@ -78,7 +78,7 @@ $cap = Invoke-ListCapPe $CapDir (Join-Path $Root "tests/native/list-cap-corrupt.
 Write-Output $cap.Out
 Write-Output "FAIL_BEFORE list-cap exit $($cap.Code)"
 if ($cap.Out -match "list is too large") { throw "FAIL_BEFORE at $CapSha unexpectedly fail-closed" }
-Write-Output "FAIL_BEFORE at $CapSha: 100001 pushes did not raise list is too large (exit $($cap.Code)); at `"id`" intern/rt_at path"
+Write-Output ("FAIL_BEFORE at " + $CapSha + ": 100001 pushes did not raise list is too large (exit " + $cap.Code + "); at `"id`" intern/rt_at path")
 git worktree remove --force $CapDir
 
 $FailDir = Join-Path $Root "data/fail-before-gen2"
@@ -98,7 +98,7 @@ for ($i = 1; $i -le 3; $i++) {
 if (-not $saw) {
     throw "FAIL_BEFORE at $FailSha expected gen1!=gen2 or varying gen2 (jobs 132147041715 abc6c092, 132169879533 abc6c092, 132147042612 1db10b7a vs gen1 09fc0afb)"
 }
-Write-Output "FAIL_BEFORE at $FailSha: gen2 SHA not deterministic vs gen1 09fc0afb (native-net 132147041715, native-selfhost 132147042612 / 132169879533)"
+Write-Output ("FAIL_BEFORE at " + $FailSha + ": gen2 SHA not deterministic vs gen1 09fc0afb (native-net 132147041715, native-selfhost 132147042612 / 132169879533)")
 git worktree remove --force $FailDir
 
 $afterCap = Invoke-ListCapPe $Root (Join-Path $Root "tests/native/list-cap-corrupt.vire")
