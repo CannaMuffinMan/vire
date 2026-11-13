@@ -1,8 +1,20 @@
 ~ Native static files from declared root site/.
-~ Packed rt_net_client+1455 is the rel32 of `call fn_route` (blob 0xac1).
-~ Capture that pin BEFORE re-pinning rt_net_client as a leaf prologue
-~ (GC used to follow the SOCKET integer). Extra fix last-wins over the
-~ packed fn_route dest; order is packed then this file, always the same.
+~ Rewrite the packed fn_route fix in place. A second fix at a numeric
+~ blob offset moved when native-compiler packed a new client, and two
+~ writes at one at made gen1/gen2 hex diverge. Leaf-tag ctx/buf, jmp cl_hdr.
+
+define retargetRoute with fixes
+  let i be 0
+  let n be length with fixes
+  while i < n
+    let fix be fixes at i
+    if (fix at "to") == "fn_route"
+      put {"at": (fix at "at"), "to": "rt_site_gate"} into fixes at i
+    end
+    let i be i + 1
+  end
+  return true
+end
 
 define emitClientLeaf with image, fixes, labels
   pin with labels, "rt_net_client", image
@@ -29,18 +41,19 @@ define emitClientLeaf with image, fixes, labels
 end
 
 define emitSiteRuntime with image, fixes, labels
-  let packed be labels at "rt_net_client"
-  put (packed + 1511) into labels at "rt_net_client_ok"
+  retargetRoute with fixes
   let image be emitClientLeaf with image, fixes, labels
-  push with fixes, {"at": (packed + 1455), "to": "rt_site_gate"}
   parkMsg with image, labels, "txt_site_pre", "HTTP/1.1 "
   parkMsg with image, labels, "txt_site_okph", "200 OK"
   parkMsg with image, labels, "txt_site_nfph", "404 Not Found"
   parkMsg with image, labels, "txt_site_moph", "405 Method Not Allowed"
   parkMsg with image, labels, "txt_site_ct", "\r\nContent-Type: "
   parkMsg with image, labels, "txt_site_cl", "\r\nContent-Length: "
-  parkMsg with image, labels, "txt_site_rest", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'\r\nCache-Control: public, max-age=60\r\nETag: \""
-  parkMsg with image, labels, "txt_site_end", "\"\r\n\r\n"
+  parkMsg with image, labels, "txt_site_rest", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'\r\nCache-Control: public, max-age=60\r\nETag: "
+  parkMsg with image, labels, "txt_site_end", "\r\n\r\n"
+  pin with labels, "txt_site_quot", image
+  emitU64 with image, 1
+  emitList with image, [34, 0]
   parkMsg with image, labels, "txt_site_html", "text/html; charset=utf-8"
   parkMsg with image, labels, "txt_site_css", "text/css; charset=utf-8"
   parkMsg with image, labels, "txt_site_svg", "image/svg+xml"
@@ -305,8 +318,14 @@ define emitSiteRuntime with image, fixes, labels
   emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
   emitRel with image, fixes, "txt_site_rest"
   emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_quot"
+  emitCallTo with image, fixes, "rt_buf_text"
   emitList with image, [72, 139, 76, 36, 16, 139, 84, 36, 68]
   emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_quot"
+  emitCallTo with image, fixes, "rt_buf_text"
   emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
   emitRel with image, fixes, "txt_site_end"
   emitCallTo with image, fixes, "rt_buf_text"
