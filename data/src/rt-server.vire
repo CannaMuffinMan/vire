@@ -112,12 +112,6 @@ define emitListenMux with image, fixes, labels
   let image be emitIat with image, fixes, "iat_ln"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "srv_fail"
-  emitList with image, [199, 69, 160]
-  emitU32 with image, 1
-  emitList with image, [72, 139, 77, 240, 186]
-  emitU32 with image, 2147796606
-  emitList with image, [76, 141, 69, 160]
-  let image be emitIat with image, fixes, "iat_io"
   emitList with image, [72, 199, 69, 200, 16, 0, 0, 0]
   emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 76, 141, 69, 200]
   let image be emitIat with image, fixes, "iat_gn"
@@ -201,12 +195,6 @@ define emitListenMux with image, fixes, labels
   emitList with image, [72, 137, 69, 184]
   emitList with image, [72, 139, 77, 184]
   emitCallTo with image, fixes, "rt_sock_timeouts"
-  emitList with image, [199, 69, 160]
-  emitU32 with image, 1
-  emitList with image, [72, 139, 77, 184, 186]
-  emitU32 with image, 2147796606
-  emitList with image, [76, 141, 69, 160]
-  let image be emitIat with image, fixes, "iat_io"
   emitList with image, [185]
   emitU32 with image, 0
   pin with labels, "srv_find", image
@@ -215,11 +203,12 @@ define emitListenMux with image, fixes, labels
   emitList with image, [72, 139, 4, 202, 72, 133, 192, 15, 133]
   emitRel with image, fixes, "srv_findn"
   emitList with image, [137, 77, 168, 72, 139, 69, 184, 72, 137, 4, 202]
+  emitList with image, [72, 137, 69, 176, 137, 77, 172]
   let image be emitIat with image, fixes, "iat_gt"
   emitList with image, [139, 77, 168, 72, 141, 21]
   emitRel with image, fixes, "srv_born"
   emitList with image, [137, 4, 138, 233]
-  emitRel with image, fixes, "srv_clients"
+  emitRel with image, fixes, "srv_peekgo"
   pin with labels, "srv_findn", image
   emitList with image, [255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_find"
@@ -241,6 +230,11 @@ define emitListenMux with image, fixes, labels
   emitList with image, [139, 77, 172, 43, 4, 138, 61]
   emitU32 with image, 5000
   emitJcc with image, fixes, 135, "srv_to"
+  emitList with image, [72, 139, 77, 176]
+  emitCallTo with image, fixes, "rt_fd_has"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "srv_cn"
+  pin with labels, "srv_peekgo", image
   emitList with image, [72, 139, 77, 176, 72, 139, 21]
   emitRel with image, fixes, "srv_peek"
   emitList with image, [65, 184]
