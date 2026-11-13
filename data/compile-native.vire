@@ -1528,9 +1528,6 @@ define emitStmt with gen, funcs, func, stmt
   if gen at "bad"
     return true
   end
-  if gen at "net"
-    emitCall with gen, "rt_step"
-  end
   let k be stmt at 0
   if k == "let"
     emitExpr with gen, funcs, func, (stmt at 2)
@@ -1714,7 +1711,7 @@ define main
   if hits at "net"
     let opened be openNetImage
   end
-  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": "", "net": (hits at "net")}
+  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
   let hasRoute be false
   while i < (length with funcs)

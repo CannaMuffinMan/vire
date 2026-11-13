@@ -41,7 +41,7 @@ define emitServerRuntime with image, fixes, labels
   emitList with image, [195]
   pin with labels, "step_fail", image
   emitFail with image, fixes, "msg_step"
-  return (emitListenMux with image, fixes, labels)
+  return emitListenMux with image, fixes, labels
 end
 
 define emitListenMux with image, fixes, labels
