@@ -298,7 +298,14 @@ static class VireNet
         Socket socket = table.Need(handle, line, column);
         string text = payload as string;
         if (text == null) throw new VireError("send needs a connection and text", line, column);
-        byte[] raw = Encoding.UTF8.GetBytes(text);
+        // Latin-1 / raw bytes 0-255 so Postgres frontend v3 (and native PE) stay 1:1.
+        byte[] raw = new byte[text.Length];
+        for (int i = 0; i < text.Length; i++)
+        {
+            int c = text[i];
+            if (c > 255) throw new VireError("send needs a connection and text", line, column);
+            raw[i] = (byte)c;
+        }
         int off = 0;
         try
         {
@@ -327,7 +334,9 @@ static class VireNet
         {
             int n = socket.Receive(buf, 0, max, SocketFlags.None);
             if (n <= 0) return "";
-            return Encoding.UTF8.GetString(buf, 0, n);
+            char[] chars = new char[n];
+            for (int i = 0; i < n; i++) chars[i] = (char)buf[i];
+            return new string(chars);
         }
         catch (VireError) { throw; }
         catch (Exception) { throw new VireError("could not connect", line, column); }

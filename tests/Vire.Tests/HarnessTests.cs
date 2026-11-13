@@ -130,6 +130,8 @@ public class HarnessTests
         Assert.Contains("schema-prove-windows.ps1", yml);
         Assert.Contains("native-tcp-windows.ps1", yml);
         Assert.Contains("time-prove-windows.ps1", yml);
+        Assert.Contains("pg-prove-windows.ps1", yml);
+        Assert.Contains("native-pg-windows", yml);
         Assert.Contains("native-selfhost-handoff.ps1", yml);
         Assert.Contains("native-selfhost-windows", yml);
         Assert.DoesNotContain("continue-on-error: true", yml);

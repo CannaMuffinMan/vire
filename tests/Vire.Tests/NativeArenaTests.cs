@@ -116,6 +116,24 @@ public class NativeArenaTests
         string yml = File.ReadAllText(Path.Combine(root, ".github", "workflows", "check.yml"));
         Assert.DoesNotContain("native-selfhost-proof.ps1", yml);
         Assert.Contains("native-oom.ps1", yml);
+        Assert.Contains("native-list-cap-proof.ps1", yml);
         Assert.DoesNotContain("continue-on-error: true", yml);
+    }
+
+    [Fact]
+    public void PeRtPushListGateMatchesHostCap()
+    {
+        string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
+        int push = more.IndexOf("pin with labels, \"rt_push\", image", StringComparison.Ordinal);
+        int bytes = more.IndexOf("pin with labels, \"push_byte\", image", StringComparison.Ordinal);
+        Assert.True(push >= 0 && bytes > push);
+        string listGate = more.Substring(push, bytes - push);
+        Assert.Contains("emitU32 with image, 100000", listGate);
+        Assert.DoesNotContain("emitU32 with image, 2000000", listGate);
+        string byteGate = more.Substring(bytes, more.IndexOf("pin with labels, \"rt_bytes\", image", StringComparison.Ordinal) - bytes);
+        Assert.Contains("emitU32 with image, 2000000", byteGate);
+        string host = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "Vire.cs"));
+        Assert.Contains("const int MaxItems = 100000;", host);
+        Assert.Contains("int itemCap = 100000;", host);
     }
 }
