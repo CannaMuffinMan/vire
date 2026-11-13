@@ -25,12 +25,12 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
 }
 
 git show "${BaseSha}:compile-native.vire" | Set-Content -Path (Join-Path $Root "compile-native.base.vire") -Encoding utf8
-$before = & dotnet exec $VireDll --compiler compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1 | Out-String
+$before = & dotnet exec $VireDll compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1 | Out-String
 Write-Output $before
 if ($before -notmatch "definitions called too deeply") {
     throw "expected base parser MaxCalls miss"
 }
-Write-Output "FAIL_BEFORE at $BaseSha: compile-native parseExpr MaxCalls 64 nested (1+(1+…)) depth 20 → definitions called too deeply"
+Write-Output ("FAIL_BEFORE at " + $BaseSha + ": compile-native parseExpr MaxCalls 64 nested (1+(1+…)) depth 20 → definitions called too deeply")
 
 function Invoke-HostPe([string]$Name, [string]$WantContains) {
     $srcRel = "data/$Name.vire"
@@ -59,6 +59,6 @@ Invoke-HostPe "deep-expr" "^21$"
 Invoke-HostPe "million-hash" "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
 Invoke-HostPe "long-ascii" "^4096$"
 
-Write-Output "PASS_AFTER at $AfterSha: host and gen1 PE identical for deep-expr, FIPS 1M SHA, 4096-char ASCII literal"
+Write-Output ("PASS_AFTER at " + $AfterSha + ": host and gen1 PE identical for deep-expr, FIPS 1M SHA, 4096-char ASCII literal")
 Write-Output "native limits windows check ok"
 Remove-Item -Force (Join-Path $Root "compile-native.base.vire") -ErrorAction SilentlyContinue

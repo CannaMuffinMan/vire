@@ -23,7 +23,7 @@ Related, also leave alone:
 
 **Was:** `compile-native.vire` `parseExpr` → `parseOr` → `parseAnd` → `parseCmp` → `parseSum` → `parseProduct` → `parseUnary` → `parsePrimary` → `parseAtom` → `parseExpr`. Nested `(1 + (1 + …))` hit host `MaxCalls` 64 at **depth 6** (`definitions called too deeply` at the old `parseAnd` call). That forced deep expressions in crypto/KDF sources to be rewritten as `let`s.
 
-**Now:** `compile-native.vire` `precOf` / `parseExpr` (from line 237) is an iterative precedence climber. `emitExpr` (from `emitAtom`/`emitExpr`) walks the AST with an explicit stack. Depth 80 nested `+` compiles. Host interpreter still evaluates the same program.
+**Now:** `parseClimb` + `parseAtom` (from line 237) instead of eight stacked parse functions. Host `--compiler` sets `MaxCalls` 256 (`Vire.cs` `UseCompilerLimits`) so depth 20 compiles on the host. Guest `MaxCalls` and native PE frames stay 64. `emitExpr` walks the AST with an explicit stack. Residual: the native compiler PE still cannot parse 20-deep expressions itself (64 frames); host compile then run matches the interpreter.
 
 ### PE `text is too large to write` (aligned with host)
 

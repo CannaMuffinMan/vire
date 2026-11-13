@@ -18,7 +18,7 @@ cp tests/native/long-ascii.vire data/long-ascii.vire
 
 git show "$BaseSha:compile-native.vire" > compile-native.base.vire
 set +e
-before=$(dotnet exec "$VireDll" --compiler compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1)
+before=$(dotnet exec "$VireDll" compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1)
 before_code=$?
 set -e
 echo "$before"

@@ -253,352 +253,175 @@ define precOf with k
   return 0
 end
 
-~ Iterative expression parser. Nested parens/calls used to walk parseOr..parseAtom
-~ and hit host MaxCalls 64 (and the native 64-frame VM) around depth 6.
+~ One recursive climb instead of parseOr..parseAtom (8 frames per nest).
+~ Depth 6 used to hit MaxCalls 64; one frame per nest leaves room for depth 20.
 define parseExpr with state, func
-  let frames be []
-  let result be ["none"]
-  push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-  while (length with frames) > 0
+  return parseClimb with state, func, 0
+end
+
+define parseClimb with state, func, minP
+  let prefs be []
+  while true
     if state at "bad"
       stop
     end
-    let i be (length with frames) - 1
-    let fr be frames at i
-    let step be fr at "step"
-    if step == "done"
-      let result be fr at "left"
-      drop with frames
-      if (length with frames) == 0
-        stop
-      end
-      let p be (length with frames) - 1
-      let par be frames at p
-      let role be par at "role"
-      if role == "paren"
-        if (form with state) != ")"
-          markBad with state, "that expression is not ready"
-          stop
-        end
-        bump with state
-        put result into par at "left"
-        put "postfix" into par at "step"
-        put par into frames at p
-      end
-      if role == "at"
-        put ["at", par at "old", result] into par at "left"
-        put "postfix" into par at "step"
-        put par into frames at p
-      end
-      if role == "call"
-        push with (par at "args"), result
-        put "callmore" into par at "step"
-        put par into frames at p
-      end
-      if role == "list"
-        push with (par at "items"), result
-        put "listmore" into par at "step"
-        put par into frames at p
-      end
-      if role == "mapkey"
-        put result into par at "old"
-        put "mapcolon" into par at "step"
-        put par into frames at p
-      end
-      if role == "mapval"
-        push with (par at "pairs"), ["pair", par at "old", result]
-        put "mapmore" into par at "step"
-        put par into frames at p
-      end
-      if role == "infix"
-        put [par at "op", par at "left", result] into par at "left"
-        put "infix" into par at "step"
-        put par into frames at p
-      end
-    end
-    if step == "prefix"
-      let prefs be []
-      while true
-        if state at "bad"
-          stop
-        end
-        let fk be form with state
-        if fk == "not" or fk == "-"
-          push with prefs, fk
-          bump with state
-        end
-        if fk != "not" and fk != "-"
-          stop
-        end
-      end
-      put prefs into fr at "prefs"
-      put "atom" into fr at "step"
-      put fr into frames at i
-    end
-    if step == "atom"
-      let k be form with state
-      if k == "num"
-        put ["num", valueOf with state] into fr at "left"
-        bump with state
-        put "postfix" into fr at "step"
-        put fr into frames at i
-      end
-      if k == "text"
-        put ["text", spell with state] into fr at "left"
-        bump with state
-        put "postfix" into fr at "step"
-        put fr into frames at i
-      end
-      if k == "true"
-        bump with state
-        put ["bool", 1] into fr at "left"
-        put "postfix" into fr at "step"
-        put fr into frames at i
-      end
-      if k == "false"
-        bump with state
-        put ["bool", 0] into fr at "left"
-        put "postfix" into fr at "step"
-        put fr into frames at i
-      end
-      if k == "none"
-        bump with state
-        put ["none"] into fr at "left"
-        put "postfix" into fr at "step"
-        put fr into frames at i
-      end
-      if k == "name"
-        let nm be spell with state
-        bump with state
-        let callIt be 0
-        if (form with state) == "with"
-          let callIt be 1
-          bump with state
-          if (form with state) == "eof" or (form with state) == "end" or (form with state) == "else"
-            markBad with state, "that call is missing a value"
-            stop
-          end
-          noteNeed with state, nm
-          put "call" into fr at "role"
-          put nm into fr at "nm"
-          put [] into fr at "args"
-          put "callarg" into fr at "step"
-          put fr into frames at i
-        end
-        if callIt == 0
-          put ["name", nm] into fr at "left"
-          put "postfix" into fr at "step"
-          put fr into frames at i
-        end
-      end
-      if k == "("
-        bump with state
-        put "paren" into fr at "role"
-        put "wait" into fr at "step"
-        put fr into frames at i
-        push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-      end
-      if k == "["
-        ~ list elements always parseExpr with state, func (iterative frame, min 0)
-        bump with state
-        put "list" into fr at "role"
-        put [] into fr at "items"
-        let emptyList be 0
-        if (form with state) == "]"
-          let emptyList be 1
-          bump with state
-          put ["list", []] into fr at "left"
-          put "postfix" into fr at "step"
-          put fr into frames at i
-        end
-        if emptyList == 0
-          put "listwait" into fr at "step"
-          put fr into frames at i
-          push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-        end
-      end
-      if k == "{"
-        bump with state
-        put "map" into fr at "role"
-        put [] into fr at "pairs"
-        let emptyMap be 0
-        if (form with state) == "}"
-          let emptyMap be 1
-          bump with state
-          put ["map", []] into fr at "left"
-          put "postfix" into fr at "step"
-          put fr into frames at i
-        end
-        if emptyMap == 0
-          put "mapkey" into fr at "role"
-          put "wait" into fr at "step"
-          put fr into frames at i
-          push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-        end
-      end
-      if k != "num" and k != "text" and k != "true" and k != "false" and k != "none" and k != "name" and k != "(" and k != "[" and k != "{"
-        markBad with state, "that expression is not ready"
-        stop
-      end
-    end
-    if step == "callarg"
-      put "wait" into fr at "step"
-      put fr into frames at i
-      push with frames, {"role": "expr", "min": 5, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-    end
-    if step == "callmore"
-      let moreCall be 0
-      if (form with state) == ","
-        let moreCall be 1
-        bump with state
-        put "callarg" into fr at "step"
-        put fr into frames at i
-      end
-      if moreCall == 0
-        put ["call", fr at "nm", fr at "args"] into fr at "left"
-        put "postfix" into fr at "step"
-        put "expr" into fr at "role"
-        put fr into frames at i
-      end
-    end
-    if step == "listmore"
-      let moreList be 0
-      if (form with state) == ","
-        let moreList be 1
-        bump with state
-        let trail be 0
-        if (form with state) == "]"
-          let trail be 1
-          put "listend" into fr at "step"
-          put fr into frames at i
-        end
-        if trail == 0
-          put "listwait" into fr at "step"
-          put fr into frames at i
-          push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-        end
-      end
-      if moreList == 0
-        put "listend" into fr at "step"
-        put fr into frames at i
-      end
-    end
-    if step == "listend"
-      if (form with state) != "]"
-        markBad with state, "that expression is not ready"
-        stop
-      end
+    let fk be form with state
+    if fk == "not" or fk == "-"
+      push with prefs, fk
       bump with state
-      put ["list", fr at "items"] into fr at "left"
-      put "postfix" into fr at "step"
-      put "expr" into fr at "role"
-      put fr into frames at i
     end
-    if step == "mapcolon"
-      if (form with state) != ":"
-        markBad with state, "that expression is not ready"
-        stop
-      end
-      bump with state
-      put "mapval" into fr at "role"
-      put "wait" into fr at "step"
-      put fr into frames at i
-      push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-    end
-    if step == "mapmore"
-      let moreMap be 0
-      if (form with state) == ","
-        let moreMap be 1
-        bump with state
-        let trailm be 0
-        if (form with state) == "}"
-          let trailm be 1
-          put "mapend" into fr at "step"
-          put fr into frames at i
-        end
-        if trailm == 0
-          put "mapkey" into fr at "role"
-          put "wait" into fr at "step"
-          put fr into frames at i
-          push with frames, {"role": "expr", "min": 0, "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-        end
-      end
-      if moreMap == 0
-        put "mapend" into fr at "step"
-        put fr into frames at i
-      end
-    end
-    if step == "mapend"
-      if (form with state) != "}"
-        markBad with state, "that expression is not ready"
-        stop
-      end
-      bump with state
-      put ["map", fr at "pairs"] into fr at "left"
-      put "postfix" into fr at "step"
-      put "expr" into fr at "role"
-      put fr into frames at i
-    end
-    if step == "postfix"
-      let sawAt be 0
-      if (form with state) == "at"
-        let sawAt be 1
-        bump with state
-        put "at" into fr at "role"
-        put (fr at "left") into fr at "old"
-        put "wait" into fr at "step"
-        put fr into frames at i
-        push with frames, {"role": "expr", "min": 99, "step": "atom", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-      end
-      if sawAt == 0
-        let prefs be fr at "prefs"
-        let npref be length with prefs
-        let left be fr at "left"
-        while npref > 0
-          let npref be npref - 1
-          let pk be prefs at npref
-          if pk == "not"
-            let left be ["not", left]
-          end
-          if pk == "-"
-            let left be ["neg", left]
-          end
-        end
-        put left into fr at "left"
-        put "infix" into fr at "step"
-        put "expr" into fr at "role"
-        put fr into frames at i
-      end
-    end
-    if step == "infix"
-      let k be form with state
-      let prec be precOf with k
-      let took be 0
-      if prec > 0
-        if prec >= (fr at "min")
-          let took be 1
-          bump with state
-          put k into fr at "op"
-          put "wait" into fr at "step"
-          put "infix" into fr at "role"
-          put fr into frames at i
-          push with frames, {"role": "expr", "min": (prec + 1), "step": "prefix", "prefs": [], "left": none, "op": "", "items": [], "args": [], "pairs": [], "nm": "", "old": none}
-        end
-      end
-      if took == 0
-        put "done" into fr at "step"
-        put fr into frames at i
-      end
-    end
-    if step == "wait"
-    end
-    if step == "listwait"
+    if fk != "not" and fk != "-"
+      stop
     end
   end
+  let left be parseAtom with state, func
+  while (form with state) == "at"
+    if state at "bad"
+      stop
+    end
+    bump with state
+    let left be ["at", left, parseAtom with state, func]
+  end
+  let npref be length with prefs
+  while npref > 0
+    let npref be npref - 1
+    let pk be prefs at npref
+    if pk == "not"
+      let left be ["not", left]
+    end
+    if pk == "-"
+      let left be ["neg", left]
+    end
+  end
+  while true
+    if state at "bad"
+      stop
+    end
+    let k be form with state
+    let prec be precOf with k
+    if prec == 0
+      stop
+    end
+    if prec < minP
+      stop
+    end
+    bump with state
+    let left be [k, left, parseClimb with state, func, (prec + 1)]
+  end
+  return left
+end
+
+define parseAtom with state, func
   if state at "bad"
     return ["none"]
   end
-  return result
+  let k be form with state
+  if k == "num"
+    let n be valueOf with state
+    bump with state
+    return ["num", n]
+  end
+  if k == "text"
+    let raw be spell with state
+    bump with state
+    return ["text", raw]
+  end
+  if k == "true"
+    bump with state
+    return ["bool", 1]
+  end
+  if k == "false"
+    bump with state
+    return ["bool", 0]
+  end
+  if k == "none"
+    bump with state
+    return ["none"]
+  end
+  if k == "name"
+    let nm be spell with state
+    bump with state
+    if (form with state) == "with"
+      bump with state
+      if (form with state) == "eof" or (form with state) == "end" or (form with state) == "else"
+        return markBad with state, "that call is missing a value"
+      end
+      let args be []
+      push with args, (parseClimb with state, func, 5)
+      while (form with state) == ","
+        bump with state
+        push with args, (parseClimb with state, func, 5)
+      end
+      noteNeed with state, nm
+      return ["call", nm, args]
+    end
+    return ["name", nm]
+  end
+  if k == "("
+    bump with state
+    let inner be parseClimb with state, func, 0
+    if (form with state) != ")"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return inner
+  end
+  if k == "["
+    ~ list elements always parseExpr with state, func
+    bump with state
+    let items be []
+    if (form with state) == "]"
+      bump with state
+      return ["list", items]
+    end
+    push with items, (parseClimb with state, func, 0)
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "]"
+        stop
+      end
+      push with items, (parseClimb with state, func, 0)
+    end
+    if (form with state) != "]"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return ["list", items]
+  end
+  if k == "{"
+    bump with state
+    let pairs be []
+    if (form with state) == "}"
+      bump with state
+      return ["map", pairs]
+    end
+    let key be parseClimb with state, func, 0
+    if (form with state) != ":"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    let val be parseClimb with state, func, 0
+    push with pairs, ["pair", key, val]
+    while (form with state) == ","
+      bump with state
+      if (form with state) == "}"
+        stop
+      end
+      let key be parseClimb with state, func, 0
+      if (form with state) != ":"
+        return markBad with state, "that expression is not ready"
+      end
+      bump with state
+      let val be parseClimb with state, func, 0
+      push with pairs, ["pair", key, val]
+    end
+    if (form with state) != "}"
+      return markBad with state, "that expression is not ready"
+    end
+    bump with state
+    return ["map", pairs]
+  end
+  return markBad with state, "that expression is not ready"
 end
 
 define parseLoop with state, func
