@@ -25,6 +25,18 @@ public class NativePeEmitTests
             byte[] pe = new byte[hex.Length / 2];
             for (int i = 0; i < pe.Length; i++)
                 pe[i] = byte.Parse(hex.Substring(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            if (OperatingSystem.IsLinux())
+            {
+                Assert.Equal(0x7f, pe[0]);
+                Assert.Equal((byte)'E', pe[1]);
+                Assert.Equal((byte)'L', pe[2]);
+                Assert.Equal((byte)'F', pe[3]);
+                Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x02 }) >= 0);
+                Assert.True(IndexOf(pe, new byte[] { 0xBA, 0x00, 0x00, 0x00, 0x10 }) < 0);
+                int internLinux = IndexOf(pe, new byte[] { 1, 0, 0, 0, 0, 0, 0, 0, (byte)'A', 0, 0, 0, 0, 0, 0, 0 });
+                Assert.True(internLinux >= 0);
+                return;
+            }
             int e = BitConverter.ToInt32(pe, 0x3c);
             int oh = e + 24;
             Assert.Equal(0x20b, BitConverter.ToUInt16(pe, oh));

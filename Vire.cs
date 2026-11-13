@@ -382,7 +382,7 @@ sealed class Machine
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close",
-        "start", "wait", "result"
+        "start", "wait", "result", "linux"
     });
 
     public Machine(Dictionary<string, Func> funcs, string root)
@@ -606,7 +606,7 @@ sealed class Machine
     object Builtin(string name, List<object> args, int line, int col)
     {
         int need = 1;
-        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes") need = 0;
+        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "linux") need = 0;
         if (name == "wait" || name == "result") need = 1;
         if (name == "start")
         {
@@ -895,6 +895,7 @@ sealed class Machine
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "ticks") return ClockTicks();
+        if (name == "linux") return OperatingSystem.IsLinux();
         if (name == "fetch")
         {
             string url = args[0] as string;
@@ -1596,7 +1597,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks" || name == "linux"))
                 return Builtin(name, new List<object>(), line, col);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), line, col);

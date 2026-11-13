@@ -1,0 +1,25 @@
+name: native-elf
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native-elf-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - name: FAIL_BEFORE then hello ELF
+        run: bash tools/native-elf-hello.sh
+      - name: files read/write syscalls
+        run: bash tools/native-elf-files.sh
+      - name: loopback TCP connect/listen
+        run: bash tools/native-elf-tcp.sh
+      - name: selfhost gen1=gen2
+        run: bash tools/native-elf-selfhost.sh

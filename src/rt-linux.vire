@@ -1,0 +1,484 @@
+~ Linux x86-64 syscall shims. Win64 callers, raw syscalls, no libc.
+
+define emitLeaRdi with image, fixes, name
+  let image be emitList with image, [72, 141, 61]
+  let image be emitRel with image, fixes, name
+  return image
+end
+
+define emitLeaRax with image, fixes, name
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, name
+  return image
+end
+
+define emitSaveRbx with image, fixes
+  let image be emitList with image, [72, 137, 29]
+  let image be emitRel with image, fixes, "saved_rbx"
+  return image
+end
+
+define emitLoadRbx with image, fixes
+  let image be emitList with image, [72, 139, 29]
+  let image be emitRel with image, fixes, "saved_rbx"
+  return image
+end
+
+define emitSys with image, n
+  let image be emitList with image, [184]
+  let image be emitU32 with image, n
+  let image be emitList with image, [15, 5]
+  return image
+end
+
+define emitSysNeg1 with image
+  ~ cmp rax, -4096; jb ok; mov rax, -1
+  let image be emitList with image, [72, 61]
+  let image be emitU32 with image, 4294963200
+  let image be emitList with image, [114, 7, 72, 199, 192, 255, 255, 255, 255]
+  return image
+end
+
+define emitLinuxStart with image, fixes, labels
+  pin with labels, "linux_start", image
+  let image be emitList with image, [49, 237, 76, 139, 36, 36, 76, 141, 108, 36, 8, 72, 131, 228, 240]
+  let image be emitLeaRdi with image, fixes, "cmdline_buf"
+  let image be emitList with image, [73, 137, 254, 69, 49, 255]
+  pin with labels, "ls_arg", image
+  let image be emitList with image, [77, 57, 252, 15, 142]
+  let image be emitRel with image, fixes, "ls_done"
+  let image be emitList with image, [75, 139, 116, 253, 0]
+  pin with labels, "ls_copy", image
+  let image be emitList with image, [138, 6, 136, 7, 72, 255, 198, 72, 255, 199, 132, 192, 15, 133]
+  let image be emitRel with image, fixes, "ls_copy"
+  let image be emitList with image, [72, 255, 207, 198, 7, 32, 72, 255, 199, 73, 255, 199, 233]
+  let image be emitRel with image, fixes, "ls_arg"
+  pin with labels, "ls_done", image
+  let image be emitList with image, [76, 57, 247, 15, 132]
+  let image be emitRel with image, fixes, "ls_nul"
+  let image be emitList with image, [72, 255, 207]
+  pin with labels, "ls_nul", image
+  let image be emitList with image, [198, 7, 0]
+  let image be emitLeaRax with image, fixes, "cmdline_buf"
+  let image be emitList with image, [72, 137, 5]
+  let image be emitRel with image, fixes, "cmdline_ptr"
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "code"
+  return image
+end
+
+define emitIatThunk with image, fixes, labels, thunk, stub
+  pin with labels, thunk, image
+  let image be emitList with image, [83, 232]
+  let image be emitRel with image, fixes, stub
+  let image be emitList with image, [91, 195]
+  return image
+end
+
+define emitLinuxThunks with image, fixes, labels
+  let image be emitIatThunk with image, fixes, labels, "thunk_gs", "stub_gs"
+  let image be emitIatThunk with image, fixes, labels, "thunk_wf", "stub_wf"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ep", "stub_ep"
+  let image be emitIatThunk with image, fixes, labels, "thunk_va", "stub_va"
+  let image be emitIatThunk with image, fixes, labels, "thunk_cf", "stub_cf"
+  let image be emitIatThunk with image, fixes, labels, "thunk_rf", "stub_rf"
+  let image be emitIatThunk with image, fixes, labels, "thunk_sz", "stub_sz"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ch", "stub_ch"
+  let image be emitIatThunk with image, fixes, labels, "thunk_cl", "stub_cl"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ga", "stub_ga"
+  let image be emitIatThunk with image, fixes, labels, "thunk_fi", "stub_fi"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ue", "stub_ue"
+  let image be emitIatThunk with image, fixes, labels, "thunk_vh", "stub_vh"
+  let image be emitIatThunk with image, fixes, labels, "thunk_sp", "stub_sp"
+  let image be emitIatThunk with image, fixes, labels, "thunk_se", "stub_se"
+  let image be emitIatThunk with image, fixes, labels, "thunk_fp", "stub_fp"
+  return image
+end
+
+define emitLinuxNetThunks with image, fixes, labels
+  let image be emitLinuxThunks with image, fixes, labels
+  let image be emitIatThunk with image, fixes, labels, "thunk_gt", "stub_gt"
+  let image be emitIatThunk with image, fixes, labels, "thunk_wsa", "stub_wsa"
+  let image be emitIatThunk with image, fixes, labels, "thunk_sk", "stub_sk"
+  let image be emitIatThunk with image, fixes, labels, "thunk_bd", "stub_bd"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ln", "stub_ln"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ac", "stub_ac"
+  let image be emitIatThunk with image, fixes, labels, "thunk_rv", "stub_rv"
+  let image be emitIatThunk with image, fixes, labels, "thunk_sd", "stub_sd"
+  let image be emitIatThunk with image, fixes, labels, "thunk_cs", "stub_cs"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ss", "stub_ss"
+  let image be emitIatThunk with image, fixes, labels, "thunk_gn", "stub_gn"
+  let image be emitIatThunk with image, fixes, labels, "thunk_cn", "stub_cn"
+  return image
+end
+
+define emitLinuxRtLinux with image, fixes, labels
+  pin with labels, "rt_linux", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 185]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_push_bool"
+  let image be emitList with image, [201, 195]
+  return image
+end
+
+define emitLinuxStubs with image, fixes, labels
+  pin with labels, "stub_gs", image
+  let image be emitList with image, [129, 249]
+  let image be emitU32 with image, 4294967285
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "gs_out"
+  let image be emitList with image, [129, 249]
+  let image be emitU32 with image, 4294967284
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "gs_err"
+  let image be emitList with image, [49, 192, 195]
+  pin with labels, "gs_out", image
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [195]
+  pin with labels, "gs_err", image
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_ep", image
+  let image be emitList with image, [137, 207]
+  let image be emitSys with image, 60
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_va", image
+  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 49, 255, 72, 137, 214, 186]
+  let image be emitU32 with image, 3
+  let image be emitList with image, [65, 186]
+  let image be emitU32 with image, 34
+  let image be emitList with image, [73, 199, 192, 255, 255, 255, 255, 77, 49, 201]
+  let image be emitSys with image, 9
+  let image be emitList with image, [72, 61]
+  let image be emitU32 with image, 4294963200
+  let image be emitList with image, [114, 2, 49, 192, 72, 131, 196, 8, 91, 65, 94, 65, 95, 93, 195]
+
+  pin with labels, "stub_wf", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 76, 137, 203, 72, 137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitSys with image, 1
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [72, 133, 219, 116, 3, 72, 137, 3, 72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "wf_fail"
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "wf_done"
+  pin with labels, "wf_fail", image
+  let image be emitList with image, [49, 192]
+  pin with labels, "wf_done", image
+  let image be emitList with image, [72, 131, 196, 8, 91, 65, 94, 65, 95, 93]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_rf", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 65, 87, 65, 86, 83, 72, 131, 236, 8, 76, 137, 203, 72, 137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitSys with image, 0
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [72, 133, 219, 116, 3, 72, 137, 3, 72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "rf_fail"
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "rf_done"
+  pin with labels, "rf_fail", image
+  let image be emitList with image, [49, 192]
+  pin with labels, "rf_done", image
+  let image be emitList with image, [72, 131, 196, 8, 91, 65, 94, 65, 95, 93]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_ch", image
+  let image be emitList with image, [83, 72, 137, 207]
+  let image be emitSys with image, 3
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [91, 195]
+
+  pin with labels, "stub_cl", image
+  let image be emitLeaRax with image, fixes, "cmdline_ptr"
+  let image be emitList with image, [72, 139, 0, 195]
+
+  pin with labels, "stub_ue", image
+  let image be emitList with image, [49, 192, 195]
+  pin with labels, "stub_vh", image
+  let image be emitList with image, [49, 192, 195]
+
+  pin with labels, "stub_cf", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 83, 72, 131, 236, 16, 72, 137, 203, 139, 69, 48, 137, 69, 248, 49, 246, 247, 194]
+  let image be emitU32 with image, 1073741824
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "cf_nw"
+  let image be emitList with image, [190]
+  let image be emitU32 with image, 1
+  pin with labels, "cf_nw", image
+  let image be emitList with image, [247, 194]
+  let image be emitU32 with image, 2147483648
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "cf_disp"
+  let image be emitList with image, [131, 254, 1, 15, 133]
+  let image be emitRel with image, fixes, "cf_disp"
+  let image be emitList with image, [190]
+  let image be emitU32 with image, 2
+  pin with labels, "cf_disp", image
+  let image be emitList with image, [131, 125, 248, 1, 15, 133]
+  let image be emitRel with image, fixes, "cf_d2"
+  let image be emitList with image, [129, 206]
+  let image be emitU32 with image, 192
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "cf_open"
+  pin with labels, "cf_d2", image
+  let image be emitList with image, [131, 125, 248, 2, 15, 133]
+  let image be emitRel with image, fixes, "cf_d4"
+  let image be emitList with image, [129, 206]
+  let image be emitU32 with image, 576
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "cf_open"
+  pin with labels, "cf_d4", image
+  let image be emitList with image, [131, 125, 248, 4, 15, 133]
+  let image be emitRel with image, fixes, "cf_d5"
+  let image be emitList with image, [129, 206]
+  let image be emitU32 with image, 64
+  let image be emitList with image, [233]
+  let image be emitRel with image, fixes, "cf_open"
+  pin with labels, "cf_d5", image
+  let image be emitList with image, [131, 125, 248, 5, 15, 133]
+  let image be emitRel with image, fixes, "cf_open"
+  let image be emitList with image, [129, 206]
+  let image be emitU32 with image, 512
+  pin with labels, "cf_open", image
+  let image be emitList with image, [72, 137, 223, 186]
+  let image be emitU32 with image, 420
+  let image be emitSys with image, 2
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [72, 141, 101, 248, 91, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_sz", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
+  let image be emitU32 with image, 4294967136
+  let image be emitSys with image, 5
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "sz_fail"
+  let image be emitList with image, [72, 139, 69, 144, 72, 133, 219, 116, 6, 72, 137, 194, 72, 193, 234, 32, 137, 19, 72, 141, 101, 248, 91, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+  pin with labels, "sz_fail", image
+  let image be emitList with image, [184, 255, 255, 255, 255, 72, 141, 101, 248, 91, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_ga", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 192, 0, 0, 0, 72, 137, 207, 72, 141, 181]
+  let image be emitU32 with image, 4294967136
+  let image be emitSys with image, 4
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "ga_fail"
+  let image be emitList with image, [139, 133]
+  let image be emitU32 with image, 4294967160
+  let image be emitList with image, [37]
+  let image be emitU32 with image, 61440
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 16384
+  let image be emitList with image, [117]
+  let image be emitU8 with image, 14
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195, 184]
+  let image be emitU32 with image, 128
+  let image be emitList with image, [201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+  pin with labels, "ga_fail", image
+  let image be emitList with image, [184, 255, 255, 255, 255, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_fi", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 192, 0, 0, 0, 72, 137, 211, 72, 137, 207, 72, 141, 181]
+  let image be emitU32 with image, 4294967136
+  let image be emitSys with image, 5
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "fi_fail"
+  let image be emitList with image, [199, 3, 128, 0, 0, 0, 139, 133]
+  let image be emitU32 with image, 4294967160
+  let image be emitList with image, [37]
+  let image be emitU32 with image, 61440
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 16384
+  let image be emitList with image, [117]
+  let image be emitU8 with image, 6
+  let image be emitList with image, [199, 3, 16, 0, 0, 0]
+  let image be emitList with image, [72, 139, 133]
+  let image be emitU32 with image, 4294967152
+  let image be emitList with image, [137, 67, 40, 72, 139, 69, 144, 137, 67, 36, 72, 193, 232, 32, 137, 67, 32, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [72, 141, 101, 248, 91, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+  pin with labels, "fi_fail", image
+  let image be emitList with image, [49, 192, 72, 141, 101, 248, 91, 201]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_sp", image
+  let image be emitList with image, [85, 72, 137, 229, 65, 87, 72, 137, 207, 72, 137, 214, 77, 137, 199, 68, 137, 202]
+  let image be emitSys with image, 8
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "sp_fail"
+  let image be emitList with image, [77, 133, 255, 116, 3, 73, 137, 7, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [65, 95, 93, 195]
+  pin with labels, "sp_fail", image
+  let image be emitList with image, [49, 192, 65, 95, 93, 195]
+
+  pin with labels, "stub_se", image
+  let image be emitList with image, [85, 72, 137, 229, 83, 72, 137, 203, 72, 137, 207, 49, 246, 186]
+  let image be emitU32 with image, 1
+  let image be emitSys with image, 8
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "se_fail"
+  let image be emitList with image, [72, 137, 195, 72, 137, 199, 72, 137, 198]
+  let image be emitSys with image, 77
+  let image be emitList with image, [72, 133, 192, 15, 136]
+  let image be emitRel with image, fixes, "se_fail"
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [91, 93, 195]
+  pin with labels, "se_fail", image
+  let image be emitList with image, [49, 192, 91, 93, 195]
+
+  pin with labels, "stub_fp", image
+  let image be emitSaveRbx with image, fixes
+  let image be emitList with image, [85, 72, 137, 229, 83, 72, 129, 236, 128, 0, 0, 0, 72, 137, 203, 72, 137, 85, 232, 76, 137, 69, 224]
+  let image be emitLeaRax with image, fixes, "proc_fd"
+  let image be emitList with image, [72, 141, 125, 176, 72, 137, 198]
+  pin with labels, "fp_cp", image
+  let image be emitList with image, [138, 6, 136, 7, 72, 255, 198, 72, 255, 199, 132, 192, 15, 133]
+  let image be emitRel with image, fixes, "fp_cp"
+  let image be emitList with image, [72, 255, 207, 137, 216, 49, 201]
+  pin with labels, "fp_dig", image
+  let image be emitList with image, [49, 210, 65, 187]
+  let image be emitU32 with image, 10
+  let image be emitList with image, [65, 247, 243, 128, 194, 48, 136, 84, 13, 160, 72, 255, 193, 133, 192, 15, 133]
+  let image be emitRel with image, fixes, "fp_dig"
+  pin with labels, "fp_rev", image
+  let image be emitList with image, [72, 133, 201, 15, 132]
+  let image be emitRel with image, fixes, "fp_go"
+  let image be emitList with image, [72, 255, 201, 138, 68, 13, 160, 136, 7, 72, 255, 199, 233]
+  let image be emitRel with image, fixes, "fp_rev"
+  pin with labels, "fp_go", image
+  let image be emitList with image, [198, 7, 0, 72, 141, 125, 176, 72, 139, 117, 232, 72, 139, 85, 224]
+  let image be emitSys with image, 89
+  let image be emitList with image, [72, 133, 192, 15, 142]
+  let image be emitRel with image, fixes, "fp_fail"
+  let image be emitList with image, [72, 139, 85, 232, 198, 4, 2, 0, 72, 129, 196, 128, 0, 0, 0, 91, 93]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+  pin with labels, "fp_fail", image
+  let image be emitList with image, [49, 192, 72, 129, 196, 128, 0, 0, 0, 91, 93]
+  let image be emitLoadRbx with image, fixes
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_gt", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 32, 191]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [72, 141, 117, 240]
+  let image be emitSys with image, 228
+  let image be emitList with image, [72, 139, 69, 248, 49, 210, 72, 185]
+  let image be emitU64 with image, 1000000
+  let image be emitList with image, [72, 247, 241, 72, 139, 85, 240, 72, 105, 210, 232, 3, 0, 0, 72, 1, 208, 201, 195]
+
+  return image
+end
+
+define emitLinuxNetStubs with image, fixes, labels
+  pin with labels, "stub_wsa", image
+  let image be emitList with image, [49, 192, 195]
+
+  pin with labels, "stub_sk", image
+  let image be emitList with image, [137, 207, 137, 214, 68, 137, 194]
+  let image be emitSys with image, 41
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_bd", image
+  let image be emitList with image, [137, 207, 72, 137, 214, 68, 137, 194]
+  let image be emitSys with image, 49
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_ln", image
+  let image be emitList with image, [137, 207, 137, 214]
+  let image be emitSys with image, 50
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_ac", image
+  let image be emitList with image, [137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitSys with image, 43
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_rv", image
+  let image be emitList with image, [85, 72, 137, 229, 137, 207, 72, 137, 214, 68, 137, 194, 77, 137, 202]
+  let image be emitList with image, [77, 49, 192, 77, 49, 201]
+  let image be emitSys with image, 45
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [93, 195]
+
+  pin with labels, "stub_sd", image
+  let image be emitList with image, [85, 72, 137, 229, 137, 207, 72, 137, 214, 68, 137, 194, 77, 137, 202]
+  let image be emitList with image, [77, 49, 192, 77, 49, 201]
+  let image be emitSys with image, 44
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [93, 195]
+
+  pin with labels, "stub_cs", image
+  let image be emitList with image, [137, 207]
+  let image be emitSys with image, 3
+  let image be emitList with image, [49, 192, 195]
+
+  pin with labels, "stub_ss", image
+  let image be emitList with image, [85, 72, 137, 229, 137, 207, 137, 214, 68, 137, 192, 76, 137, 203]
+  ~ Win SOL_SOCKET 0xFFFF -> 1, SO_REUSEADDR 4 -> 2
+  let image be emitList with image, [129, 250, 255, 255, 0, 0, 117]
+  let image be emitU8 with image, 5
+  let image be emitList with image, [190]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [131, 248, 4, 117]
+  let image be emitU8 with image, 5
+  let image be emitList with image, [184]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [137, 194, 139, 69, 48, 73, 137, 194, 65, 137, 192]
+  let image be emitSys with image, 54
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [93, 195]
+
+  pin with labels, "stub_gn", image
+  let image be emitList with image, [137, 207, 72, 137, 214, 76, 137, 194]
+  let image be emitSys with image, 51
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+
+  pin with labels, "stub_cn", image
+  let image be emitList with image, [137, 207, 72, 137, 214, 68, 137, 194]
+  let image be emitSys with image, 42
+  let image be emitSysNeg1 with image
+  let image be emitList with image, [195]
+  return image
+end
