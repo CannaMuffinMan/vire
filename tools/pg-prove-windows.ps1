@@ -47,6 +47,7 @@ function Invoke-FailBeforePinBuild {
             throw "pin $PinSha unexpectedly has src/rt-pg.vire"
         }
         $guest = [System.IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-client.vire"))
+        $guest = [regex]::Replace($guest, '(?m)^can .*\r?\n?', "")
         $guest = $guest -replace "PORT_PLACEHOLDER", "55432"
         $guest = $guest -replace "PGUSER_PLACEHOLDER", "vire"
         $guest = $guest -replace "PGDB_PLACEHOLDER", "vire"
