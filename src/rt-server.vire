@@ -2,6 +2,15 @@
 ~ Declared by calling listen (server capability). Caps stay 32MB / 100000 / 5M.
 
 define emitServerRuntime with image, fixes, labels
+  ~ Packed rt_net_client calls rt_alloc for ctx and recv buf without emitLeaf.
+  ~ Retarget those two packed relocs (blob 0x527 / 0x56f) via netNames index
+  ~ rt_alloc_leaf — not `labels at x + N`, which native gen2 cannot parse.
+  pin with labels, "rt_alloc_leaf", image
+  emitList with image, [72, 131, 236, 40]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 131, 196, 40, 195]
+
   pin with labels, "rt_sock_timeouts", image
   emitPro with image
   emitList with image, [72, 137, 77, 248, 199, 69, 240]
