@@ -340,7 +340,6 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_listen"
   emitCallTo with image, fixes, "rt_text_cat"
-  emitList with image, [72, 137, 194]
   emitPushTag with image, 2
   emitCallTo with image, fixes, "rt_say"
   pin with labels, "ws_accept", image
