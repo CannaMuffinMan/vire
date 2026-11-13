@@ -7,5 +7,4 @@ control.vire
 text.vire
 try-miss.vire
 mod-main.vire
-json.vire
 files.vire

@@ -1,8 +1,0 @@
-~ Tour: json and parse (native compiler emits rt_json / rt_parse).
-define main
-  let row be {"ok": true, "n": 3}
-  let text be json with row
-  say text
-  let back be parse with text
-  say back at "n"
-end

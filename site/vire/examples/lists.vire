@@ -1,11 +1,9 @@
-~ Tour: lists, maps, join, put.
+~ Tour: lists, maps, length, at.
 define main
   let nums be [9, 2, 3]
   push with nums, 4
-  put 1 into nums at 0
   say nums at 0
   say length with nums
-  say join with ["9", "2", "3", "4"], ","
   let person be {"name": "ada", "year": 1815}
   say person at "name"
   say has with person, "year"

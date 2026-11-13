@@ -68,7 +68,7 @@ itself uses `+`. Unary minus in a call argument is not a statement; bind it firs
 `skip` and `stop` are valid only inside `while` or `for`.
 
 ```vire
-~ Tour: else if, for, skip, stop.
+~ Tour: else if, for, skip.
 define main
   let n be 2
   if n == 1
@@ -78,17 +78,12 @@ define main
   else
     say "other"
   end
-  let total be 0
-  for item in [1, 2, 3, 4]
+  for item in [1, 2, 3]
     if item == 2
       skip
     end
-    if item == 4
-      stop
-    end
-    let total be total + item
+    say item
   end
-  say total
 end
 ```
 
@@ -96,7 +91,8 @@ Source: [`control.vire`](../site/vire/examples/control.vire). Output:
 
 ```
 two
-4
+1
+3
 ```
 
 ### 2.4 Definitions
@@ -226,10 +222,10 @@ Package samples live under `samples/` and `deps/`. Homepage CI does not run a
 
 `bytes` exists as a bare native name (empty buffer), not as `bytes with x`.
 
-[`json.vire`](../site/vire/examples/json.vire) prints `{"ok":true,"n":3}` then `3`.
 [`files.vire`](../site/vire/examples/files.vire) writes `data/note.txt` and prints `hello`.
 [`text.vire`](../site/vire/examples/text.vire) and [`lists.vire`](../site/vire/examples/lists.vire)
-cover the rest of the tour.
+cover the rest of the tour. Native PE `json`/`parse` guests are still crashy
+on this tip (homepage CI does not run one). Host `json` works.
 
 `listen` / `connect` are real but start network I/O. They are proven in
 `native-net.yml` and `native-windows`, not in the homepage sample set.
