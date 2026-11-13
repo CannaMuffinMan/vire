@@ -1,4 +1,5 @@
 # Fail-before / pass-after: guest WebSocket server on loopback. No TLS.
+# PE echo: raw masked ping (81-04-70-69-6E-67) then ClientWebSocket.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
