@@ -25,33 +25,41 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
 }
 
 function Invoke-Http([string]$Method, [string]$Url, [string]$Body) {
-    $req = [System.Net.HttpWebRequest]::Create($Url)
-    $req.Method = $Method
-    $req.Timeout = 20000
+    $u = [Uri]$Url
+    $payload = ""
     if ($Method -eq "POST") {
-        $raw = [Text.Encoding]::UTF8.GetBytes($Body)
-        $req.ContentType = "application/json"
-        $req.ContentLength = $raw.Length
-        $s = $req.GetRequestStream()
-        $s.Write($raw, 0, $raw.Length)
-        $s.Close()
+        if ($null -eq $Body) { $Body = "" }
+        $payload = $Body
     }
-    try {
-        $resp = $req.GetResponse()
-        $reader = New-Object IO.StreamReader($resp.GetResponseStream())
-        $text = $reader.ReadToEnd()
-        $code = [int]$resp.StatusCode
-        $reader.Close(); $resp.Close()
-        return @{ Code = $code; Body = $text }
-    } catch [System.Net.WebException] {
-        $resp = $_.Exception.Response
-        if ($resp -eq $null) { throw }
-        $reader = New-Object IO.StreamReader($resp.GetResponseStream())
-        $text = $reader.ReadToEnd()
-        $code = [int]$resp.StatusCode
-        $reader.Close(); $resp.Close()
-        return @{ Code = $code; Body = $text }
+    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n"
+    if ($Method -eq "POST") {
+        $req += "Content-Type: application/json`r`nContent-Length: $($payload.Length)`r`n"
     }
+    $req += "`r`n" + $payload
+    $c = New-Object Net.Sockets.TcpClient
+    $c.ReceiveTimeout = 8000
+    $c.SendTimeout = 8000
+    $c.Connect("127.0.0.1", $u.Port)
+    $st = $c.GetStream()
+    $bytes = [Text.Encoding]::ASCII.GetBytes($req)
+    $st.Write($bytes, 0, $bytes.Length)
+    $ms = New-Object IO.MemoryStream
+    $buf = New-Object byte[] 4096
+    while ($true) {
+        $n = 0
+        try { $n = $st.Read($buf, 0, $buf.Length) } catch { break }
+        if ($n -le 0) { break }
+        $ms.Write($buf, 0, $n)
+    }
+    $c.Close()
+    $raw = [Text.Encoding]::ASCII.GetString($ms.ToArray())
+    $split = $raw.IndexOf("`r`n`r`n")
+    if ($split -lt 0) { throw "no HTTP body in $raw" }
+    $head = $raw.Substring(0, $split)
+    $text = $raw.Substring($split + 4)
+    $code = 0
+    if ($head -match '^HTTP/1\.[01] (\d+)') { $code = [int]$Matches[1] }
+    return @{ Code = $code; Body = $text.TrimEnd("`r", "`n") }
 }
 
 function Wait-Port([int]$Port, [int]$Tries = 300) {
@@ -237,8 +245,22 @@ if ($compileCode -ne 0) { throw "compile-native fcg-api exit $compileCode" }
 if ("$compileOut" -notmatch "compiled") { throw "compile-native missing compiled" }
 $exe = Join-Path $Data "fcg-api.exe"
 Convert-HexToExe (Join-Path $Root $hexRel) $exe
-$peProc = Start-Process -FilePath $exe -ArgumentList @("$ListenPe", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Data "pe-listen.out") -RedirectStandardError (Join-Path $Data "pe-listen.err")
-Wait-Port $ListenPe
+$peOut = Join-Path $Data "pe-listen.out"
+$peErr = Join-Path $Data "pe-listen.err"
+$peProc = Start-Process -FilePath $exe -ArgumentList @("$ListenPe", "$RedisPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $peOut -RedirectStandardError $peErr
+try {
+    Wait-Port $ListenPe
+} catch {
+    Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
+    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
+    Write-Output ("pe_exited " + $peProc.HasExited)
+    throw
+}
+if ($peProc.HasExited) {
+    Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
+    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
+    throw "pe exited before routes"
+}
 $peLogin = Assert-Routes $ListenPe "pe"
 if ($hostLogin -ne $peLogin) { throw "host/PE honeypot bodies differ" }
 Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
