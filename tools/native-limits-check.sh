@@ -9,7 +9,7 @@ if [[ ! -f "$VireDll" ]]; then
   echo "missing $VireDll" >&2
   exit 1
 fi
-# Last compile-native that still had parseExpr MaxCalls 64 (before #73).
+# Pre-#73 compile-native: still nested parseExpr so depth 20 hits the 64-call cap.
 BaseSha=6fbb705097938ce032c29cddfff947ccb12c3d5a
 AfterSha=$(git rev-parse HEAD)
 mkdir -p data
@@ -18,8 +18,12 @@ cp tests/native/million-hash.vire data/million-hash.vire
 cp tests/native/long-ascii.vire data/long-ascii.vire
 
 git show "$BaseSha:compile-native.vire" > compile-native.base.vire
+# Do not use --compiler: that raises the 64-call nest cap. Inject cans so
+# host Apply accepts the pinned compiler's read/write.
+{ echo 'can fs.read data'; echo 'can fs.write data'; cat compile-native.base.vire; } > compile-native.base.cans.vire
+mv compile-native.base.cans.vire compile-native.base.vire
 set +e
-before=$(dotnet exec "$VireDll" --compiler compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1)
+before=$(dotnet exec "$VireDll" compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1)
 before_code=$?
 set -e
 echo "$before"
