@@ -501,19 +501,17 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 141, 77]
   emitU8 with image, 128
   emitList with image, [186, 60, 0, 0, 0]
-  emitList with image, [76, 141, 69, 152]
+  emitList with image, [76, 141, 69, 220]
   emitCallTo with image, fixes, "rt_sha1"
-  emitList with image, [72, 141, 77, 152]
-  emitList with image, [72, 141, 85]
-  emitU8 with image, 128
+  emitList with image, [72, 141, 77, 220]
+  emitList with image, [72, 141, 85, 192]
   emitCallTo with image, fixes, "rt_ws_b64"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_ws_101"
   emitCallTo with image, fixes, "ws_sendz"
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "ws_cli"
-  emitList with image, [72, 141, 85]
-  emitU8 with image, 128
+  emitList with image, [72, 141, 85, 192]
   emitList with image, [65, 184]
   emitU32 with image, 28
   emitCallTo with image, fixes, "rt_net_sendall"
