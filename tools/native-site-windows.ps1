@@ -48,7 +48,7 @@ function Get-Http([int]$Port, [string]$Path, [string]$Method = "GET", [hashtable
     $client.Connect("127.0.0.1", $Port)
     $stream = $client.GetStream()
     $req = "$Method $Path HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n"
-    foreach ($k in $Headers.Keys) { $req += "$k: $($Headers[$k])`r`n" }
+    foreach ($k in $Headers.Keys) { $req += "${k}: $($Headers[$k])`r`n" }
     $req += "`r`n"
     $bytes = [Text.Encoding]::ASCII.GetBytes($req)
     $stream.Write($bytes, 0, $bytes.Length)
