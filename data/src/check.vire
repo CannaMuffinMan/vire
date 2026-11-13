@@ -451,11 +451,231 @@ define checkFunc with func, funcs, allowed
   return checkBlock with (func at "body"), env, func, funcs, allowed
 end
 
+define capWalkExpr with expr, allowed
+  if expr == none
+    return ""
+  end
+  if (kind with expr) != "list"
+    return ""
+  end
+  if (length with expr) < 1
+    return ""
+  end
+  let k be expr at 0
+  if k == "name"
+    return needCap with (expr at 1), allowed
+  end
+  if k == "call"
+    let why be needCap with (expr at 1), allowed
+    if why != ""
+      return why
+    end
+    let args be expr at 2
+    let i be 0
+    while i < (length with args)
+      let why be capWalkExpr with (args at i), allowed
+      if why != ""
+        return why
+      end
+      let i be i + 1
+    end
+    return ""
+  end
+  if k == "not" or k == "neg"
+    return capWalkExpr with (expr at 1), allowed
+  end
+  if k == "bin" or k == "at"
+    let why be capWalkExpr with (expr at 2), allowed
+    if why != ""
+      return why
+    end
+    return capWalkExpr with (expr at 3), allowed
+  end
+  if k == "list"
+    let items be expr at 1
+    let i be 0
+    while i < (length with items)
+      let why be capWalkExpr with (items at i), allowed
+      if why != ""
+        return why
+      end
+      let i be i + 1
+    end
+    return ""
+  end
+  if k == "map"
+    let pairs be expr at 1
+    let i be 0
+    while i < (length with pairs)
+      let pair be pairs at i
+      let why be capWalkExpr with (pair at 1), allowed
+      if why != ""
+        return why
+      end
+      let why be capWalkExpr with (pair at 2), allowed
+      if why != ""
+        return why
+      end
+      let i be i + 1
+    end
+    return ""
+  end
+  return ""
+end
+
+define capWalkBlock with body, allowed
+  if body == none
+    return ""
+  end
+  let i be 0
+  while i < (length with body)
+    let why be capWalkStmt with (body at i), allowed
+    if why != ""
+      return why
+    end
+    let i be i + 1
+  end
+  return ""
+end
+
+define capWalkStmt with stmt, allowed
+  if stmt == none
+    return ""
+  end
+  if (kind with stmt) != "list"
+    return ""
+  end
+  if (length with stmt) < 1
+    return ""
+  end
+  let k be stmt at 0
+  if k == "let"
+    return capWalkExpr with (stmt at 2), allowed
+  end
+  if k == "say" or k == "return"
+    return capWalkExpr with (stmt at 1), allowed
+  end
+  if k == "put"
+    let why be capWalkExpr with (stmt at 2), allowed
+    if why != ""
+      return why
+    end
+    return capWalkExpr with (stmt at 3), allowed
+  end
+  if k == "while"
+    let why be capWalkExpr with (stmt at 1), allowed
+    if why != ""
+      return why
+    end
+    return capWalkBlock with (stmt at 2), allowed
+  end
+  if k == "for"
+    let why be capWalkExpr with (stmt at 2), allowed
+    if why != ""
+      return why
+    end
+    return capWalkBlock with (stmt at 3), allowed
+  end
+  if k == "if"
+    let why be capWalkExpr with (stmt at 1), allowed
+    if why != ""
+      return why
+    end
+    let why be capWalkBlock with (stmt at 2), allowed
+    if why != ""
+      return why
+    end
+    return capWalkBlock with (stmt at 3), allowed
+  end
+  if k == "try"
+    let why be capWalkBlock with (stmt at 1), allowed
+    if why != ""
+      return why
+    end
+    if (stmt at 3) != none
+      return capWalkBlock with (stmt at 3), allowed
+    end
+    return ""
+  end
+  if k == "call"
+    return capWalkExpr with stmt, allowed
+  end
+  return ""
+end
+
+define bodyHasTypes with body
+  if body == none
+    return false
+  end
+  let i be 0
+  while i < (length with body)
+    let stmt be body at i
+    if (kind with stmt) == "list"
+      if (length with stmt) > 0
+        let k be stmt at 0
+        if k == "let"
+          if (length with stmt) >= 4
+            if (stmt at 3) != ""
+              return true
+            end
+          end
+        end
+        if k == "while" or k == "if" or k == "try"
+          if bodyHasTypes with (stmt at 2)
+            return true
+          end
+          if k == "if" or k == "try"
+            if bodyHasTypes with (stmt at 3)
+              return true
+            end
+          end
+        end
+        if k == "for"
+          if bodyHasTypes with (stmt at 3)
+            return true
+          end
+        end
+      end
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define funcHasTypes with func
+  if (func at "retType") != ""
+    return true
+  end
+  let pts be func at "paramTypes"
+  let i be 0
+  while i < (length with pts)
+    if (pts at i) != ""
+      return true
+    end
+    let i be i + 1
+  end
+  return bodyHasTypes with (func at "body")
+end
+
 define checkProgram with funcs, caps
   let allowed be allowedSet with caps
+  let typed be false
   let i be 0
   while i < (length with funcs)
-    let why be checkFunc with (funcs at i), funcs, allowed
+    if funcHasTypes with (funcs at i)
+      let typed be true
+    end
+    let i be i + 1
+  end
+  let i be 0
+  while i < (length with funcs)
+    let why be ""
+    if typed
+      let why be checkFunc with (funcs at i), funcs, allowed
+    end
+    if not typed
+      let why be capWalkBlock with ((funcs at i) at "body"), allowed
+    end
     if why != ""
       return why
     end

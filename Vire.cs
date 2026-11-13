@@ -3409,7 +3409,7 @@ sealed class Program
             string program = Path.GetFullPath(rest[0]);
             string folder = Path.GetDirectoryName(program);
             int budget = BudgetFor(program, hostCompiler);
-            Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
+            Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>(), new int[1], !hostCompiler);
             if (!funcs.ContainsKey("main")) throw new VireError("a vire program needs define main", 1);
             Machine machine = new Machine(funcs, folder);
             machine.UseSource(program);
