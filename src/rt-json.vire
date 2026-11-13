@@ -1,0 +1,977 @@
+~ JSON decode/encode for API guests. Same source on host interpreter and
+~ native gen1 PE (no kind). Caps stay 100000 / 1e6 / depth 16
+~ (stricter than host parse 256 so FCG routes fail with schema_check).
+~
+~ Numbers: JSON integers in 0..2147483647, or negative with the same
+~ magnitude, become Vire whole numbers. -0 becomes 0. Any fraction,
+~ exponent, or integer outside that range is a one-key map {"$n": token}
+~ whose token is the JSON number spelling. Encode writes $n tokens raw.
+~ Duplicate object keys: last value wins. String values are UTF-8 bytes
+~ (chr 0..255), including \uXXXX and surrogate pairs.
+
+define json_ok with value
+  return ["ok", value]
+end
+
+define json_bad with why
+  return ["bad", why]
+end
+
+define json_depth_max
+  return 16
+end
+
+define json_hex_val with ch
+  let p be find with "0123456789", ch
+  if p >= 0
+    return p
+  end
+  let p be find with "abcdef", ch
+  if p >= 0
+    return p + 10
+  end
+  let p be find with "ABCDEF", ch
+  if p >= 0
+    return p + 10
+  end
+  return 0 - 1
+end
+
+define json_hex4 with n
+  let digits be "0123456789abcdef"
+  let v be n
+  let o be "\\u"
+  let k be 0
+  let parts be [0, 0, 0, 0]
+  let i be 3
+  while i >= 0
+    let d be v % 16
+    put (digits at d) into parts at i
+    let v be idiv with v, 16
+    let i be i - 1
+  end
+  return o + (parts at 0) + (parts at 1) + (parts at 2) + (parts at 3)
+end
+
+define json_latin
+  let t be ""
+  let i be 0
+  while i < 256
+    let t be t + (chr with i)
+    let i be i + 1
+  end
+  return t
+end
+
+define json_byte with latin, ch
+  return find with latin, ch
+end
+
+define json_utf8_cp with cp
+  if cp < 0
+    return json_bad with "bad unicode"
+  end
+  if cp > 1114111
+    return json_bad with "bad unicode"
+  end
+  if (cp >= 55296) and (cp <= 57343)
+    return json_bad with "lone surrogate"
+  end
+  if cp < 128
+    return json_ok with (chr with cp)
+  end
+  if cp < 2048
+    let hi be idiv with cp, 64
+    let lo be cp % 64
+    return json_ok with ((chr with (192 + hi)) + (chr with (128 + lo)))
+  end
+  if cp < 65536
+    let a be idiv with cp, 4096
+    let r be cp % 4096
+    let b be idiv with r, 64
+    let c be r % 64
+    return json_ok with ((chr with (224 + a)) + (chr with (128 + b)) + (chr with (128 + c)))
+  end
+  let a be idiv with cp, 262144
+  let r be cp % 262144
+  let b be idiv with r, 4096
+  let r2 be r % 4096
+  let c be idiv with r2, 64
+  let d be r2 % 64
+  return json_ok with ((chr with (240 + a)) + (chr with (128 + b)) + (chr with (128 + c)) + (chr with (128 + d)))
+end
+
+define json_mark with cur, why
+  put true into cur at "bad"
+  put why into cur at "why"
+  return none
+end
+
+define json_skip with cur
+  let s be cur at "s"
+  let n be cur at "n"
+  let i be cur at "i"
+  while i < n
+    let ch be s at i
+    if ch == " "
+      let i be i + 1
+    else if ch == "\n"
+      let i be i + 1
+    else if ch == "\r"
+      let i be i + 1
+    else if ch == "\t"
+      let i be i + 1
+    else
+      stop
+    end
+  end
+  put i into cur at "i"
+  return cur
+end
+
+define json_need with cur, mark
+  json_skip with cur
+  let i be cur at "i"
+  if i >= (cur at "n")
+    return json_mark with cur, "ended early"
+  end
+  if ((cur at "s") at i) != mark
+    return json_mark with cur, "expected mark"
+  end
+  put (i + 1) into cur at "i"
+  return mark
+end
+
+define json_read_hex4 with cur
+  let s be cur at "s"
+  let i be cur at "i"
+  if (i + 4) > (cur at "n")
+    json_mark with cur, "bad escape"
+    return 0 - 1
+  end
+  let code be 0
+  let k be 0
+  while k < 4
+    let h be json_hex_val with (s at i)
+    if h < 0
+      json_mark with cur, "bad escape"
+      return 0 - 1
+    end
+    let code be (code * 16) + h
+    let i be i + 1
+    let k be k + 1
+  end
+  put i into cur at "i"
+  return code
+end
+
+define json_simple_esc with esc
+  if esc == "\""
+    return "\""
+  end
+  if esc == "\\"
+    return "\\"
+  end
+  if esc == "/"
+    return "/"
+  end
+  if esc == "b"
+    return chr with 8
+  end
+  if esc == "f"
+    return chr with 12
+  end
+  if esc == "n"
+    return "\n"
+  end
+  if esc == "r"
+    return "\r"
+  end
+  if esc == "t"
+    return "\t"
+  end
+  return none
+end
+
+define json_pair_cp with cur, hi, out
+  let s be cur at "s"
+  let i be cur at "i"
+  let n be cur at "n"
+  if (i + 6) > n
+    json_mark with cur, "lone surrogate"
+    return none
+  end
+  if (s at i) != "\\"
+    json_mark with cur, "lone surrogate"
+    return none
+  end
+  if (s at (i + 1)) != "u"
+    json_mark with cur, "lone surrogate"
+    return none
+  end
+  put (i + 2) into cur at "i"
+  let low be json_read_hex4 with cur
+  if cur at "bad"
+    return none
+  end
+  if (low < 56320) or (low > 57343)
+    json_mark with cur, "lone surrogate"
+    return none
+  end
+  let cp be 65536 + ((hi - 55296) * 1024) + (low - 56320)
+  let u be json_utf8_cp with cp
+  if (u at 0) != "ok"
+    json_mark with cur, (u at 1)
+    return none
+  end
+  return out + (u at 1)
+end
+
+define json_after_u with cur, code, out
+  if (code >= 55296) and (code <= 56319)
+    return json_pair_cp with cur, code, out
+  end
+  if (code >= 56320) and (code <= 57343)
+    json_mark with cur, "lone surrogate"
+    return none
+  end
+  let u be json_utf8_cp with code
+  if (u at 0) != "ok"
+    json_mark with cur, (u at 1)
+    return none
+  end
+  return out + (u at 1)
+end
+
+define json_string with cur
+  let s be cur at "s"
+  let n be cur at "n"
+  let i be cur at "i"
+  let latin be cur at "latin"
+  if i >= n
+    return json_mark with cur, "needs text"
+  end
+  if (s at i) != "\""
+    return json_mark with cur, "needs text"
+  end
+  let i be i + 1
+  let out be ""
+  while i < n
+    let ch be s at i
+    let i be i + 1
+    if ch == "\""
+      put i into cur at "i"
+      return out
+    end
+    if ch == "\\"
+      if i >= n
+        return json_mark with cur, "bad escape"
+      end
+      let esc be s at i
+      let i be i + 1
+      if esc == "u"
+        put i into cur at "i"
+        let code be json_read_hex4 with cur
+        if cur at "bad"
+          return none
+        end
+        let out be json_after_u with cur, code, out
+        if cur at "bad"
+          return none
+        end
+        let i be cur at "i"
+      else
+        let piece be json_simple_esc with esc
+        if piece == none
+          return json_mark with cur, "bad escape"
+        end
+        let out be out + piece
+      end
+    else
+      let b be json_byte with latin, ch
+      if b < 0
+        return json_mark with cur, "non-byte text"
+      end
+      if b < 32
+        return json_mark with cur, "unescaped control"
+      end
+      let out be out + ch
+    end
+  end
+  return json_mark with cur, "text unfinished"
+end
+
+define json_word with cur, want, value
+  let s be cur at "s"
+  let i be cur at "i"
+  let n be length with want
+  let k be 0
+  while k < n
+    if (i + k) >= (cur at "n")
+      return json_mark with cur, "bad value"
+    end
+    if (s at (i + k)) != (want at k)
+      return json_mark with cur, "bad value"
+    end
+    let k be k + 1
+  end
+  put (i + n) into cur at "i"
+  return value
+end
+
+define json_is_digit with ch
+  if (find with "0123456789", ch) >= 0
+    return true
+  end
+  return false
+end
+
+define json_digits_from with s, n, i
+  while i < n
+    if json_is_digit with (s at i)
+      let i be i + 1
+    else
+      stop
+    end
+  end
+  return i
+end
+
+define json_int_body with s, n, i
+  if i >= n
+    return 0 - 1
+  end
+  if (json_is_digit with (s at i)) == false
+    return 0 - 1
+  end
+  if (s at i) != "0"
+    return json_digits_from with s, n, i
+  end
+  let i be i + 1
+  if i >= n
+    return i
+  end
+  if json_is_digit with (s at i)
+    return 0 - 1
+  end
+  return i
+end
+
+define json_dot_part with s, n, i
+  if i >= n
+    return [i, 0]
+  end
+  if (s at i) != "."
+    return [i, 0]
+  end
+  let i be i + 1
+  let d0 be i
+  let i be json_digits_from with s, n, i
+  if i == d0
+    return [0 - 1, 1]
+  end
+  return [i, 1]
+end
+
+define json_exp_sign with s, n, i
+  if i >= n
+    return i
+  end
+  if ((s at i) == "+") or ((s at i) == "-")
+    return i + 1
+  end
+  return i
+end
+
+define json_exp_part with s, n, i
+  if i >= n
+    return [i, 0]
+  end
+  let e be s at i
+  if (e != "e") and (e != "E")
+    return [i, 0]
+  end
+  let i be json_exp_sign with s, n, (i + 1)
+  let d0 be i
+  let i be json_digits_from with s, n, i
+  if i == d0
+    return [0 - 1, 1]
+  end
+  return [i, 1]
+end
+
+define json_frac_exp with s, n, i
+  let dot be json_dot_part with s, n, i
+  if (dot at 0) < 0
+    return dot
+  end
+  let exp be json_exp_part with s, n, (dot at 0)
+  if (exp at 0) < 0
+    return exp
+  end
+  if ((dot at 1) + (exp at 1)) > 0
+    return [(exp at 0), 1]
+  end
+  return [(exp at 0), 0]
+end
+
+define json_make_int with raw, neg
+  let digits be raw
+  if neg == true
+    let digits be slice with raw, 1, (length with raw)
+  end
+  if (length with digits) > 10
+    return {"$n": raw}
+  end
+  let mag be 0
+  let p be 0
+  let dn be length with digits
+  while p < dn
+    let mag be (mag * 10) + (json_hex_val with (digits at p))
+    let p be p + 1
+  end
+  if mag > 2147483647
+    return {"$n": raw}
+  end
+  if neg == false
+    return mag
+  end
+  if mag == 0
+    return 0
+  end
+  return 0 - mag
+end
+
+define json_number with cur
+  let s be cur at "s"
+  let n be cur at "n"
+  let i be cur at "i"
+  let start be i
+  let neg be false
+  if i >= n
+    return json_mark with cur, "bad number"
+  end
+  if (s at i) == "-"
+    let neg be true
+    let i be i + 1
+  end
+  let i be json_int_body with s, n, i
+  if i < 0
+    return json_mark with cur, "bad number"
+  end
+  let rest be json_frac_exp with s, n, i
+  let i be rest at 0
+  if i < 0
+    return json_mark with cur, "bad number"
+  end
+  let raw be slice with s, start, i
+  put i into cur at "i"
+  if (rest at 1) == 1
+    return {"$n": raw}
+  end
+  return json_make_int with raw, neg
+end
+
+define json_here with cur, mark
+  if (cur at "i") >= (cur at "n")
+    return false
+  end
+  if ((cur at "s") at (cur at "i")) != mark
+    return false
+  end
+  return true
+end
+
+define json_array with cur
+  put ((cur at "d") + 1) into cur at "d"
+  if (cur at "d") > json_depth_max
+    return json_mark with cur, "too-deep nesting"
+  end
+  put ((cur at "i") + 1) into cur at "i"
+  json_skip with cur
+  let xs be []
+  if json_here with cur, "]"
+    put ((cur at "i") + 1) into cur at "i"
+    put ((cur at "d") - 1) into cur at "d"
+    return xs
+  end
+  while (cur at "i") < (cur at "n")
+    if (length with xs) > 100000
+      return json_mark with cur, "too large"
+    end
+    let one be json_value with cur
+    if cur at "bad"
+      return none
+    end
+    push with xs, one
+    json_skip with cur
+    if (cur at "i") >= (cur at "n")
+      return json_mark with cur, "list unfinished"
+    end
+    let ch be (cur at "s") at (cur at "i")
+    if ch == ","
+      put ((cur at "i") + 1) into cur at "i"
+      skip
+    end
+    if ch == "]"
+      put ((cur at "i") + 1) into cur at "i"
+      put ((cur at "d") - 1) into cur at "d"
+      return xs
+    end
+    return json_mark with cur, "list unfinished"
+  end
+  return json_mark with cur, "list unfinished"
+end
+
+define json_object with cur
+  put ((cur at "d") + 1) into cur at "d"
+  if (cur at "d") > json_depth_max
+    return json_mark with cur, "too-deep nesting"
+  end
+  put ((cur at "i") + 1) into cur at "i"
+  json_skip with cur
+  let m be {}
+  if json_here with cur, "}"
+    put ((cur at "i") + 1) into cur at "i"
+    put ((cur at "d") - 1) into cur at "d"
+    return m
+  end
+  while (cur at "i") < (cur at "n")
+    if (length with m) > 100000
+      return json_mark with cur, "too large"
+    end
+    json_skip with cur
+    let key be json_string with cur
+    if cur at "bad"
+      return none
+    end
+    json_skip with cur
+    if (cur at "i") >= (cur at "n")
+      return json_mark with cur, "needs a colon"
+    end
+    if ((cur at "s") at (cur at "i")) != ":"
+      return json_mark with cur, "needs a colon"
+    end
+    put ((cur at "i") + 1) into cur at "i"
+    let val be json_value with cur
+    if cur at "bad"
+      return none
+    end
+    put val into m at key
+    json_skip with cur
+    if (cur at "i") >= (cur at "n")
+      return json_mark with cur, "map unfinished"
+    end
+    let ch be (cur at "s") at (cur at "i")
+    if ch == ","
+      put ((cur at "i") + 1) into cur at "i"
+      skip
+    end
+    if ch == "}"
+      put ((cur at "i") + 1) into cur at "i"
+      put ((cur at "d") - 1) into cur at "d"
+      return m
+    end
+    return json_mark with cur, "map unfinished"
+  end
+  return json_mark with cur, "map unfinished"
+end
+
+define json_value with cur
+  json_skip with cur
+  if cur at "bad"
+    return none
+  end
+  if (cur at "d") > json_depth_max
+    return json_mark with cur, "too-deep nesting"
+  end
+  if (cur at "i") >= (cur at "n")
+    return json_mark with cur, "ended early"
+  end
+  let ch be (cur at "s") at (cur at "i")
+  if ch == "\""
+    return json_string with cur
+  end
+  if ch == "["
+    return json_array with cur
+  end
+  if ch == "{"
+    return json_object with cur
+  end
+  if ch == "t"
+    return json_word with cur, "true", true
+  end
+  if ch == "f"
+    return json_word with cur, "false", false
+  end
+  if ch == "n"
+    return json_word with cur, "null", none
+  end
+  return json_number with cur
+end
+
+define json_decode with raw
+  if raw == none
+    return json_bad with "ended early"
+  end
+  let n be length with raw
+  if n > 1000000
+    return json_bad with "too large"
+  end
+  let cur be {"s": raw, "i": 0, "n": n, "d": 0, "bad": false, "why": "", "latin": json_latin}
+  let value be json_value with cur
+  if cur at "bad"
+    return json_bad with (cur at "why")
+  end
+  json_skip with cur
+  if (cur at "i") != n
+    return json_bad with "extra text"
+  end
+  return json_ok with value
+end
+
+define json_is_bool with value
+  if value == true
+    return true
+  end
+  if value == false
+    return true
+  end
+  return false
+end
+
+define json_is_numbox with value
+  try
+    if (has with value, "$n") == false
+      return false
+    end
+    let names be keys with value
+    if (length with names) != 1
+      return false
+    end
+    return true
+  miss
+    return false
+  end
+end
+
+define json_is_map with value
+  if json_is_numbox with value
+    return false
+  end
+  try
+    let _ be keys with value
+    return true
+  miss
+    return false
+  end
+end
+
+define json_is_text with value
+  try
+    let _ be find with value, ""
+    return true
+  miss
+    return false
+  end
+end
+
+define json_is_list with value
+  if json_is_bool with value
+    return false
+  end
+  if value == none
+    return false
+  end
+  if json_is_map with value
+    return false
+  end
+  if json_is_numbox with value
+    return false
+  end
+  if json_is_text with value
+    return false
+  end
+  try
+    let _ be length with value
+    return true
+  miss
+    return false
+  end
+end
+
+define json_key_lt with latin, a, b
+  let i be 0
+  let na be length with a
+  let nb be length with b
+  while i < na
+    if i >= nb
+      return false
+    end
+    let ca be json_byte with latin, (a at i)
+    let cb be json_byte with latin, (b at i)
+    if ca < cb
+      return true
+    end
+    if ca > cb
+      return false
+    end
+    let i be i + 1
+  end
+  if na < nb
+    return true
+  end
+  return false
+end
+
+define json_sort_keys with latin, names
+  let n be length with names
+  let i be 0
+  while i < n
+    let j be i + 1
+    while j < n
+      if json_key_lt with latin, (names at j), (names at i)
+        let tmp be names at i
+        put (names at j) into names at i
+        put tmp into names at j
+      end
+      let j be j + 1
+    end
+    let i be i + 1
+  end
+  return names
+end
+
+define json_cont with b
+  if b < 128
+    return false
+  end
+  if b > 191
+    return false
+  end
+  return true
+end
+
+define json_utf8_2 with latin, s, n, i, b0
+  if (i + 1) >= n
+    return json_bad with "truncated utf8"
+  end
+  let b1 be json_byte with latin, (s at (i + 1))
+  if (json_cont with b1) == false
+    return json_bad with "bad utf8"
+  end
+  let cp be ((b0 - 192) * 64) + (b1 - 128)
+  if cp < 128
+    return json_bad with "overlong utf8"
+  end
+  return json_ok with [cp, (i + 2)]
+end
+
+define json_utf8_3 with latin, s, n, i, b0
+  if (i + 2) >= n
+    return json_bad with "truncated utf8"
+  end
+  let b1 be json_byte with latin, (s at (i + 1))
+  let b2 be json_byte with latin, (s at (i + 2))
+  if (json_cont with b1) == false
+    return json_bad with "bad utf8"
+  end
+  if (json_cont with b2) == false
+    return json_bad with "bad utf8"
+  end
+  let cp be ((b0 - 224) * 4096) + ((b1 - 128) * 64) + (b2 - 128)
+  if cp < 2048
+    return json_bad with "overlong utf8"
+  end
+  if (cp >= 55296) and (cp <= 57343)
+    return json_bad with "lone surrogate"
+  end
+  return json_ok with [cp, (i + 3)]
+end
+
+define json_utf8_4 with latin, s, n, i, b0
+  if (i + 3) >= n
+    return json_bad with "truncated utf8"
+  end
+  let b1 be json_byte with latin, (s at (i + 1))
+  let b2 be json_byte with latin, (s at (i + 2))
+  let b3 be json_byte with latin, (s at (i + 3))
+  if (json_cont with b1) == false
+    return json_bad with "bad utf8"
+  end
+  if (json_cont with b2) == false
+    return json_bad with "bad utf8"
+  end
+  if (json_cont with b3) == false
+    return json_bad with "bad utf8"
+  end
+  let cp be ((b0 - 240) * 262144) + ((b1 - 128) * 4096) + ((b2 - 128) * 64) + (b3 - 128)
+  if cp < 65536
+    return json_bad with "overlong utf8"
+  end
+  if cp > 1114111
+    return json_bad with "bad unicode"
+  end
+  return json_ok with [cp, (i + 4)]
+end
+
+define json_utf8_next with latin, s, i
+  let n be length with s
+  if i >= n
+    return json_bad with "truncated utf8"
+  end
+  let b0 be json_byte with latin, (s at i)
+  if b0 < 0
+    return json_bad with "non-byte text"
+  end
+  if b0 < 128
+    return json_ok with [b0, (i + 1)]
+  end
+  if b0 < 194
+    return json_bad with "bad utf8"
+  end
+  if b0 < 224
+    return json_utf8_2 with latin, s, n, i, b0
+  end
+  if b0 < 240
+    return json_utf8_3 with latin, s, n, i, b0
+  end
+  if b0 < 245
+    return json_utf8_4 with latin, s, n, i, b0
+  end
+  return json_bad with "bad utf8"
+end
+
+define json_esc_cp with cp
+  if cp == 8
+    return "\\b"
+  end
+  if cp == 12
+    return "\\f"
+  end
+  if cp == 10
+    return "\\n"
+  end
+  if cp == 13
+    return "\\r"
+  end
+  if cp == 9
+    return "\\t"
+  end
+  if cp == 34
+    return "\\\""
+  end
+  if cp == 92
+    return "\\\\"
+  end
+  if cp < 32
+    return json_hex4 with cp
+  end
+  if cp < 127
+    return chr with cp
+  end
+  if cp < 65536
+    return json_hex4 with cp
+  end
+  let x be cp - 65536
+  let hi be 55296 + (idiv with x, 1024)
+  let lo be 56320 + (x % 1024)
+  return (json_hex4 with hi) + (json_hex4 with lo)
+end
+
+define json_enc_text with latin, s
+  let i be 0
+  let n be length with s
+  let out be "\""
+  while i < n
+    let nxt be json_utf8_next with latin, s, i
+    if (nxt at 0) != "ok"
+      return nxt
+    end
+    let pair be nxt at 1
+    let out be out + (json_esc_cp with (pair at 0))
+    let i be pair at 1
+  end
+  return json_ok with (out + "\"")
+end
+
+define json_enc with latin, value, d, stable
+  if d > json_depth_max
+    return json_bad with "too-deep nesting"
+  end
+  if value == none
+    return json_ok with "null"
+  end
+  if value == true
+    return json_ok with "true"
+  end
+  if value == false
+    return json_ok with "false"
+  end
+  if json_is_numbox with value
+    return json_ok with (value at "$n")
+  end
+  if json_is_map with value
+    let names be keys with value
+    if stable == true
+      let names be json_sort_keys with latin, names
+    end
+    let out be "{"
+    let i be 0
+    let n be length with names
+    while i < n
+      if i > 0
+        let out be out + ","
+      end
+      let kenc be json_enc_text with latin, (names at i)
+      if (kenc at 0) != "ok"
+        return kenc
+      end
+      let venc be json_enc with latin, (value at (names at i)), (d + 1), stable
+      if (venc at 0) != "ok"
+        return venc
+      end
+      let out be out + (kenc at 1) + ":" + (venc at 1)
+      let i be i + 1
+    end
+    return json_ok with (out + "}")
+  end
+  if json_is_text with value
+    return json_enc_text with latin, value
+  end
+  if json_is_list with value
+    let out be "["
+    let i be 0
+    let n be length with value
+    while i < n
+      if i > 0
+        let out be out + ","
+      end
+      let one be json_enc with latin, (value at i), (d + 1), stable
+      if (one at 0) != "ok"
+        return one
+      end
+      let out be out + (one at 1)
+      let i be i + 1
+    end
+    return json_ok with (out + "]")
+  end
+  return json_ok with (text with value)
+end
+
+define json_encode with value
+  return json_enc with json_latin, value, 0, false
+end
+
+define json_stringify with value, opts
+  let stable be false
+  try
+    if (has with opts, "keys") == true
+      if (opts at "keys") == "stable"
+        let stable be true
+      end
+    end
+  miss
+  end
+  return json_enc with json_latin, value, 0, stable
+end
