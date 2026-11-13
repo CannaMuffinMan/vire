@@ -1,0 +1,37 @@
+~ String-keyed `at` on maps, including keys stored via slice (Lane 4 `u at "id"`).
+define match with pattern, path
+  let params be {}
+  let a be split with pattern, "/"
+  let b be split with path, "/"
+  if (length with a) != (length with b)
+    return none
+  end
+  let i be 0
+  while i < (length with a)
+    let p be a at i
+    let g be b at i
+    let first be ""
+    if (length with p) > 0
+      let first be p at 0
+    end
+    if first == ":"
+      let name be slice with p, 1, (length with p)
+      put g into params at name
+    end
+    if first != ":"
+      if p != g
+        return none
+      end
+    end
+    let i be i + 1
+  end
+  return params
+end
+
+define main
+  let person be {"name": "ada", "year": 1815}
+  say person at "name"
+  say has with person, "year"
+  let u be match with "/api/users/:id", "/api/users/42"
+  say u at "id"
+end

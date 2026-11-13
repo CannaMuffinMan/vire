@@ -1,0 +1,4 @@
+define main
+  let u be none
+  say u at "id"
+end
