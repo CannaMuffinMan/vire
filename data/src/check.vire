@@ -81,7 +81,7 @@ define formatCaps with caps
   while i < (length with labels)
     let j be i + 1
     while j < (length with labels)
-      if (labels at j) < (labels at i)
+      if textLess with (labels at j), (labels at i)
         let tmp be labels at i
         put (labels at j) into labels at i
         put tmp into labels at j
@@ -91,6 +91,27 @@ define formatCaps with caps
     let i be i + 1
   end
   return join with labels, ", "
+end
+
+define textLess with a, b
+  let i be 0
+  let na be length with a
+  let nb be length with b
+  while i < na
+    if i >= nb
+      return false
+    end
+    let ca be codeOf with (a at i)
+    let cb be codeOf with (b at i)
+    if ca < cb
+      return true
+    end
+    if ca > cb
+      return false
+    end
+    let i be i + 1
+  end
+  return na < nb
 end
 
 define allowedSet with caps

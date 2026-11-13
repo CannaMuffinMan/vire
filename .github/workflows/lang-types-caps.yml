@@ -26,8 +26,6 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
-      - name: stage compiler sources
-        run: bash tools/stage-compiler-src.sh
       - name: native selfhost gen1=gen2
         run: pwsh -File tools/native-selfhost-handoff.ps1
       - name: host and gen1 PE types/caps
