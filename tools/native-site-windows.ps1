@@ -13,7 +13,7 @@ if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
 
 $BaseSha = "6fbb705"
 Write-Output "fail_before_sha $BaseSha"
-Write-Output "FAIL_BEFORE at $BaseSha: no ETag/304/declared-root native site gate; host TrySite had no SHA-256 ETag"
+Write-Output "FAIL_BEFORE at ${BaseSha}: no ETag/304/declared-root native site gate; host TrySite had no SHA-256 ETag"
 
 $siteSrc = Join-Path $Root "sites/landing/site"
 $siteDst = Join-Path $Root "site"
