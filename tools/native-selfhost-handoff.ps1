@@ -202,6 +202,14 @@ if ($h1 -ne $h2) {
     $k = 1024
     while ($k -lt $n -and $s1[$k] -eq $s2[$k]) { $k++ }
     Write-Output ("gen_hex_first_body_diff " + $k)
+    if ($k -lt $n) {
+        $even = $k - ($k % 2)
+        $a = [Math]::Max(0, $even - 16)
+        $b = [Math]::Min($n, $even + 32)
+        Write-Output ("gen1_at_body " + $s1.Substring($a, $b - $a))
+        Write-Output ("gen2_at_body " + $s2.Substring($a, $b - $a))
+        Write-Output ("gen_body_file_off " + ($even / 2))
+    }
     if ($s1.Length -ge 440 -and $s2.Length -ge 440) {
         $t1 = $s1.Remove(432, 8).Insert(432, "00000000")
         $t2 = $s2.Remove(432, 8).Insert(432, "00000000")
