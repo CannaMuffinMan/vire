@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
 $BaseSha = "9ea4561d12236f7f2f44858f137d7c948836df65"
-$AfterSha = (git rev-parse HEAD).Trim()
+$AfterSha = if ($env:VIRE_HEAD_SHA) { $env:VIRE_HEAD_SHA.Trim() } else { (git rev-parse HEAD).Trim() }
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
 
@@ -70,7 +70,7 @@ try {
 } finally {
     git worktree remove --force $fb
 }
-Write-Output "FAIL_BEFORE at $BaseSha: src/http.vire missing; HTTP framework guest would not compile"
+Write-Output ("FAIL_BEFORE at {0}: src/http.vire missing; HTTP framework guest would not compile" -f $BaseSha)
 
 Copy-Item (Join-Path $Root "http-prove.vire") (Join-Path $Data "http-prove.vire") -Force
 Copy-Item (Join-Path $Root "guest-http.vire") (Join-Path $Data "guest-http.vire") -Force
@@ -259,4 +259,4 @@ try {
     try { $peProc.Kill() } catch { }
 }
 
-Write-Output "PASS_AFTER at $AfterSha host and gen1 PE HTTP framework routes identical; adversarial 400"
+Write-Output ("PASS_AFTER at {0} host and gen1 PE HTTP framework routes identical; adversarial 400" -f $AfterSha)

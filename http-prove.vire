@@ -11,9 +11,9 @@ define main
   say ((t at "query") at "q")
   let u be http_match with "/api/users/:id", "/api/users/42"
   say (u at "id")
-  let miss be http_match with "/api/users/:id", "/api/posts/42"
-  if miss == none
-    say "miss"
+  let unmatched be http_match with "/api/users/:id", "/api/posts/42"
+  if unmatched == none
+    say "unmatched"
   end
   let hdrs be http_parse_headers with "GET /x HTTP/1.1\r\nHost: x\r\nX-Foo: Bar\r\nCookie: sid=abc; k=v\r\n\r\n"
   say (http_header_get with hdrs, "x-foo")

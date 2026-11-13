@@ -5,7 +5,7 @@ cd "$Root"
 export VIRE_BUDGET=5000000 VIRE_HEADLESS=1
 VireDll="$Root/bin/Release/net10.0/vire.dll"
 BaseSha="9ea4561d12236f7f2f44858f137d7c948836df65"
-AfterSha="$(git rev-parse HEAD)"
+AfterSha="${VIRE_HEAD_SHA:-$(git rev-parse HEAD)}"
 echo "fail_before_sha $BaseSha"
 echo "pass_after_sha $AfterSha"
 git cat-file -e "${BaseSha}^{commit}" || git fetch --depth 1 origin "$BaseSha"

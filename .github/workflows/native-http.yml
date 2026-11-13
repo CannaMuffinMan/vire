@@ -4,6 +4,8 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  VIRE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 jobs:
   native-http-ubuntu:
     runs-on: ubuntu-latest
