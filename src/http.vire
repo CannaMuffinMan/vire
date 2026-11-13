@@ -95,66 +95,43 @@ end
 
 define http_header_get with headers, name
   let want be lower with name
-  if (has with headers, want)
-    return headers at want
+  let ks be keys with headers
+  let i be 0
+  while i < (length with ks)
+    if (lower with (ks at i)) == want
+      return headers at (ks at i)
+    end
+    let i be i + 1
   end
   return none
 end
 
-define http_next_crlf with block, i
-  let n be length with block
-  while i < n
-    if (i + 1) < n
-      if (block at i) == "\r"
-        if (block at (i + 1)) == "\n"
-          return i
+define http_parse_headers with block
+  let headers be {}
+  let lines be split with block, "\r\n"
+  let i be 1
+  let sawCl be 0
+  let sawTe be 0
+  while i < (length with lines)
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon <= 0
+        put true into headers at "_bad"
+      else
+        let name be http_trim with (slice with line, 0, colon)
+        let value be http_trim with (slice with line, (colon + 1), (length with line))
+        let low be lower with name
+        put value into headers at low
+        if low == "content-length"
+          let sawCl be sawCl + 1
+        end
+        if low == "transfer-encoding"
+          let sawTe be sawTe + 1
         end
       end
     end
     let i be i + 1
-  end
-  return 0 - 1
-end
-
-define http_parse_headers with block
-  let headers be {}
-  let i be 0
-  let n be length with block
-  let lineNo be 0
-  let sawCl be 0
-  let sawTe be 0
-  while i <= n
-    let cr be http_next_crlf with block, i
-    let endLine be n
-    if cr >= 0
-      let endLine be cr
-    end
-    let line be slice with block, i, endLine
-    if lineNo > 0
-      if line != ""
-        let colon be find with line, ":"
-        if colon <= 0
-          put true into headers at "_bad"
-        end
-        if colon > 0
-          let name be http_trim with (slice with line, 0, colon)
-          let value be http_trim with (slice with line, (colon + 1), (length with line))
-          let low be lower with name
-          put value into headers at low
-          if low == "content-length"
-            let sawCl be sawCl + 1
-          end
-          if low == "transfer-encoding"
-            let sawTe be sawTe + 1
-          end
-        end
-      end
-    end
-    let lineNo be lineNo + 1
-    if cr < 0
-      stop
-    end
-    let i be cr + 2
   end
   put sawCl into headers at "_cl"
   put sawTe into headers at "_te"
@@ -169,32 +146,21 @@ define http_parse_cookies with raw
   if raw == ""
     return jar
   end
+  let parts be split with raw, ";"
   let i be 0
-  let n be length with raw
-  while i <= n
-    let semi be i
-    while semi < n
-      if (raw at semi) == ";"
-        stop
-      end
-      let semi be semi + 1
-    end
-    let part be http_trim with (slice with raw, i, semi)
+  while i < (length with parts)
+    let part be http_trim with (parts at i)
     if part != ""
       let eq be find with part, "="
       if eq < 0
         put "" into jar at part
-      end
-      if eq >= 0
+      else
         let k be http_trim with (slice with part, 0, eq)
         let v be http_trim with (slice with part, (eq + 1), (length with part))
         put v into jar at k
       end
     end
-    if semi >= n
-      stop
-    end
-    let i be semi + 1
+    let i be i + 1
   end
   return jar
 end
@@ -262,52 +228,27 @@ define http_decode_chunked with raw
 end
 
 define http_match with pattern, path
+  let a be split with pattern, "/"
+  let b be split with path, "/"
+  if (length with a) != (length with b)
+    return none
+  end
   let params be {}
   let i be 0
-  let j be 0
-  let pn be length with pattern
-  let gn be length with path
-  while i <= pn
-    let ns be i
-    while ns < pn
-      if (pattern at ns) == "/"
-        stop
-      end
-      let ns be ns + 1
-    end
-    let ng be j
-    while ng < gn
-      if (path at ng) == "/"
-        stop
-      end
-      let ng be ng + 1
-    end
-    let p be slice with pattern, i, ns
-    let g be slice with path, j, ng
-    let first be ""
-    if (length with p) > 0
-      let first be p at 0
-    end
-    if first == ":"
+  while i < (length with a)
+    let p be a at i
+    let g be b at i
+    let flag be begins with p, ":"
+    if flag
       let name be slice with p, 1, (length with p)
       put g into params at name
     end
-    if first != ":"
+    if flag == false
       if p != g
         return none
       end
     end
-    if ns == pn
-      if ng != gn
-        return none
-      end
-      return params
-    end
-    if ng == gn
-      return none
-    end
-    let i be ns + 1
-    let j be ng + 1
+    let i be i + 1
   end
   return params
 end
