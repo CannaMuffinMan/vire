@@ -26,7 +26,7 @@ Native Windows x64 PE (this tree, proven in `native-security.yml` / Windows jobs
 
 - Emitted `.text` is execute+read, `.data`/`.idata` read+write (W^X section characteristics). Entry calls `VirtualQuery` and exits if a code page is writable+executable or a data page is executable.
 - Guest `write` of compiler output under `data/` uses a sibling `.tmp` plus `MoveFileExA(REPLACE_EXISTING)` after dest nlink==1 (hardlinks still refuse). Host `VireFiles.WriteAllText` already used tmp+`File.Move`.
-- Native faults go to stdout as `crash code=` / `crash rip=` / `crash off=` (RIP minus `0x140000000`) and to `data/crash.log` only via exclusive `CREATE_NEW` plus bind/nlink. `crash-rip.txt` is not created.
+- Native faults go to stdout as `crash code=` / `crash rip=` / `crash off=` (RIP minus `0x140000000`) and to `data/crash.log` via exclusive `CREATE_NEW` (no heap bind in VEH). `crash-rip.txt` is not created.
 - Seeded HTTP (`HttpWire`), JSON (`parse` / `src/rt-schema`), and Postgres row/error parsers (`src/rt-pg.vire` `pg_rows_parse` / `pg_err`): host and PE must not AV/hang. No WebSocket frame or Redis reply parser on this branch.
 
 ## Non-guarantees

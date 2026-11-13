@@ -99,8 +99,9 @@ public class NativePathSafetyTests
         int after = rt.IndexOf("pin with labels, \"rt_push_int\"", crash);
         string slice = rt.Substring(crash, after - crash);
         Assert.Contains("iat_cf", slice);
-        Assert.Contains("rt_bind_path", slice);
+        Assert.DoesNotContain("rt_bind_path", slice);
         Assert.Contains("crash_log_path", slice);
+        Assert.Contains("72, 199, 68, 36, 32, 1, 0, 0, 0", slice);
         Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", slice);
         Assert.Contains("crash_rip_msg", slice);
     }

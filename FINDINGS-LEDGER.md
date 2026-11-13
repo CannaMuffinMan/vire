@@ -17,7 +17,7 @@ No CVE IDs. Caps/sandbox/Defender unchanged.
 | F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
 | F4 | yes | Unicorn + Windows `f4_double_read` / intern section; **W^X** PE `.text` `0x60000020` / `.data` `0xC0000040` + `VirtualQuery` / SEC_IMAGE + silent `rt_wx_check` | intern may sit in RW `.data`; property is copy-before-NUL |
 | F5 | yes | Unicorn nlink; Windows hardlink; **until-hit then fixed==0**; dest nlink==1 then **tmp + MoveFileExA** atomic replace under `data/` | walk-then-open is a separate gate (`f_walk`) |
-| F6 | yes | VEH still prints `crash rip=`; **also** `crash code=` + `crash off=` to stdout and `data/crash.log` via CREATE_NEW + `rt_bind_path` + nlink==1 (never CREATE_ALWAYS / crash-rip.txt) | log skipped if `data/crash.log` already exists (CREATE_NEW) |
+| F6 | yes | VEH still prints `crash rip=`; **also** `crash code=` + `crash off=` to stdout and `data/crash.log` via exclusive `CREATE_NEW` (never CREATE_ALWAYS / crash-rip.txt). No heap `rt_bind_path` in VEH — filter can run before VirtualAlloc | log skipped if `data/crash.log` already exists (CREATE_NEW) |
 | F7 | yes | `42770835327` printed `files stay inside the program folder` | — |
 | F8 | yes | `and 255` on host; `mov rcx,imm64` in compile-native; host+Unicorn `[0, 0, 1]` for 2^31 / 2^39 / 2^31+1 | — |
 | F9 | yes | PackZipSigned gone | — |
