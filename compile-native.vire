@@ -1117,21 +1117,45 @@ define emitOp with gen, bytes
   return true
 end
 
+define emitFix with gen, name
+  ~ Runtime labels from emitRuntime/emitMore are pinned before user code.
+  ~ Net/JSON packed labels land later — those stay deferred.
+  ~ Patch early rt_* rel32 now so `fixes` stays under the 100000 cap.
+  let later be false
+  if begins with name, "rt_net"
+    let later be true
+  end
+  if begins with name, "rt_json"
+    let later be true
+  end
+  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
+    let later be true
+  end
+  if (begins with name, "rt_") and (later == false)
+    let buf be gen at "image"
+    let pos be length with buf
+    put (emitU32 with buf, (((gen at "labels") at name) - (pos + 4))) into gen at "image"
+    return true
+  end
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
 define emitCall with gen, name
   put (emitU8 with (gen at "image"), 232) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitJmp with gen, name
   put (emitU8 with (gen at "image"), 233) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitLeaRcx with gen, name
   emitOp with gen, [72, 141, 13]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1150,7 +1174,7 @@ end
 
 define emitJz with gen, name
   emitOp with gen, [15, 132]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1330,16 +1354,18 @@ define emitExpr with gen, funcs, func, root
   if gen at "bad"
     return true
   end
+  ~ List frames, not maps: map_new leaves cap-4 unused slots. Those slots
+  ~ are GC-visible and were uninitialized. Index: e, p, i, no, yes, done.
   let stack be []
-  push with stack, {"e": root, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+  push with stack, [root, 0, 0, "", "", ""]
   while (length with stack) > 0
     if gen at "bad"
       stop
     end
     let si be (length with stack) - 1
     let fr be stack at si
-    let expr be fr at "e"
-    let p be fr at "p"
+    let expr be fr at 0
+    let p be fr at 1
     let k be expr at 0
     if k == "num" or k == "text" or k == "bool" or k == "none" or k == "name"
       emitAtom with gen, funcs, func, expr
@@ -1347,9 +1373,9 @@ define emitExpr with gen, funcs, func, root
     end
     if k == "not" or k == "neg"
       if p == 0
-        put 1 into fr at "p"
+        put 1 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 1, 0, 0, "", "", ""]
       end
       if p == 1
         if k == "not"
@@ -1391,16 +1417,16 @@ define emitExpr with gen, funcs, func, root
         if user == 1
           emitCall with gen, "rt_save_frame"
         end
-        put 1 into fr at "p"
-        put 0 into fr at "i"
+        put 1 into fr at 1
+        put 0 into fr at 2
         put fr into stack at si
       end
       if p == 1
-        let i be fr at "i"
+        let i be fr at 2
         if i < (length with args)
-          put (i + 1) into fr at "i"
+          put (i + 1) into fr at 2
           put fr into stack at si
-          push with stack, {"e": args at i, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+          push with stack, [args at i, 0, 0, "", "", ""]
         end
         if i >= (length with args)
           if user == 0
@@ -1423,29 +1449,29 @@ define emitExpr with gen, funcs, func, root
       if p == 0
         let no be fresh with gen
         let done be fresh with gen
-        put no into fr at "no"
-        put done into fr at "done"
-        put 1 into fr at "p"
+        put no into fr at 3
+        put done into fr at 5
+        put 1 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 1, 0, 0, "", "", ""]
       end
       if p == 1
         emitCall with gen, "rt_truth"
         emitOp with gen, [133, 192]
-        emitJz with gen, (fr at "no")
-        put 2 into fr at "p"
+        emitJz with gen, (fr at 3)
+        put 2 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 2, 0, 0, "", "", ""]
       end
       if p == 2
         emitCall with gen, "rt_truth"
         emitBoolAcc with gen
-        emitJmp with gen, (fr at "done")
-        pinHere with gen, (fr at "no")
+        emitJmp with gen, (fr at 5)
+        pinHere with gen, (fr at 3)
         put (emitU8 with (gen at "image"), 185) into gen at "image"
         put (emitU32 with (gen at "image"), 0) into gen at "image"
         emitCall with gen, "rt_push_bool"
-        pinHere with gen, (fr at "done")
+        pinHere with gen, (fr at 5)
         drop with stack
       end
     end
@@ -1453,44 +1479,44 @@ define emitExpr with gen, funcs, func, root
       if p == 0
         let yes be fresh with gen
         let done be fresh with gen
-        put yes into fr at "yes"
-        put done into fr at "done"
-        put 1 into fr at "p"
+        put yes into fr at 4
+        put done into fr at 5
+        put 1 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 1, 0, 0, "", "", ""]
       end
       if p == 1
         emitCall with gen, "rt_truth"
         emitOp with gen, [133, 192]
         put (emitU8 with (gen at "image"), 15) into gen at "image"
         put (emitU8 with (gen at "image"), 133) into gen at "image"
-        put (emitRel with (gen at "image"), (gen at "fixes"), (fr at "yes")) into gen at "image"
-        put 2 into fr at "p"
+        put (emitRel with (gen at "image"), (gen at "fixes"), (fr at 4)) into gen at "image"
+        put 2 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 2, 0, 0, "", "", ""]
       end
       if p == 2
         emitCall with gen, "rt_truth"
         emitBoolAcc with gen
-        emitJmp with gen, (fr at "done")
-        pinHere with gen, (fr at "yes")
+        emitJmp with gen, (fr at 5)
+        pinHere with gen, (fr at 4)
         put (emitU8 with (gen at "image"), 185) into gen at "image"
         put (emitU32 with (gen at "image"), 1) into gen at "image"
         emitCall with gen, "rt_push_bool"
-        pinHere with gen, (fr at "done")
+        pinHere with gen, (fr at 5)
         drop with stack
       end
     end
     if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">=" or k == "+" or k == "-" or k == "*" or k == "/" or k == "%" or k == "at"
       if p == 0
-        put 1 into fr at "p"
+        put 1 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 1, 0, 0, "", "", ""]
       end
       if p == 1
-        put 2 into fr at "p"
+        put 2 into fr at 1
         put fr into stack at si
-        push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        push with stack, [expr at 2, 0, 0, "", "", ""]
       end
       if p == 2
         if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">="
@@ -1538,17 +1564,17 @@ define emitExpr with gen, funcs, func, root
     if k == "list"
       if p == 0
         emitCall with gen, "rt_list_new"
-        put 1 into fr at "p"
-        put 0 into fr at "i"
+        put 1 into fr at 1
+        put 0 into fr at 2
         put fr into stack at si
       end
       if p == 1
         let items be expr at 1
-        let i be fr at "i"
+        let i be fr at 2
         if i < (length with items)
-          put 2 into fr at "p"
+          put 2 into fr at 1
           put fr into stack at si
-          push with stack, {"e": items at i, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+          push with stack, [items at i, 0, 0, "", "", ""]
         end
         if i >= (length with items)
           drop with stack
@@ -1556,40 +1582,40 @@ define emitExpr with gen, funcs, func, root
       end
       if p == 2
         emitCall with gen, "rt_push"
-        put 1 into fr at "p"
-        put ((fr at "i") + 1) into fr at "i"
+        put 1 into fr at 1
+        put ((fr at 2) + 1) into fr at 2
         put fr into stack at si
       end
     end
     if k == "map"
       if p == 0
         emitCall with gen, "rt_map_new"
-        put 1 into fr at "p"
-        put 0 into fr at "i"
+        put 1 into fr at 1
+        put 0 into fr at 2
         put fr into stack at si
       end
       if p == 1
         let pairs be expr at 1
-        let i be fr at "i"
+        let i be fr at 2
         if i < (length with pairs)
-          put 2 into fr at "p"
+          put 2 into fr at 1
           put fr into stack at si
-          push with stack, {"e": (pairs at i) at 1, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+          push with stack, [(pairs at i) at 1, 0, 0, "", "", ""]
         end
         if i >= (length with pairs)
           drop with stack
         end
       end
       if p == 2
-        put 3 into fr at "p"
+        put 3 into fr at 1
         put fr into stack at si
-        let pair be (expr at 1) at (fr at "i")
-        push with stack, {"e": pair at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
+        let pair be (expr at 1) at (fr at 2)
+        push with stack, [pair at 2, 0, 0, "", "", ""]
       end
       if p == 3
         emitCall with gen, "rt_map_put"
-        put 1 into fr at "p"
-        put ((fr at "i") + 1) into fr at "i"
+        put 1 into fr at 1
+        put ((fr at 2) + 1) into fr at 2
         put fr into stack at si
       end
     end
