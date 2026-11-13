@@ -90,6 +90,7 @@ public static class WxNative {
     public IntPtr BaseAddress;
     public IntPtr AllocationBase;
     public uint AllocationProtect;
+    public ushort PartitionId;
     public UIntPtr RegionSize;
     public uint State;
     public uint Protect;
@@ -97,7 +98,8 @@ public static class WxNative {
   }
 }
 "@
-    $h = [WxNative]::CreateFileW($ExePath, 0x80000000, 1, [IntPtr]::Zero, 3, 0, [IntPtr]::Zero)
+    $genericRead = [uint32]2147483648
+    $h = [WxNative]::CreateFileW($ExePath, $genericRead, 1, [IntPtr]::Zero, 3, 0, [IntPtr]::Zero)
     if ($h -eq [IntPtr]::new(-1)) { throw "CreateFileW $ExePath" }
     # PAGE_READONLY | SEC_IMAGE
     $map = [WxNative]::CreateFileMappingW($h, [IntPtr]::Zero, 0x1000002, 0, 0, $null)
@@ -121,8 +123,8 @@ public static class WxNative {
     [void][WxNative]::VirtualQuery($dataAddr, [ref]$mbi, [IntPtr]48)
     $dataProt = $mbi.Protect
     Write-Host ("f4_vq_text=0x{0:X} f4_vq_data=0x{1:X}" -f $textProt, $dataProt)
-    if (($textProt -band 0xC0) -ne 0) { throw "text page is W+X" }
-    if (($textProt -band 0x30) -eq 0) { throw "text page is not executable" }
+    if (($textProt -band 0x40) -ne 0) { throw "text page is PAGE_EXECUTE_READWRITE" }
+    if (($textProt -band 0xF0) -eq 0) { throw "text page is not executable" }
     if (($dataProt -band 0xF0) -ne 0) { throw "data page is executable" }
     [void][WxNative]::CloseHandle($map)
     [void][WxNative]::CloseHandle($h)

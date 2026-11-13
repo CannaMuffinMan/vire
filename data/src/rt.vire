@@ -86,11 +86,11 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [72, 141, 5]
   let image be emitRel with image, fixes, "wx_mbi"
   let image be emitList with image, [139, 64, 36, 169]
-  let image be emitU32 with image, 192
+  let image be emitU32 with image, 64
   let image be emitList with image, [15, 133]
   let image be emitRel with image, fixes, "wx_bad"
   let image be emitList with image, [169]
-  let image be emitU32 with image, 48
+  let image be emitU32 with image, 240
   let image be emitList with image, [15, 132]
   let image be emitRel with image, fixes, "wx_bad"
   let image be emitList with image, [72, 141, 13]
