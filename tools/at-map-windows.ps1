@@ -6,8 +6,10 @@ $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$BaseSha = (git rev-parse origin/native-compiler).Trim()
+$BaseSha = "3946d1c6c4f3fc12e4a486da600bba354ad60c64"
 $AfterSha = (git rev-parse HEAD).Trim()
+git cat-file -t $BaseSha 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) { git fetch origin $BaseSha 2>&1 | Out-Host }
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
 Copy-Item (Join-Path $Root "tests/native/at-map.vire") (Join-Path $Data "at-map.vire") -Force
@@ -41,6 +43,7 @@ Write-Output $beforeOut
 $beforeNorm = ($beforeOut -replace '\r', '').Trim()
 $wantNorm = ($Want -replace '\r', '').Trim()
 if ($beforeCode -eq 0 -and $beforeNorm -eq $wantNorm) { throw "expected base PE to disagree on u at id" }
+if ($beforeOut -notmatch "an index must be a whole number") { throw "expected FAIL_BEFORE at $BaseSha to print an index must be a whole number" }
 Write-Output ("FAIL_BEFORE at " + $BaseSha + ": gen1 PE split/at for u at `"id`" disagreed with host")
 git worktree remove --force $Work
 
