@@ -235,7 +235,7 @@ static class VireListen
             SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
-        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line, root))
+        if (VireSite.Try(stream, method, path, head, line, root))
             return;
         object result;
         int maxOutput;
@@ -309,10 +309,12 @@ static class VireListen
     {
         if (code == 200) return "OK";
         if (code == 206) return "Partial Content";
+        if (code == 304) return "Not Modified";
         if (code == 400) return "Bad Request";
         if (code == 401) return "Unauthorized";
         if (code == 403) return "Forbidden";
         if (code == 404) return "Not Found";
+        if (code == 405) return "Method Not Allowed";
         if (code == 408) return "Request Timeout";
         if (code == 411) return "Length Required";
         if (code == 413) return "Payload Too Large";
@@ -358,67 +360,7 @@ static class VireListen
 
     static bool TrySite(NetworkStream stream, string method, string url, string head, int line, string root)
     {
-        string site = Path.Combine(root, "site");
-        if (!Directory.Exists(site)) return false;
-        string rel;
-        if (!SiteRelative(url, out rel))
-        {
-            SendSiteEmpty(stream, 404, "text/plain", "not found");
-            return true;
-        }
-        string type;
-        long limit;
-        if (!SiteType(rel, out type, out limit)) return false;
-        string full;
-        try { full = VirePaths.DataOrSite(root, "site/" + rel, line); }
-        catch (VireError)
-        {
-            SendSiteEmpty(stream, 404, "text/plain", "not found");
-            return true;
-        }
-        string siteRoot = Path.GetFullPath(Path.Combine(root, "site"));
-        if (!VirePaths.InFolder(siteRoot, full))
-        {
-            SendSiteEmpty(stream, 404, "text/plain", "not found");
-            return true;
-        }
-        if (!File.Exists(full) || Directory.Exists(full)) return false;
-        try
-        {
-            if ((File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0)
-            {
-                SendSiteEmpty(stream, 404, "text/plain", "not found");
-                return true;
-            }
-        }
-        catch (IOException)
-        {
-            SendSiteEmpty(stream, 404, "text/plain", "not found");
-            return true;
-        }
-        long length = new FileInfo(full).Length;
-        if (length > limit)
-        {
-            SendSiteEmpty(stream, 413, "text/plain", "too large");
-            return true;
-        }
-        long start = 0;
-        long count = length;
-        bool partial = false;
-        bool video = type.StartsWith("video/", StringComparison.Ordinal);
-        if (video)
-        {
-            int rangeStatus = SiteRange(head, length, out start, out count, out partial);
-            if (rangeStatus == 416)
-            {
-                SendSiteRangeFail(stream, type, length);
-                return true;
-            }
-        }
-        long writeCount = method == "HEAD" ? 0 : count;
-        using (FileStream file = File.OpenRead(full))
-            SendSiteFile(stream, partial ? 206 : 200, type, file, start, count, writeCount, partial, length, video);
-        return true;
+        return VireSite.Try(stream, method, url, head, line, root);
     }
 
     static bool SiteRelative(string url, out string rel)

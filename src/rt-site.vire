@@ -1,0 +1,299 @@
+~ Native static files from declared root site/. Locals live on rsp so the
+~ listen client's rbp frame stays intact. Traversal is 404. POST of a real
+~ file is 405. Missing files fall through to route (API).
+
+define emitSiteRuntime with image, fixes, labels
+  put ((labels at "rt_net_client") + 1511) into labels at "rt_net_client_ok"
+  push with fixes, {"at": ((labels at "rt_net_client") + 1455), "to": "rt_site_gate"}
+  parkMsg with image, labels, "txt_site_pre", "HTTP/1.1 "
+  parkMsg with image, labels, "txt_site_okph", "200 OK"
+  parkMsg with image, labels, "txt_site_nfph", "404 Not Found"
+  parkMsg with image, labels, "txt_site_moph", "405 Method Not Allowed"
+  parkMsg with image, labels, "txt_site_ct", "\r\nContent-Type: "
+  parkMsg with image, labels, "txt_site_cl", "\r\nContent-Length: "
+  parkMsg with image, labels, "txt_site_rest", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'\r\nCache-Control: public, max-age=60\r\nETag: \""
+  parkMsg with image, labels, "txt_site_end", "\"\r\n\r\n"
+  parkMsg with image, labels, "txt_site_html", "text/html; charset=utf-8"
+  parkMsg with image, labels, "txt_site_css", "text/css; charset=utf-8"
+  parkMsg with image, labels, "txt_site_svg", "image/svg+xml"
+  parkMsg with image, labels, "txt_site_json", "application/json; charset=utf-8"
+  parkMsg with image, labels, "txt_site_txt", "text/plain; charset=utf-8"
+  parkMsg with image, labels, "txt_site_md", "text/markdown; charset=utf-8"
+  parkMsg with image, labels, "txt_site_nfbody", "<html>not found</html>"
+  parkMsg with image, labels, "txt_site_mbody", "<html>method not allowed</html>"
+  parkMsg with image, labels, "txt_site_idx", "index.html"
+  pin with labels, "rt_site_gate", image
+  emitList with image, [72, 129, 236, 128, 0, 0, 0]
+  emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
+  emitList with image, [72, 139, 69, 248, 72, 139, 80, 40]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_GET"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "site_is_get"
+  emitList with image, [72, 139, 69, 248, 72, 139, 80, 40]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_HEAD"
+  emitCallTo with image, fixes, "rt_texteq"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "site_is_head"
+  emitList with image, [199, 68, 36, 64, 2, 0, 0, 0]
+  emitJmpTo with image, fixes, "site_have_method"
+  pin with labels, "site_is_head", image
+  emitList with image, [199, 68, 36, 64, 1, 0, 0, 0]
+  emitJmpTo with image, fixes, "site_have_method"
+  pin with labels, "site_is_get", image
+  emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
+  pin with labels, "site_have_method", image
+  emitList with image, [72, 139, 69, 248, 72, 139, 80, 48]
+  emitList with image, [72, 133, 210, 15, 132]
+  emitRel with image, fixes, "site_fall"
+  emitList with image, [72, 139, 10]
+  emitList with image, [72, 141, 66, 8]
+  emitList with image, [72, 137, 68, 36, 72]
+  emitList with image, [72, 137, 76, 36, 80]
+  emitList with image, [49, 192]
+  pin with labels, "site_skip", image
+  emitList with image, [72, 59, 68, 36, 80, 15, 131]
+  emitRel with image, fixes, "site_rel"
+  emitList with image, [72, 139, 84, 36, 72, 68, 15, 182, 4, 2, 65, 128, 248, 47, 15, 133]
+  emitRel with image, fixes, "site_rel"
+  emitList with image, [72, 255, 192, 233]
+  emitRel with image, fixes, "site_skip"
+  pin with labels, "site_rel", image
+  emitList with image, [72, 139, 76, 36, 80, 72, 41, 193, 72, 133, 201, 15, 133]
+  emitRel with image, fixes, "site_have_rel"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_site_idx"
+  emitList with image, [72, 139, 10, 72, 141, 66, 8, 72, 137, 68, 36, 72, 72, 137, 76, 36, 80, 49, 192]
+  pin with labels, "site_have_rel", image
+  emitList with image, [72, 137, 68, 36, 88]
+  emitList with image, [72, 139, 76, 36, 80, 72, 43, 76, 36, 88, 72, 137, 76, 36, 96]
+  emitList with image, [49, 192]
+  pin with labels, "site_ch", image
+  emitList with image, [72, 59, 68, 36, 96, 15, 131]
+  emitRel with image, fixes, "site_okpath"
+  emitList with image, [72, 139, 84, 36, 72, 68, 15, 182, 12, 2, 65, 128, 249, 92, 15, 132]
+  emitRel with image, fixes, "site_bad"
+  emitList with image, [65, 128, 249, 37, 15, 132]
+  emitRel with image, fixes, "site_bad"
+  emitList with image, [65, 128, 249, 58, 15, 132]
+  emitRel with image, fixes, "site_bad"
+  emitList with image, [65, 128, 249, 0, 15, 132]
+  emitRel with image, fixes, "site_bad"
+  emitList with image, [65, 128, 249, 46, 15, 133]
+  emitRel with image, fixes, "site_nextch"
+  emitList with image, [72, 141, 80, 1, 72, 59, 84, 36, 96, 15, 131]
+  emitRel with image, fixes, "site_nextch"
+  emitList with image, [72, 139, 76, 36, 72, 68, 15, 182, 20, 17, 65, 128, 250, 46, 15, 132]
+  emitRel with image, fixes, "site_bad"
+  pin with labels, "site_nextch", image
+  emitList with image, [72, 255, 192, 233]
+  emitRel with image, fixes, "site_ch"
+  pin with labels, "site_okpath", image
+  emitList with image, [72, 139, 76, 36, 96, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 68, 36, 104]
+  emitList with image, [72, 139, 84, 36, 96, 72, 131, 194, 5, 72, 137, 16]
+  emitList with image, [199, 64, 8, 115, 105, 116, 101, 198, 64, 12, 47]
+  emitList with image, [72, 139, 76, 36, 96, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "site_copied"
+  emitList with image, [86, 87, 72, 139, 68, 36, 104, 72, 141, 120, 13, 72, 139, 116, 36, 72, 72, 139, 76, 36, 96, 243, 164, 95, 94]
+  pin with labels, "site_copied", image
+  emitList with image, [72, 139, 68, 36, 104, 72, 139, 16, 198, 68, 16, 8, 0]
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 76, 36, 104]
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [72, 139, 84, 36, 104, 72, 141, 74, 8, 186]
+  emitU32 with image, 2147483648
+  emitList with image, [65, 184]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 201, 199, 68, 36, 32]
+  emitU32 with image, 3
+  emitList with image, [199, 68, 36, 40]
+  emitU32 with image, 2097280
+  emitList with image, [72, 199, 68, 36, 48]
+  emitU32 with image, 0
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "iat_cf"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "site_fall"
+  emitList with image, [72, 137, 68, 36, 112]
+  emitList with image, [72, 139, 76, 36, 112]
+  emitCallTo with image, fixes, "rt_bind_path"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [131, 124, 36, 64, 2, 15, 132]
+  emitRel with image, fixes, "site_cls_405"
+  emitList with image, [185]
+  emitU32 with image, 64
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 68, 36, 48, 72, 139, 76, 36, 112, 72, 137, 194, 255, 21]
+  emitRel with image, fixes, "iat_fi"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [72, 139, 84, 36, 48, 247, 2]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [247, 2]
+  emitU32 with image, 16
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [72, 139, 76, 36, 112, 72, 141, 84, 36, 56, 199, 2, 0, 0, 0, 0, 255, 21]
+  emitRel with image, fixes, "iat_sz"
+  emitList with image, [61]
+  emitU32 with image, 4294967295
+  emitList with image, [15, 132]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [61]
+  emitU32 with image, 1000000
+  emitList with image, [15, 135]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [137, 68, 36, 68]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_txt"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitList with image, [72, 139, 84, 36, 104, 72, 139, 10, 72, 131, 249, 5, 15, 130]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [128, 124, 10, 3, 46, 15, 133]
+  emitRel with image, fixes, "site_try_css"
+  emitList with image, [129, 124, 10, 4, 104, 116, 109, 108, 15, 133]
+  emitRel with image, fixes, "site_try_css"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_html"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitJmpTo with image, fixes, "site_read"
+  pin with labels, "site_try_css", image
+  emitList with image, [72, 139, 84, 36, 104, 72, 139, 10, 72, 131, 249, 4, 15, 130]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [128, 124, 10, 4, 46, 15, 133]
+  emitRel with image, fixes, "site_try_svg"
+  emitList with image, [129, 124, 10, 5, 99, 115, 115, 0, 15, 133]
+  emitRel with image, fixes, "site_try_svg"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_css"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitJmpTo with image, fixes, "site_read"
+  pin with labels, "site_try_svg", image
+  emitList with image, [72, 139, 84, 36, 104, 72, 139, 10, 72, 131, 249, 4, 15, 130]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [128, 124, 10, 4, 46, 15, 133]
+  emitRel with image, fixes, "site_try_json"
+  emitList with image, [129, 124, 10, 5, 115, 118, 103, 0, 15, 133]
+  emitRel with image, fixes, "site_try_json"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_svg"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitJmpTo with image, fixes, "site_read"
+  pin with labels, "site_try_json", image
+  emitList with image, [72, 139, 84, 36, 104, 72, 139, 10, 72, 131, 249, 5, 15, 130]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [128, 124, 10, 3, 46, 15, 133]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [129, 124, 10, 4, 106, 115, 111, 110, 15, 133]
+  emitRel with image, fixes, "site_read"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_json"
+  emitList with image, [72, 137, 76, 36, 40]
+  pin with labels, "site_read", image
+  emitList with image, [139, 76, 36, 68, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 68, 36, 120]
+  emitList with image, [139, 76, 36, 68, 72, 137, 8]
+  emitList with image, [72, 139, 76, 36, 112, 72, 141, 80, 8, 68, 139, 68, 36, 68, 76, 141, 76, 36, 56, 72, 199, 68, 36, 32]
+  emitU32 with image, 0
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "iat_rf"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "site_cls_fall"
+  emitList with image, [72, 139, 76, 36, 112, 255, 21]
+  emitRel with image, fixes, "iat_ch"
+  emitList with image, [72, 199, 68, 36, 112, 255, 255, 255, 255]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_okph"
+  emitList with image, [72, 137, 76, 36, 48]
+  emitJmpTo with image, fixes, "site_send"
+  pin with labels, "site_cls_405", image
+  emitList with image, [72, 139, 76, 36, 112, 255, 21]
+  emitRel with image, fixes, "iat_ch"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_moph"
+  emitList with image, [72, 137, 76, 36, 48]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_mbody"
+  emitList with image, [72, 137, 76, 36, 120]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_html"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
+  emitList with image, [199, 68, 36, 68, 28, 0, 0, 0]
+  emitJmpTo with image, fixes, "site_send"
+  pin with labels, "site_bad", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_nfph"
+  emitList with image, [72, 137, 76, 36, 48]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_nfbody"
+  emitList with image, [72, 137, 76, 36, 120]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "txt_site_html"
+  emitList with image, [72, 137, 76, 36, 40]
+  emitList with image, [199, 68, 36, 64, 0, 0, 0, 0]
+  emitList with image, [199, 68, 36, 68, 20, 0, 0, 0]
+  emitJmpTo with image, fixes, "site_send"
+  pin with labels, "site_cls_fall", image
+  emitList with image, [72, 139, 76, 36, 112, 72, 131, 249, 255, 15, 132]
+  emitRel with image, fixes, "site_fall"
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "iat_ch"
+  pin with labels, "site_fall", image
+  emitList with image, [72, 129, 196, 128, 0, 0, 0]
+  emitJmpTo with image, fixes, "fn_route"
+  pin with labels, "site_send", image
+  emitCallTo with image, fixes, "rt_buf_new"
+  emitList with image, [72, 137, 68, 36, 16]
+  emitList with image, [72, 137, 193, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_pre"
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 139, 84, 36, 48]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_ct"
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 139, 84, 36, 40]
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_cl"
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 139, 84, 36, 68]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_rest"
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16, 139, 84, 36, 68]
+  emitCallTo with image, fixes, "rt_int_text"
+  emitList with image, [72, 139, 76, 36, 16, 72, 141, 21]
+  emitRel with image, fixes, "txt_site_end"
+  emitCallTo with image, fixes, "rt_buf_text"
+  emitList with image, [72, 139, 76, 36, 16]
+  emitCallTo with image, fixes, "rt_buf_finish"
+  emitList with image, [72, 137, 68, 36, 8]
+  emitList with image, [72, 139, 77, 248, 72, 139, 9, 72, 139, 84, 36, 8, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [131, 124, 36, 64, 1, 15, 132]
+  emitRel with image, fixes, "site_done"
+  emitList with image, [72, 139, 84, 36, 120, 72, 133, 210, 15, 132]
+  emitRel with image, fixes, "site_done"
+  emitList with image, [72, 139, 2, 76, 137, 192, 72, 139, 77, 248, 72, 139, 9, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  pin with labels, "site_done", image
+  emitList with image, [72, 129, 196, 128, 0, 0, 0, 88]
+  emitCallTo with image, fixes, "rt_restore_frame"
+  emitJmpTo with image, fixes, "rt_net_client_ok"
+  return image
+end

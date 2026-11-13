@@ -3,6 +3,8 @@ data/*
 !data/src/**
 !data/compile-native.vire
 site/
+!sites/landing/site/
+!sites/landing/site/**
 err.txt
 out.txt
 *.user

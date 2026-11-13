@@ -1,0 +1,9 @@
+~ Serve declared site/ root. route is unused for static files.
+
+define route with method, path, body
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18081
+end
