@@ -14,7 +14,8 @@ function Invoke-Handoff([string]$Tree) {
         if (-not (Test-Path "bin/Release/net10.0/vire.dll")) {
             dotnet build vire.csproj -c Release | Out-Host
         }
-        pwsh -File tools/native-selfhost-handoff.ps1
+        & pwsh -File tools/native-selfhost-handoff.ps1
+        return $LASTEXITCODE
     } finally {
         Pop-Location
     }
@@ -26,17 +27,9 @@ if ($LASTEXITCODE -ne 0) { git fetch origin $BaseSha $BulkSha 2>&1 | Out-Host }
 $FailDir = Join-Path $Root "data/fail-before-gen2"
 if (Test-Path $FailDir) { git worktree remove --force $FailDir 2>$null; Remove-Item -Recurse -Force $FailDir -ErrorAction SilentlyContinue }
 git worktree add --detach $FailDir $BulkSha
-$failHit = $false
-$failOut = ""
-try {
-    Invoke-Handoff $FailDir
-} catch {
-    $failHit = $true
-    $failOut = "$_"
-    Write-Output $failOut
-}
-if (-not $failHit) { throw "FAIL_BEFORE expected gen2 crash at $BulkSha" }
-Write-Output "FAIL_BEFORE at $BaseSha with bulk $BulkSha : gen2 crashed"
+$failCode = Invoke-Handoff $FailDir
+if ($failCode -eq 0) { throw "FAIL_BEFORE expected gen2 crash at $BulkSha" }
+Write-Output "FAIL_BEFORE at $BaseSha with bulk $BulkSha : gen2 exit $failCode"
 
 $PassDir = Join-Path $Root "data/pass-after-gen2"
 if (Test-Path $PassDir) { git worktree remove --force $PassDir 2>$null; Remove-Item -Recurse -Force $PassDir -ErrorAction SilentlyContinue }
@@ -45,7 +38,8 @@ Push-Location $PassDir
 try {
     git merge --no-edit $BulkSha
     if ($LASTEXITCODE -ne 0) { throw "PASS_AFTER merge of $BulkSha failed" }
-    Invoke-Handoff $PassDir
+    $passCode = Invoke-Handoff $PassDir
+    if ($passCode -ne 0) { throw "PASS_AFTER handoff exit $passCode" }
 } finally {
     Pop-Location
 }
