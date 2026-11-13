@@ -88,27 +88,93 @@ $RedisPort = 16379
 $ListenHost = 18082
 $ListenPe = 18083
 
-# Throwaway redis-server if present; otherwise a tiny RESP PING/GET/SET listener in this process is not used.
-# CI installs Redis-x64. Local runs may already have redis on 6379 — still bind 16379.
-$redisExe = $null
-foreach ($c in @(
-        (Join-Path $env:ProgramFiles "Redis\redis-server.exe"),
-        (Join-Path $env:LOCALAPPDATA "fcg-redis\redis-server.exe"),
-        "redis-server"
-    )) {
-    if (Get-Command $c -ErrorAction SilentlyContinue) { $redisExe = (Get-Command $c).Source; break }
-    if (Test-Path $c) { $redisExe = $c; break }
+Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+public class VireRespFix {
+    readonly TcpListener Listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
+    readonly Dictionary<string, string> Store = new Dictionary<string, string>();
+    volatile bool stop;
+    public int Start() {
+        Listener.Start();
+        int port = ((IPEndPoint)Listener.LocalEndpoint).Port;
+        Thread t = new Thread(Run);
+        t.IsBackground = true;
+        t.Start();
+        return port;
+    }
+    public void Halt() {
+        stop = true;
+        try { Listener.Stop(); } catch (Exception) { }
+    }
+    void Run() {
+        try {
+            while (!stop) {
+                TcpClient client = Listener.AcceptTcpClient();
+                Thread w = new Thread(() => Serve(client));
+                w.IsBackground = true;
+                w.Start();
+            }
+        } catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+    }
+    void Serve(TcpClient client) {
+        try {
+            NetworkStream stream = client.GetStream();
+            stream.ReadTimeout = 5000;
+            byte[] buf = new byte[65536];
+            int n = stream.Read(buf, 0, buf.Length);
+            if (n <= 0) return;
+            string text = Encoding.ASCII.GetString(buf, 0, n);
+            string reply = Handle(text);
+            byte[] outb = Encoding.ASCII.GetBytes(reply);
+            stream.Write(outb, 0, outb.Length);
+        } catch (Exception) { }
+        finally { try { client.Close(); } catch (Exception) { } }
+    }
+    string Handle(string text) {
+        List<string> parts = new List<string>();
+        int i = 0;
+        if (i >= text.Length || text[i] != '*') return "-ERR\r\n";
+        i++;
+        int nl = text.IndexOf("\r\n", i);
+        if (nl < 0) return "-ERR\r\n";
+        int count = int.Parse(text.Substring(i, nl - i));
+        i = nl + 2;
+        for (int k = 0; k < count; k++) {
+            if (i >= text.Length || text[i] != '$') return "-ERR\r\n";
+            i++;
+            nl = text.IndexOf("\r\n", i);
+            if (nl < 0) return "-ERR\r\n";
+            int len = int.Parse(text.Substring(i, nl - i));
+            i = nl + 2;
+            parts.Add(text.Substring(i, len));
+            i += len + 2;
+        }
+        string cmd = parts[0].ToUpperInvariant();
+        if (cmd == "PING") return "+PONG\r\n";
+        if (cmd == "SET" && parts.Count >= 3) {
+            lock (Store) { Store[parts[1]] = parts[2]; }
+            return "+OK\r\n";
+        }
+        if (cmd == "GET" && parts.Count >= 2) {
+            string val;
+            lock (Store) {
+                if (!Store.TryGetValue(parts[1], out val)) return "$-1\r\n";
+            }
+            return "$" + val.Length + "\r\n" + val + "\r\n";
+        }
+        return "-ERR\r\n";
+    }
 }
-if (-not $redisExe) {
-    $zip = Join-Path $Data "redis-win.zip"
-    $dest = Join-Path $env:LOCALAPPDATA "fcg-redis"
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/microsoftarchive/redis/releases/download/win-3.0.504/Redis-x64-3.0.504.zip" -OutFile $zip
-    Expand-Archive -Force -Path $zip -DestinationPath $dest
-    $redisExe = Join-Path $dest "redis-server.exe"
-}
-$redisProc = Start-Process -FilePath $redisExe -ArgumentList "--port", "$RedisPort", "--bind", "127.0.0.1", "--protected-mode", "no" -PassThru -WindowStyle Hidden
-Start-Sleep -Milliseconds 400
+"@
+$redisFix = New-Object VireRespFix
+$RedisPort = $redisFix.Start()
+Write-Output "resp_listen 127.0.0.1:$RedisPort"
 Wait-Port $RedisPort
 Write-Output (Redis-Cmd $RedisPort @("SET", "waitlist:count", "3"))
 Write-Output "redis_seed_ok"
@@ -116,7 +182,8 @@ Write-Output "redis_seed_ok"
 git cat-file -e "$BaseSha^{commit}" 2>$null
 if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin $BaseSha }
 $oldSrc = Join-Path $Data "fcgcpa-fail-before.vire"
-git show "${BaseSha}:api/fcgcpa.vire" | Set-Content -Path $oldSrc -Encoding utf8
+$utf8 = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($oldSrc, ((& git show "${BaseSha}:api/fcgcpa.vire") -join "`n") + "`n", $utf8)
 $oldProc = Start-Process -FilePath "dotnet" -ArgumentList @("exec", $VireDll, $oldSrc, "18081") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Data "old-listen.out") -RedirectStandardError (Join-Path $Data "old-listen.err")
 Wait-Port 18081
 $before = Invoke-Http "GET" "http://127.0.0.1:18081/api/waitlist/count" $null
@@ -178,4 +245,4 @@ Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
 
 try { $hostProc.Kill() } catch { }
 try { $peProc.Kill() } catch { }
-try { $redisProc.Kill() } catch { }
+try { $redisFix.Halt() } catch { }

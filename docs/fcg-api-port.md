@@ -138,6 +138,6 @@ WebSocket `/ws/kick` (Node) waits on PR #68.
 
 ## CI proof
 
-Throwaway Postgres + Redis. Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into Redis `waitlist:count`. Host interpreter and gen1 PE must return the **Expected body** column for every ported route.
+Throwaway Postgres + Redis on Ubuntu. Windows PE prove uses a loopback RESP2 PING/GET/SET fixture (same ASCII as Redis; microsoftarchive redis-server did not bind in CI). Seed three `"WaitlistEntry"` rows and copy `COUNT(*)=3` into `waitlist:count`. Host interpreter and gen1 PE must return the **Expected body** column for every ported route.
 
 FAIL_BEFORE SHA: `9ea4561d12236f7f2f44858f137d7c948836df65` (`GET /api/waitlist/count` → 404 from `api/fcgcpa.vire` on that pin).
