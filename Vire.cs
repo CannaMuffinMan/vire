@@ -56,6 +56,8 @@ sealed class Token
 sealed class Func
 {
     public List<string> Params = new List<string>();
+    public List<string> ParamTypes = new List<string>();
+    public string ReturnType = "";
     public List<object> Body = new List<object>();
     public int Line;
     public int Column;
@@ -374,7 +376,7 @@ sealed class Machine
     VireThreadTable threads = new VireThreadTable();
     VireTcpTable tcp = new VireTcpTable();
 
-    static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
+    internal static readonly string[] BuiltinNames = new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
@@ -383,7 +385,9 @@ sealed class Machine
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close",
         "start", "wait", "result"
-    });
+    };
+
+    static readonly HashSet<string> Builtins = new HashSet<string>(BuiltinNames);
 
     public Machine(Dictionary<string, Func> funcs, string root)
     {
@@ -1884,6 +1888,7 @@ sealed class Unit
     public Dictionary<string, Func> Funcs = new Dictionary<string, Func>();
     public List<string> Uses = new List<string>();
     public List<string> Needs = new List<string>();
+    public List<CapDecl> Caps = new List<CapDecl>();
 }
 
 sealed class Parser
@@ -1929,6 +1934,11 @@ sealed class Parser
                 unit.Needs.Add((string)Eat("string").Value);
                 continue;
             }
+            if (At("can"))
+            {
+                unit.Caps.Add(ParseCan());
+                continue;
+            }
             Func func = Definition();
             string name = (string)func.Body[0];
             func.Body.RemoveAt(0);
@@ -1948,17 +1958,78 @@ sealed class Parser
         if (At("with"))
         {
             Eat("with");
-            func.Params.Add((string)Eat("name").Value);
+            ParseParam(func);
             while (At(","))
             {
                 Eat(",");
-                func.Params.Add((string)Eat("name").Value);
+                ParseParam(func);
             }
+        }
+        if (At("as"))
+        {
+            Eat("as");
+            func.ReturnType = ParseType();
         }
         func.Body = Block();
         func.Body.Insert(0, name);
         Eat("end");
         return func;
+    }
+
+    void ParseParam(Func func)
+    {
+        func.Params.Add((string)Eat("name").Value);
+        if (At(":"))
+        {
+            Eat(":");
+            func.ParamTypes.Add(ParseType());
+        }
+        else func.ParamTypes.Add("");
+    }
+
+    CapDecl ParseCan()
+    {
+        Token start = Eat("can");
+        string name = ParseDotted();
+        if (VireCheck.KnownCap(name) == null)
+            throw new VireError("unknown capability " + name, start.Line, start.Column);
+        string arg = "";
+        if (name == "fs.read" || name == "fs.write")
+        {
+            if (!At("name")) throw new VireError("can " + name + " needs a root (data or site)", start.Line, start.Column);
+            arg = (string)Eat("name").Value;
+            if (arg != "data" && arg != "site")
+                throw new VireError("can " + name + " needs a root (data or site)", start.Line, start.Column);
+        }
+        CapDecl cap = new CapDecl();
+        cap.Name = name;
+        cap.Arg = arg;
+        return cap;
+    }
+
+    string ParseDotted()
+    {
+        string name = (string)Eat("name").Value;
+        while (At("."))
+        {
+            Eat(".");
+            name += "." + (string)Eat("name").Value;
+        }
+        return name;
+    }
+
+    string ParseType()
+    {
+        Token tok = Peek();
+        if (tok.Kind == "none")
+        {
+            Eat("none");
+            return "none";
+        }
+        if (tok.Kind != "name") throw new VireError("expected a type", tok.Line, tok.Column);
+        string name = (string)Eat("name").Value;
+        if (!VireCheck.IsTypeName(name)) throw new VireError("unknown type " + name, tok.Line, tok.Column);
+        return name;
     }
 
     List<object> Block()
@@ -1993,7 +2064,15 @@ sealed class Parser
         {
             Eat("let");
             string name = (string)Eat("name").Value;
+            string type = "";
+            if (At(":"))
+            {
+                Eat(":");
+                type = ParseType();
+            }
             Eat("be");
+            if (type.Length > 0)
+                return new object[] { "let", name, Expression(), type, tok.Line, tok.Column };
             return new object[] { "let", name, Expression(), tok.Line, tok.Column };
         }
         if (tok.Kind == "put")
@@ -2238,7 +2317,7 @@ static class Lexer
     static readonly HashSet<string> Keywords = new HashSet<string>(new string[] {
         "define", "with", "end", "let", "be", "say", "while", "if", "else", "return",
         "and", "or", "not", "true", "false", "for", "in", "at", "put", "into",
-        "try", "miss", "stop", "skip", "none", "now", "use", "need"
+        "try", "miss", "stop", "skip", "none", "now", "use", "need", "can", "as"
     });
 
     public static List<Token> Tokenize(string source)
@@ -2335,7 +2414,7 @@ static class Lexer
                 }
             }
             string one = ch.ToString();
-            if ("+-*/%<>=(),[]{}:".IndexOf(ch) >= 0)
+            if ("+-*/%<>=(),[]{}:.".IndexOf(ch) >= 0)
             {
                 tokens.Add(new Token(one, one, line, here));
                 i++;
@@ -2961,10 +3040,15 @@ sealed class Program
 
     internal static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen)
     {
-        return Load(program, folder, seen, new int[1]);
+        return Load(program, folder, seen, new int[1], true);
     }
 
     static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen, int[] loaded)
+    {
+        return Load(program, folder, seen, loaded, true);
+    }
+
+    static Dictionary<string, Func> Load(string program, string folder, HashSet<string> seen, int[] loaded, bool applyCheck)
     {
         string full = Path.GetFullPath(program);
         if (!full.EndsWith(".vire", StringComparison.OrdinalIgnoreCase))
@@ -2987,12 +3071,12 @@ sealed class Program
         try { text = VirePaths.ReadProgramText(full, folder, 1, 1); }
         catch (IOException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
         catch (UnauthorizedAccessException) { throw new VireError("could not read " + Path.GetFileName(full), 1); }
-        return LoadText(full, text, folder, seen, loaded);
+        return LoadText(full, text, folder, seen, loaded, applyCheck);
         }
         finally { seen.Remove(full); }
     }
 
-    static Dictionary<string, Func> LoadText(string full, string text, string folder, HashSet<string> seen, int[] loaded)
+    static Dictionary<string, Func> LoadText(string full, string text, string folder, HashSet<string> seen, int[] loaded, bool applyCheck)
     {
         try
         {
@@ -3000,7 +3084,7 @@ sealed class Program
         foreach (string used in unit.Uses)
         {
             string next = VirePaths.UseFile(folder, used, 1);
-            Dictionary<string, Func> imported = Load(next, folder, seen, loaded);
+            Dictionary<string, Func> imported = Load(next, folder, seen, loaded, false);
             Merge(unit, imported);
         }
         foreach (string package in unit.Needs)
@@ -3020,8 +3104,9 @@ sealed class Program
             if (loaded[0] >= 32) throw new VireError("too many files were used", 1);
             loaded[0]++;
             seen.Add(next);
-            Merge(unit, LoadText(next, body, folder, seen, loaded));
+            Merge(unit, LoadText(next, body, folder, seen, loaded, false));
         }
+        if (applyCheck) VireCheck.Apply(unit);
         return unit.Funcs;
         }
         finally { seen.Remove(full); }

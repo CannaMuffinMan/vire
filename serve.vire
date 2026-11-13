@@ -1,4 +1,6 @@
 ~ Static files live in site/. listen serves GET/HEAD of allowed types from that folder.
+can net.listen
+can fs.read data
 define route with method, path, body
   return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
 end

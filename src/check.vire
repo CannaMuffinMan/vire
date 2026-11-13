@@ -1,0 +1,435 @@
+~ Gradual types and capability checks. Messages must match the host checker.
+
+define isTypeName with name
+  if name == "number" or name == "text" or name == "bool" or name == "list" or name == "map" or name == "none" or name == "any"
+    return true
+  end
+  return false
+end
+
+define knownCap with name
+  if name == "clock" or name == "net.listen" or name == "net.connect.loopback" or name == "fs.read" or name == "fs.write"
+    return name
+  end
+  return ""
+end
+
+define needFor with builtin
+  if builtin == "now" or builtin == "ticks"
+    return "clock"
+  end
+  if builtin == "listen"
+    return "net.listen"
+  end
+  if builtin == "connect" or builtin == "send" or builtin == "recv" or builtin == "close"
+    return "net.connect.loopback"
+  end
+  if builtin == "read" or builtin == "exists" or builtin == "files" or builtin == "folders" or builtin == "sources"
+    return "fs.read"
+  end
+  if builtin == "write" or builtin == "erase" or builtin == "copy" or builtin == "append"
+    return "fs.write"
+  end
+  return ""
+end
+
+define builtinRet with builtin
+  if builtin == "length" or builtin == "number" or builtin == "ticks" or builtin == "abs" or builtin == "min" or builtin == "max" or builtin == "round" or builtin == "find" or builtin == "idiv" or builtin == "shl8"
+    return "number"
+  end
+  if builtin == "text" or builtin == "kind" or builtin == "now" or builtin == "lower" or builtin == "upper" or builtin == "join" or builtin == "json" or builtin == "read" or builtin == "chr" or builtin == "hex" or builtin == "hash"
+    return "text"
+  end
+  if builtin == "split" or builtin == "keys" or builtin == "files" or builtin == "folders" or builtin == "sources" or builtin == "args" or builtin == "bytes"
+    return "list"
+  end
+  if builtin == "has" or builtin == "begins" or builtin == "ends" or builtin == "exists"
+    return "bool"
+  end
+  return "any"
+end
+
+define capLabel with cap
+  if (cap at "arg") == ""
+    return cap at "name"
+  end
+  return (cap at "name") + " " + (cap at "arg")
+end
+
+define formatCaps with caps
+  if (length with caps) == 0
+    return "none"
+  end
+  let labels be []
+  let i be 0
+  while i < (length with caps)
+    let label be capLabel with (caps at i)
+    let seen be false
+    let j be 0
+    while j < (length with labels)
+      if (labels at j) == label
+        let seen be true
+      end
+      let j be j + 1
+    end
+    if not seen
+      push with labels, label
+    end
+    let i be i + 1
+  end
+  let i be 0
+  while i < (length with labels)
+    let j be i + 1
+    while j < (length with labels)
+      if (labels at j) < (labels at i)
+        let tmp be labels at i
+        put (labels at j) into labels at i
+        put tmp into labels at j
+      end
+      let j be j + 1
+    end
+    let i be i + 1
+  end
+  return join with labels, ", "
+end
+
+define allowedSet with caps
+  let allowed be {}
+  let i be 0
+  while i < (length with caps)
+    let cap be caps at i
+    let nm be cap at "name"
+    if nm == "fs.read" or nm == "fs.write"
+      put true into allowed at nm
+    end
+    if nm != "fs.read" and nm != "fs.write"
+      put true into allowed at (capLabel with cap)
+    end
+    let i be i + 1
+  end
+  return allowed
+end
+
+define typeFits with want, got
+  if want == "" or want == "any"
+    return true
+  end
+  if got == "" or got == "any"
+    return true
+  end
+  if want == got
+    return true
+  end
+  return false
+end
+
+define needCap with builtin, allowed
+  let cap be needFor with builtin
+  if cap == ""
+    return ""
+  end
+  if has with allowed, cap
+    return ""
+  end
+  return builtin + " needs capability " + cap
+end
+
+define inferExpr with expr, env, funcs, allowed
+  let k be expr at 0
+  if k == "num"
+    return {"ty": "number", "why": ""}
+  end
+  if k == "text"
+    return {"ty": "text", "why": ""}
+  end
+  if k == "bool"
+    return {"ty": "bool", "why": ""}
+  end
+  if k == "none"
+    return {"ty": "none", "why": ""}
+  end
+  if k == "list"
+    let items be expr at 1
+    let i be 0
+    while i < (length with items)
+      let inner be inferExpr with (items at i), env, funcs, allowed
+      if (inner at "why") != ""
+        return inner
+      end
+      let i be i + 1
+    end
+    return {"ty": "list", "why": ""}
+  end
+  if k == "map"
+    let pairs be expr at 1
+    let i be 0
+    while i < (length with pairs)
+      let pair be pairs at i
+      let a be inferExpr with (pair at 1), env, funcs, allowed
+      if (a at "why") != ""
+        return a
+      end
+      let b be inferExpr with (pair at 2), env, funcs, allowed
+      if (b at "why") != ""
+        return b
+      end
+      let i be i + 1
+    end
+    return {"ty": "map", "why": ""}
+  end
+  if k == "name"
+    let nm be expr at 1
+    if has with env, nm
+      return {"ty": env at nm, "why": ""}
+    end
+    let needWhy be needCap with nm, allowed
+    if needWhy != ""
+      return {"ty": "any", "why": needWhy}
+    end
+    return {"ty": (builtinRet with nm), "why": ""}
+  end
+  if k == "call"
+    return inferCall with (expr at 1), (expr at 2), env, funcs, allowed
+  end
+  if k == "not"
+    let inner be inferExpr with (expr at 1), env, funcs, allowed
+    if (inner at "why") != ""
+      return inner
+    end
+    return {"ty": "bool", "why": ""}
+  end
+  if k == "neg"
+    let inner be inferExpr with (expr at 1), env, funcs, allowed
+    if (inner at "why") != ""
+      return inner
+    end
+    return {"ty": "number", "why": ""}
+  end
+  if k == "bin"
+    let op be expr at 1
+    let left be inferExpr with (expr at 2), env, funcs, allowed
+    if (left at "why") != ""
+      return left
+    end
+    let right be inferExpr with (expr at 3), env, funcs, allowed
+    if (right at "why") != ""
+      return right
+    end
+    if op == "and" or op == "or" or op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">="
+      return {"ty": "bool", "why": ""}
+    end
+    if op == "+"
+      if (left at "ty") == "number" and (right at "ty") == "number"
+        return {"ty": "number", "why": ""}
+      end
+      if (left at "ty") == "text" and (right at "ty") == "text"
+        return {"ty": "text", "why": ""}
+      end
+      if (left at "ty") == "list" and (right at "ty") == "list"
+        return {"ty": "list", "why": ""}
+      end
+      return {"ty": "any", "why": ""}
+    end
+    return {"ty": "number", "why": ""}
+  end
+  if k == "at"
+    let a be inferExpr with (expr at 1), env, funcs, allowed
+    if (a at "why") != ""
+      return a
+    end
+    let b be inferExpr with (expr at 2), env, funcs, allowed
+    if (b at "why") != ""
+      return b
+    end
+    return {"ty": "any", "why": ""}
+  end
+  return {"ty": "any", "why": ""}
+end
+
+define findFn with funcs, nm
+  let i be 0
+  while i < (length with funcs)
+    if ((funcs at i) at "name") == nm
+      return funcs at i
+    end
+    let i be i + 1
+  end
+  return none
+end
+
+define inferCall with nm, args, env, funcs, allowed
+  let needWhy be needCap with nm, allowed
+  if needWhy != ""
+    return {"ty": "any", "why": needWhy}
+  end
+  let i be 0
+  let got be []
+  while i < (length with args)
+    let inner be inferExpr with (args at i), env, funcs, allowed
+    if (inner at "why") != ""
+      return inner
+    end
+    push with got, (inner at "ty")
+    let i be i + 1
+  end
+  let fn be findFn with funcs, nm
+  if fn != none
+    let pts be fn at "paramTypes"
+    let i be 0
+    while i < (length with pts)
+      if i < (length with got)
+        let want be pts at i
+        if not (typeFits with want, (got at i))
+          return {"ty": "any", "why": (nm + " takes " + want + ", got " + (got at i))}
+        end
+      end
+      let i be i + 1
+    end
+    let ret be fn at "retType"
+    if ret == ""
+      let ret be "any"
+    end
+    return {"ty": ret, "why": ""}
+  end
+  return {"ty": (builtinRet with nm), "why": ""}
+end
+
+define checkStmt with stmt, env, func, funcs, allowed
+  let k be stmt at 0
+  if k == "let"
+    let expr be stmt at 2
+    let inner be inferExpr with expr, env, funcs, allowed
+    if (inner at "why") != ""
+      return inner at "why"
+    end
+    let want be ""
+    if (length with stmt) >= 4
+      let want be stmt at 3
+    end
+    if want != ""
+      if not (typeFits with want, (inner at "ty"))
+        let nm be "that name"
+        if (length with stmt) >= 5
+          let nm be stmt at 4
+        end
+        return nm + " is " + want + ", got " + (inner at "ty")
+      end
+    end
+    return ""
+  end
+  if k == "say" or k == "return"
+    let inner be inferExpr with (stmt at 1), env, funcs, allowed
+    if (inner at "why") != ""
+      return inner at "why"
+    end
+    if k == "return"
+      let want be func at "retType"
+      if want != ""
+        if not (typeFits with want, (inner at "ty"))
+          return "return is " + want + ", got " + (inner at "ty")
+        end
+      end
+    end
+    return ""
+  end
+  if k == "put"
+    let a be inferExpr with (stmt at 2), env, funcs, allowed
+    if (a at "why") != ""
+      return a at "why"
+    end
+    let b be inferExpr with (stmt at 3), env, funcs, allowed
+    if (b at "why") != ""
+      return b at "why"
+    end
+    return ""
+  end
+  if k == "while"
+    let t be inferExpr with (stmt at 1), env, funcs, allowed
+    if (t at "why") != ""
+      return t at "why"
+    end
+    return checkBlock with (stmt at 2), env, func, funcs, allowed
+  end
+  if k == "for"
+    let t be inferExpr with (stmt at 2), env, funcs, allowed
+    if (t at "why") != ""
+      return t at "why"
+    end
+    return checkBlock with (stmt at 3), env, func, funcs, allowed
+  end
+  if k == "if"
+    let t be inferExpr with (stmt at 1), env, funcs, allowed
+    if (t at "why") != ""
+      return t at "why"
+    end
+    let why be checkBlock with (stmt at 2), env, func, funcs, allowed
+    if why != ""
+      return why
+    end
+    return checkBlock with (stmt at 3), env, func, funcs, allowed
+  end
+  if k == "try"
+    let why be checkBlock with (stmt at 1), env, func, funcs, allowed
+    if why != ""
+      return why
+    end
+    if (stmt at 3) != none
+      return checkBlock with (stmt at 3), env, func, funcs, allowed
+    end
+    return ""
+  end
+  if k == "call"
+    let inner be inferCall with (stmt at 1), (stmt at 2), env, funcs, allowed
+    return inner at "why"
+  end
+  if k == "stop" or k == "skip"
+    return ""
+  end
+  return ""
+end
+
+define checkBlock with body, env, func, funcs, allowed
+  if body == none
+    return ""
+  end
+  let i be 0
+  while i < (length with body)
+    let why be checkStmt with (body at i), env, func, funcs, allowed
+    if why != ""
+      return why
+    end
+    let i be i + 1
+  end
+  return ""
+end
+
+define checkFunc with func, funcs, allowed
+  let env be {}
+  let params be func at "params"
+  let pts be func at "paramTypes"
+  let i be 0
+  while i < (length with params)
+    let ty be "any"
+    if i < (length with pts)
+      if (pts at i) != ""
+        let ty be pts at i
+      end
+    end
+    put ty into env at (params at i)
+    let i be i + 1
+  end
+  return checkBlock with (func at "body"), env, func, funcs, allowed
+end
+
+define checkProgram with funcs, caps
+  let allowed be allowedSet with caps
+  let i be 0
+  while i < (length with funcs)
+    let why be checkFunc with (funcs at i), funcs, allowed
+    if why != ""
+      return why
+    end
+    let i be i + 1
+  end
+  return ""
+end

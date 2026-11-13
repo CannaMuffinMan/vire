@@ -1,5 +1,7 @@
 ~ A two-file image stored as one JSON document.
 
+can fs.read data
+can fs.write data
 define main
   let image be {"readme": "boot", "note": ""}
   put "hello disk" into image at "note"

@@ -257,6 +257,7 @@ public class ListenTests : IDisposable
     {
         return string.Join("\n", new string[]
         {
+            "can net.listen",
             "define burn",
             "  let n be 0",
             "  while n < 80",

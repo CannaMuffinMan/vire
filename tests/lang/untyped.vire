@@ -1,0 +1,6 @@
+define main
+  let n be 1
+  let t be "ok"
+  say n
+  say t
+end

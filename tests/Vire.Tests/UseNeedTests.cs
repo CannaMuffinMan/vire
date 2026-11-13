@@ -178,7 +178,7 @@ public class UseNeedTests
     static string ChainSource(int extras)
     {
         if (extras == 0)
-            return "define main\n  say \"files-ok\"\nend\n";
+            return "can fs.read data\ndefine main\n  say \"files-ok\"\nend\n";
         return "use \"u1.vire\"\ndefine main\n  say mark\nend\n";
     }
 
@@ -189,7 +189,7 @@ public class UseNeedTests
         {
             files[(i - 1) * 2] = "u" + i + ".vire";
             if (i == extras)
-                files[(i - 1) * 2 + 1] = "define mark\n  return \"files-ok\"\nend\n";
+                files[(i - 1) * 2 + 1] = "can fs.read data\ndefine mark\n  return \"files-ok\"\nend\n";
             else
                 files[(i - 1) * 2 + 1] = "use \"u" + (i + 1) + ".vire\"\n";
         }

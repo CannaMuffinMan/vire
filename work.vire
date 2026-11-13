@@ -1,3 +1,4 @@
+can fs.write data
 define save_note
   write with "data/note.txt", value with "note"
   line with "Saved"

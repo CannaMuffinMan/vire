@@ -2,6 +2,10 @@
 ~ Open question (roadmap Q2): who may POST /block is Canna's call.
 ~ Phase 0 does not authorize POST /block. Do not invent a key scheme here.
 
+can net.listen
+can net.connect.loopback
+can fs.read data
+can fs.write data
 define pad6 with n
   let s be text with n
   while (length with s) < 6

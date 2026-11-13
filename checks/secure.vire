@@ -1,3 +1,5 @@
+can fs.read data
+can fs.write data
 define main
   let fails be 0
   try

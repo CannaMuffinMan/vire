@@ -1,3 +1,4 @@
+can fs.read data
 define main
   try
     read with "../secret.txt"

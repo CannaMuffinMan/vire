@@ -1,3 +1,4 @@
+can fs.write data
 use "src/asm.vire"
 
 define ord with ch

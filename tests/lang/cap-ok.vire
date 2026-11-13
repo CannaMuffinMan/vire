@@ -1,0 +1,5 @@
+can clock
+define main
+  let t: number be ticks
+  say t
+end

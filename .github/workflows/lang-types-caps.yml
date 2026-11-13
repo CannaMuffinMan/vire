@@ -1,0 +1,36 @@
+name: lang-types-caps
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  host-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - name: FAIL_BEFORE then PASS_AFTER
+        run: bash tools/lang-types-caps-prove.sh
+  native-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - name: stage compiler sources
+        run: bash tools/stage-compiler-src.sh
+      - name: native selfhost gen1=gen2
+        run: pwsh -File tools/native-selfhost-handoff.ps1
+      - name: host and gen1 PE types/caps
+        run: pwsh -File tools/lang-types-caps-prove.ps1
+      - name: clean machine no dotnet
+        run: pwsh -File tools/clean-machine-native.ps1

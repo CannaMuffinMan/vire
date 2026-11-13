@@ -1,6 +1,9 @@
 ~ budget 30000000
 ~ Vire compiler. The compiler source is Vire. The .NET file is only the bootstrap.
 
+can fs.read data
+can fs.write data
+
 define isSpace with ch
   if ch == " "
     return true
@@ -111,6 +114,12 @@ define keyword with word
     return true
   end
   if word == "need"
+    return true
+  end
+  if word == "can"
+    return true
+  end
+  if word == "as"
     return true
   end
   return false
@@ -947,7 +956,22 @@ define parseStmt with state
     bump with state
     let name be spelling with state
     bump with state
+    let ty be ""
+    if (tokenKind with state) == ":"
+      bump with state
+      if (tokenKind with state) == "none"
+        let ty be "none"
+        bump with state
+      end
+      if ty == ""
+        let ty be spelling with state
+        bump with state
+      end
+    end
     eat with state, "be"
+    if ty != ""
+      return ["let", name, (parseExpr with state), ty, line, col]
+    end
     return ["let", name, (parseExpr with state), line, col]
   end
   if k == "say"
@@ -1039,11 +1063,23 @@ define parseDefine with state
     bump with state
     push with params, (spelling with state)
     bump with state
+    if (tokenKind with state) == ":"
+      bump with state
+      bump with state
+    end
     while (tokenKind with state) == ","
       bump with state
       push with params, (spelling with state)
       bump with state
+      if (tokenKind with state) == ":"
+        bump with state
+        bump with state
+      end
     end
+  end
+  if (tokenKind with state) == "as"
+    bump with state
+    bump with state
   end
   let body be parseBlock with state
   eat with state, "end"
@@ -1156,6 +1192,12 @@ define compileUnit with path, seen, state
       let extra be compileUnit with next, seen, state
       let funcs be mergeFuncs with funcs, extra, state
     end
+    if (tokenKind with inner) == "can"
+      bump with inner
+      while (tokenKind with inner) == "name" or (tokenKind with inner) == "."
+        bump with inner
+      end
+    end
     if not ((tokenKind with inner) == "use")
       if (tokenKind with inner) == "need"
         bump with inner
@@ -1222,9 +1264,11 @@ define compileUnit with path, seen, state
     end
     if not ((tokenKind with inner) == "use")
       if not ((tokenKind with inner) == "need")
-        if not ((tokenKind with inner) == "eof")
-          if not (inner at "bad")
-            push with funcs, (parseDefine with inner)
+        if not ((tokenKind with inner) == "can")
+          if not ((tokenKind with inner) == "eof")
+            if not (inner at "bad")
+              push with funcs, (parseDefine with inner)
+            end
           end
         end
       end

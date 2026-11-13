@@ -1,8 +1,26 @@
 # Vire
 
-Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 10 SDK, can run them. A Windows desktop build can also open a window. Binaries are not stored in git. GitHub Actions uploads single-file builds as workflow artifacts.
+Vire is a small programming language. Programs are `.vire` files.
 
-The manual is [GUIDE.md](GUIDE.md).
+**Host** is the .NET interpreter. Anyone with Docker or the .NET 10 SDK can run `.vire` files that way. That runner is not a native compiler.
+
+**Native** is a Windows PE emitted by `compile-native.vire`. The PE is x64 Windows only. It does not use .NET. Standing on its own means a gen1 PE compiles `compile-native.vire` to a gen2 PE whose hex matches gen1.
+
+The language manual is [docs/LANGUAGE.md](docs/LANGUAGE.md). The older tour is [GUIDE.md](GUIDE.md). Binaries are not stored in git. GitHub Actions uploads single-file host builds as workflow artifacts.
+
+## Clean machine (native only)
+
+On a Windows machine that already has `gen1.exe` (a PE of `compile-native.vire`) and this source tree, you do not need .NET on PATH.
+
+```text
+REM PATH must not contain dotnet
+where dotnet
+REM expected: INFO: Could not find files for the given pattern(s).
+
+gen1.exe data\compile-native.vire data\gen2.hex
+```
+
+`tools/clean-machine-native.ps1` strips `dotnet` from PATH, then runs `gen1.exe` on a guest under `data/`. CI job `clean-machine` in `.github/workflows/lang-types-caps.yml` proves that recipe.
 
 ## Run with Docker
 

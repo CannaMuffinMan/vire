@@ -1,3 +1,4 @@
+can fs.read data
 define main
   let held be []
   let n be 0
