@@ -675,10 +675,6 @@ define noteNeed with state, nm
   if nm == "listen"
     put true into state at "needNet"
   end
-  if nm == "ws_listen"
-    put true into state at "needNet"
-    put true into state at "needWs"
-  end
   if nm == "connect"
     put true into state at "needNet"
   end
@@ -701,7 +697,7 @@ define noteNeed with state, nm
 end
 
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false, "needWs": false}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false}
   let funcs be []
   let uses be []
   let needs be []
@@ -747,7 +743,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson", "needWs": state at "needWs"}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson"}
 end
 
 define normPath with path
@@ -986,7 +982,7 @@ define loadUnit with path, folder, seen
     let missing be true
   end
   if missing
-    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false, "needWs": false}
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false}
   end
   return loadText with path, source, folder, seen
 end
@@ -1016,7 +1012,6 @@ define loadText with path, source, folder, seen
   let uses be parsed at "uses"
   let needNet be parsed at "needNet"
   let needJson be parsed at "needJson"
-  let needWs be parsed at "needWs"
   let ui be 0
   while ui < (length with uses)
     let rel be uses at ui
@@ -1046,9 +1041,6 @@ define loadText with path, source, folder, seen
     end
     if extra at "needJson"
       let needJson be true
-    end
-    if extra at "needWs"
-      let needWs be true
     end
     let ui be ui + 1
   end
@@ -1111,13 +1103,10 @@ define loadText with path, source, folder, seen
     if extra at "needJson"
       let needJson be true
     end
-    if extra at "needWs"
-      let needWs be true
-    end
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson, "needWs": needWs}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson}
 end
 
 define emitOp with gen, bytes
@@ -1213,28 +1202,13 @@ define builtinArity with nm
   if nm == "args" or nm == "ticks"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
     return 1
   end
-  if nm == "read" or nm == "lower" or nm == "keys" or nm == "drop"
+  if nm == "close" or nm == "ws_listen"
     return 1
   end
-  if nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr"
-    return 1
-  end
-  if nm == "json" or nm == "parse" or nm == "listen"
-    return 1
-  end
-  if nm == "ws_listen" or nm == "close"
-    return 1
-  end
-  if nm == "push" or nm == "find" or nm == "has" or nm == "write"
-    return 2
-  end
-  if nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv"
-    return 2
-  end
-  if nm == "join" or nm == "extend"
+  if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
     return 2
   end
   if nm == "connect" or nm == "send" or nm == "recv"
@@ -1504,17 +1478,7 @@ define emitExpr with gen, funcs, func, root
         drop with stack
       end
     end
-    let bin be 0
-    if k == "==" or k == "!=" or k == "<" or k == "<="
-      let bin be 1
-    end
-    if k == ">" or k == ">=" or k == "+" or k == "-"
-      let bin be 1
-    end
-    if k == "*" or k == "/" or k == "%" or k == "at"
-      let bin be 1
-    end
-    if bin
+    if k == "==" or k == "!=" or k == "<" or k == "<=" or k == ">" or k == ">=" or k == "+" or k == "-" or k == "*" or k == "/" or k == "%" or k == "at"
       if p == 0
         put 1 into fr at "p"
         put fr into stack at si
