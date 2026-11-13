@@ -64,8 +64,14 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
   let base be length with image
   let names be netNames
   if need_net
+    let saved_route be labels at "fn_route"
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
+    ~ Packed pins reuse the fn_route name and would move call fn_route's rel32
+    ~ onto the blob stub. Keep the guest route pin from emitFunc.
+    if has_route
+      put saved_route into labels at "fn_route"
+    end
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
     let image be emitTcpClient with image, fixes, labels
     return emitClientLeaf with image, fixes, labels
