@@ -1,0 +1,206 @@
+~ Linux x86-64 ELF64 executable builder. Used by the native compiler.
+
+use "src/rt-linux.vire"
+
+define elfImageVa
+  return 4198400
+end
+
+define poke64 with buf, pos, n
+  poke32 with buf, pos, n
+  let high be 0
+  if n >= 4294967296
+    let high be floorDiv with n, 4294967296
+  end
+  poke32 with buf, (pos + 4), high
+  return buf
+end
+
+define pokePhdr with head, off, type, flags, offset, vaddr, filesz, memsz, align
+  poke32 with head, off, type
+  poke32 with head, (off + 4), flags
+  poke64 with head, (off + 8), offset
+  poke64 with head, (off + 16), vaddr
+  poke64 with head, (off + 24), vaddr
+  poke64 with head, (off + 32), filesz
+  poke64 with head, (off + 40), memsz
+  poke64 with head, (off + 48), align
+  return head
+end
+
+define elfIatNames
+  return ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp"]
+end
+
+define elfStubNames
+  return ["stub_gs", "stub_wf", "stub_ep", "stub_va", "stub_cf", "stub_rf", "stub_sz", "stub_ch", "stub_cl", "stub_ga", "stub_fi", "stub_ue", "stub_vh", "stub_sp", "stub_se", "stub_fp"]
+end
+
+define elfNetIatNames
+  return ["iat_gt", "iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn", "iat_cn"]
+end
+
+define elfNetStubNames
+  return ["stub_gt", "stub_wsa", "stub_sk", "stub_bd", "stub_ln", "stub_ac", "stub_rv", "stub_sd", "stub_cs", "stub_ss", "stub_gn", "stub_cn"]
+end
+
+define emitIatSlots with image, labels, names
+  let i be 0
+  while i < (length with names)
+    pin with labels, (names at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  return image
+end
+
+define openElfImage
+  let image be bytes
+  let labels be {}
+  let fixes be []
+  let image be emitIatSlots with image, labels, (elfIatNames)
+  pin with labels, "saved_rbx", image
+  let image be emitU64 with image, 0
+  pin with labels, "cmdline_ptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "proc_fd", image
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 112
+  let image be emitU8 with image, 114
+  let image be emitU8 with image, 111
+  let image be emitU8 with image, 99
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 115
+  let image be emitU8 with image, 101
+  let image be emitU8 with image, 108
+  let image be emitU8 with image, 102
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 102
+  let image be emitU8 with image, 100
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 0
+  pin with labels, "cmdline_buf", image
+  let pad be 0
+  while pad < 2048
+    let image be emitU8 with image, 0
+    let pad be pad + 1
+  end
+  let image be alignTo with image, 4096
+  let image be emitLinuxStart with image, fixes, labels
+  let image be emitLinuxStubs with image, fixes, labels
+  let image be emitRuntime with image, fixes, labels
+  let image be emitLinuxRtLinux with image, fixes, labels
+  return {"image": image, "labels": labels, "fixes": fixes, "hints": [], "ilts": [], "iats": (elfIatNames), "impSize": 0, "net": false, "elf": true}
+end
+
+define openElfNetImage
+  let image be bytes
+  let labels be {}
+  let fixes be []
+  let image be emitIatSlots with image, labels, (elfIatNames)
+  let image be emitIatSlots with image, labels, (elfNetIatNames)
+  pin with labels, "saved_rbx", image
+  let image be emitU64 with image, 0
+  pin with labels, "cmdline_ptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "proc_fd", image
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 112
+  let image be emitU8 with image, 114
+  let image be emitU8 with image, 111
+  let image be emitU8 with image, 99
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 115
+  let image be emitU8 with image, 101
+  let image be emitU8 with image, 108
+  let image be emitU8 with image, 102
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 102
+  let image be emitU8 with image, 100
+  let image be emitU8 with image, 47
+  let image be emitU8 with image, 0
+  pin with labels, "cmdline_buf", image
+  let padn be 0
+  while padn < 2048
+    let image be emitU8 with image, 0
+    let padn be padn + 1
+  end
+  let image be alignTo with image, 4096
+  let image be emitLinuxStart with image, fixes, labels
+  let image be emitLinuxStubs with image, fixes, labels
+  let image be emitLinuxNetStubs with image, fixes, labels
+  let image be emitRuntime with image, fixes, labels
+  let image be emitLinuxRtLinux with image, fixes, labels
+  let iats be []
+  let i be 0
+  let names be elfIatNames
+  while i < (length with names)
+    push with iats, (names at i)
+    let i be i + 1
+  end
+  let extra be elfNetIatNames
+  let i be 0
+  while i < (length with extra)
+    push with iats, (extra at i)
+    let i be i + 1
+  end
+  return {"image": image, "labels": labels, "fixes": fixes, "hints": [], "ilts": [], "iats": iats, "impSize": 0, "net": true, "elf": true}
+end
+
+define finishElfImage with image, labels, fixes, iats
+  patchRel with image, labels, fixes
+  let va be elfImageVa
+  let i be 0
+  let stubs be elfStubNames
+  let names be elfIatNames
+  while i < (length with names)
+    poke64 with image, (labels at (names at i)), (va + (labels at (stubs at i)))
+    let i be i + 1
+  end
+  if has with labels, "iat_wsa"
+    let extraI be elfNetIatNames
+    let extraS be elfNetStubNames
+    let i be 0
+    while i < (length with extraI)
+      poke64 with image, (labels at (extraI at i)), (va + (labels at (extraS at i)))
+      let i be i + 1
+    end
+  end
+  return image
+end
+
+define buildElf with image, entry, dataOff
+  ~ ELF64 ET_EXEC, W^X PT_LOAD, PT_GNU_STACK RW. Image VA 0x401000.
+  let head be zeros with 4096
+  poke32 with head, 0, 1179403647
+  put 2 into head at 4
+  put 1 into head at 5
+  put 1 into head at 6
+  poke16 with head, 16, 2
+  poke16 with head, 18, 62
+  poke32 with head, 20, 1
+  poke64 with head, 24, ((elfImageVa) + entry)
+  poke64 with head, 32, 64
+  poke16 with head, 52, 64
+  poke16 with head, 54, 56
+  poke16 with head, 56, 5
+  let image be alignTo with image, 4096
+  let rawSize be length with image
+  let textRaw be dataOff - 4096
+  let dataRaw be rawSize - dataOff
+  if textRaw < 1
+    let textRaw be 1
+  end
+  if dataRaw < 1
+    let dataRaw be 1
+  end
+  pokePhdr with head, 64, 1, 5, 0, 4194304, 4096, 4096, 4096
+  pokePhdr with head, 120, 1, 6, 4096, (elfImageVa), 4096, 4096, 4096
+  pokePhdr with head, 176, 1, 5, 8192, ((elfImageVa) + 4096), textRaw, textRaw, 4096
+  pokePhdr with head, 232, 1, 6, (4096 + dataOff), ((elfImageVa) + dataOff), dataRaw, dataRaw, 4096
+  poke32 with head, 288, 1685382481
+  poke32 with head, 292, 6
+  poke64 with head, 336, 16
+  let elf be extend with head, image
+  return elf
+end

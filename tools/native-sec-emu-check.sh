@@ -27,7 +27,7 @@ printf 'SECRET' > "$work/data/note.txt"
 
 compile() {
   local src=$1 hex=$2
-  VIRE_BUDGET= dotnet exec "$dll" --compiler compile-native.vire "$src" "$hex"
+  VIRE_BUDGET= dotnet exec "$dll" --compiler compile-native.vire "$src" "$hex" pe
 }
 
 compile "$work/hello.vire" "$work/hello.hex"

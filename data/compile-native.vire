@@ -1,7 +1,8 @@
-~ Compile let, if, calls, and read into a native Windows executable.
+~ Compile let, if, calls, and read into a native Windows PE or Linux ELF executable.
 
 use "src/pe.vire"
 use "src/rt-net.vire"
+use "src/elf.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -1114,21 +1115,45 @@ define emitOp with gen, bytes
   return true
 end
 
+define emitFix with gen, name
+  ~ Runtime labels from emitRuntime/emitMore are pinned before user code.
+  ~ Net/JSON packed labels land later in emitNetRuntime — those stay deferred.
+  ~ Patch the early rt_* rel32s now so `fixes` stays under the 100000 cap.
+  let later be false
+  if begins with name, "rt_net"
+    let later be true
+  end
+  if begins with name, "rt_json"
+    let later be true
+  end
+  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
+    let later be true
+  end
+  if (begins with name, "rt_") and (later == false)
+    let buf be gen at "image"
+    let pos be length with buf
+    put (emitU32 with buf, (((gen at "labels") at name) - (pos + 4))) into gen at "image"
+    return true
+  end
+  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  return true
+end
+
 define emitCall with gen, name
   put (emitU8 with (gen at "image"), 232) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitJmp with gen, name
   put (emitU8 with (gen at "image"), 233) into gen at "image"
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
 define emitLeaRcx with gen, name
   emitOp with gen, [72, 141, 13]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1147,7 +1172,7 @@ end
 
 define emitJz with gen, name
   emitOp with gen, [15, 132]
-  put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+  emitFix with gen, name
   return true
 end
 
@@ -1199,7 +1224,7 @@ define emitBoolAcc with gen
 end
 
 define builtinArity with nm
-  if nm == "args" or nm == "ticks"
+  if nm == "args" or nm == "ticks" or nm == "linux"
     return 0
   end
   if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
@@ -1271,7 +1296,7 @@ define emitAtom with gen, funcs, func, expr
       return true
     end
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), name) into gen at "image"
+    emitFix with gen, name
     emitCall with gen, "rt_push_text"
     return true
   end
@@ -1303,6 +1328,10 @@ define emitAtom with gen, funcs, func, expr
     end
     if nm == "ticks"
       emitCall with gen, "rt_ticks"
+      return true
+    end
+    if nm == "linux"
+      emitCall with gen, "rt_linux"
       return true
     end
     let found be findFunc with funcs, nm
@@ -1461,7 +1490,7 @@ define emitExpr with gen, funcs, func, root
         emitOp with gen, [133, 192]
         put (emitU8 with (gen at "image"), 15) into gen at "image"
         put (emitU8 with (gen at "image"), 133) into gen at "image"
-        put (emitRel with (gen at "image"), (gen at "fixes"), (fr at "yes")) into gen at "image"
+        emitFix with gen, (fr at "yes")
         put 2 into fr at "p"
         put fr into stack at si
         push with stack, {"e": expr at 2, "p": 0, "i": 0, "no": "", "yes": "", "done": ""}
@@ -1596,8 +1625,7 @@ end
 
 define emitBlock with gen, funcs, func, body
   let i be 0
-  let n be length with body
-  while i < n
+  while i < (length with body)
     emitStmt with gen, funcs, func, (body at i)
     let i be i + 1
   end
@@ -1654,7 +1682,7 @@ define emitStmt with gen, funcs, func, stmt
     emitOp with gen, [133, 192]
     emitJz with gen, done
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
+    emitFix with gen, ctr
     emitCall with gen, "rt_loop_tick"
     emitBlock with gen, funcs, func, (stmt at 2)
     emitJmp with gen, head
@@ -1680,7 +1708,7 @@ define emitStmt with gen, funcs, func, stmt
     put (emitU32 with (gen at "image"), (stmt at 1)) into gen at "image"
     emitCall with gen, "rt_store"
     emitOp with gen, [72, 141, 13]
-    put (emitRel with (gen at "image"), (gen at "fixes"), ctr) into gen at "image"
+    emitFix with gen, ctr
     emitCall with gen, "rt_loop_tick"
     emitBlock with gen, funcs, func, (stmt at 3)
     emitJmp with gen, head
@@ -1787,9 +1815,24 @@ define main
   end
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
+  let wantElf be linux
+  if (length with files) > 2
+    if (files at 2) == "pe"
+      let wantElf be false
+    end
+    if (files at 2) == "elf"
+      let wantElf be true
+    end
+  end
   let opened be openImage
+  if wantElf
+    let opened be openElfImage
+  end
   if hits at "net"
     let opened be openNetImage
+    if wantElf
+      let opened be openElfNetImage
+    end
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
@@ -1828,6 +1871,13 @@ define main
     put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
+  if wantElf
+    put (finishElfImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
+    let exe be buildElf with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base")
+    write with (files at 1), (hex with exe)
+    say "compiled"
+    return none
+  end
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)

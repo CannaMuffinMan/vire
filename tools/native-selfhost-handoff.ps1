@@ -87,6 +87,8 @@ Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
+Copy-Item (Join-Path $Root "src/elf.vire") (Join-Path $Src "elf.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-linux.vire") (Join-Path $Src "rt-linux.vire") -Force
 foreach ($blob in @(
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt"
@@ -101,6 +103,8 @@ $pairs = @(
     @("src/rt.vire", "data/src/rt.vire"),
     @("src/rt-more.vire", "data/src/rt-more.vire"),
     @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/elf.vire", "data/src/elf.vire"),
+    @("src/rt-linux.vire", "data/src/rt-linux.vire"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
     @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),
@@ -168,9 +172,26 @@ $r = Invoke-Bounded -Name "gen2_native" -TimeoutSec 2400 -FilePath $g1 -Argument
     "data/compile-native.vire", "data/gen2.hex"
 )
 if ($r.StdOut -notmatch "compiled") { throw "gen2_native missing compiled" }
+Write-Output ("gen1_hex_bytes " + (Get-Item $gen1Hex).Length)
+Write-Output ("gen2_hex_bytes " + (Get-Item $gen2Hex).Length)
 $h1 = (Get-FileHash -Algorithm SHA256 $gen1Hex).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
-if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
+if ($h1 -ne $h2) {
+    $a = [System.IO.File]::ReadAllBytes($gen1Hex)
+    $b = [System.IO.File]::ReadAllBytes($gen2Hex)
+    $n = [Math]::Min($a.Length, $b.Length)
+    $i = 0
+    while ($i -lt $n -and $a[$i] -eq $b[$i]) { $i++ }
+    if ($i -lt $n) {
+        $hi = [Math]::Min($n, $i + 16)
+        $sliceA = ($a[$i..($hi - 1)] | ForEach-Object { $_.ToString("x2") }) -join ""
+        $sliceB = ($b[$i..($hi - 1)] | ForEach-Object { $_.ToString("x2") }) -join ""
+        Write-Output ("hex_mismatch_off $i gen1=$sliceA gen2=$sliceB")
+    } else {
+        Write-Output ("hex_mismatch_off $n prefix_equal lens $($a.Length) $($b.Length)")
+    }
+    throw "gen1/gen2 SHA-256 differ"
+}
 Write-Output "native selfhost handoff ok"
