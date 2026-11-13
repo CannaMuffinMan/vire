@@ -171,15 +171,14 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_addn", image
   emitList with image, [139, 77, 168, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_addc"
-  emitList with image, [72, 141, 5]
-  emitRel with image, fixes, "srv_tv"
-  emitList with image, [199, 0, 0, 0, 0, 0, 199, 64, 4]
-  emitU32 with image, 50000
-  emitList with image, [49, 201, 72, 141, 21]
+  ~ nfds ignored on Win64; timeout NULL so listen stays in the wait set
+  ~ until a connection is pending. A 50ms timeval was returning 0 with an
+  ~ empty set every iteration, so accept never ran and /health got 0 bytes.
+  emitList with image, [185]
+  emitU32 with image, 1
+  emitList with image, [72, 141, 21]
   emitRel with image, fixes, "srv_fdset"
-  emitList with image, [77, 49, 192, 77, 49, 201, 72, 141, 5]
-  emitRel with image, fixes, "srv_tv"
-  emitList with image, [72, 137, 68, 36, 32]
+  emitList with image, [77, 49, 192, 77, 49, 201, 49, 192, 72, 137, 68, 36, 32]
   let image be emitIat with image, fixes, "iat_sel"
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "srv_listen"
