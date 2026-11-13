@@ -436,6 +436,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "ws_cli"
   emitList with image, [72, 139, 85, 248]
+  emitList with image, [72, 131, 194, 8]
   emitList with image, [73, 137, 192]
   emitCallTo with image, fixes, "rt_net_sendall"
   emitEpi with image
