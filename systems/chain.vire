@@ -1,5 +1,7 @@
 ~ Tiny chain: genesis plus two blocks, stored as json.
 
+can fs.read data
+can fs.write data
 define code with ch
   if ch == "e"
     return 101

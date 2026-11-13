@@ -1,3 +1,4 @@
+can clock
 define main
   let i be 0
   while i < 2500000

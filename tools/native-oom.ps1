@@ -40,7 +40,12 @@ function Compile-Native {
     param([string]$Name, [string]$Src)
     $srcRel = "data/native-oom/$Name.vire"
     $hexRel = "data/native-oom/$Name.hex"
-    Copy-Item $Src (Join-Path $Root $srcRel) -Force
+    $body = [IO.File]::ReadAllText($Src)
+    $cn = [IO.File]::ReadAllText((Join-Path $Root "compile-native.vire"))
+    if ($cn -notmatch '(?m)^can ') {
+        $body = [regex]::Replace($body, '(?m)^can .*\r?\n?', "")
+    }
+    [IO.File]::WriteAllText((Join-Path $Root $srcRel), $body)
     $code = Invoke-Vire compile-native.vire $srcRel $hexRel
     if ($code -ne 0) { throw "compile $Name failed exit=$code" }
     $hex = [System.IO.File]::ReadAllText((Join-Path $Root $hexRel)).Trim()

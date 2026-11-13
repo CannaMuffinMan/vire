@@ -8,7 +8,7 @@ public class NowTests
     [Fact]
     public void TicksAreWholeNumbersThatDoNotGoBackwards()
     {
-        string src = "define main\n  let first be ticks\n  let second be ticks\n  return [first, second]\nend\n";
+        string src = "can clock\ndefine main\n  let first be ticks\n  let second be ticks\n  return [first, second]\nend\n";
         string dir = Path.Combine(Path.GetTempPath(), "vire-ticks-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try

@@ -1,3 +1,4 @@
+can net.connect.loopback
 define main
   say "hi"
   let port be PORT_PLACEHOLDER

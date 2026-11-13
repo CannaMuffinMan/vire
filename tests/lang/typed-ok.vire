@@ -1,0 +1,10 @@
+define add with a: number, b: number as number
+  return a + b
+end
+
+define main
+  let n: number be 1
+  let t: text be "ok"
+  say (add with n, 2)
+  say t
+end

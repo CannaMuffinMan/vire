@@ -1,5 +1,7 @@
 ~ General-purpose Vire: data, control flow, functions, files, and errors.
 
+can fs.read data
+can fs.write data
 define area with w, h
   return w * h
 end

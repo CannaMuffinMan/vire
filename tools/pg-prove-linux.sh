@@ -33,6 +33,7 @@ python3 - <<PY
 from pathlib import Path
 root = Path("$ROOT")
 guest = (root / "tests/native/pg-client.vire").read_text()
+guest = "\n".join(ln for ln in guest.splitlines() if not ln.startswith("can "))
 guest = guest.replace("PORT_PLACEHOLDER", "55432")
 guest = guest.replace("PGUSER_PLACEHOLDER", "vire")
 guest = guest.replace("PGDB_PLACEHOLDER", "vire")

@@ -1,5 +1,6 @@
 ~ Host vs gen1 PE: loopback Postgres v3. Placeholders filled by prove scripts.
 
+can net.connect.loopback
 define fail with why
   say "FAIL " + why
   halt with 1

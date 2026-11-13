@@ -133,7 +133,7 @@ public class PathSsrfTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
-                "define main\n  write with \"data/payload.batch\", \"@echo off\"\n  write with \"data/deps.lock\", \"greet " + new string('b', 64) + "\"\nend\n");
+                "can fs.write data\ndefine main\n  write with \"data/payload.batch\", \"@echo off\"\n  write with \"data/deps.lock\", \"greet " + new string('b', 64) + "\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.False(File.Exists(batch));
             Assert.Equal("greet " + new string('a', 64) + "\n", File.ReadAllText(lockFile));
@@ -230,7 +230,7 @@ public class PathSsrfTests
             Assert.Equal("hacked-os", File.ReadAllText(lockFile));
             File.WriteAllText(lockFile, "original-lock");
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
-                "define main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
+                "can fs.write data\ndefine main\n  write with \"data/note.txt\", \"hacked\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.Equal("original-lock", File.ReadAllText(lockFile));
             Console.WriteLine("hardlink_pass_after lock=" + File.ReadAllText(lockFile));
@@ -258,7 +258,7 @@ public class PathSsrfTests
             Assert.False(VirePaths.UnderWritableZone(dir, folded));
             Assert.False(VirePaths.InFolder(Path.Combine(dir, "data"), folded));
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
-                "define main\n  write with \"Data/note.txt\", \"PWN\"\nend\n");
+                "can fs.write data\ndefine main\n  write with \"Data/note.txt\", \"PWN\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.Equal("OUTSIDE-KEEP", File.ReadAllText(folded));
             Console.WriteLine("linux_zone_pass_after Data_note_kept=OUTSIDE-KEEP");
@@ -438,9 +438,9 @@ public class PathSsrfTests
         File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
         File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
         File.WriteAllText(Path.Combine(dir, "append.vire"),
-            "define main\n  append with \"data/note.txt\", \"PWN\"\nend\n");
+            "can fs.write data\ndefine main\n  append with \"data/note.txt\", \"PWN\"\nend\n");
         File.WriteAllText(Path.Combine(dir, "read.vire"),
-            "define main\n  say (read with \"data/note.txt\")\nend\n");
+            "can fs.read data\ndefine main\n  say (read with \"data/note.txt\")\nend\n");
         try
         {
             Assert.Equal(0, Program.Execute(new string[] { Path.Combine(dir, "append.vire") }));
@@ -493,7 +493,7 @@ public class PathSsrfTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "plant.vire"),
-                "define main\n  write with \"data/evil.vire\", \"define main\\n  say \\\"pwn\\\"\\nend\\n\"\nend\n");
+                "can fs.write data\ndefine main\n  write with \"data/evil.vire\", \"define main\\n  say \\\"pwn\\\"\\nend\\n\"\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "plant.vire") }));
             Assert.False(File.Exists(Path.Combine(dir, "data", "evil.vire")));
         }
@@ -524,7 +524,7 @@ public class PathSsrfTests
                 Console.WriteLine("symlink test skipped: link was not created");
                 return;
             }
-            File.WriteAllText(Path.Combine(dir, "readlink.vire"), "define main\n  say (read with \"data/link.txt\")\nend\n");
+            File.WriteAllText(Path.Combine(dir, "readlink.vire"), "can fs.read data\ndefine main\n  say (read with \"data/link.txt\")\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "readlink.vire") }));
         }
         finally
@@ -557,7 +557,7 @@ public class PathSsrfTests
                 return;
             }
             File.WriteAllText(Path.Combine(dir, "readparent.vire"),
-                "define main\n  say (read with \"data/secret.txt\")\nend\n");
+                "can fs.read data\ndefine main\n  say (read with \"data/secret.txt\")\nend\n");
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "readparent.vire") }));
         }
         finally
@@ -739,7 +739,7 @@ public class PathSsrfTests
         Assert.Contains("data and site", planted.InterpErr);
 
         DualMode.DualRun walk = DualMode.RunSource(
-            "define main\n  read with \"data/../secret.txt\"\nend\n", null);
+            "can fs.read data\ndefine main\n  read with \"data/../secret.txt\"\nend\n", null);
         Assert.True(walk.Matched, Diff(walk));
         Assert.Equal(1, walk.InterpCode);
         Assert.Contains("program folder", walk.InterpErr);
@@ -848,7 +848,7 @@ public class PathSsrfTests
                 Console.WriteLine("symlink dual-mode test skipped: link was not created");
                 return;
             }
-            string src = "define main\n  say (read with \"data/link.txt\")\nend\n";
+            string src = "can fs.read data\ndefine main\n  say (read with \"data/link.txt\")\nend\n";
             File.WriteAllText(Path.Combine(dir, "readlink.vire"), src);
             Assert.Equal(1, Program.Execute(new string[] { Path.Combine(dir, "readlink.vire") }));
 

@@ -133,7 +133,7 @@ public class DepsLockTests
             for (int i = 0; i < writes.Length; i++)
             {
                 string rel = writes[i];
-                WriteProgram(dir, "define main\n  write with \"" + rel + "\", \"pwn\"\nend\n");
+                WriteProgram(dir, "can fs.write data\ndefine main\n  write with \"" + rel + "\", \"pwn\"\nend\n");
                 RunResult run = Run(Path.Combine(dir, "main.vire"));
                 Assert.Equal(1, run.Code);
                 Assert.Contains("will not write a program file", run.Err);
@@ -149,17 +149,17 @@ public class DepsLockTests
             for (int i = 0; i < tricky.Length; i++)
             {
                 string rel = tricky[i];
-                WriteProgram(dir, "define main\n  write with \"" + rel + "\", \"pwn\"\nend\n");
+                WriteProgram(dir, "can fs.write data\ndefine main\n  write with \"" + rel + "\", \"pwn\"\nend\n");
                 RunResult run = Run(Path.Combine(dir, "main.vire"));
                 Assert.Equal(1, run.Code);
                 Assert.DoesNotContain("pwn", run.Out);
             }
-            WriteProgram(dir, "define main\n  copy with \"data/note.txt\", \"data/deps.lock\"\nend\n");
+            WriteProgram(dir, "can fs.write data\ndefine main\n  copy with \"data/note.txt\", \"data/deps.lock\"\nend\n");
             RunResult copied = Run(Path.Combine(dir, "main.vire"));
             Assert.Equal(1, copied.Code);
             Assert.Contains("will not write a program file", copied.Err);
             File.WriteAllText(Path.Combine(dir, "data", "deps.lock"), "kept\n");
-            WriteProgram(dir, "define main\n  append with \"data/deps.lock\", \"pwn\"\nend\n");
+            WriteProgram(dir, "can fs.write data\ndefine main\n  append with \"data/deps.lock\", \"pwn\"\nend\n");
             RunResult appended = Run(Path.Combine(dir, "main.vire"));
             Assert.Equal(1, appended.Code);
             Assert.Equal("kept\n", File.ReadAllText(Path.Combine(dir, "data", "deps.lock")));

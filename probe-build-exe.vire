@@ -1,5 +1,6 @@
 ~ openImage plus buildExe copy. Isolates the PE header concat loop.
 
+can fs.write data
 use "src/pe.vire"
 
 define main

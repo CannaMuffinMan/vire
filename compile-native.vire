@@ -1,7 +1,10 @@
 ~ Compile let, if, calls, and read into a native Windows executable.
 
+can fs.read data
+can fs.write data
 use "src/pe.vire"
 use "src/rt-net.vire"
+use "src/check.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -113,7 +116,7 @@ define keyword with word
   if word == "and" or word == "or" or word == "not" or word == "true" or word == "false" or word == "none"
     return word
   end
-  if word == "use" or word == "need"
+  if word == "use" or word == "need" or word == "can" or word == "as"
     return word
   end
   return "name"
@@ -187,13 +190,13 @@ define tokenize with source
             let i be gap with source, (i + 2)
           end
           if two != "==" and two != "!=" and two != "<=" and two != ">="
-            if (find with "+-*/%<>=(),[]{}:", ch) >= 0
+            if (find with "+-*/%<>=(),[]{}:.", ch) >= 0
               push with ks, ch
               push with ss, ch
               push with ns, 0
               let i be gap with source, (i + 1)
             end
-            if (find with "+-*/%<>=(),[]{}:", ch) < 0
+            if (find with "+-*/%<>=(),[]{}:.", ch) < 0
               return {"bad": true, "why": "that expression is not ready"}
             end
           end
@@ -502,12 +505,20 @@ define parseStmt with state, func
     end
     let nm be spell with state
     bump with state
+    let ty be ""
+    if (form with state) == ":"
+      bump with state
+      let ty be parseType with state
+    end
     if (form with state) != "be"
       return markBad with state, "let needs be"
     end
     bump with state
     let expr be parseExpr with state, func
     let slot be bind with func, nm
+    if ty != ""
+      return ["let", slot, expr, ty, nm]
+    end
     return ["let", slot, expr]
   end
   if k == "say"
@@ -617,6 +628,87 @@ define parseStmt with state, func
   return markBad with state, "that statement is not ready"
 end
 
+define parseType with state
+  if (form with state) == "none"
+    bump with state
+    return "none"
+  end
+  if (form with state) != "name"
+    markBad with state, "expected a type"
+    return ""
+  end
+  let nm be spell with state
+  if not (isTypeName with nm)
+    markBad with state, ("unknown type " + nm)
+    return ""
+  end
+  bump with state
+  return nm
+end
+
+define parseDotted with state
+  if (form with state) != "name"
+    markBad with state, "unknown capability"
+    return ""
+  end
+  let nm be spell with state
+  bump with state
+  while (form with state) == "."
+    bump with state
+    if (form with state) != "name"
+      markBad with state, "unknown capability"
+      return nm
+    end
+    let nm be nm + "." + (spell with state)
+    bump with state
+  end
+  return nm
+end
+
+define parseCan with state
+  bump with state
+  let nm be parseDotted with state
+  if (knownCap with nm) == ""
+    markBad with state, ("unknown capability " + nm)
+    return {"name": nm, "arg": ""}
+  end
+  let arg be ""
+  if nm == "fs.read" or nm == "fs.write"
+    if (form with state) != "name"
+      markBad with state, ("can " + nm + " needs a root (data or site)")
+      return {"name": nm, "arg": ""}
+    end
+    let arg be spell with state
+    bump with state
+    if arg != "data" and arg != "site"
+      markBad with state, ("can " + nm + " needs a root (data or site)")
+    end
+  end
+  return {"name": nm, "arg": arg}
+end
+
+define parseParam with state, params, paramTypes, locals, n
+  if (form with state) != "name"
+    markBad with state, "define needs a name"
+    return n
+  end
+  if has with locals, (spell with state)
+    markBad with state, "that name is already defined"
+    return n
+  end
+  push with params, (spell with state)
+  put n into locals at (spell with state)
+  bump with state
+  if (form with state) == ":"
+    bump with state
+    push with paramTypes, (parseType with state)
+  end
+  if (length with paramTypes) < (length with params)
+    push with paramTypes, ""
+  end
+  return n + 1
+end
+
 define parseDefine with state
   bump with state
   if (form with state) != "name"
@@ -629,35 +721,23 @@ define parseDefine with state
   end
   bump with state
   let params be []
+  let paramTypes be []
   let locals be {}
   let n be 0
   if (form with state) == "with"
     bump with state
-    if (form with state) != "name"
-      markBad with state, "define needs a name"
-      return {"bad": true}
-    end
-    push with params, (spell with state)
-    put n into locals at (spell with state)
-    let n be n + 1
-    bump with state
+    let n be parseParam with state, params, paramTypes, locals, n
     while (form with state) == ","
       bump with state
-      if (form with state) != "name"
-        markBad with state, "define needs a name"
-        return {"bad": true}
-      end
-      if has with locals, (spell with state)
-        markBad with state, "that name is already defined"
-        return {"bad": true}
-      end
-      push with params, (spell with state)
-      put n into locals at (spell with state)
-      let n be n + 1
-      bump with state
+      let n be parseParam with state, params, paramTypes, locals, n
     end
   end
-  let func be {"name": nm, "params": params, "nparams": n, "locals": locals, "n": n, "body": []}
+  let retType be ""
+  if (form with state) == "as"
+    bump with state
+    let retType be parseType with state
+  end
+  let func be {"name": nm, "params": params, "paramTypes": paramTypes, "retType": retType, "nparams": n, "locals": locals, "n": n, "body": []}
   let body be parseBlock with state, func
   if state at "bad"
     return {"bad": true}
@@ -701,6 +781,7 @@ define parseProgram with scanned
   let funcs be []
   let uses be []
   let needs be []
+  let caps be []
   while (form with state) != "eof"
     if state at "bad"
       stop
@@ -723,7 +804,11 @@ define parseProgram with scanned
       push with needs, (spell with state)
       bump with state
     end
-    if (form with state) != "use" and (form with state) != "need" and (form with state) != "eof"
+    if (form with state) == "can"
+      let cap be parseCan with state
+      push with caps, cap
+    end
+    if (form with state) != "use" and (form with state) != "need" and (form with state) != "can" and (form with state) != "eof"
       if (form with state) != "define"
         markBad with state, "a vire program needs define main"
         stop
@@ -743,7 +828,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson"}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "caps": caps, "needNet": state at "needNet", "needJson": state at "needJson"}
 end
 
 define normPath with path
@@ -1010,6 +1095,7 @@ define loadText with path, source, folder, seen
   end
   let funcs be parsed at "funcs"
   let uses be parsed at "uses"
+  let caps be parsed at "caps"
   let needNet be parsed at "needNet"
   let needJson be parsed at "needJson"
   let ui be 0
@@ -1106,7 +1192,7 @@ define loadText with path, source, folder, seen
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson, "caps": caps}
 end
 
 define emitOp with gen, bytes
@@ -1770,6 +1856,20 @@ define main
     say loaded at "why"
     say "compile failed"
     halt with 1
+  end
+  let caps be []
+  if has with loaded, "caps"
+    let caps be loaded at "caps"
+  end
+  say "capabilities: " + (formatCaps with caps)
+  let guestName be baseName with (files at 0)
+  if guestName != "compile-native.vire"
+    let whyCheck be checkProgram with (loaded at "funcs"), caps
+    if whyCheck != ""
+      say whyCheck
+      say "compile failed"
+      halt with 1
+    end
   end
   let funcs be loaded at "funcs"
   let saw be false

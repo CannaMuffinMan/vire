@@ -124,7 +124,7 @@ public class ListenSecurityTests
 
     static string OkRoute()
     {
-        return "define route with method, path, body\n  return \"ok\"\nend\ndefine main\n  listen with 0\nend\n";
+        return "can net.listen\ndefine route with method, path, body\n  return \"ok\"\nend\ndefine main\n  listen with 0\nend\n";
     }
 
     static int HighPort()

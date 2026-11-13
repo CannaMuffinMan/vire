@@ -2,6 +2,7 @@
 ~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
 ~ to this token). Both paths are unauthenticated in the Node inventory.
 
+can net.listen
 define route with method, path, body
   if method == "GET"
     if path == "/health"

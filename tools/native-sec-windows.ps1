@@ -131,7 +131,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $hostDir "data") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $hostDir "outside") | Out-Null
 Set-Content -Path (Join-Path $hostDir "data\note.txt") -Value "SECRET-KEEP-ME-LONG" -NoNewline
 Set-Content -Path (Join-Path $hostDir "outside\note.txt") -Value "OUTSIDE-KEEP" -NoNewline
-Set-Content -Path (Join-Path $hostDir "append.vire") -Value "define main`n  append with `"data/note.txt`", `"PWN`"`nend`n"
+Set-Content -Path (Join-Path $hostDir "append.vire") -Value "can fs.write data`ndefine main`n  append with `"data/note.txt`", `"PWN`"`nend`n"
 $dataHost = Join-Path $hostDir "data"
 $outHost = Join-Path $hostDir "outside"
 $checkedPath = [IO.Path]::GetFullPath((Join-Path $dataHost "note.txt"))
@@ -157,7 +157,7 @@ cmd /c rmdir "$dataHost" | Out-Null
 if (Test-Path (Join-Path $hostDir "data.real")) { Rename-Item -LiteralPath (Join-Path $hostDir "data.real") -NewName "data" }
 
 # Trailing dot/space native refuse on the product PE.
-Set-Content -Path (Join-Path $Work "dotbat.vire") -Value "define main`n  write with `"data/payload.bat.`", `"pwn`"`nend`n"
+Set-Content -Path (Join-Path $Work "dotbat.vire") -Value "can fs.write data`ndefine main`n  write with `"data/payload.bat.`", `"pwn`"`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/dotbat.vire" "data/native-sec-windows/dotbat.hex"
 if ($code -ne 0) { throw "dotbat compile failed" }
 HexToExe "data/native-sec-windows/dotbat.hex" (Join-Path $Work "dotbat.exe")
@@ -178,7 +178,7 @@ $link = Join-Path $Work "data"
 if (Test-Path $link) { Remove-Item -Recurse -Force $link }
 cmd /c mklink /J "$link" "$outside"
 if ($LASTEXITCODE -ne 0) { throw "junction skipped or failed" }
-Set-Content -Path (Join-Path $Work "read.vire") -Value "define main`n  say (read with `"data/secret.txt`")`nend`n"
+Set-Content -Path (Join-Path $Work "read.vire") -Value "can fs.read data`ndefine main`n  say (read with `"data/secret.txt`")`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/read.vire" "data/native-sec-windows/read.hex"
 if ($code -ne 0) { throw "read compile failed" }
 HexToExe "data/native-sec-windows/read.hex" (Join-Path $Work "read.exe")
@@ -200,7 +200,7 @@ $note = Join-Path $Work "data\note.txt"
 $alias = Join-Path $Work "data\alias.txt"
 Set-Content -Path $note -Value "SECRET" -NoNewline
 cmd /c mklink /H "$alias" "$note"
-Set-Content -Path (Join-Path $Work "write.vire") -Value "define main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
+Set-Content -Path (Join-Path $Work "write.vire") -Value "can fs.write data`ndefine main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/write.vire" "data/native-sec-windows/write.hex"
 if ($code -ne 0) { throw "write compile failed" }
 HexToExe "data/native-sec-windows/write.hex" (Join-Path $Work "write.exe")
@@ -271,6 +271,14 @@ function Apply-SecWiden([string]$Tree) {
     }
     if ($hit -lt 1) { throw "sec widen applied to no rt-more.vire in $Tree" }
     Write-Host ("sec_widen applied " + $Tree)
+}
+
+function GuestBodyForTree([string]$Tree, [string]$Body) {
+    $cn = [IO.File]::ReadAllText((Join-Path $Tree "compile-native.vire"))
+    if ($cn -notmatch '(?m)^can ') {
+        return [regex]::Replace($Body, '(?m)^can .*\r?\n?', "")
+    }
+    return $Body
 }
 
 function Invoke-VireAt {
@@ -419,13 +427,14 @@ if (-not $stripped) { throw "trailing-dot fail-before: Windows did not strip pay
 # 4. F4: intern section named; RW mutation vs RX AV. Same cell via let p.
 New-Item -ItemType Directory -Force -Path (Join-Path $Work "data\f4") | Out-Null
 Set-Content -Path (Join-Path $Work "data\f4\note.txt") -Value "NOTE" -NoNewline
-Set-Content -Path (Join-Path $Work "f4.vire") -Value "define main`n  let p be `"data/f4/note.txt`"`n  say (read with p)`n  say (read with p)`nend`n"
+Set-Content -Path (Join-Path $Work "f4.vire") -Value "can fs.read data`ndefine main`n  let p be `"data/f4/note.txt`"`n  say (read with p)`n  say (read with p)`nend`n"
 $code = Invoke-Vire compile-native.vire "data/native-sec-windows/f4.vire" "data/native-sec-windows/f4.hex"
 if ($code -ne 0) { throw "f4 compile failed" }
 HexToExe "data/native-sec-windows/f4.hex" (Join-Path $Work "f4.exe")
 $vulnData = [string](Join-Path $VulnTree "data")
 New-Item -ItemType Directory -Force -Path $vulnData | Out-Null
-Copy-Item -LiteralPath ([string](Join-Path $Work "f4.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f4.vire")) -Force
+$f4Pin = GuestBodyForTree $VulnTree ([IO.File]::ReadAllText((Join-Path $Work "f4.vire")))
+[IO.File]::WriteAllText((Join-Path $vulnData "native-sec-windows-f4.vire"), $f4Pin)
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f4.vire", "data/f4-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f4-vuln.hex") (Join-Path $Work "f4-vuln.exe")
 
@@ -521,13 +530,13 @@ Write-Host ("sec_widen_fix_tree " + $RaceFix)
 function Compile-WidenGuest([string]$Tree, [string]$SrcName, [string]$Body, [string]$ExePath) {
     $data = Join-Path $Tree "data"
     New-Item -ItemType Directory -Force -Path $data | Out-Null
-    Set-Content -Path (Join-Path $data $SrcName) -Value $Body
+    Set-Content -Path (Join-Path $data $SrcName) -Value (GuestBodyForTree $Tree $Body)
     Invoke-VireAt -WorkingDirectory $Tree -VireArgs @((Join-Path $Tree "compile-native.vire"), ("data/" + $SrcName), ("data/" + $SrcName + ".hex"))
     Convert-HexFileToExe (Join-Path $data ($SrcName + ".hex")) $ExePath
 }
 
-$f5Body = "define main`n  write with `"data/f5-slot.txt`", `"HACKED`"`nend`n"
-$walkBody = "define main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
+$f5Body = "can fs.write data`ndefine main`n  write with `"data/f5-slot.txt`", `"HACKED`"`nend`n"
+$walkBody = "can fs.write data`ndefine main`n  write with `"data/note.txt`", `"hacked`"`nend`n"
 Compile-WidenGuest $RaceVuln "f5-widen.vire" $f5Body (Join-Path $Work "f5-vuln.exe")
 Compile-WidenGuest $RaceFix "f5-widen.vire" $f5Body (Join-Path $Work "f5.exe")
 Compile-WidenGuest $RaceVuln "walk-widen.vire" $walkBody (Join-Path $Work "walk-vuln.exe")

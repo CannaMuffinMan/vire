@@ -1,0 +1,4 @@
+define main
+  let n: number be "x"
+  say n
+end

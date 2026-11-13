@@ -1,3 +1,4 @@
+can fs.write data
 define main
   try
     write with "bad.exe", "nope"

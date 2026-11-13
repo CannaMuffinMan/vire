@@ -12,13 +12,13 @@ public class ConnectTests
     public void DualModeRefusesPrivateAndLinkLocalBeforeConnect()
     {
         DualMode.DualRun priv = DualMode.RunSource(
-            "define main\n  connect with \"10.0.0.1\", 80\nend\n", null);
+            "can net.connect.loopback\ndefine main\n  connect with \"10.0.0.1\", 80\nend\n", null);
         Assert.True(priv.Matched, Diff(priv));
         Assert.Equal(1, priv.InterpCode);
         Assert.Contains("private", priv.InterpErr);
 
         DualMode.DualRun link = DualMode.RunSource(
-            "define main\n  connect with \"169.254.169.254\", 80\nend\n", null);
+            "can net.connect.loopback\ndefine main\n  connect with \"169.254.169.254\", 80\nend\n", null);
         Assert.True(link.Matched, Diff(link));
         Assert.Equal(1, link.InterpCode);
         Assert.Contains("private", link.InterpErr);
@@ -28,13 +28,13 @@ public class ConnectTests
     public void DualModeRefusesNonLiteralHostAndBadPort()
     {
         DualMode.DualRun host = DualMode.RunSource(
-            "define main\n  connect with \"localhost\", 8080\nend\n", null);
+            "can net.connect.loopback\ndefine main\n  connect with \"localhost\", 8080\nend\n", null);
         Assert.True(host.Matched, Diff(host));
         Assert.Equal(1, host.InterpCode);
         Assert.Contains("not allowed", host.InterpErr);
 
         DualMode.DualRun port = DualMode.RunSource(
-            "define main\n  connect with \"127.0.0.1\", 0\nend\n", null);
+            "can net.connect.loopback\ndefine main\n  connect with \"127.0.0.1\", 0\nend\n", null);
         Assert.True(port.Matched, Diff(port));
         Assert.Equal(1, port.InterpCode);
         Assert.Contains("port", port.InterpErr);
@@ -70,7 +70,7 @@ public class ConnectTests
         try
         {
             DualMode.DualRun run = DualMode.RunSource(
-                "define main\n  let h be connect with \"127.0.0.1\", " + port + "\n  send with h, \"ping\"\n  let got be recv with h, 16\n  close with h\n  say got\nend\n",
+                "can net.connect.loopback\ndefine main\n  let h be connect with \"127.0.0.1\", " + port + "\n  send with h, \"ping\"\n  let got be recv with h, 16\n  close with h\n  say got\nend\n",
                 null);
             Assert.True(run.Matched, Diff(run));
             Assert.Equal(0, run.InterpCode);

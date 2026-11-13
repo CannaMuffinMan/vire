@@ -1,3 +1,5 @@
+can fs.read data
+can fs.write data
 define main
   write with "data/note.txt", "hi"
   write with "data/box/keep.txt", "x"

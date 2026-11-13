@@ -1,6 +1,10 @@
 ~ One run writes a private media vault, a branching story, and a data page into site/.
 ~ serve was removed. After this writes site/, run serve.vire (listen) or any static server behind a reverse proxy.
 
+can clock
+can net.listen
+can fs.read data
+can fs.write data
 define clip with name
   if (find with name, ".mp4") >= 0
     return true

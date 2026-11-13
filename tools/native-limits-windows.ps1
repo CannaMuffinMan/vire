@@ -6,7 +6,8 @@ $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$BaseSha = (git rev-parse origin/native-compiler).Trim()
+# Pre-#73 compile-native: still nested parseExpr so depth 20 hits the 64-call cap.
+$BaseSha = "6fbb705097938ce032c29cddfff947ccb12c3d5a"
 $AfterSha = (git rev-parse HEAD).Trim()
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
@@ -24,7 +25,10 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
 
-git show "${BaseSha}:compile-native.vire" | Set-Content -Path (Join-Path $Root "compile-native.base.vire") -Encoding utf8
+$basePath = Join-Path $Root "compile-native.base.vire"
+git show "${BaseSha}:compile-native.vire" | Set-Content -Path $basePath -Encoding utf8
+$pinned = [IO.File]::ReadAllText($basePath)
+[IO.File]::WriteAllText($basePath, "can fs.read data`ncan fs.write data`n" + $pinned)
 $before = & dotnet exec $VireDll compile-native.base.vire data/deep-expr.vire data/deep-expr.base.hex 2>&1 | Out-String
 Write-Output $before
 if ($before -notmatch "definitions called too deeply") {

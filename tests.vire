@@ -1,3 +1,6 @@
+can clock
+can fs.read data
+can fs.write data
 use "checks/core.vire"
 
 define kept with line

@@ -1,6 +1,7 @@
 ~ Couch Potato night-city shell. Static HTML and CSS. No embeds, audio, or payments.
 ~ The program folder is the sandbox. write only allows site/ and data/.
 
+can fs.write data
 define lines with parts
   return join with parts, "\n"
 end

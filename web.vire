@@ -1,3 +1,5 @@
+can net.listen
+can fs.write data
 need "ui"
 ~ serve was removed. This writes site/; open the folder with listen (serve.vire) or any static server.
 

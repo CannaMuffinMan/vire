@@ -169,6 +169,7 @@ public class ServeTests
     {
         return string.Join("\n", new string[]
         {
+            "can net.listen",
             "define route with method, path, body",
             "  return \"{\\\"ok\\\":false,\\\"status\\\":404,\\\"error\\\":\\\"not found\\\"}\"",
             "end",
