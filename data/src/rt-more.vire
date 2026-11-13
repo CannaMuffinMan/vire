@@ -111,7 +111,9 @@ define emitMore with image, fixes, labels
   emitJcc with image, fixes, 135, "try_fail"
   emitList with image, [73, 137, 196, 72, 41, 200, 137, 8, 199, 64, 4]
   emitU32 with image, 0
-  emitList with image, [72, 131, 192, 8, 195]
+  ~ Zero the payload. Compact reuse left dirty qwords; GC then chased them
+  ~ as pointers and rewrote live compiler/PE bytes (same-length gen2 hash flake).
+  emitList with image, [87, 72, 141, 120, 8, 80, 139, 8, 131, 225, 248, 193, 233, 3, 49, 192, 252, 243, 72, 171, 88, 95, 72, 131, 192, 8, 195]
   pin with labels, "try_fail", image
   emitList with image, [49, 192, 195]
 
