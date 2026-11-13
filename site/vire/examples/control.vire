@@ -1,0 +1,11 @@
+~ Tour: if / else if / else. Native for-in still disagrees with the host.
+define main
+  let n be 2
+  if n == 1
+    say "one"
+  else if n == 2
+    say "two"
+  else
+    say "other"
+  end
+end

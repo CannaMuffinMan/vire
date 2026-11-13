@@ -1,0 +1,5 @@
+use "mod-lib.vire"
+
+define main
+  say helper
+end

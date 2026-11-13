@@ -1,0 +1,8 @@
+~ Hero sample: a complete Vire program.
+define greet with who
+  return "hello, " + who
+end
+
+define main
+  say greet with "vire"
+end

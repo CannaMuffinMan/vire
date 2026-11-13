@@ -1,56 +1,82 @@
 # Vire
 
-Vire is a small programming language. Programs are `.vire` files. Anyone with Docker, or the .NET 10 SDK, can run them. A Windows desktop build can also open a window. Binaries are not stored in git. GitHub Actions uploads single-file builds as workflow artifacts.
+Vire is a programming language. The compiler is written in Vire and, on
+Windows, compiles itself to a native PE. Guests are sandboxed. Types are
+dynamic today. Networking (loopback HTTP, TCP, Postgres) is landing.
 
-The manual is [GUIDE.md](GUIDE.md).
+This README is the front door. The language reference is
+[docs/LANGUAGE.md](docs/LANGUAGE.md). The developer homepage (static, no CDN)
+is [site/vire/index.html](site/vire/index.html). The longer narrative manual is
+[GUIDE.md](GUIDE.md).
 
-## Run with Docker
+[![check](https://github.com/CannaMuffinMan/vire/actions/workflows/check.yml/badge.svg)](https://github.com/CannaMuffinMan/vire/actions/workflows/check.yml)
+[![site-vire](https://github.com/CannaMuffinMan/vire/actions/workflows/site-vire.yml/badge.svg)](https://github.com/CannaMuffinMan/vire/actions/workflows/site-vire.yml)
+[![native-net](https://github.com/CannaMuffinMan/vire/actions/workflows/native-net.yml/badge.svg)](https://github.com/CannaMuffinMan/vire/actions/workflows/native-net.yml)
+[![crypto](https://github.com/CannaMuffinMan/vire/actions/workflows/crypto.yml/badge.svg)](https://github.com/CannaMuffinMan/vire/actions/workflows/crypto.yml)
+[![fuzz](https://github.com/CannaMuffinMan/vire/actions/workflows/fuzz.yml/badge.svg)](https://github.com/CannaMuffinMan/vire/actions/workflows/fuzz.yml)
 
-This does not depend on a Windows PC.
+## Hello world
+
+```vire
+define greet with who
+  return "hello, " + who
+end
+
+define main
+  say greet with "vire"
+end
+```
+
+That file is [`site/vire/examples/hello.vire`](site/vire/examples/hello.vire).
+It prints `hello, vire`.
+
+## Quick start
+
+You need the [.NET 10 SDK](https://dot.net/). Binaries are not stored in git.
+
+```text
+dotnet build vire.csproj -c Release
+dotnet exec bin/Release/net10.0/vire.dll site/vire/examples/hello.vire
+```
+
+Run the suite the host still uses:
+
+```text
+dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release
+dotnet exec bin/Release/net10.0/vire.dll tests.vire
+```
+
+Docker (interpreter image, no Windows PE):
 
 ```text
 docker build -t vire .
 docker run --rm vire tests.vire
 ```
 
-`tests.vire` is inside the image. It should print `pass`.
+### Native Windows PE
 
-To run your own program, mount the folder that contains it:
-
-```text
-docker run --rm -v "$PWD":/work vire my.vire
-```
-
-On Windows PowerShell, if Docker cannot mount the drive, copy the program into a folder on `C:` or keep using the files already in the image: `tests.vire`, `count.vire`, `term.vire`, and `vault.vire`.
-
-## Run with .NET 10
+On Windows, after the same `dotnet build`:
 
 ```text
-dotnet build -c Release
-dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release
-dotnet run -c Release -- tests.vire
+dotnet exec bin/Release/net10.0/vire.dll --compiler compile-native.vire data/guest-hello.vire data/guest-hello.hex
 ```
 
-That runner uses the terminal. `open` and `show` do not draw a desktop window.
+CI converts that hex to an `.exe` and expects `hello from stage` from
+`guest-hello.vire`. The fixed-point proof (gen1 hex = gen2 hex) is
+`tools/native-selfhost-handoff.ps1` on `windows-latest`
+([check.yml](.github/workflows/check.yml) job `native-selfhost-windows`).
 
-Publish a single file for another machine:
+Linux ELF is **in progress** and is not a shipped target.
 
-```text
-dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o dist/linux-x64
-dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o dist/linux-arm64
-dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -o dist/osx-x64
-dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -o dist/osx-arm64
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64
-```
+## What is true today
 
-## Windows desktop window
-
-`vire.windows.csproj` opens a real window for `work.vire` and `board.vire`. Build it with:
-
-```text
-dotnet build windows/vire.windows.csproj -c Release
-dotnet publish windows/vire.windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/win-x64-windows
-```
+- Self-host: native gen1 = gen2 is proven in CI on Windows.
+- Emit path: Windows PE from Vire, no cl/gcc/rustc.
+- Bootstrap: the C# host in this repo still emits the first image.
+- Caps: host list 100,000; native arena 32 MB; step budget up to 5,000,000.
+- No `can` capability syntax yet. Sandbox + import allowlist + caps.
+- No type annotations yet.
+- Postgres TLS / SCRAM: in progress (loopback trust/cleartext is what CI proves).
 
 ## License
 

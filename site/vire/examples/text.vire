@@ -1,0 +1,10 @@
+~ Tour: text builtins the native compiler emits.
+define main
+  let word be "Vire"
+  say lower with word
+  say begins with word, "Vi"
+  say ends with word, "re"
+  say replace with word, "i", "y"
+  say find with word, "r"
+  say word at 0
+end

@@ -1,0 +1,10 @@
+# Runnable programs (one per line). Libraries without main are omitted.
+hello.vire
+count.vire
+defs.vire
+lists.vire
+control.vire
+text.vire
+try-miss.vire
+mod-main.vire
+files.vire

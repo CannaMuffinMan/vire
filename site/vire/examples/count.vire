@@ -1,0 +1,8 @@
+~ Tour: while loops and integer arithmetic.
+define main
+  let n be 1
+  while n <= 5
+    say n
+    let n be n + 1
+  end
+end

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Vire</title>
+  <rect width="64" height="64" rx="14" fill="#0e1614"/>
+  <path d="M14 16h10l8 22 8-22h10L36 52H28L14 16z" fill="#7ee0c6"/>
+  <path d="M42 44h8v6H42z" fill="#f0c27b"/>
+</svg>

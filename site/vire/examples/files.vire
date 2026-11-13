@@ -1,0 +1,5 @@
+~ Tour: sandboxed write/read. Paths stay under data/ of the program folder.
+define main
+  write with "data/note.txt", "hello"
+  say read with "data/note.txt"
+end
