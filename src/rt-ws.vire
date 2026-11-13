@@ -50,35 +50,31 @@ define emitSha1Native with image, fixes, labels
   emitList with image, [72, 139, 69, 208, 72, 43, 69, 168]
   emitList with image, [72, 131, 248, 64, 15, 140]
   emitRel with image, fixes, "sha1_tail"
-  emitList with image, [72, 139, 77, 216, 72, 3, 77, 168]
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 139, 117, 216, 72, 3, 117, 168]
+  emitList with image, [72, 141, 189, 64, 254, 255, 255]
   emitList with image, [185, 64, 0, 0, 0]
-  pin with labels, "sha1_cpy64", image
-  emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 255, 201, 15, 133]
-  emitRel with image, fixes, "sha1_cpy64"
+  emitList with image, [243, 164]
   emitCallTo with image, fixes, "sha1_block"
   emitList with image, [72, 131, 69, 168, 64]
   emitJmpTo with image, fixes, "sha1_full"
   pin with labels, "sha1_tail", image
   emitList with image, [72, 139, 69, 208, 72, 43, 69, 168]
   emitList with image, [72, 137, 69, 160]
-  emitList with image, [72, 139, 77, 216, 72, 3, 77, 168]
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 139, 117, 216, 72, 3, 117, 168]
+  emitList with image, [72, 141, 189, 64, 254, 255, 255]
   emitList with image, [139, 77, 160]
   emitList with image, [133, 201, 15, 132]
   emitRel with image, fixes, "sha1_pad80"
-  pin with labels, "sha1_cpyrem", image
-  emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 255, 201, 15, 133]
-  emitRel with image, fixes, "sha1_cpyrem"
+  emitList with image, [243, 164]
   pin with labels, "sha1_pad80", image
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 141, 149, 64, 254, 255, 255]
   emitList with image, [72, 3, 85, 160]
   emitList with image, [198, 2, 128]
   emitList with image, [72, 139, 69, 160]
   emitList with image, [72, 255, 192]
   emitList with image, [72, 131, 248, 56, 15, 135]
   emitRel with image, fixes, "sha1_extra"
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 141, 149, 64, 254, 255, 255]
   emitList with image, [72, 3, 85, 160]
   emitList with image, [72, 255, 194]
   emitList with image, [185, 56, 0, 0, 0]
@@ -91,7 +87,7 @@ define emitSha1Native with image, fixes, labels
   emitRel with image, fixes, "sha1_z1"
   emitJmpTo with image, fixes, "sha1_len64"
   pin with labels, "sha1_extra", image
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 141, 149, 64, 254, 255, 255]
   emitList with image, [72, 3, 85, 160]
   emitList with image, [72, 255, 194]
   emitList with image, [185, 64, 0, 0, 0]
@@ -101,14 +97,14 @@ define emitSha1Native with image, fixes, labels
   emitList with image, [198, 2, 0, 72, 255, 194, 255, 201, 15, 133]
   emitRel with image, fixes, "sha1_z2"
   emitCallTo with image, fixes, "sha1_block"
-  emitList with image, [72, 141, 85, 128]
+  emitList with image, [72, 141, 149, 64, 254, 255, 255]
   emitList with image, [185, 56, 0, 0, 0]
   pin with labels, "sha1_z3", image
   emitList with image, [198, 2, 0, 72, 255, 194, 255, 201, 15, 133]
   emitRel with image, fixes, "sha1_z3"
   pin with labels, "sha1_len64", image
   emitList with image, [72, 139, 69, 208, 72, 193, 224, 3]
-  emitList with image, [72, 141, 77, 128]
+  emitList with image, [72, 141, 141, 64, 254, 255, 255]
   emitList with image, [72, 199, 65, 56, 0, 0, 0, 0]
   emitList with image, [72, 15, 200]
   emitList with image, [72, 137, 65, 56]
@@ -125,21 +121,21 @@ define emitSha1Native with image, fixes, labels
   emitList with image, [83, 86, 87, 65, 84, 65, 85, 65, 86, 65, 87]
   emitList with image, [49, 201]
   pin with labels, "sha1_ld", image
-  emitList with image, [139, 84, 141, 128]
+  emitList with image, [139, 148, 141, 64, 254, 255, 255]
   emitList with image, [15, 201]
-  emitList with image, [137, 148, 141, 120, 254, 255, 255]
+  emitList with image, [137, 148, 141, 64, 254, 255, 255]
   emitList with image, [255, 193]
   emitList with image, [131, 249, 16]
   emitList with image, [15, 140]
   emitRel with image, fixes, "sha1_ld"
   emitList with image, [185, 16, 0, 0, 0]
   pin with labels, "sha1_exp", image
-  emitList with image, [139, 148, 141, 108, 254, 255, 255]
-  emitList with image, [51, 148, 141, 88, 254, 255, 255]
-  emitList with image, [51, 148, 141, 64, 254, 255, 255]
-  emitList with image, [51, 148, 141, 56, 254, 255, 255]
+  emitList with image, [139, 148, 141, 52, 254, 255, 255]
+  emitList with image, [51, 148, 141, 32, 254, 255, 255]
+  emitList with image, [51, 148, 141, 8, 254, 255, 255]
+  emitList with image, [51, 148, 141, 0, 254, 255, 255]
   emitList with image, [193, 194, 1]
-  emitList with image, [137, 148, 141, 120, 254, 255, 255]
+  emitList with image, [137, 148, 141, 64, 254, 255, 255]
   emitList with image, [255, 193]
   emitList with image, [131, 249, 80]
   emitList with image, [15, 140]
@@ -200,7 +196,7 @@ define emitSha1Native with image, fixes, labels
   emitList with image, [65, 1, 195]
   emitList with image, [65, 1, 211]
   emitList with image, [65, 1, 219]
-  emitList with image, [68, 3, 156, 141, 120, 254, 255, 255]
+  emitList with image, [68, 3, 156, 141, 64, 254, 255, 255]
   emitList with image, [69, 137, 233]
   emitList with image, [69, 137, 229]
   emitList with image, [68, 137, 251]
