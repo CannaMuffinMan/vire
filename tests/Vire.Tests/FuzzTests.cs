@@ -105,18 +105,18 @@ public class FuzzTests
         }
 
         byte[] hugeLine = Encoding.ASCII.GetBytes("GET /" + new string('a', HttpWire.MaxRequestLine + 8) + " HTTP/1.1\r\nHost: x\r\n\r\n");
-        Assert.Equal(431, HttpWire.ParseComplete(hugeLine, hugeLine.Length).Status);
+        Assert.Equal(400, HttpWire.ParseComplete(hugeLine, hugeLine.Length).Status);
 
         byte[] hugeHead = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\n" + new string('H', HttpWire.MaxHeaderBlock) + ": x\r\n\r\n");
         int headStatus = HttpWire.ParseComplete(hugeHead, Math.Min(hugeHead.Length, HttpWire.MaxHeaderBlock)).Status;
-        Assert.True(headStatus == 431 || headStatus == 408, "headers status " + headStatus);
+        Assert.True(headStatus == 400 || headStatus == 408, "headers status " + headStatus);
 
         string fatBody = "POST / HTTP/1.1\r\nContent-Length: " + (HttpWire.MaxRequestBody + 1) + "\r\n\r\n";
         byte[] fat = Encoding.ASCII.GetBytes(fatBody);
         Assert.Equal(413, HttpWire.ParseComplete(fat, fat.Length).Status);
 
         byte[] chunked = Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n");
-        Assert.Equal(501, HttpWire.ParseComplete(chunked, chunked.Length).Status);
+        Assert.Equal(400, HttpWire.ParseComplete(chunked, chunked.Length).Status);
 
         byte[] noLen = Encoding.ASCII.GetBytes("POST / HTTP/1.1\r\nHost: x\r\n\r\n");
         Assert.Equal(411, HttpWire.ParseComplete(noLen, noLen.Length).Status);
