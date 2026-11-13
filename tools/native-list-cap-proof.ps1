@@ -53,7 +53,12 @@ function Compile-Run {
     New-Item -ItemType Directory -Force -Path $work | Out-Null
     $srcRel = "data/native-list-cap/$Name.vire"
     $hexRel = "data/native-list-cap/$Name.hex"
-    Copy-Item $Src (Join-Path $Root $srcRel) -Force
+    $body = [IO.File]::ReadAllText($Src)
+    $cn = [IO.File]::ReadAllText((Join-Path $Root "compile-native.vire"))
+    if ($cn -notmatch '(?m)^can ') {
+        $body = [regex]::Replace($body, '(?m)^can .*\r?\n?', "")
+    }
+    [IO.File]::WriteAllText((Join-Path $Root $srcRel), $body)
     $compiled = Invoke-Vire compile-native.vire $srcRel $hexRel
     if ($compiled.Exit -ne 0) { throw "compile $Name failed exit=$($compiled.Exit)" }
     $exe = Join-Path $work "$Name.exe"
