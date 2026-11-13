@@ -9,7 +9,9 @@ if [[ ! -f "$VireDll" ]]; then
   echo "missing $VireDll" >&2
   exit 1
 fi
-BaseSha=$(git rev-parse origin/native-compiler)
+# Last native-compiler tip before map `at` split (PR #85). origin/native-compiler
+# is that merge, so a worktree of it already has the pass PE.
+BaseSha=3946d1c6c4f3fc12e4a486da600bba354ad60c64
 AfterSha=$(git rev-parse HEAD)
 python3 -m pip install --user -q unicorn
 mkdir -p data
