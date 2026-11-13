@@ -279,8 +279,14 @@ if (Test-Path (Join-Path $Root $echoHex)) { Remove-Item -Force (Join-Path $Root 
 $cn = Get-Content -Raw (Join-Path $Root "compile-native.vire")
 if ($cn -notmatch "(?s)~ ws-stub-begin.*?~ ws-stub-end") { throw "compile-native.vire missing ws stubs" }
 $cn = [regex]::Replace($cn, "(?s)~ ws-stub-begin.*?~ ws-stub-end", "use `"src/rt-ws.vire`"")
-Set-Content -Path (Join-Path $Root "data/compile-ws.vire") -Value $cn -NoNewline
-$compileEcho = Invoke-Vire data/compile-ws.vire "data/ws-echo.vire" $echoHex
+$utf8 = New-Object System.Text.UTF8Encoding $false
+$wsCompiler = Join-Path $Root "compile-ws.vire"
+[System.IO.File]::WriteAllText($wsCompiler, $cn, $utf8)
+try {
+    $compileEcho = Invoke-Vire compile-ws.vire "data/ws-echo.vire" $echoHex
+} finally {
+    if (Test-Path $wsCompiler) { Remove-Item -Force $wsCompiler }
+}
 if ($compileEcho -ne 0) { throw "compile-native ws-echo exit $compileEcho" }
 $echoExe = Join-Path $Data "ws-echo.exe"
 Convert-HexToExe (Join-Path $Root $echoHex) $echoExe
