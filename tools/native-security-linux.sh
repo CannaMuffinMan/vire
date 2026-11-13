@@ -42,9 +42,9 @@ dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo \
 if [[ -f src/rt-pg.vire ]]; then
   echo "postgres parser present (pg_rows_parse/pg_err fuzzed on Windows)"
 fi
-if grep -RniE 'websocket|redis' src compile-native.vire >/dev/null 2>&1; then
-  echo "unexpected WebSocket/Redis parser present"
+if grep -RniE 'websocket' src compile-native.vire >/dev/null 2>&1; then
+  echo "unexpected WebSocket frame parser present"
   exit 1
 fi
-echo "residual: no WebSocket frame or Redis reply parsers on native-compiler"
+echo "residual: no WebSocket frame parser; guest Redis client is src/rt-redis.vire"
 echo "native_security_linux ok"

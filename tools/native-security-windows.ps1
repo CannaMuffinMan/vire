@@ -407,5 +407,5 @@ for ($n = 0; $n -lt $httpIters; $n++) {
 }
 if ($server.HasExited) { throw "http fuzz server died" }
 Stop-Process -Id $server.Id -Force
-Write-Host "PASS_AFTER http fuzz seed=20261113 iters=$httpIters PE alive (no WS/Redis parsers; pg_rows_parse fuzzed)"
+Write-Host "PASS_AFTER http fuzz seed=20261113 iters=$httpIters PE alive (no WS parser; pg_rows_parse fuzzed)"
 Write-Host "native_security_windows ok"
