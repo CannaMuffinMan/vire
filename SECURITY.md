@@ -24,9 +24,9 @@ These are the current strengths, not a claim that the process cannot be abused:
 
 Native Windows x64 PE (this tree, proven in `native-security.yml` / Windows jobs — not a substitute for the host interpreter list above):
 
-- Emitted `.text` is execute+read, `.data`/`.idata` read+write (W^X section characteristics). Entry calls `VirtualQuery` and exits if a code page is writable+executable or a data page is executable.
+- Emitted `.text` is execute+read, `.data`/`.idata` read+write (W^X section characteristics). Entry calls `VirtualQuery`; `rt_wx_check` is advisory. CI `VirtualQuery` on a `SEC_IMAGE` map is the OS proof.
 - Guest `write` of compiler output under `data/` uses a sibling `.tmp` plus `MoveFileExA(REPLACE_EXISTING)` after dest nlink==1 (hardlinks still refuse). Host `VireFiles.WriteAllText` already used tmp+`File.Move`.
-- Native faults go to stdout as `crash code=` / `crash rip=` / `crash off=` (RIP minus `0x140000000`) and to `data/crash.log` via exclusive `CREATE_NEW` (no heap bind in VEH). `crash-rip.txt` is not created.
+- Native faults go to stdout as `crash code=` / `crash rip=` / `crash off=` (RIP minus `0x140000000`). At startup `rt_crash_prepare` GetFileAttributesA-rejects a reparse `data` directory, `rt_bind_path`s the real directory, and stores an absolute `crash_abs`. VEH CreateFile uses only that buffer (`CREATE_NEW` + `FILE_FLAG_OPEN_REPARSE_POINT`). A junctioned `data\` does not receive the log. `crash-rip.txt` is not created.
 - Seeded HTTP (`HttpWire`), JSON (`parse` / `src/rt-schema`), and Postgres row/error parsers (`src/rt-pg.vire` `pg_rows_parse` / `pg_err`): host and PE must not AV/hang. No WebSocket frame or Redis reply parser on this branch.
 
 ## Non-guarantees

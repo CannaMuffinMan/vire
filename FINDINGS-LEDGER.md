@@ -17,7 +17,7 @@ No CVE IDs. Caps/sandbox/Defender unchanged.
 | F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
 | F4 | yes | Unicorn + Windows `f4_double_read` / intern section; **W^X** PE `.text` `0x60000020` / `.data` `0xC0000040` + `VirtualQuery` / SEC_IMAGE + silent `rt_wx_check` | intern may sit in RW `.data`; property is copy-before-NUL |
 | F5 | yes | Unicorn nlink; Windows hardlink; **until-hit then fixed==0**; dest nlink==1 then **tmp + MoveFileExA** atomic replace under `data/` | walk-then-open is a separate gate (`f_walk`) |
-| F6 | yes | VEH still prints `crash rip=`; **also** `crash code=` + `crash off=` to stdout and `data/crash.log` via exclusive `CREATE_NEW` (never CREATE_ALWAYS / crash-rip.txt). No heap `rt_bind_path` in VEH — filter can run before VirtualAlloc | log skipped if `data/crash.log` already exists (CREATE_NEW) |
+| F6 | yes | stdout `crash code/rip/off`; startup `rt_crash_prepare` bind+no-reparse into `crash_abs`; VEH CreateFile only that absolute path | log skipped if prepare fails (junctioned `data\`) or `CREATE_NEW` exists |
 | F7 | yes | `42770835327` printed `files stay inside the program folder` | — |
 | F8 | yes | `and 255` on host; `mov rcx,imm64` in compile-native; host+Unicorn `[0, 0, 1]` for 2^31 / 2^39 / 2^31+1 | — |
 | F9 | yes | PackZipSigned gone | — |
@@ -147,25 +147,25 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 ## F4 W^X (this lane)
 
 - Status: **implemented**; Windows `VirtualQuery` after `SEC_IMAGE` map plus in-process `rt_wx_check`
-- FAIL_BEFORE: `6fbb705` IAT has no `VirtualQuery`
+- FAIL_BEFORE: `7fd41b88` IAT has no `VirtualQuery`
 - PASS_AFTER: this SHA IAT includes `VirtualQuery`; hello PE `.text` not writable, `.data` not executable; hello still prints `hello from vire`
 - Residual: `SEC_IMAGE` mapping is the loader's section protect, not a second running process's `VirtualQueryEx`
 
 ## F5 atomic replace (this lane)
 
 - Status: **implemented** in native `rt_write`
-- FAIL_BEFORE: `6fbb705` had no `MoveFileExA`; dest was truncated in place
+- FAIL_BEFORE: `7fd41b88` had no `MoveFileExA`; dest was truncated in place
 - PASS_AFTER: dest nlink==1, write `dest.tmp`, `MoveFileExA`; two-process reader must not see mixed OLD/NEW
 - Residual: empty reads during create of a brand-new name are possible before the first successful replace
 
 ## F6 crash log hardlink truncate
 
 - Status: **fixed**; Windows crash PE this push
-- Exposure: `crash-rip.txt` CREATE_ALWAYS in cwd.
-- Fix: RIP on stdout (no `crash-rip.txt`). This lane also writes `data/crash.log` with CREATE_NEW + bind + nlink==1 (`crash code=` / `crash rip=` / `crash off=`).
-- Fail-before: 7c7c8ea hello PE, patch `call fn_main` after VEH to `xor rax,rax; mov rax,[rax]`.
-- Pass-after: this SHA same patch → stdout `crash rip=`, **no** `crash-rip.txt`.
-- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code.
+- Exposure: `crash-rip.txt` CREATE_ALWAYS; later relative `data/crash.log` CREATE_NEW followed a junctioned `data\` outside the program folder.
+- Fix: RIP on stdout (no `crash-rip.txt`). Startup `rt_crash_prepare` rejects `FILE_ATTRIBUTE_REPARSE_POINT` on `data`, `rt_bind_path`s the directory, stores absolute `crash_abs`. VEH CreateFile uses only that buffer.
+- Fail-before: `7fd41b88` (no dedicated log); junction leak `1600038` writes `crash.log` through `data\` junction.
+- Pass-after: this SHA, junctioned `data\` does not receive `crash.log`; real `data\crash.log` still gets `crash code/rip/off`.
+- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code. Crash before `rt_crash_prepare` (null at very first instruction) skips the log.
 
 ## F7 junction test accepts any nonzero exit
 

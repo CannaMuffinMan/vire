@@ -48,6 +48,8 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "iat_vh"
   let image be emitList with image, [232]
   let image be emitRel with image, fixes, "rt_wx_check"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_crash_prepare"
   let image be emitList with image, [77, 137, 238, 232]
   let image be emitRel with image, fixes, "rt_args_init"
   let image be emitList with image, [232]
@@ -114,6 +116,67 @@ define emitRuntime with image, fixes, labels
   ~ Advisory only: Windows image MBI Protect can be WRITECOPY (0x80) or
   ~ PartitionId-shifted. Section chars + CI VirtualQuery remain the proof.
   ~ Never ExitProcess here or hello dies with empty stdout.
+  let image be emitList with image, [49, 192, 201, 195]
+  pin with labels, "rt_crash_prepare", image
+  ~ Bind data\ at startup into crash_abs. Reject directory reparse points.
+  ~ VEH CreateFile uses only that buffer (never a CWD-relative path).
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 199, 69, 248, 255, 255, 255, 255, 72, 141, 13]
+  let image be emitRel with image, fixes, "data_dir_path"
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ga"
+  let image be emitList with image, [131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [169]
+  let image be emitU32 with image, 1024
+  let image be emitList with image, [15, 133]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [169]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "data_dir_path"
+  let image be emitList with image, [186]
+  let image be emitU32 with image, 2147483648
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 7
+  let image be emitList with image, [69, 49, 201, 72, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40]
+  let image be emitU32 with image, 33554432
+  let image be emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_cf"
+  let image be emitList with image, [72, 131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [72, 137, 69, 248, 72, 137, 193, 232]
+  let image be emitRel with image, fixes, "rt_bind_path"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [72, 139, 77, 248, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_abs"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1000
+  let image be emitList with image, [69, 49, 201, 255, 21]
+  let image be emitRel with image, fixes, "iat_fp"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 1000
+  let image be emitList with image, [15, 131]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [72, 141, 53]
+  let image be emitRel with image, fixes, "crash_suffix"
+  let image be emitList with image, [72, 141, 61]
+  let image be emitRel with image, fixes, "crash_abs"
+  let image be emitList with image, [72, 1, 199, 185]
+  let image be emitU32 with image, 11
+  let image be emitList with image, [252, 243, 164, 72, 141, 5]
+  let image be emitRel with image, fixes, "crash_ready"
+  let image be emitList with image, [72, 199, 0, 1, 0, 0, 0]
+  pin with labels, "crash_prep_close", image
+  let image be emitList with image, [72, 139, 77, 248, 72, 131, 249, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  pin with labels, "crash_prep_skip", image
   let image be emitList with image, [49, 192, 201, 195]
   pin with labels, "crash_filter", image
   let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 139, 1, 72, 137, 69, 248, 139, 0, 72, 137, 69, 240, 72, 139, 69, 248, 72, 139, 64, 16, 72, 137, 69, 232, 72, 185]
@@ -214,8 +277,12 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
   let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "crash_ready"
+  let image be emitList with image, [72, 131, 56, 0, 15, 132]
+  let image be emitRel with image, fixes, "crash_exit"
   let image be emitList with image, [72, 141, 13]
-  let image be emitRel with image, fixes, "crash_log_path"
+  let image be emitRel with image, fixes, "crash_abs"
   let image be emitList with image, [186]
   let image be emitU32 with image, 1073741824
   let image be emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 1, 0, 0, 0, 199, 68, 36, 40]
@@ -224,7 +291,6 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "iat_cf"
   let image be emitList with image, [72, 131, 248, 255, 15, 132]
   let image be emitRel with image, fixes, "crash_exit"
-  ~ CREATE_NEW only (no heap bind): VEH can run before VirtualAlloc.
   let image be emitList with image, [72, 137, 69, 216, 72, 139, 77, 216, 72, 141, 21]
   let image be emitRel with image, fixes, "crash_code_msg"
   let image be emitList with image, [65, 184]
@@ -838,6 +904,10 @@ define parkRuntime with image, labels
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 111, 102, 102, 61]
   pin with labels, "crash_log_path", image
   let image be emitList with image, [100, 97, 116, 97, 47, 99, 114, 97, 115, 104, 46, 108, 111, 103, 0]
+  pin with labels, "data_dir_path", image
+  let image be emitList with image, [100, 97, 116, 97, 0]
+  pin with labels, "crash_suffix", image
+  let image be emitList with image, [92, 99, 114, 97, 115, 104, 46, 108, 111, 103, 0]
   pin with labels, "lit_true", image
   let image be emitList with image, [116, 114, 117, 101]
   pin with labels, "lit_false", image
@@ -898,6 +968,14 @@ define parkRuntime with image, labels
   while wxI < 48
     let image be emitU8 with image, 0
     let wxI be wxI + 1
+  end
+  pin with labels, "crash_ready", image
+  let image be emitU64 with image, 0
+  pin with labels, "crash_abs", image
+  let absI be 0
+  while absI < 1024
+    let image be emitU8 with image, 0
+    let absI be absI + 1
   end
   pin with labels, "intern_tab", image
   let internI be 0

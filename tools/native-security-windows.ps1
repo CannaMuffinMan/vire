@@ -4,7 +4,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
-$BaseSha = "6fbb705097938ce032c29cddfff947ccb12c3d5a"
+$BaseSha = "7fd41b8814442a4348478c409c7720ad2b925dd9"
 $HeadSha = ([string](& git rev-parse HEAD)).Trim()
 Write-Host "FAIL_BEFORE_SHA $BaseSha"
 Write-Host "PASS_AFTER_SHA $HeadSha"

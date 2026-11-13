@@ -70,7 +70,9 @@ public class CopilotFindingsTests
         int crash = rt.IndexOf("pin with labels, \"crash_filter\"", StringComparison.Ordinal);
         int next = rt.IndexOf("pin with labels, \"rt_push_int\"", crash);
         string slice = rt.Substring(crash, next - crash);
-        Assert.Contains("crash_log_path", slice);
+        Assert.Contains("crash_abs", slice);
+        Assert.Contains("crash_ready", slice);
+        Assert.DoesNotContain("crash_log_path", slice);
         Assert.Contains("iat_cf", slice);
         Assert.DoesNotContain("rt_bind_path", slice);
         Assert.DoesNotContain("rt_alloc", slice);
@@ -80,6 +82,12 @@ public class CopilotFindingsTests
         Assert.Contains("crash_code_msg", slice);
         Assert.Contains("crash_off_msg", slice);
         Assert.DoesNotContain("crash-rip.txt", rt);
+        int prep = rt.IndexOf("pin with labels, \"rt_crash_prepare\"", StringComparison.Ordinal);
+        string prepSlice = rt.Substring(prep, crash - prep);
+        Assert.Contains("rt_bind_path", prepSlice);
+        Assert.Contains("iat_ga", prepSlice);
+        Assert.Contains("data_dir_path", prepSlice);
+        Assert.Contains("crash_abs", prepSlice);
     }
 
     [Fact]

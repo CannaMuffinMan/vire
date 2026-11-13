@@ -3,7 +3,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 export PATH="${DOTNET_ROOT:-$HOME/.dotnet}:$PATH"
-BASE_SHA=6fbb705097938ce032c29cddfff947ccb12c3d5a
+BASE_SHA=7fd41b8814442a4348478c409c7720ad2b925dd9
 HEAD_SHA=$(git rev-parse HEAD)
 echo "FAIL_BEFORE_SHA $BASE_SHA"
 echo "PASS_AFTER_SHA $HEAD_SHA"

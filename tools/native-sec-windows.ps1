@@ -380,28 +380,13 @@ function Set-CrashEntry([string]$SrcExe, [string]$DstExe) {
     $pe = [IO.File]::ReadAllBytes($SrcExe)
     $at = Get-PeEntryFileOffset $pe
     $i = $at
-    $ff = 0
-    while ($i -lt ($pe.Length - 6)) {
-        if ($pe[$i] -eq 0xFF -and $pe[$i + 1] -eq 0x15) {
-            $ff++
-            $i += 6
-            if ($ff -eq 4) { break }
-        } else {
-            $i++
-        }
-    }
-    $e8 = 0
     $hit = -1
     while ($i -lt ($pe.Length - 6)) {
-        if ($pe[$i] -eq 0xE8) {
-            $e8++
-            if ($e8 -eq 2) { $hit = $i; break }
-            $i += 5
-        } else {
-            $i++
-        }
+        if ($pe[$i] -eq 0x31 -and $pe[$i + 1] -eq 0xC9 -and $pe[$i + 2] -eq 0xFF -and $pe[$i + 3] -eq 0x15) { break }
+        if ($pe[$i] -eq 0xE8) { $hit = $i }
+        $i++
     }
-    if ($hit -lt 0) { throw "call fn_main not found after VEH setup" }
+    if ($hit -lt 0) { throw "call fn_main not found before xor ecx; ExitProcess" }
     $patch = [byte[]](0x48, 0x31, 0xC0, 0x48, 0x8B, 0x00)
     [Array]::Copy($patch, 0, $pe, $hit, $patch.Length)
     [IO.File]::WriteAllBytes($DstExe, $pe)
@@ -522,6 +507,37 @@ if (-not $f6fix.Log.Contains("crash code=") -or -not $f6fix.Log.Contains("crash 
 }
 if ($f6vuln.Log.Contains("crash code=")) { Write-Host "f6_crash_log vuln unexpectedly wrote crash.log" }
 Write-Host "f6_crash_pe fixed KEEP intact stdout+data/crash.log crash code/rip/off"
+
+function Invoke-F6JunctionLeak([string]$HelloExe, [string]$Tag) {
+    $jdir = Join-Path $Work ("f6-junc-" + $Tag)
+    $outside = Join-Path $Work ("f6-outside-" + $Tag)
+    if (Test-Path $jdir) { Remove-Item -Recurse -Force $jdir }
+    if (Test-Path $outside) { Remove-Item -Recurse -Force $outside }
+    New-Item -ItemType Directory -Force -Path $jdir | Out-Null
+    New-Item -ItemType Directory -Force -Path $outside | Out-Null
+    cmd /c mklink /J "$jdir\data" "$outside"
+    if ($LASTEXITCODE -ne 0) { throw "f6 junction mklink /J failed" }
+    $crashExe = Join-Path $jdir "crash.exe"
+    Set-CrashEntry $HelloExe $crashExe
+    $run = Invoke-NativeExe -ExePath $crashExe -WorkingDirectory $jdir
+    $outLog = Join-Path $outside "crash.log"
+    $outHas = Test-Path -LiteralPath $outLog
+    $outText = if ($outHas) { [IO.File]::ReadAllText($outLog) } else { "" }
+    Write-Host ("f6_junction " + $Tag + " code=" + $run.Code + " outside_has_log=" + $outHas + " outside=" + ($outText -replace '\s+', ' '))
+    return @{ OutsideHas = $outHas; Outside = $outText; Run = $run }
+}
+
+$LeakSha = "1600038b6ce895a6615492456cf02105d65dfbe3"
+$LeakTree = [string](Get-ShaTree $LeakSha)
+Copy-Item -LiteralPath ([string](Join-Path $Work "hello.vire")) -Destination ([string](Join-Path $LeakTree "data/native-sec-windows-hello.vire")) -Force
+Invoke-VireAt -WorkingDirectory $LeakTree -VireArgs @((Join-Path $LeakTree "compile-native.vire"), "data/native-sec-windows-hello.vire", "data/hello-leak.hex") -TimeoutSec 180
+Convert-HexFileToExe (Join-Path $LeakTree "data/hello-leak.hex") (Join-Path $Work "hello-leak.exe")
+$f6jVuln = Invoke-F6JunctionLeak -HelloExe (Join-Path $Work "hello-leak.exe") -Tag "vuln"
+if (-not $f6jVuln.OutsideHas) { throw "f6 junction fail-before missing: $LeakSha did not write crash.log through data\ junction" }
+Write-Host "FAIL_BEFORE $LeakSha f6 junction wrote crash.log outside program folder"
+$f6jFix = Invoke-F6JunctionLeak -HelloExe (Join-Path $Work "hello.exe") -Tag "fixed"
+if ($f6jFix.OutsideHas) { throw "f6 junction pass-after leaked crash.log outside: $($f6jFix.Outside)" }
+Write-Host "PASS_AFTER f6 junction data\ redirect did not land crash.log outside"
 
 # Widened F5 + walk: same Sleep inserted in 3d9fc58 and HEAD worktrees only.
 $RaceVuln = [string](Get-ShaTree "3d9fc58c80629f1fd6ac11b3576831f5c869087d")

@@ -38,6 +38,8 @@ public class NativeParserFuzzTests
         Assert.Contains("iat_mv", more);
         Assert.Contains("write_tmp_ok", more);
         Assert.Contains("crash_log_path", rt);
+        Assert.Contains("crash_abs", rt);
+        Assert.Contains("rt_crash_prepare", rt);
         Assert.Contains("rt_wx_check", rt);
         Assert.DoesNotContain("33554433", more);
         Assert.DoesNotContain("Set-MpPreference", File.ReadAllText(Path.Combine(root, "tools", "native-security-windows.ps1")));
