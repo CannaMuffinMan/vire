@@ -1,3 +1,5 @@
+use "src/rt-sha1.vire"
+
 ~ Guest WebSocket (RFC 6455) plus native PE rt_ws_listen.
 ~ Loopback 127.0.0.1 only. No TLS / wss. No permessage-deflate.
 ~ Client frames must be masked. Control frames <= 125 and not fragmented.
