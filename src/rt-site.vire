@@ -1,20 +1,7 @@
 ~ Native static files from declared root site/.
-~ Rewrite the packed fn_route fix in place. A second fix at a numeric
-~ blob offset moved when native-compiler packed a new client, and two
-~ writes at one at made gen1/gen2 hex diverge. Leaf-tag ctx/buf, jmp cl_hdr.
-
-define retargetRoute with fixes
-  let i be 0
-  let n be length with fixes
-  while i < n
-    let fix be fixes at i
-    if (fix at "to") == "fn_route"
-      put {"at": (fix at "at"), "to": "rt_site_gate"} into fixes at i
-    end
-    let i be i + 1
-  end
-  return true
-end
+~ Packed fn_route is remapped to rt_site_gate when the fix is first
+~ pushed (applyPackedFixes hook). No later mutation of the fixes list
+~ (native put-at-i hung gen2 or diverged hex). Leaf-tag ctx/buf, jmp cl_hdr.
 
 define emitClientLeaf with image, fixes, labels
   pin with labels, "rt_net_client", image
@@ -41,7 +28,6 @@ define emitClientLeaf with image, fixes, labels
 end
 
 define emitSiteRuntime with image, fixes, labels
-  retargetRoute with fixes
   let image be emitClientLeaf with image, fixes, labels
   parkMsg with image, labels, "txt_site_pre", "HTTP/1.1 "
   parkMsg with image, labels, "txt_site_okph", "200 OK"

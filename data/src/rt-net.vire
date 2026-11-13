@@ -45,13 +45,19 @@ define applyPackedPins with labels, base, raw, names
   return true
 end
 
-define applyPackedFixes with fixes, base, raw, names
+define applyPackedFixes with fixes, base, raw, names, hook
   let i be 0
   let n be length with raw
   while i + 11 < n
     let off be parseU32 with raw, i
     let id be parseU16 with raw, (i + 8)
-    push with fixes, {"at": (base + off), "to": (names at id)}
+    let dest be names at id
+    if hook
+      if dest == "fn_route"
+        let dest be "rt_site_gate"
+      end
+    end
+    push with fixes, {"at": (base + off), "to": dest}
     let i be i + 12
   end
   return true
@@ -67,12 +73,12 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
   if need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
-    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
+    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names, true
     return (emitSiteRuntime with (emitTcpClient with image, fixes, labels), fixes, labels)
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
-  applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.txt"), names
+  applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.txt"), names, false
   return image
 end
 
