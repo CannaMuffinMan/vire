@@ -330,7 +330,7 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "ws_sock"
   emitList with image, [186]
-  emitU32 with image, 1
+  emitU32 with image, 128
   let image be emitIat with image, fixes, "iat_ln"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "ws_fail"
@@ -732,11 +732,6 @@ define emitWsListen with image, fixes, labels
   emitList with image, [72, 137, 69, 192]
   emitJmpTo with image, fixes, "ws_fr"
   pin with labels, "ws_frbad", image
-  emitList with image, [178, 8]
-  emitList with image, [72, 141, 69, 160]
-  emitList with image, [198, 64, 0, 3, 198, 64, 1, 234]
-  emitList with image, [65, 184, 2, 0, 0, 0]
-  emitCallTo with image, fixes, "ws_wrfr"
   emitEpi with image
 
   pin with labels, "ws_rdfr", image
