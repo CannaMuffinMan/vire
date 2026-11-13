@@ -1365,7 +1365,7 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 248, 4, 15, 133]
   emitRel with image, fixes, "push_bad"
   emitList with image, [72, 137, 85, 232, 72, 139, 10, 72, 129, 249]
-  emitU32 with image, 2000000
+  emitU32 with image, 100000
   emitJcc with image, fixes, 131, "push_big"
   emitList with image, [72, 139, 66, 8, 72, 57, 193, 15, 130]
   emitRel with image, fixes, "push_room"

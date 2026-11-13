@@ -1,0 +1,103 @@
+~ Host vs gen1 PE: loopback Postgres v3. Placeholders filled by prove scripts.
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define cell0 with got
+  if (length with (got at "rows")) < 1
+    return ""
+  end
+  let row be (got at "rows") at 0
+  if (length with row) < 1
+    return ""
+  end
+  return row at 0
+end
+
+define main
+  say "pg pin 5b10ea5fa5eea46859f17a52b36037d9d088c01d"
+  say "pg residual no TLS; auth trust/cleartext; SCRAM residual under 5M cap"
+  try
+    connect with "8.8.8.8", 5432
+    fail with "non-loopback missed"
+  miss problem
+    say "non-loopback refused"
+  end
+  try
+    connect with "10.0.0.1", 5432
+    fail with "private missed"
+  miss problem
+    say "private refused"
+  end
+  let port be PORT_PLACEHOLDER
+  let user be "PGUSER_PLACEHOLDER"
+  let db be "PGDB_PLACEHOLDER"
+  let secret be "PGSECRET_PLACEHOLDER"
+  let opened be pg_open with "127.0.0.1", port, user, db, secret
+  if (opened at "ok") == false
+    fail with (opened at "why")
+  end
+  let conn be opened at "conn"
+  say "auth " + (conn at "auth")
+  let one be pg_query with conn, "SELECT 1"
+  if (one at "ok") == false
+    fail with (one at "why")
+  end
+  if (cell0 with one) != "1"
+    fail with ("select1 got " + (cell0 with one))
+  end
+  say "select1 1"
+  let cre be pg_query with conn, "CREATE TEMP TABLE t(n int)"
+  if (cre at "ok") == false
+    fail with (cre at "why")
+  end
+  say "create " + (cre at "cmd")
+  let ins be pg_query with conn, "INSERT INTO t VALUES (7)"
+  if (ins at "ok") == false
+    fail with (ins at "why")
+  end
+  say "insert " + (ins at "cmd")
+  let sel be pg_query with conn, "SELECT n FROM t"
+  if (sel at "ok") == false
+    fail with (sel at "why")
+  end
+  if (cell0 with sel) != "7"
+    fail with ("roundtrip got " + (cell0 with sel))
+  end
+  say "roundtrip 7"
+  let bad be pg_query with conn, "SELECT FROM"
+  if (bad at "ok") == true
+    fail with "bad sql missed"
+  end
+  say "bad-sql " + (bad at "why")
+  let u be pg_query with conn, "CREATE TEMP TABLE u(n text)"
+  if (u at "ok") == false
+    fail with (u at "why")
+  end
+  let hostile be "1); DROP TABLE u; --"
+  let bound be pg_exec_param with conn, "INSERT INTO u(n) VALUES ($1)", hostile
+  if (bound at "ok") == false
+    fail with (bound at "why")
+  end
+  say "bind " + (bound at "cmd")
+  let got be pg_query with conn, "SELECT n FROM u"
+  if (got at "ok") == false
+    fail with (got at "why")
+  end
+  if (cell0 with got) != hostile
+    fail with ("param stored " + (cell0 with got))
+  end
+  say "param-literal " + (cell0 with got)
+  let live be pg_query with conn, "SELECT count(*) FROM u"
+  if (live at "ok") == false
+    fail with "drop injected"
+  end
+  if (cell0 with live) != "1"
+    fail with ("count " + (cell0 with live))
+  end
+  say "injection-blocked table-live"
+  pg_close with conn
+  say "PG PROVE pass"
+end
