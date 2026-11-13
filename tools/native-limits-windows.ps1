@@ -6,7 +6,8 @@ $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$BaseSha = (git rev-parse origin/native-compiler).Trim()
+# Last compile-native that still had parseExpr MaxCalls 64 (before #73).
+$BaseSha = "6fbb705097938ce032c29cddfff947ccb12c3d5a"
 $AfterSha = (git rev-parse HEAD).Trim()
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null

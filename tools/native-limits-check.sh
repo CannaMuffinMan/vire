@@ -9,7 +9,8 @@ if [[ ! -f "$VireDll" ]]; then
   echo "missing $VireDll" >&2
   exit 1
 fi
-BaseSha=$(git rev-parse origin/native-compiler)
+# Last compile-native that still had parseExpr MaxCalls 64 (before #73).
+BaseSha=6fbb705097938ce032c29cddfff947ccb12c3d5a
 AfterSha=$(git rev-parse HEAD)
 mkdir -p data
 cp tests/native/deep-expr.vire data/deep-expr.vire
