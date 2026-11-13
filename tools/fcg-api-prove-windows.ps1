@@ -31,9 +31,9 @@ function Invoke-Http([string]$Method, [string]$Url, [string]$Body) {
         if ($null -eq $Body) { $Body = "" }
         $payload = $Body
     }
-    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n"
+    $req = "$Method $($u.AbsolutePath) HTTP/1.1`r`nHost: 127.0.0.1`r`n"
     if ($Method -eq "POST") {
-        $req += "Content-Type: application/json`r`nContent-Length: $($payload.Length)`r`n"
+        $req += "Content-Length: $($payload.Length)`r`n"
     }
     $req += "`r`n" + $payload
     $c = New-Object Net.Sockets.TcpClient
@@ -261,7 +261,15 @@ if ($peProc.HasExited) {
     Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
     throw "pe exited before routes"
 }
-$peLogin = Assert-Routes $ListenPe "pe"
+Start-Sleep -Milliseconds 400
+try {
+    $peLogin = Assert-Routes $ListenPe "pe"
+} catch {
+    Write-Output ("pe_out " + (Get-Content -Raw $peOut -ErrorAction SilentlyContinue))
+    Write-Output ("pe_err " + (Get-Content -Raw $peErr -ErrorAction SilentlyContinue))
+    Write-Output ("pe_exited " + $peProc.HasExited)
+    throw
+}
 if ($hostLogin -ne $peLogin) { throw "host/PE honeypot bodies differ" }
 Write-Output "PASS_AFTER at $AfterSha host and gen1 PE FCG API bodies identical"
 
