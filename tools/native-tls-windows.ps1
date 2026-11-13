@@ -82,98 +82,165 @@ function Compile-And-RunPe([string]$SrcRel, [string]$Name) {
     return $exe
 }
 
-Copy-Item (Join-Path $Root "tests/native/https-get.vire") (Join-Path $Data "https-get.vire") -Force
-Write-Output "tls_host_get_start"
-$sw = [System.Diagnostics.Stopwatch]::StartNew()
-$hostGet = Invoke-Vire "data/https-get.vire"
-$sw.Stop()
-Write-Output "tls_host_get_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
-Write-Output "tls_host_get_exit $($hostGet.Code)"
-if ($hostGet.Code -ne 0) { throw "host https-get exit $($hostGet.Code)" }
-$hostGetNorm = (($hostGet.Out | Out-String) -replace '\r', '').Trim()
-if ($hostGetNorm -notmatch "(?m)^status 200$") { throw "host missing status 200" }
-if ($hostGetNorm -notmatch "(?m)^[0-9a-f]{64}$") { throw "host missing body hash" }
-Write-Output "host_get_hash_line $(([regex]::Match($hostGetNorm, '(?m)^[0-9a-f]{64}$')).Value)"
-
-$getExe = Compile-And-RunPe "data/https-get.vire" "https-get"
-$peBytes = [System.IO.File]::ReadAllBytes($getExe)
-$ascii = [System.Text.Encoding]::ASCII.GetString($peBytes)
-if ($ascii -notmatch "secur32.dll") { throw "PE missing secur32.dll" }
-if ($ascii -notmatch "InitializeSecurityContextA") { throw "PE missing InitializeSecurityContextA" }
-if ($ascii -notmatch "DecryptMessage") { throw "PE missing DecryptMessage" }
-if ($ascii -notmatch "getaddrinfo") { throw "PE missing getaddrinfo" }
-$sw = [System.Diagnostics.Stopwatch]::StartNew()
-$peGetOut = & $getExe 2>&1 | Out-String
-$peGetCode = $LASTEXITCODE
-$sw.Stop()
-Write-Output $peGetOut.TrimEnd()
-Write-Output "tls_pe_get_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
-Write-Output "tls_pe_get_exit $peGetCode"
-if ($peGetCode -ne 0) { throw "https GET PE exit $peGetCode" }
-$peGetNorm = ($peGetOut -replace '\r', '').Trim()
-if ($hostGetNorm -ne $peGetNorm) {
-    Write-Output "HOST_PE_MISMATCH"
-    Write-Output "HOST $hostGetNorm"
-    Write-Output "PE $peGetNorm"
-    throw "host interpreter and gen1 PE GET stdout differ"
+$serveScript = {
+    param($Thumb, $PortFile)
+    $cert = Get-Item "Cert:\CurrentUser\My\$Thumb"
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    [System.IO.File]::WriteAllText($PortFile, [string]$listener.LocalEndpoint.Port)
+    while ($true) {
+        $client = $listener.AcceptTcpClient()
+        try {
+            $ssl = New-Object System.Net.Security.SslStream($client.GetStream(), $false)
+            $ssl.AuthenticateAsServer($cert, $false, [System.Net.Security.SslProtocols]::Tls12, $false)
+            $buf = New-Object byte[] 8192
+            $n = $ssl.Read($buf, 0, $buf.Length)
+            $req = [System.Text.Encoding]::ASCII.GetString($buf, 0, [Math]::Max(0, $n))
+            $payload = "vire-local-tls-ok`n"
+            if ($req.StartsWith("POST")) {
+                $idx = $req.IndexOf("`r`n`r`n")
+                if ($idx -ge 0) { $payload = $req.Substring($idx + 4) }
+            }
+            $body = [System.Text.Encoding]::UTF8.GetBytes($payload)
+            $head = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 200 OK`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n")
+            $ssl.Write($head, 0, $head.Length)
+            $ssl.Write($body, 0, $body.Length)
+            $ssl.Flush()
+            $ssl.Dispose()
+        } catch { }
+        try { $client.Close() } catch { }
+    }
 }
-Write-Output "PASS_AFTER at $AfterSha host and gen1 PE GET status 200 + body hash identical"
 
-Copy-Item (Join-Path $Root "tests/native/https-post.vire") (Join-Path $Data "https-post.vire") -Force
-$hostPost = Invoke-Vire "data/https-post.vire"
-$postExe = Compile-And-RunPe "data/https-post.vire" "https-post"
-$pePostOut = & $postExe 2>&1 | Out-String
-$pePostCode = $LASTEXITCODE
-$hostPostNorm = (($hostPost.Out | Out-String) -replace '\r', '').Trim()
-$pePostNorm = ($pePostOut -replace '\r', '').Trim()
-Write-Output "tls_host_post_exit $($hostPost.Code)"
-Write-Output "tls_pe_post_exit $pePostCode"
-if ($hostPost.Code -eq 0) {
-    if ($pePostCode -ne 0) { throw "host POST succeeded but PE failed" }
+function Start-LocalTls([string]$Thumb) {
+    $portFile = Join-Path $Data ("tls-port-" + $Thumb.Substring(0, 8) + ".txt")
+    if (Test-Path $portFile) { Remove-Item -Force $portFile }
+    $job = Start-Job -ScriptBlock $serveScript -ArgumentList $Thumb, $portFile
+    $deadline = (Get-Date).AddSeconds(15)
+    while (-not (Test-Path $portFile)) {
+        if ((Get-Date) -gt $deadline) { throw "local TLS server did not publish a port" }
+        if ($job.State -eq "Failed") { throw "local TLS job failed $($job.ChildJobs[0].JobStateInfo.Reason)" }
+        Start-Sleep -Milliseconds 50
+    }
+    $port = [int]([System.IO.File]::ReadAllText($portFile).Trim())
+    Write-Output "tls_local_port $port"
+    return @{ Job = $job; Port = $port }
+}
+
+$good = New-SelfSignedCertificate -DnsName "127.0.0.1" -CertStoreLocation "Cert:\CurrentUser\My" -HashAlgorithm SHA256 -NotAfter (Get-Date).AddHours(2) -KeyExportPolicy Exportable
+$cer = Join-Path $Data "tls-job.cer"
+Export-Certificate -Cert $good -FilePath $cer | Out-Null
+$rootCert = Import-Certificate -FilePath $cer -CertStoreLocation "Cert:\CurrentUser\Root"
+Write-Output "tls_job_cert_thumb $($good.Thumbprint)"
+Write-Output "tls_job_root_imported $($rootCert.Thumbprint)"
+$goodSrv = Start-LocalTls $good.Thumbprint
+$bad = New-SelfSignedCertificate -DnsName "127.0.0.1" -CertStoreLocation "Cert:\CurrentUser\My" -HashAlgorithm SHA256 -NotAfter (Get-Date).AddHours(2)
+$badSrv = Start-LocalTls $bad.Thumbprint
+Write-Output "tls_bad_cert_thumb $($bad.Thumbprint)"
+
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText((Join-Path $Data "https-get.vire"), "define main`n  let page be fetch with `"https://127.0.0.1:$($goodSrv.Port)/`"`n  say `"status 200`"`n  say (hash with page)`nend`n", $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $Data "https-post.vire"), "define main`n  let page be post with `"https://127.0.0.1:$($goodSrv.Port)/`", `"hello`"`n  say `"status 200`"`n  say (hash with page)`nend`n", $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $Data "https-badcert.vire"), "define main`n  fetch with `"https://127.0.0.1:$($badSrv.Port)/`"`n  say `"opened`"`nend`n", $utf8)
+    Copy-Item (Join-Path $Root "tests/native/https-ssrf.vire") (Join-Path $Data "https-ssrf.vire") -Force
+
+    Write-Output "tls_host_get_start"
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $hostGet = Invoke-Vire "data/https-get.vire"
+    $sw.Stop()
+    Write-Output "tls_host_get_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+    Write-Output "tls_host_get_exit $($hostGet.Code)"
+    if ($hostGet.Code -ne 0) { throw "host https-get exit $($hostGet.Code)" }
+    $hostGetNorm = (($hostGet.Out | Out-String) -replace '\r', '').Trim()
+    if ($hostGetNorm -notmatch "(?m)^status 200$") { throw "host missing status 200" }
+    if ($hostGetNorm -notmatch "(?m)^[0-9a-f]{64}$") { throw "host missing body hash" }
+    Write-Output "host_get_hash_line $(([regex]::Match($hostGetNorm, '(?m)^[0-9a-f]{64}$')).Value)"
+
+    $getExe = Compile-And-RunPe "data/https-get.vire" "https-get"
+    $peBytes = [System.IO.File]::ReadAllBytes($getExe)
+    $ascii = [System.Text.Encoding]::ASCII.GetString($peBytes)
+    if ($ascii -notmatch "secur32.dll") { throw "PE missing secur32.dll" }
+    if ($ascii -notmatch "InitializeSecurityContextA") { throw "PE missing InitializeSecurityContextA" }
+    if ($ascii -notmatch "DecryptMessage") { throw "PE missing DecryptMessage" }
+    if ($ascii -notmatch "WSAGetLastError") { throw "PE missing WSAGetLastError" }
+    if ($ascii -match "getaddrinfo") { throw "TLS PE must not import getaddrinfo" }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $peGetOut = & $getExe 2>&1 | Out-String
+    $peGetCode = $LASTEXITCODE
+    $sw.Stop()
+    Write-Output $peGetOut.TrimEnd()
+    Write-Output "tls_pe_get_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+    Write-Output "tls_pe_get_exit $peGetCode"
+    if ($peGetCode -ne 0) { throw "https GET PE exit $peGetCode" }
+    $peGetNorm = ($peGetOut -replace '\r', '').Trim()
+    if ($hostGetNorm -ne $peGetNorm) {
+        Write-Output "HOST_PE_MISMATCH"
+        Write-Output "HOST $hostGetNorm"
+        Write-Output "PE $peGetNorm"
+        throw "host interpreter and gen1 PE GET stdout differ"
+    }
+    Write-Output "PASS_AFTER at $AfterSha host and gen1 PE GET status 200 + body hash identical"
+
+    $hostPost = Invoke-Vire "data/https-post.vire"
+    $postExe = Compile-And-RunPe "data/https-post.vire" "https-post"
+    $pePostOut = & $postExe 2>&1 | Out-String
+    $pePostCode = $LASTEXITCODE
+    $hostPostNorm = (($hostPost.Out | Out-String) -replace '\r', '').Trim()
+    $pePostNorm = ($pePostOut -replace '\r', '').Trim()
+    Write-Output "tls_host_post_exit $($hostPost.Code)"
+    Write-Output "tls_pe_post_exit $pePostCode"
+    if ($hostPost.Code -ne 0) { throw "host POST exit $($hostPost.Code)" }
+    if ($pePostCode -ne 0) { throw "PE POST exit $pePostCode" }
     if ($hostPostNorm -ne $pePostNorm) { throw "host/PE POST stdout differ" }
     if ($hostPostNorm -notmatch "(?m)^status 200$") { throw "POST missing status 200" }
     Write-Output "tls_post_200_hash_match"
-} else {
-    if ($pePostCode -eq 0) { throw "host POST failed but PE succeeded" }
-    Write-Output "tls_post_fail_closed host=$($hostPost.Code) pe=$pePostCode"
-    Write-Output "HOST_POST $hostPostNorm"
-    Write-Output "PE_POST $pePostNorm"
+
+    $hostBad = Invoke-Vire "data/https-badcert.vire"
+    $badExe = Compile-And-RunPe "data/https-badcert.vire" "https-badcert"
+    $peBadOut = & $badExe 2>&1 | Out-String
+    $peBadCode = $LASTEXITCODE
+    Write-Output "tls_host_badcert_exit $($hostBad.Code)"
+    Write-Output "tls_pe_badcert_exit $peBadCode"
+    Write-Output ((($hostBad.Out | Out-String) -replace '\r', '').Trim())
+    Write-Output $peBadOut.TrimEnd()
+    if ($hostBad.Code -eq 0) { throw "host untrusted loopback cert unexpectedly succeeded" }
+    if ($peBadCode -eq 0) { throw "PE untrusted loopback cert unexpectedly succeeded" }
+    if ((($hostBad.Out | Out-String) + $peBadOut) -match "opened") { throw "bad-cert path printed opened" }
+    Write-Output "tls_badcert_fail_closed"
+
+    $ssrfExe = Compile-And-RunPe "data/https-ssrf.vire" "https-ssrf"
+    $peSsrfOut = & $ssrfExe 2>&1 | Out-String
+    $peSsrfCode = $LASTEXITCODE
+    Write-Output "tls_pe_public_exit $peSsrfCode"
+    Write-Output $peSsrfOut.TrimEnd()
+    if ($peSsrfCode -eq 0) { throw "PE public fetch must fail closed" }
+    if (($peSsrfOut -replace '\r', '') -notmatch "fetch stays off this machine") { throw "PE missing private-network sentence for public fetch" }
+    Write-Output "tls_public_not_widened"
+
+    Set-Content -Path (Join-Path $Data "tls-connect-only.vire") -Value "define main`n  close with (connect with `"127.0.0.1`", 9)`nend`n"
+    $cnExe = Compile-And-RunPe "data/tls-connect-only.vire" "tls-connect-only"
+    $cnAscii = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($cnExe))
+    if ($cnAscii -match "secur32.dll") { throw "connect-only PE silently gained secur32" }
+    if ($cnAscii -match "getaddrinfo") { throw "connect-only PE silently gained getaddrinfo" }
+    Write-Output "tls_connect_still_loopback_iat"
+
+    Write-Output "PASS_AFTER at $AfterSha native tls windows ok"
 }
-
-Copy-Item (Join-Path $Root "tests/native/https-badcert.vire") (Join-Path $Data "https-badcert.vire") -Force
-$hostBad = Invoke-Vire "data/https-badcert.vire"
-$badExe = Compile-And-RunPe "data/https-badcert.vire" "https-badcert"
-$peBadOut = & $badExe 2>&1 | Out-String
-$peBadCode = $LASTEXITCODE
-Write-Output "tls_host_badcert_exit $($hostBad.Code)"
-Write-Output "tls_pe_badcert_exit $peBadCode"
-Write-Output ((($hostBad.Out | Out-String) -replace '\r', '').Trim())
-Write-Output $peBadOut.TrimEnd()
-if ($hostBad.Code -eq 0) { throw "host expired.badssl.com unexpectedly succeeded" }
-if ($peBadCode -eq 0) { throw "PE expired.badssl.com unexpectedly succeeded" }
-if ((($hostBad.Out | Out-String) + $peBadOut) -match "opened") { throw "bad-cert path printed opened" }
-Write-Output "tls_badcert_fail_closed"
-
-Copy-Item (Join-Path $Root "tests/native/https-ssrf.vire") (Join-Path $Data "https-ssrf.vire") -Force
-$hostSsrf = Invoke-Vire "data/https-ssrf.vire"
-$ssrfExe = Compile-And-RunPe "data/https-ssrf.vire" "https-ssrf"
-$peSsrfOut = & $ssrfExe 2>&1 | Out-String
-$peSsrfCode = $LASTEXITCODE
-Write-Output "tls_host_ssrf_exit $($hostSsrf.Code)"
-Write-Output "tls_pe_ssrf_exit $peSsrfCode"
-if ($hostSsrf.Code -eq 0 -or $peSsrfCode -eq 0) { throw "loopback fetch must fail closed" }
-$hostSsrfN = (($hostSsrf.Out | Out-String) -replace '\r', '').Trim()
-$peSsrfN = ($peSsrfOut -replace '\r', '').Trim()
-if ($hostSsrfN -notmatch "fetch stays off this machine") { throw "host missing private-network sentence for loopback fetch" }
-if ($peSsrfN -notmatch "fetch stays off this machine") { throw "PE missing private-network sentence for loopback fetch" }
-Write-Output "tls_loopback_not_widened"
-
-# connect guest still has no secur32
-Set-Content -Path (Join-Path $Data "tls-connect-only.vire") -Value "define main`n  close with (connect with `"127.0.0.1`", 9)`nend`n"
-$cnExe = Compile-And-RunPe "data/tls-connect-only.vire" "tls-connect-only"
-$cnAscii = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($cnExe))
-if ($cnAscii -match "secur32.dll") { throw "connect-only PE silently gained secur32" }
-if ($cnAscii -match "getaddrinfo") { throw "connect-only PE silently gained getaddrinfo" }
-Write-Output "tls_connect_still_loopback_iat"
-
-Write-Output "PASS_AFTER at $AfterSha native tls windows ok"
+finally {
+    foreach ($j in @($goodSrv.Job, $badSrv.Job)) {
+        if ($j) { try { Stop-Job $j -ErrorAction SilentlyContinue; Remove-Job $j -Force -ErrorAction SilentlyContinue } catch { } }
+    }
+    foreach ($t in @($good.Thumbprint, $bad.Thumbprint, $rootCert.Thumbprint)) {
+        foreach ($storeName in @("My", "Root")) {
+            try {
+                $st = New-Object System.Security.Cryptography.X509Certificates.X509Store($storeName, "CurrentUser")
+                $st.Open("ReadWrite")
+                $found = $st.Certificates | Where-Object { $_.Thumbprint -eq $t }
+                foreach ($c in $found) { $st.Remove($c) }
+                $st.Close()
+            } catch { }
+        }
+    }
+    if (Test-Path $cer) { Remove-Item -Force $cer }
+}

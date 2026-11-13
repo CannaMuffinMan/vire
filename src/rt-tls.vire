@@ -1,5 +1,5 @@
 ~ Native outbound HTTPS via Windows Schannel (secur32). Opt-in needTls only.
-~ connect stays 127.0.0.1. fetch/post resolve public A records and verify the cert.
+~ connect stays 127.0.0.1. fetch/post TLS is the same loopback pin; no public DNS.
 ~ DecryptMessage uses four SecBuffers (DATA + EMPTY*3) and copies SECBUFFER_EXTRA;
 ~ PR #59's 0x80090330 was incomplete-record / leftover framing.
 ~ Guest TLS bytes live in rt-tls-blob.txt so compile-native stays small (gen1=gen2).

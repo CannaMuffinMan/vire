@@ -19,7 +19,8 @@ public class NativeTlsTests
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("openTlsImage", pe);
         Assert.Contains("secur32.dll", pe);
-        Assert.Contains("getaddrinfo", pe);
+        Assert.Contains("WSAGetLastError", pe);
+        Assert.DoesNotContain("getaddrinfo", pe);
         Assert.DoesNotContain("\"LoadLibraryA\"", pe);
         string tls = File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire"));
         Assert.Contains("InitializeSecurityContextA", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
@@ -37,7 +38,7 @@ public class NativeTlsTests
         Directory.CreateDirectory(work);
         try
         {
-            File.WriteAllText(Path.Combine(work, "get.vire"), "define main\n  say (fetch with \"https://example.com/\")\nend\n");
+            File.WriteAllText(Path.Combine(work, "get.vire"), "define main\n  say (fetch with \"https://127.0.0.1:9443/\")\nend\n");
             File.WriteAllText(Path.Combine(work, "cn.vire"), "define main\n  close with (connect with \"127.0.0.1\", 9)\nend\n");
             File.WriteAllText(Path.Combine(work, "hello.vire"), "define main\n  say \"hello from vire\"\nend\n");
             DualMode.Proc get = DualMode.RunVire(root, new string[] { "compile-native.vire", Rel(work, "get.vire"), Rel(work, "get.hex") }, root);
@@ -52,7 +53,8 @@ public class NativeTlsTests
             Assert.Contains("AcquireCredentialsHandleA", getImp);
             Assert.Contains("InitializeSecurityContextA", getImp);
             Assert.Contains("DecryptMessage", getImp);
-            Assert.Contains("getaddrinfo", getImp);
+            Assert.Contains("WSAGetLastError", getImp);
+            Assert.DoesNotContain("getaddrinfo", getImp);
             Assert.Contains("connect", getImp);
             Assert.DoesNotContain("LoadLibraryA", getImp);
             Assert.DoesNotContain("GetProcAddress", getImp);

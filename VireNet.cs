@@ -92,6 +92,29 @@ static class VireNet
         return true;
     }
 
+    internal static IPAddress DemandFetchPin(string url, int line, int column)
+    {
+        Uri parsed;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed) || parsed.Host.Length == 0)
+            throw new VireError("that address is not allowed", line, column);
+        if (!string.IsNullOrEmpty(parsed.UserInfo))
+            throw new VireError("that address is not allowed", line, column);
+        IPAddress literal;
+        if (IPAddress.TryParse(parsed.IdnHost, out literal))
+        {
+            if (literal.IsIPv4MappedToIPv6) literal = literal.MapToIPv4();
+            byte[] part = literal.GetAddressBytes();
+            if (literal.AddressFamily == AddressFamily.InterNetwork && part.Length == 4
+                && part[0] == 127 && part[1] == 0 && part[2] == 0 && part[3] == 1)
+            {
+                if (parsed.Scheme != "https")
+                    throw new VireError("fetch allows https only", line, column);
+                return literal;
+            }
+        }
+        return DemandPublic(url, line, column);
+    }
+
     internal static IPAddress DemandPublic(string url, int line)
     {
         return DemandPublic(url, line, 1);
@@ -151,7 +174,7 @@ static class VireNet
         string payload = body;
         for (int hop = 0; hop <= MaxRedirects; hop++)
         {
-            IPAddress pinned = DemandPublic(current, line, column);
+            IPAddress pinned = DemandFetchPin(current, line, column);
             int code;
             string location;
             string text = SendPinned(verb, current, payload, pinned, line, column, out code, out location);
