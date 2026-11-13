@@ -32,7 +32,10 @@ dotnet build "$WORKDIR/base/vire.csproj" -c Release --nologo >/tmp/native-elf-fa
 mkdir -p "$WORKDIR/base/data"
 cp "$WORKDIR/base/guest-hello.vire" "$WORKDIR/base/data/guest-hello.vire"
 set +e
-dotnet exec "$WORKDIR/base/bin/Release/net10.0/vire.dll" --compiler compile-native.vire data/guest-hello.vire data/guest-hello.hex >"$WORKDIR/base-hello.out" 2>&1
+(
+  cd "$WORKDIR/base"
+  dotnet exec bin/Release/net10.0/vire.dll --compiler compile-native.vire data/guest-hello.vire data/guest-hello.hex
+) >"$WORKDIR/base-hello.out" 2>&1
 BEFORE_CODE=$?
 set -e
 echo "fail_before_compile_exit $BEFORE_CODE"
