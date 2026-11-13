@@ -1046,7 +1046,7 @@ define emitMore with image, fixes, labels
   emitCallTo with image, fixes, "rt_span_text"
   emitList with image, [72, 139, 77, 216]
   emitCallTo with image, fixes, "rt_cons_text"
-  emitList with image, [72, 137, 85, 216, 72, 139, 69, 224, 72, 1, 69, 208, 72, 137, 69, 200, 233]
+  emitList with image, [72, 137, 85, 216, 72, 139, 69, 224, 72, 1, 69, 208, 72, 139, 69, 208, 72, 137, 69, 200, 233]
   emitRel with image, fixes, "split_scan"
   pin with labels, "split_next", image
   emitList with image, [72, 255, 69, 208, 233]
@@ -1203,7 +1203,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "at_map"
   emitList with image, [72, 131, 248, 6, 15, 132]
   emitRel with image, fixes, "at_bytes"
-  emitFail with image, fixes, "msg_index"
+  emitFail with image, fixes, "msg_at"
   pin with labels, "at_text", image
   emitList with image, [72, 139, 69, 232, 72, 139, 85, 224, 76, 139, 85, 240, 73, 139, 10]
   emitCallTo with image, fixes, "rt_index"
@@ -2418,6 +2418,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_keys", "keys needs a map"
   parkMsg with image, labels, "msg_drop", "drop needs a non-empty list"
   parkMsg with image, labels, "msg_index", "an index must be a whole number"
+  parkMsg with image, labels, "msg_at", "at needs a list, text, or map"
   parkMsg with image, labels, "msg_outside", "index is outside the value"
   parkMsg with image, labels, "msg_mapkey", "map keys must be text or numbers"
   parkMsg with image, labels, "msg_has", "has needs a map"
