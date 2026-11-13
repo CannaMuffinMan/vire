@@ -1,0 +1,234 @@
+use "src/rt-json.vire"
+use "src/rt-schema.vire"
+
+define proveOk with tag, got
+  if (got at 0) == "ok"
+    say tag + " PASS"
+    return 0
+  end
+  say tag + " FAIL got " + (got at 0) + " " + (got at 1)
+  return 1
+end
+
+define proveBad with tag, got
+  if (got at 0) == "bad"
+    say tag + " REJECT " + (got at 1)
+    return 0
+  end
+  say tag + " FAIL expected reject"
+  return 1
+end
+
+define proveEq with tag, a, b
+  if a == b
+    say tag + " PASS"
+    return 0
+  end
+  say tag + " FAIL " + a + " != " + b
+  return 1
+end
+
+define nestOpen with n, ch
+  let s be ""
+  let i be 0
+  while i < n
+    let s be s + ch
+    let i be i + 1
+  end
+  return s
+end
+
+define fuzzByte with rng
+  let x be rng at 0
+  let x be ((x * 1103515245) + 12345) % 2147483647
+  put x into rng at 0
+  return x % 4
+end
+
+define fuzzJson with rng, d
+  if d > 3
+    return "0"
+  end
+  let k be fuzzByte with rng
+  if k == 0
+    return "true"
+  end
+  if k == 1
+    return "null"
+  end
+  if k == 2
+    return jq with "x"
+  end
+  let left be fuzzJson with rng, (d + 1)
+  let right be fuzzJson with rng, (d + 1)
+  if (fuzzByte with rng) == 0
+    return "[" + left + "," + right + "]"
+  end
+  return "{" + (jq with "a") + ":" + left + "," + (jq with "b") + ":" + right + "}"
+end
+
+define jq with inner
+  return (chr with 34) + inner + (chr with 34)
+end
+
+define bs
+  return chr with 92
+end
+
+define ju with hex
+  return (bs) + "u" + hex
+end
+
+define proveY with fails
+  let got be json_decode with "true"
+  let fails be fails + (proveOk with "y_true", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_true enc", (enc at 1), "true")
+  let got be json_decode with "false"
+  let fails be fails + (proveOk with "y_false", got)
+  let got be json_decode with "null"
+  let fails be fails + (proveOk with "y_null", got)
+  if (got at 1) != none
+    say "y_null FAIL value"
+    let fails be fails + 1
+  else
+    say "y_null value PASS"
+  end
+  let got be json_decode with "[]"
+  let fails be fails + (proveOk with "y_array_empty", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_array_empty enc", (enc at 1), "[]")
+  let got be json_decode with "{}"
+  let fails be fails + (proveOk with "y_object_empty", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_object_empty enc", (enc at 1), "{}")
+  let got be json_decode with (jq with " ")
+  let fails be fails + (proveOk with "y_string_space", got)
+  let got be json_decode with "123"
+  let fails be fails + (proveOk with "y_number", got)
+  let fails be fails + (proveEq with "y_number val", (text with (got at 1)), "123")
+  let got be json_decode with "-123"
+  let fails be fails + (proveOk with "y_number_negative", got)
+  let fails be fails + (proveEq with "y_number_negative val", (text with (got at 1)), "-123")
+  let got be json_decode with "1.5"
+  let fails be fails + (proveOk with "y_number_decimal", got)
+  let box be got at 1
+  let fails be fails + (proveEq with "y_number_decimal box", (box at "$n"), "1.5")
+  let enc be json_encode with box
+  let fails be fails + (proveEq with "y_number_decimal enc", (enc at 1), "1.5")
+  let got be json_decode with "-2.50e+3"
+  let fails be fails + (proveOk with "y_number_exp", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_number_exp enc", (enc at 1), "-2.50e+3")
+  return fails
+end
+
+define cat2 with a, b
+  return a + b
+end
+
+define proveEsc with fails
+  let u be ju with "0041"
+  let u be cat2 with u, "/"
+  let u be cat2 with u, (ju with "0062")
+  let raw be jq with u
+  let got be json_decode with (jq with (ju with "0041"))
+  let fails be fails + (proveOk with "y_string_escapes", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_string_escapes enc", (enc at 1), (jq with "A"))
+  let got be json_decode with (jq with (ju with "20AC"))
+  let fails be fails + (proveOk with "y_string_u20ac", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "y_string_u20ac enc", (enc at 1), (jq with (ju with "20ac")))
+  let pair be cat2 with (ju with "D83D"), (ju with "DE00")
+  let got be json_decode with (jq with pair)
+  let fails be fails + (proveOk with "y_string_surrogate", got)
+  let enc be json_encode with (got at 1)
+  let want be cat2 with (ju with "d83d"), (ju with "de00")
+  let fails be fails + (proveEq with "y_string_surrogate enc", (enc at 1), (jq with want))
+  return fails
+end
+
+define proveObj with fails
+  let got be json_decode with ("{" + (jq with "z") + ":1," + (jq with "a") + ":2}")
+  let fails be fails + (proveOk with "y_object_keys", got)
+  let enc be json_stringify with (got at 1), {"keys": "stable"}
+  let fails be fails + (proveEq with "stable keys", (enc at 1), ("{" + (jq with "a") + ":2," + (jq with "z") + ":1}"))
+  let got be json_decode with ("{" + (jq with "a") + ":1," + (jq with "a") + ":2}")
+  let fails be fails + (proveOk with "i_object_duplicate", got)
+  let enc be json_encode with (got at 1)
+  let fails be fails + (proveEq with "i_object_duplicate last-wins", (enc at 1), ("{" + (jq with "a") + ":2}"))
+  return fails
+end
+
+define oneBad with fails, tag, raw
+  return fails + (proveBad with tag, (json_decode with raw))
+end
+
+define proveN with fails
+  let fails be oneBad with fails, "n_empty", ""
+  let fails be oneBad with fails, "n_number_leading_zero", "[01]"
+  let fails be oneBad with fails, "n_number_1e", "[1e]"
+  let fails be oneBad with fails, "n_number_dot", "[1.]"
+  let fails be oneBad with fails, "n_number_plus", "[+1]"
+  let fails be oneBad with fails, "n_array_extra_comma", "[1,]"
+  let fails be oneBad with fails, "n_object_no_colon", ("{" + (jq with "a") + "}")
+  let fails be oneBad with fails, "n_extra", "true false"
+  let fails be oneBad with fails, "n_lone_surrogate", (jq with (ju with "D800"))
+  let fails be oneBad with fails, "n_unescaped_control", (jq with (chr with 1))
+  let deep be cat2 with (nestOpen with 20, "["), (nestOpen with 20, "]")
+  let fails be oneBad with fails, "n_too_deep", deep
+  let mid be cat2 with (nestOpen with 2, "["), "1"
+  let okdeep be cat2 with mid, (nestOpen with 2, "]")
+  let fails be fails + (proveOk with "y_depth_two", (json_decode with okdeep))
+  return fails
+end
+
+define proveSchema with fails
+  let healthRaw be ("{" + (jq with "ok") + ":true," + (jq with "service") + ":" + (jq with "fcgcpa") + "," + (jq with "payments") + ":false}")
+  let parsed be json_decode with healthRaw
+  let fails be fails + (proveOk with "schema decode", parsed)
+  let checked be schema_check with (parsed at 1), schema_health
+  let fails be fails + (proveOk with "schema_check", checked)
+  return fails
+end
+
+define proveFuzz with fails
+  let rng be [20261113]
+  let fi be 0
+  while fi < 20
+    let blob be fuzzJson with rng, 0
+    let d1 be json_decode with blob
+    if (d1 at 0) != "ok"
+      say "FUZZ decode FAIL " + blob
+      let fails be fails + 1
+    else
+      let e1 be json_encode with (d1 at 1)
+      let d2 be json_decode with (e1 at 1)
+      let e2 be json_encode with (d2 at 1)
+      if (e1 at 1) != (e2 at 1)
+        say "FUZZ roundtrip FAIL"
+        let fails be fails + 1
+      end
+    end
+    let fi be fi + 1
+  end
+  say "FUZZ seed 20261113 PASS"
+  return fails
+end
+
+define main
+  let fails be 0
+  let fails be proveY with fails
+  let fails be proveEsc with fails
+  let fails be proveObj with fails
+  let fails be proveN with fails
+  let fails be proveSchema with fails
+  let fails be proveFuzz with fails
+  if fails == 0
+    say "JSON PROVE pass"
+  else
+    say "JSON PROVE fails " + (text with fails)
+    halt with 1
+  end
+end
