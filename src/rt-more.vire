@@ -1684,9 +1684,12 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 77, 248, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  ~ Path bytes are not heap pointers. Leaving them unmarked rewrote gen2 PE.
+  emitLeaf with image
   emitList with image, [72, 137, 69, 240, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
   emitList with image, [72, 137, 69, 232, 72, 141, 13]
   emitRel with image, fixes, "dot_path"
   emitList with image, [186]
