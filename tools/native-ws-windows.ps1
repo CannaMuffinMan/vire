@@ -259,17 +259,9 @@ if (-not $peEcho.Port) {
     throw "PE ws-echo did not print listening port out=$out err=$err"
 }
 Write-Output "ws_pe_listen 127.0.0.1:$($peEcho.Port)"
-Invoke-WsRawProbe $peEcho.Port "ws_pe"
-if (-not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
-Write-Output "ws_pe_echo_relisten"
-$peEcho = Start-WsGuest $echoExe @()
-if (-not $peEcho.Port) {
-    if ($peEcho.Proc -and -not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
-    throw "PE ws-echo did not print listening port after 101 probe"
-}
-Write-Output "ws_pe_listen2 127.0.0.1:$($peEcho.Port)"
 $peEchoed = Invoke-WsEcho $peEcho.Port
 Write-Output "ws_pe_echo $peEchoed"
+Invoke-WsRawProbe $peEcho.Port "ws_pe"
 Invoke-WsAdversary $peEcho.Port
 Write-Output "ws_pe_adversary ok"
 if (-not $peEcho.Proc.HasExited) { try { $peEcho.Proc.Kill($true) } catch { } }
