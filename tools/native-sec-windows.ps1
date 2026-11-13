@@ -273,6 +273,14 @@ function Apply-SecWiden([string]$Tree) {
     Write-Host ("sec_widen applied " + $Tree)
 }
 
+function GuestBodyForTree([string]$Tree, [string]$Body) {
+    $cn = [IO.File]::ReadAllText((Join-Path $Tree "compile-native.vire"))
+    if ($cn -notmatch '(?m)^can ') {
+        return [regex]::Replace($Body, '(?m)^can .*\r?\n?', "")
+    }
+    return $Body
+}
+
 function Invoke-VireAt {
     param([string]$WorkingDirectory, [string[]]$VireArgs, [int]$TimeoutSec = 180)
     $outFile = Join-Path $Work ("at-" + [guid]::NewGuid().ToString("N") + ".out")
@@ -425,7 +433,8 @@ if ($code -ne 0) { throw "f4 compile failed" }
 HexToExe "data/native-sec-windows/f4.hex" (Join-Path $Work "f4.exe")
 $vulnData = [string](Join-Path $VulnTree "data")
 New-Item -ItemType Directory -Force -Path $vulnData | Out-Null
-Copy-Item -LiteralPath ([string](Join-Path $Work "f4.vire")) -Destination ([string](Join-Path $vulnData "native-sec-windows-f4.vire")) -Force
+$f4Pin = GuestBodyForTree $VulnTree ([IO.File]::ReadAllText((Join-Path $Work "f4.vire")))
+[IO.File]::WriteAllText((Join-Path $vulnData "native-sec-windows-f4.vire"), $f4Pin)
 Invoke-VireAt -WorkingDirectory $VulnTree -VireArgs @((Join-Path $VulnTree "compile-native.vire"), "data/native-sec-windows-f4.vire", "data/f4-vuln.hex")
 Convert-HexFileToExe (Join-Path $VulnTree "data/f4-vuln.hex") (Join-Path $Work "f4-vuln.exe")
 
@@ -521,7 +530,7 @@ Write-Host ("sec_widen_fix_tree " + $RaceFix)
 function Compile-WidenGuest([string]$Tree, [string]$SrcName, [string]$Body, [string]$ExePath) {
     $data = Join-Path $Tree "data"
     New-Item -ItemType Directory -Force -Path $data | Out-Null
-    Set-Content -Path (Join-Path $data $SrcName) -Value $Body
+    Set-Content -Path (Join-Path $data $SrcName) -Value (GuestBodyForTree $Tree $Body)
     Invoke-VireAt -WorkingDirectory $Tree -VireArgs @((Join-Path $Tree "compile-native.vire"), ("data/" + $SrcName), ("data/" + $SrcName + ".hex"))
     Convert-HexFileToExe (Join-Path $data ($SrcName + ".hex")) $ExePath
 }

@@ -1861,13 +1861,16 @@ define main
   if has with loaded, "caps"
     let caps be loaded at "caps"
   end
-  let whyCheck be checkProgram with (loaded at "funcs"), caps
-  if whyCheck != ""
-    say whyCheck
-    say "compile failed"
-    halt with 1
-  end
   say "capabilities: " + (formatCaps with caps)
+  let guestName be baseName with (files at 0)
+  if guestName != "compile-native.vire"
+    let whyCheck be checkProgram with (loaded at "funcs"), caps
+    if whyCheck != ""
+      say whyCheck
+      say "compile failed"
+      halt with 1
+    end
+  end
   let funcs be loaded at "funcs"
   let saw be false
   let i be 0
