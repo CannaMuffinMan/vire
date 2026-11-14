@@ -144,7 +144,42 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_mux", image
   emitCallTo with image, fixes, "rt_note_wait"
   emitCallTo with image, fixes, "rt_server_reset"
-  emitList with image, [199, 69, 164, 0, 0, 0, 0]
+  emitList with image, [199, 69, 164, 0, 0, 0, 0, 185]
+  emitU32 with image, 0
+  pin with labels, "srv_cnt", image
+  emitList with image, [137, 77, 168, 72, 141, 21]
+  emitRel with image, fixes, "srv_slots"
+  emitList with image, [72, 139, 4, 202, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "srv_cntn"
+  emitList with image, [255, 69, 164]
+  pin with labels, "srv_cntn", image
+  emitList with image, [139, 77, 168, 255, 193, 131, 249, 64]
+  emitJcc with image, fixes, 140, "srv_cnt"
+  emitList with image, [131, 125, 164, 0, 15, 132]
+  emitRel with image, fixes, "srv_doac"
+  ~ Parked slots: select the listen fd alone at timeout 0 first.
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "srv_fdset"
+  emitList with image, [199, 0, 0, 0, 0, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "srv_listen"
+  emitCallTo with image, fixes, "rt_fd_add"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "srv_tv"
+  emitList with image, [199, 0, 0, 0, 0, 0, 199, 64, 4, 0, 0, 0, 0]
+  emitList with image, [185]
+  emitU32 with image, 64
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "srv_fdset"
+  emitList with image, [77, 49, 192, 77, 49, 201, 72, 141, 5]
+  emitRel with image, fixes, "srv_tv"
+  emitList with image, [72, 137, 68, 36, 32]
+  let image be emitIat with image, fixes, "iat_sel"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "srv_listen"
+  emitCallTo with image, fixes, "rt_fd_has"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "srv_doac"
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "srv_fdset"
   emitList with image, [199, 0, 0, 0, 0, 0]
@@ -160,19 +195,20 @@ define emitListenMux with image, fixes, labels
   emitRel with image, fixes, "srv_addn"
   emitList with image, [72, 137, 193]
   emitCallTo with image, fixes, "rt_fd_add"
-  emitList with image, [255, 69, 164]
   pin with labels, "srv_addn", image
   emitList with image, [139, 77, 168, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_addc"
-  ~ Zero parked clients: blocking accept (FAIL_BEFORE sequential GET).
-  ~ Otherwise select so a hung slot cannot own accept.
-  emitList with image, [131, 125, 164, 0, 15, 132]
-  emitRel with image, fixes, "srv_doac"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "srv_tv"
+  emitList with image, [199, 0, 0, 0, 0, 0, 199, 64, 4]
+  emitU32 with image, 50000
   emitList with image, [185]
-  emitU32 with image, 1
+  emitU32 with image, 64
   emitList with image, [72, 141, 21]
   emitRel with image, fixes, "srv_fdset"
-  emitList with image, [77, 49, 192, 77, 49, 201, 49, 192, 72, 137, 68, 36, 32]
+  emitList with image, [77, 49, 192, 77, 49, 201, 72, 141, 5]
+  emitRel with image, fixes, "srv_tv"
+  emitList with image, [72, 137, 68, 36, 32]
   let image be emitIat with image, fixes, "iat_sel"
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "srv_listen"
