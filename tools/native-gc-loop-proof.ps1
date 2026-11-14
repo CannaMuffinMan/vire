@@ -105,6 +105,12 @@ if ($afterGc.Exit -ne 0 -or $afterGc.Out -ne "7") {
     throw "pass-after gc-churn expected 7 exit 0, got exit=$($afterGc.Exit) out=$($afterGc.Out)"
 }
 Write-Output "PASS_AFTER gc-churn at $AfterSha"
+$afterKind = Compile-Run "gc-kind-stress-after" (Join-Path $Root "tests/native/gc-kind-stress.vire")
+Write-Output "after_kind exit=$($afterKind.Exit) out=$($afterKind.Out)"
+if ($afterKind.Exit -ne 0 -or $afterKind.Out -ne "gc-kind-stress ok") {
+    throw "pass-after gc-kind-stress expected gc-kind-stress ok exit 0, got exit=$($afterKind.Exit) out=$($afterKind.Out)"
+}
+Write-Output "PASS_AFTER gc-kind-stress at $AfterSha"
 $afterTurns = Compile-Run "while-turns-after" (Join-Path $Root "tests/native/while-turns.vire")
 Write-Output "after_turns exit=$($afterTurns.Exit) out=$($afterTurns.Out)"
 if ($afterTurns.Exit -ne 0 -or $afterTurns.Out -ne "ok") {
@@ -117,6 +123,142 @@ if ($afterSpin.Exit -eq 1 -and $afterSpin.Out.Contains("while ran too long")) {
     Write-Output "PASS_AFTER while-spin still bounded at $AfterSha"
 } else {
     throw "pass-after while-spin must still die at 2e6 consecutive trips"
+}
+
+function Set-TextcatKeep {
+    param([string]$Src, [string]$Dst, [int]$Keep)
+    $text = [IO.File]::ReadAllText($Src)
+    $updated = $text.Replace("while n < 470", "while n < $Keep")
+    [IO.File]::WriteAllText($Dst, $updated)
+}
+
+function Assert-TextcatClosed {
+    param($Result, [int]$Keep, [string]$Phase)
+    $out = "$($Result.Out)"
+    if ($out.Contains("textcat corrupt") -or $out.Contains("crash ")) {
+        throw "$Phase textcat keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("textcat ok")) { return }
+    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    throw "$Phase textcat keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+}
+
+$TextCrashSha = "37bf201c744f5e37e88463effb9d1c5e6e30d3b3"
+Write-Output "phase fail-before textcat $TextCrashSha"
+Restore-RuntimeFrom $TextCrashSha
+$catSrc = Join-Path $Work "gc-textcat-nearfull-before.vire"
+Set-TextcatKeep (Join-Path $Root "tests/native/gc-textcat-nearfull.vire") $catSrc 470
+$beforeCat = Compile-Run "textcat-before" $catSrc
+Write-Output "before_textcat exit=$($beforeCat.Exit) out=$($beforeCat.Out)"
+if ($beforeCat.Out.Contains("crash ") -or $beforeCat.Out.Contains("textcat corrupt")) {
+    Write-Output "FAIL_BEFORE textcat crash at $TextCrashSha keep=470"
+} else {
+    throw "fail-before textcat at $TextCrashSha expected crash, got exit=$($beforeCat.Exit) out=$($beforeCat.Out)"
+}
+
+Write-Output "phase pass-after textcat $AfterSha"
+Restore-RuntimeFrom $AfterSha
+for ($keep = 300; $keep -le 490; $keep++) {
+    $src = Join-Path $Work "gc-textcat-$keep.vire"
+    Set-TextcatKeep (Join-Path $Root "tests/native/gc-textcat-nearfull.vire") $src $keep
+    $got = Compile-Run "textcat-$keep" $src
+    Write-Output "after_textcat keep=$keep exit=$($got.Exit) out=$($got.Out)"
+    Assert-TextcatClosed $got $keep "pass-after"
+}
+Write-Output "PASS_AFTER textcat keep 300..490 fail-closed at $AfterSha"
+
+function Set-Keep {
+    param([string]$Src, [string]$Dst, [int]$Keep)
+    $text = [IO.File]::ReadAllText($Src)
+    $updated = $text.Replace("while n < 470", "while n < $Keep")
+    [IO.File]::WriteAllText($Dst, $updated)
+}
+
+function Assert-NearfullClosed {
+    param($Result, [string]$Kind, [int]$Keep, [string]$Phase)
+    $out = "$($Result.Out)"
+    if ($out.Contains("$Kind corrupt") -or $out.Contains("crash ")) {
+        throw "$Phase $Kind keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("$Kind ok")) { return }
+    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    throw "$Phase $Kind keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+}
+
+$StaleSha = "8f07846"
+# replace/hex/take_arg at 8f07846 keep 490 exit 0 on Windows: from-space stays
+# mapped in the 32MB VirtualAlloc, so a stale READ/copy still lands inside the
+# arena. The live crash at that commit is tah (has+add+to_text) writing past
+# the arena at rip memcpy_fwd (0x140003295 on 1811c07; bump ~0x1fff270).
+Write-Output "phase fail-before tah $StaleSha"
+Restore-RuntimeFrom $StaleSha
+$tahSrc = Join-Path $Work "gc-tah-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-tah-nearfull.vire") $tahSrc 470
+$beforeTah = Compile-Run "tah-before" $tahSrc
+Write-Output "before_tah exit=$($beforeTah.Exit) out=$($beforeTah.Out)"
+if ($beforeTah.Out.Contains("crash ") -or $beforeTah.Out.Contains("tah corrupt")) {
+    Write-Output "FAIL_BEFORE tah crash at $StaleSha keep=470"
+} else {
+    throw "fail-before tah at $StaleSha expected crash, got exit=$($beforeTah.Exit) out=$($beforeTah.Out)"
+}
+$repSrc = Join-Path $Work "gc-replace-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-replace-nearfull.vire") $repSrc 490
+$beforeRep = Compile-Run "replace-before" $repSrc
+Write-Output "before_replace exit=$($beforeRep.Exit) out=$($beforeRep.Out)"
+Write-Output "FAIL_BEFORE replace not a crash oracle at $StaleSha keep=490 (from-space still mapped; live oracle is tah)"
+$hexSrc = Join-Path $Work "gc-hex-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-hex-nearfull.vire") $hexSrc 490
+$beforeHex = Compile-Run "hex-before" $hexSrc
+Write-Output "before_hex exit=$($beforeHex.Exit) out=$($beforeHex.Out)"
+Write-Output "FAIL_BEFORE hex not a crash oracle at $StaleSha keep=490 (from-space still mapped; live oracle is tah)"
+$argSrc = Join-Path $Work "gc-takearg-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-takearg-nearfull.vire") $argSrc 490
+$beforeArg = Compile-Run "takearg-before" $argSrc
+Write-Output "before_take_arg exit=$($beforeArg.Exit) out=$($beforeArg.Out)"
+Write-Output "FAIL_BEFORE take_arg not a crash oracle at $StaleSha keep=490 (from-space still mapped; live oracle is tah)"
+
+Write-Output "phase pass-after replace/hex/take_arg $AfterSha"
+Restore-RuntimeFrom $AfterSha
+$kinds = @(
+    @{ Name = "replace"; Src = "tests/native/gc-replace-nearfull.vire"; Kind = "replace" },
+    @{ Name = "hex"; Src = "tests/native/gc-hex-nearfull.vire"; Kind = "hex" },
+    @{ Name = "take_arg"; Src = "tests/native/gc-takearg-nearfull.vire"; Kind = "take_arg" }
+)
+foreach ($k in $kinds) {
+    for ($keep = 300; $keep -le 490; $keep++) {
+        $src = Join-Path $Work ("gc-" + $k.Name + "-$keep.vire")
+        Set-Keep (Join-Path $Root $k.Src) $src $keep
+        $got = Compile-Run ($k.Name + "-$keep") $src
+        Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
+        Assert-NearfullClosed $got $k.Kind $keep "pass-after"
+    }
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300..490 fail-closed at $AfterSha")
+}
+$splitNp = Compile-Run "split-nopressure" (Join-Path $Root "tests/native/gc-split-nopressure.vire")
+Write-Output "after_split_nopressure exit=$($splitNp.Exit) out=$($splitNp.Out)"
+if ($splitNp.Exit -ne 0 -or "$($splitNp.Out)" -notmatch "split ok") {
+    throw "pass-after split nopressure expected split ok, got exit=$($splitNp.Exit) out=$($splitNp.Out)"
+}
+Write-Output "PASS_AFTER split nopressure at $AfterSha"
+$extraKinds = @(
+    @{ Name = "split"; Src = "tests/native/gc-split-nearfull.vire"; Kind = "split" },
+    @{ Name = "to_text"; Src = "tests/native/gc-to_text-nearfull.vire"; Kind = "to_text" },
+    @{ Name = "add"; Src = "tests/native/gc-add-nearfull.vire"; Kind = "add" },
+    @{ Name = "keys"; Src = "tests/native/gc-keys-nearfull.vire"; Kind = "keys" },
+    @{ Name = "extend"; Src = "tests/native/gc-extend-nearfull.vire"; Kind = "extend" },
+    @{ Name = "tt"; Src = "tests/native/gc-list-totext-nearfull.vire"; Kind = "tt" },
+    @{ Name = "mt"; Src = "tests/native/gc-map-totext-nearfull.vire"; Kind = "mt" },
+    @{ Name = "tah"; Src = "tests/native/gc-tah-nearfull.vire"; Kind = "tah" }
+)
+foreach ($k in $extraKinds) {
+    foreach ($keep in @(300, 470, 478, 482, 490)) {
+        $src = Join-Path $Work ("gc-" + $k.Name + "-$keep.vire")
+        Set-Keep (Join-Path $Root $k.Src) $src $keep
+        $got = Compile-Run ($k.Name + "-$keep") $src
+        Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
+        Assert-NearfullClosed $got $k.Kind $keep "pass-after"
+    }
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300,470,478,482,490 fail-closed at $AfterSha")
 }
 
 Write-Output "native gc/loop proof ok"

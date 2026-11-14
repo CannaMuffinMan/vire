@@ -1,0 +1,43 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let raw be bytes
+  let n be 0
+  while n < 4096
+    let raw be push with raw, 120
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let i be 0
+  let bad be 0
+  while i < 200
+    let h be hex with raw
+    if (h at 0) != "7"
+      let bad be bad + 1
+    end
+    if (h at 1) != "8"
+      let bad be bad + 1
+    end
+    if (length with h) != 8192
+      let bad be bad + 1
+    end
+    let i be i + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "hex ok"
+  end
+  if bad != 0
+    say "hex corrupt"
+    say bad
+  end
+end

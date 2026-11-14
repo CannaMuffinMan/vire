@@ -1,0 +1,48 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let p64 be "p"
+  let n be 0
+  while n < 6
+    let p64 be p64 + p64
+    let n be n + 1
+  end
+  let s be p64
+  let j be 0
+  while j < 199
+    let s be s + "," + p64
+    let j be j + 1
+  end
+  let parts be split with s, ","
+  let bad be 0
+  if (length with parts) != 200
+    let bad be bad + 1
+  end
+  if (parts at 0) != p64
+    let bad be bad + 1
+  end
+  if (parts at 199) != p64
+    let bad be bad + 1
+  end
+  if (parts at 100) != p64
+    let bad be bad + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "split ok"
+  end
+  if bad != 0
+    say "split corrupt"
+    say bad
+  end
+end
