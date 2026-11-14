@@ -391,7 +391,14 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_gc_fwd_one", image
   emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 139, 70, 4, 246, 192, 2, 15, 133]
   emitRel with image, fixes, "fwd_pin"
-  emitList with image, [72, 137, 248, 76, 41, 216, 131, 200, 1, 137, 70, 4, 72, 1, 207, 195]
+  emitList with image, [72, 137, 248, 76, 41, 216, 131, 200, 1, 137, 70, 4, 72, 1, 207]
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "heap_cell"
+  emitList with image, [72, 5]
+  emitU32 with image, 33554432
+  emitList with image, [72, 57, 199, 15, 135]
+  emitRel with image, fixes, "memcpy_oom"
+  emitList with image, [195]
   pin with labels, "fwd_pin", image
   ~ Identity forward and dest = max(dest, pin_end). Fillers are written after
   ~ memcpy, because dest writes would smash from-space sizes gc_mv still walks.
@@ -399,6 +406,12 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "fwd_pin_ok"
   emitList with image, [72, 137, 199]
   pin with labels, "fwd_pin_ok", image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "heap_cell"
+  emitList with image, [72, 5]
+  emitU32 with image, 33554432
+  emitList with image, [72, 57, 199, 15, 135]
+  emitRel with image, fixes, "memcpy_oom"
   emitList with image, [195]
 
   pin with labels, "rt_gc", image
@@ -614,15 +627,18 @@ define emitMore with image, fixes, labels
   ~ (tah keep 470/482 at bump ~0x1fff270). Src may be interned in the PE.
   emitList with image, [77, 133, 192, 15, 132]
   emitRel with image, fixes, "memcpy_done"
-  emitList with image, [76, 139, 21]
+  ~ rax/r9 only. gc_mv keeps the to-space base in r11 across this call;
+  ~ clobbering r11 made dest = arena_end + fwd and wrote unmapped at gc_mv_c
+  ~ (rip 0x140003295, mov dword [rdi+4], 0).
+  emitList with image, [72, 139, 5]
   emitRel with image, fixes, "heap_cell"
-  emitList with image, [76, 57, 209, 15, 130]
+  emitList with image, [72, 57, 193, 15, 130]
   emitRel with image, fixes, "memcpy_oom"
-  emitList with image, [77, 141, 154]
+  emitList with image, [76, 141, 136]
   emitU32 with image, 33554432
   emitList with image, [74, 141, 4, 1, 15, 128]
   emitRel with image, fixes, "memcpy_oom"
-  emitList with image, [76, 57, 216, 15, 135]
+  emitList with image, [76, 57, 200, 15, 135]
   emitRel with image, fixes, "memcpy_oom"
   emitList with image, [72, 57, 209, 15, 130]
   emitRel with image, fixes, "memcpy_fwd"
