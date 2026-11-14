@@ -307,7 +307,9 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_cn", image
   emitList with image, [139, 77, 172, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_ci"
-  emitJmpTo with image, fixes, "srv_mux"
+  ~ After reaping parked slots, blocking accept so a new GET cannot be
+  ~ masked by a 1-byte client that stays select-ready.
+  emitJmpTo with image, fixes, "srv_doac"
 
   pin with labels, "rt_fd_add", image
   emitPro with image
