@@ -29,6 +29,11 @@ public class NativeNetTests
         Assert.DoesNotContain("270500008a00", packedFixes);
         Assert.DoesNotContain("6f0500008a00", packedFixes);
         Assert.Contains("select", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("srv_doac", server);
+        Assert.Contains("243, 171", server);
+        Assert.Contains("131, 249, 64", server);
+        Assert.Contains("while fi < 64", net);
+        Assert.Contains("while pi < 2048", net);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);

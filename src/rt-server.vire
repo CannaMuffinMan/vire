@@ -206,6 +206,7 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_findn", image
   emitList with image, [255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_find"
+  ~ Slot table is 64. Full: close the new SOCKET (fail closed, no rt_fail).
   emitList with image, [72, 139, 77, 184]
   let image be emitIat with image, fixes, "iat_cs"
 
@@ -229,7 +230,12 @@ define emitListenMux with image, fixes, labels
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "srv_cn"
   pin with labels, "srv_peekgo", image
-  emitList with image, [72, 139, 77, 176, 72, 141, 21]
+  ~ Length-bound peek: zero the 16KB .data window, then MSG_PEEK at most 16384.
+  emitList with image, [72, 141, 61]
+  emitRel with image, fixes, "srv_peek"
+  emitList with image, [252, 49, 192, 185]
+  emitU32 with image, 2048
+  emitList with image, [243, 171, 72, 139, 77, 176, 72, 141, 21]
   emitRel with image, fixes, "srv_peek"
   emitList with image, [65, 184]
   emitU32 with image, 16384

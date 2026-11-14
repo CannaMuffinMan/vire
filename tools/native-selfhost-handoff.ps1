@@ -175,4 +175,16 @@ $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
 if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
-Write-Output "native selfhost handoff ok"
+$run = 1
+while ($run -lt 3) {
+    $run = $run + 1
+    if (Test-Path $gen2Hex) { Remove-Item -Force $gen2Hex }
+    $r = Invoke-Bounded -Name ("gen2_native_" + $run) -TimeoutSec 2400 -FilePath $g1 -ArgumentList @(
+        "data/compile-native.vire", "data/gen2.hex"
+    )
+    if ($r.StdOut -notmatch "compiled") { throw "gen2_native_$run missing compiled" }
+    $h2b = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
+    Write-Output ("gen2_sha256_run" + $run + " " + $h2b)
+    if ($h1 -ne $h2b) { throw "gen1/gen2 SHA-256 differ on run $run" }
+}
+Write-Output "native selfhost handoff ok gen1=gen2 runs=3"

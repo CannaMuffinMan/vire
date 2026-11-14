@@ -209,6 +209,22 @@ if (-not $warm.Ok) {
     throw "warmup /health failed out=$so err=$se text=$($warm.Text)"
 }
 Write-Output "PASS_AFTER warmup /health 200"
+$advA = New-V4Client 15000
+$advA.Connect([Net.IPAddress]::Loopback, $after.Port)
+$advA.GetStream().Write([Text.Encoding]::ASCII.GetBytes("X"), 0, 1)
+Start-Sleep -Milliseconds 150
+$advB = Get-Health $after.Port 2000
+Write-Output ("adversary_B_ms {0} ok={1} A_connected={2}" -f $advB.Ms, $advB.Ok, $advA.Connected)
+if (-not $advB.Ok) { throw "client B /health failed while A held one byte" }
+if ($advB.Ms -gt 1500) { throw "client B too slow $($advB.Ms)ms while A held" }
+if (-not $advA.Connected) { throw "client A dropped while serving B" }
+$until = (Get-Date).AddSeconds(8)
+while ((Get-Date) -lt $until -and $advA.Connected) { Start-Sleep -Milliseconds 200 }
+if ($after.Proc.HasExited) { throw "server died when A timed out" }
+$advC = Get-Health $after.Port 2000
+if (-not $advC.Ok) { throw "server silent after A timeout" }
+try { $advA.Close() } catch { }
+Write-Output "PASS_AFTER adversary A 1-byte B /health 200 while A connected; A timeout leaves server up"
 $idle2 = New-V4Client 2000
 $idle2.Connect([Net.IPAddress]::Loopback, $after.Port)
 $idle2.Close()
