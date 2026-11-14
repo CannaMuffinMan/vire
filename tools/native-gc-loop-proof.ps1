@@ -125,6 +125,48 @@ if ($afterSpin.Exit -eq 1 -and $afterSpin.Out.Contains("while ran too long")) {
     throw "pass-after while-spin must still die at 2e6 consecutive trips"
 }
 
+function Set-TextcatKeep {
+    param([string]$Src, [string]$Dst, [int]$Keep)
+    $text = [IO.File]::ReadAllText($Src)
+    $updated = $text.Replace("while n < 470", "while n < $Keep")
+    [IO.File]::WriteAllText($Dst, $updated)
+}
+
+function Assert-TextcatClosed {
+    param($Result, [int]$Keep, [string]$Phase)
+    $out = "$($Result.Out)"
+    if ($out.Contains("textcat corrupt") -or $out.Contains("crash ")) {
+        throw "$Phase textcat keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("textcat ok")) { return }
+    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    throw "$Phase textcat keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+}
+
+$TextCrashSha = "37bf201c744f5e37e88463effb9d1c5e6e30d3b3"
+Write-Output "phase fail-before textcat $TextCrashSha"
+Restore-RuntimeFrom $TextCrashSha
+$catSrc = Join-Path $Work "gc-textcat-nearfull-before.vire"
+Set-TextcatKeep (Join-Path $Root "tests/native/gc-textcat-nearfull.vire") $catSrc 470
+$beforeCat = Compile-Run "textcat-before" $catSrc
+Write-Output "before_textcat exit=$($beforeCat.Exit) out=$($beforeCat.Out)"
+if ($beforeCat.Out.Contains("crash ") -or $beforeCat.Out.Contains("textcat corrupt")) {
+    Write-Output "FAIL_BEFORE textcat crash at $TextCrashSha keep=470"
+} else {
+    throw "fail-before textcat at $TextCrashSha expected crash, got exit=$($beforeCat.Exit) out=$($beforeCat.Out)"
+}
+
+Write-Output "phase pass-after textcat $AfterSha"
+Restore-RuntimeFrom $AfterSha
+for ($keep = 300; $keep -le 490; $keep++) {
+    $src = Join-Path $Work "gc-textcat-$keep.vire"
+    Set-TextcatKeep (Join-Path $Root "tests/native/gc-textcat-nearfull.vire") $src $keep
+    $got = Compile-Run "textcat-$keep" $src
+    Write-Output "after_textcat keep=$keep exit=$($got.Exit) out=$($got.Out)"
+    Assert-TextcatClosed $got $keep "pass-after"
+}
+Write-Output "PASS_AFTER textcat keep 300..490 fail-closed at $AfterSha"
+
 Write-Output "native gc/loop proof ok"
 Write-Output "note: a truly infinite accept loop is not shown in CI; ticks/rt_note_wait reset the 2e6 spin counter per turn, then this job shuts down after 2.5e6 counted trips."
 exit 0

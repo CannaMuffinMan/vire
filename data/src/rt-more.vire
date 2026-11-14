@@ -83,6 +83,24 @@ define emitPushTag with image, tag
   return image
 end
 
+define emitParkRcx with image
+  ~ Park a heap payload on the VM stack as tag 2 so compact updates it.
+  let image be emitList with image, [73, 199, 69, 0]
+  let image be emitU32 with image, 2
+  let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16]
+  return image
+end
+
+define emitUnparkRcx with image
+  let image be emitList with image, [73, 131, 237, 16, 73, 139, 77, 8]
+  return image
+end
+
+define emitUnparkRdx with image
+  let image be emitList with image, [73, 131, 237, 16, 73, 139, 85, 8]
+  return image
+end
+
 define emitMore with image, fixes, labels
   ~ 8-byte header [size:u32][flags:u32] sits before every payload. 32MB mapping
   ~ stays the hard cap. OOM runs mark-compact once, then fails if still full.
@@ -418,37 +436,6 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_trp"
   pin with labels, "gc_trp_done", image
-  emitList with image, [72, 137, 238, 185]
-  emitU32 with image, 3
-  pin with labels, "gc_rbp", image
-  ~ Precise VM/frame/trap slots already root every Vire value. Conservative
-  ~ native frames on Windows pin too much (or follow non-rbp chains) and the
-  ~ bump never drops. Do not scan rbp; leave the walk in the image unused.
-  emitList with image, [233]
-  emitRel with image, fixes, "gc_rbp_done"
-  emitList with image, [72, 133, 246, 15, 132]
-  emitRel with image, fixes, "gc_rbp_done"
-  ~ Saved rbp on Windows often is not a frame pointer. Following it into the
-  ~ object heap would scan payloads as if they were stack slots and pin the
-  ~ world. Stop the chain at obj_lo..bump.
-  emitList with image, [76, 57, 222, 15, 130]
-  emitRel with image, fixes, "gc_rbp_ok"
-  emitList with image, [76, 57, 230, 15, 130]
-  emitRel with image, fixes, "gc_rbp_done"
-  pin with labels, "gc_rbp_ok", image
-  emitList with image, [72, 137, 247, 72, 129, 239]
-  emitU32 with image, 128
-  pin with labels, "gc_rbp_w", image
-  emitList with image, [72, 57, 247, 15, 131]
-  emitRel with image, fixes, "gc_rbp_n"
-  emitList with image, [81, 72, 139, 7]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
-  emitList with image, [89, 72, 131, 199, 8, 233]
-  emitRel with image, fixes, "gc_rbp_w"
-  pin with labels, "gc_rbp_n", image
-  emitList with image, [72, 139, 54, 255, 201, 15, 133]
-  emitRel with image, fixes, "gc_rbp"
-  pin with labels, "gc_rbp_done", image
   pin with labels, "gc_fix", image
   emitList with image, [49, 219, 76, 137, 222]
   pin with labels, "gc_fix_w", image
@@ -510,12 +497,6 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_utrp"
   pin with labels, "gc_utrp_d", image
-  emitList with image, [72, 137, 238, 185]
-  emitU32 with image, 64
-  pin with labels, "gc_urbp", image
-  pin with labels, "gc_urbp_w", image
-  pin with labels, "gc_urbp_n", image
-  pin with labels, "gc_urbp_d", image
   emitList with image, [76, 137, 222]
   pin with labels, "gc_uobj", image
   emitList with image, [76, 57, 230, 15, 131]
@@ -671,8 +652,13 @@ define emitMore with image, fixes, labels
   pin with labels, "ensure_cap", image
   emitList with image, [76, 137, 69, 232, 76, 137, 193, 72, 131, 193, 16]
   emitJcc with image, fixes, 130, "ensure_oom"
+  emitList with image, [81, 72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [89]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 137, 69, 224, 72, 139, 77, 248, 72, 139, 17, 72, 139, 69, 224, 72, 137, 16, 76, 139, 69, 232, 76, 137, 64, 8, 72, 139, 69, 224, 72, 141, 72, 16, 76, 139, 77, 248, 73, 141, 81, 16, 76, 137, 208, 77, 139, 1]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 69, 224]
@@ -853,9 +839,17 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 76, 139, 1, 76, 3, 2, 73, 129, 248]
   emitU32 with image, 1000000
   emitJcc with image, fixes, 135, "text_cat_big"
-  emitList with image, [76, 137, 69, 232, 76, 137, 193, 72, 131, 193, 16]
+  emitList with image, [76, 137, 69, 232]
+  emitList with image, [72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [72, 139, 77, 240]
+  emitParkRcx with image
+  emitList with image, [76, 137, 193, 72, 131, 193, 16]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
+  emitUnparkRdx with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
   emitList with image, [72, 137, 69, 224, 76, 139, 69, 232, 76, 137, 0, 72, 141, 72, 8, 76, 139, 77, 248, 73, 141, 81, 8, 76, 137, 208, 77, 139, 1]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 69, 224, 72, 141, 72, 8, 76, 139, 77, 248, 77, 139, 1, 76, 1, 193, 76, 139, 85, 240, 73, 141, 82, 8, 77, 139, 2]
@@ -872,13 +866,21 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 61]
   emitU32 with image, 100000
   emitJcc with image, fixes, 135, "cat_big"
-  emitList with image, [72, 137, 69, 232, 185]
+  emitList with image, [72, 137, 69, 232]
+  emitList with image, [72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [72, 139, 77, 240]
+  emitParkRcx with image
+  emitList with image, [185]
   emitU32 with image, 24
   emitCallTo with image, fixes, "rt_alloc"
   emitKindHdr with image
   emitList with image, [72, 137, 69, 224, 72, 139, 85, 232, 72, 137, 16, 72, 137, 80, 8, 72, 139, 77, 232, 72, 193, 225, 4]
   emitCallTo with image, fixes, "rt_alloc"
   emitKindPairs with image
+  emitUnparkRdx with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
   emitList with image, [72, 139, 77, 224, 72, 137, 65, 16, 72, 137, 193, 76, 139, 77, 248, 73, 139, 81, 16, 77, 139, 1, 73, 193, 224, 4]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 77, 224, 72, 139, 65, 16, 76, 139, 77, 248, 77, 139, 1, 73, 193, 224, 4, 72, 1, 192, 72, 137, 193, 76, 139, 85, 240, 73, 139, 82, 16, 77, 139, 2, 73, 193, 224, 4]
@@ -1214,8 +1216,13 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "lower_bad"
   emitList with image, [72, 137, 85, 248, 72, 139, 10, 72, 137, 77, 240, 72, 137, 201, 72, 131, 193, 16, 15, 128]
   emitRel with image, fixes, "lower_oom"
+  emitList with image, [81, 72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [89]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 137, 69, 232, 72, 139, 85, 240, 72, 137, 16, 72, 139, 77, 240, 72, 133, 201, 15, 132]
   emitRel with image, fixes, "lower_term"
   emitList with image, [76, 139, 69, 248, 73, 131, 192, 8, 76, 139, 77, 232, 73, 131, 193, 8]
@@ -1593,8 +1600,13 @@ define emitMore with image, fixes, labels
   pin with labels, "grow_cap", image
   emitList with image, [72, 137, 69, 240, 72, 137, 193, 72, 193, 225, 4]
   emitJcc with image, fixes, 130, "grow_oom"
+  emitList with image, [81, 72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [89]
   emitCallTo with image, fixes, "rt_alloc"
   emitKindPairs with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 73, 193, 224, 4, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 69, 232, 72, 139, 77, 248, 72, 139, 17, 72, 193, 226, 4, 72, 1, 208, 72, 139, 77, 240, 72, 193, 225, 4, 72, 41, 209, 72, 137, 202, 72, 137, 193]
@@ -1617,8 +1629,13 @@ define emitMore with image, fixes, labels
   pin with labels, "growb_cap", image
   emitList with image, [72, 137, 69, 240, 72, 137, 193]
   emitJcc with image, fixes, 130, "growb_oom"
+  emitList with image, [81, 72, 139, 77, 248]
+  emitParkRcx with image
+  emitList with image, [89]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 139, 81, 16, 76, 139, 1, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_memcpy"
   emitList with image, [72, 139, 77, 248, 72, 139, 69, 240, 72, 137, 65, 8, 72, 139, 69, 232, 72, 137, 65, 16, 72, 137, 200]
