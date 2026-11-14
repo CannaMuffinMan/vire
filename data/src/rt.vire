@@ -1,6 +1,7 @@
 ~ Native runtime emitted with the entry stub. Vire links the relocations.
 
 use "src/rt-more.vire"
+use "src/rt-time.vire"
 
 define emitList with image, bytes
   return (extend with image, bytes)
@@ -623,6 +624,7 @@ define emitRuntime with image, fixes, labels
   pin with labels, "rt_for_drop", image
   let image be emitList with image, [73, 131, 237, 32, 195]
   let image be emitMore with image, fixes, labels
+  let image be emitTimeRuntime with image, fixes, labels
   return image
 end
 

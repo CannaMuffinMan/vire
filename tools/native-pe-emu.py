@@ -2,6 +2,7 @@
 import os
 import struct
 import sys
+import time
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
 from unicorn.x86_const import (
     UC_X86_REG_RAX,
@@ -76,6 +77,7 @@ class Emu:
             "AddVectoredExceptionHandler",
             "SetFilePointerEx",
             "SetEndOfFile",
+            "GetSystemTimeAsFileTime",
             "GetFinalPathNameByHandleA",
         ]
         self.stubs = {}
@@ -134,6 +136,7 @@ class Emu:
             "AddVectoredExceptionHandler",
             "SetFilePointerEx",
             "SetEndOfFile",
+            "GetSystemTimeAsFileTime",
             "GetFinalPathNameByHandleA",
         ]
         iat = runs[-1]
@@ -279,6 +282,11 @@ class Emu:
 
     def api_SetEndOfFile(self):
         self.wr(UC_X86_REG_RAX, 1)
+
+    def api_GetSystemTimeAsFileTime(self):
+        ptr = self.rd(UC_X86_REG_RCX)
+        ft = int(time.time()) * 10000000 + 116444736000000000
+        self.mu.mem_write(ptr, struct.pack("<Q", ft & 0xFFFFFFFFFFFFFFFF))
 
     def api_GetFinalPathNameByHandleA(self):
         self.wr(UC_X86_REG_RAX, 0)

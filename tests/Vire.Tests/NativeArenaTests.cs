@@ -36,7 +36,7 @@ public class NativeArenaTests
         Assert.Contains("pin with labels, \"gc_busy\", image", rt);
         Assert.Contains("pin with labels, \"wait_cell\", image", rt);
         string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
-        Assert.Contains("nm == \"args\" or nm == \"ticks\"", native);
+        Assert.Contains("nm == \"args\" or nm == \"ticks\" or nm == \"unix\" or nm == \"unix_ms\"", native);
         Assert.DoesNotContain("MaxCalls", File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire")));
     }
 

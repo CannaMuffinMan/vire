@@ -377,7 +377,7 @@ sealed class Machine
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
         "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
-        "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
+        "files", "json", "parse", "now", "ticks", "unix", "unix_ms", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
@@ -606,10 +606,27 @@ sealed class Machine
         return (int)raw;
     }
 
+    // UTC Unix seconds. Fits signed 32-bit until 2038. Wall clock; not monotonic.
+    internal static int ClockUnix()
+    {
+        long sec = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (sec < 1) return 1;
+        if (sec > int.MaxValue) return int.MaxValue;
+        return (int)sec;
+    }
+
+    // UTC Unix milliseconds. Beyond int.MaxValue this is a whole double so Show prints digits.
+    internal static object ClockUnixMs()
+    {
+        long ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (ms <= int.MaxValue) return (int)ms;
+        return (double)ms;
+    }
+
     object Builtin(string name, List<object> args, int line, int col)
     {
         int need = 1;
-        if (name == "now" || name == "ticks" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes") need = 0;
+        if (name == "now" || name == "ticks" || name == "unix" || name == "unix_ms" || name == "show" || name == "term" || name == "screen" || name == "marks" || name == "clear" || name == "args" || name == "bytes") need = 0;
         if (name == "wait" || name == "result") need = 1;
         if (name == "start")
         {
@@ -898,6 +915,8 @@ sealed class Machine
         }
         if (name == "now") return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (name == "ticks") return ClockTicks();
+        if (name == "unix") return ClockUnix();
+        if (name == "unix_ms") return ClockUnixMs();
         if (name == "fetch")
         {
             string url = args[0] as string;
@@ -1599,7 +1618,7 @@ sealed class Machine
         if (kind == "var")
         {
             string name = (string)tree[1];
-            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks"))
+            if (!env.Has(name) && (name == "term" || name == "screen" || name == "show" || name == "marks" || name == "clear" || name == "args" || name == "bytes" || name == "ticks" || name == "unix" || name == "unix_ms"))
                 return Builtin(name, new List<object>(), line, col);
             if (!env.Has(name) && funcs.ContainsKey(name) && funcs[name].Params.Count == 0)
                 return Call(name, new List<object>(), line, col);
