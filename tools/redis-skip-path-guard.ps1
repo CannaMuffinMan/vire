@@ -4,12 +4,12 @@ $PSNativeCommandUseErrorActionPreference = $false
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 $Base = "103f189e54630f11a127907a84b91faa1b59375c"
-$old = git show "${Base}:tools/redis-prove-windows.ps1"
+$old = (git show "${Base}:tools/redis-prove-windows.ps1" | Out-String)
 if ($LASTEXITCODE -ne 0) { throw "git show $Base redis-prove-windows.ps1 failed" }
-if ($old -notmatch "REDIS_SERVER_UNAVAILABLE") {
+if ($old.IndexOf("REDIS_SERVER_UNAVAILABLE") -lt 0) {
     throw "FAIL_BEFORE: $Base redis-prove-windows.ps1 missing REDIS_SERVER_UNAVAILABLE"
 }
-if ($old -notmatch "exit 0") {
+if ($old.IndexOf("exit 0") -lt 0) {
     throw "FAIL_BEFORE: $Base redis-prove-windows.ps1 missing exit 0"
 }
 $oldSkip = @'
