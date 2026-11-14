@@ -18,20 +18,31 @@ define emitCallTo with image, fixes, name
 end
 
 define emitLeaf with image
-  ~ Size bit 0: non-pointer payload. Bits 1-2 are the kind (see emitKind*).
+  ~ Object header at payload-8:
+  ~   size:u32
+  ~     bit 0      leaf (text/bytes; mark must not follow payload)
+  ~     bits 1-2   must be 0 (mark `test size,6` rejects the header)
+  ~     bits 3-24  byte size including header, 8-aligned (mask 0x01FFFFF8)
+  ~     bit 25     unused (arena 32MB; an object cannot fill it)
+  ~     bits 26-27 kind: 0 raw/leaf, 1 list/map/bytes hdr, 2 tagged pairs
+  ~     bits 28-31 unused
+  ~   flags:u32
+  ~     mark: bit 0 marked, bit 1 pinned
+  ~     fwd:  (offset from heap_cell) | 1
+  ~     after copy: 0
   emitList with image, [131, 72, 248, 1]
   return image
 end
 
 define emitKindHdr with image
-  ~ Bits 1-2 = 1: list/map/bytes header. Payload is [len, cap, buf]; only buf moves.
-  emitList with image, [131, 72, 248, 2]
+  ~ size bits 26-27 = 1: payload [len, cap, buf]; only buf is a pointer.
+  emitList with image, [129, 72, 248, 0, 0, 0, 4]
   return image
 end
 
 define emitKindPairs with image
-  ~ Bits 1-2 = 2: tagged (tag, payload) array. Update only tags 2/4/5/6.
-  emitList with image, [131, 72, 248, 4]
+  ~ size bits 26-27 = 2: tagged (tag, payload) array.
+  emitList with image, [129, 72, 248, 0, 0, 0, 8]
   return image
 end
 
@@ -141,7 +152,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "mark_ret"
   emitList with image, [139, 8, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "mark_ret"
-  emitList with image, [131, 225, 248, 131, 249, 16, 15, 130]
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
   emitRel with image, fixes, "mark_ret"
   emitList with image, [72, 137, 194, 72, 1, 202, 76, 57, 226, 15, 135]
   emitRel with image, fixes, "mark_ret"
@@ -159,7 +170,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "markp_ret"
   emitList with image, [139, 8, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "markp_ret"
-  emitList with image, [131, 225, 248, 131, 249, 16, 15, 130]
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
   emitRel with image, fixes, "markp_ret"
   emitList with image, [72, 137, 194, 72, 1, 202, 76, 57, 226, 15, 135]
   emitRel with image, fixes, "markp_ret"
@@ -176,7 +187,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "markn_ret"
   emitList with image, [139, 8, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "markn_ret"
-  emitList with image, [131, 225, 248, 131, 249, 16, 15, 130]
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
   emitRel with image, fixes, "markn_ret"
   emitList with image, [72, 137, 194, 72, 1, 202, 76, 57, 226, 15, 135]
   emitRel with image, fixes, "markn_ret"
@@ -197,7 +208,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "markpn_ret"
   emitList with image, [139, 8, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "markpn_ret"
-  emitList with image, [131, 225, 248, 131, 249, 16, 15, 130]
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
   emitRel with image, fixes, "markpn_ret"
   emitList with image, [72, 137, 194, 72, 1, 202, 76, 57, 226, 15, 135]
   emitRel with image, fixes, "markpn_ret"
@@ -268,20 +279,20 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 193, 8, 233]
   emitRel with image, fixes, "rt_gc_update"
 
-  ~ Kind in size bits 1-2. Stored size is request+8; payload is [rsi+8, rsi+size).
+  ~ Kind from size bits 26-27. Payload is [rsi+8, rsi+(size & 0x01FFFFF8)).
   pin with labels, "rt_gc_scan_mark_new", image
   emitList with image, [139, 6, 246, 192, 1, 15, 133]
   emitRel with image, fixes, "scanm_ret"
-  emitList with image, [137, 193, 131, 225, 6, 131, 249, 2, 15, 132]
+  emitList with image, [137, 193, 193, 233, 26, 131, 225, 3, 131, 249, 1, 15, 132]
   emitRel with image, fixes, "scanm_hdr"
-  emitList with image, [131, 249, 4, 15, 132]
+  emitList with image, [131, 249, 2, 15, 132]
   emitRel with image, fixes, "scanm_pairs"
   emitFail with image, fixes, "msg_gc"
   pin with labels, "scanm_hdr", image
   emitList with image, [72, 139, 70, 24, 233]
   emitRel with image, fixes, "rt_gc_mark_new"
   pin with labels, "scanm_pairs", image
-  emitList with image, [139, 14, 131, 225, 248, 72, 141, 126, 8, 76, 141, 4, 14]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 141, 126, 8, 76, 141, 4, 14]
   pin with labels, "scanm_loop", image
   emitList with image, [76, 57, 199, 15, 131]
   emitRel with image, fixes, "scanm_ret"
@@ -295,16 +306,16 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_gc_scan_upd", image
   emitList with image, [139, 6, 246, 192, 1, 15, 133]
   emitRel with image, fixes, "scanu_ret"
-  emitList with image, [137, 193, 131, 225, 6, 131, 249, 2, 15, 132]
+  emitList with image, [137, 193, 193, 233, 26, 131, 225, 3, 131, 249, 1, 15, 132]
   emitRel with image, fixes, "scanu_hdr"
-  emitList with image, [131, 249, 4, 15, 132]
+  emitList with image, [131, 249, 2, 15, 132]
   emitRel with image, fixes, "scanu_pairs"
   emitFail with image, fixes, "msg_gc"
   pin with labels, "scanu_hdr", image
   emitList with image, [72, 141, 78, 24, 233]
   emitRel with image, fixes, "rt_gc_update"
   pin with labels, "scanu_pairs", image
-  emitList with image, [139, 14, 131, 225, 248, 72, 141, 126, 8, 76, 141, 4, 14]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 141, 126, 8, 76, 141, 4, 14]
   pin with labels, "scanu_loop", image
   emitList with image, [76, 57, 199, 15, 131]
   emitRel with image, fixes, "scanu_ret"
@@ -316,7 +327,7 @@ define emitMore with image, fixes, labels
   emitList with image, [195]
 
   pin with labels, "rt_gc_fwd_one", image
-  emitList with image, [139, 14, 131, 225, 248, 139, 70, 4, 246, 192, 2, 15, 133]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 139, 70, 4, 246, 192, 2, 15, 133]
   emitRel with image, fixes, "fwd_pin"
   emitList with image, [72, 137, 248, 76, 41, 216, 131, 200, 1, 137, 70, 4, 72, 1, 207, 195]
   pin with labels, "fwd_pin", image
@@ -344,7 +355,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_hdr_done"
   emitList with image, [139, 14, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "gc_done"
-  emitList with image, [131, 225, 248, 131, 249, 16, 15, 130]
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
   emitRel with image, fixes, "gc_done"
   emitList with image, [72, 137, 240, 72, 1, 200, 76, 57, 224, 15, 135]
   emitRel with image, fixes, "gc_done"
@@ -427,7 +438,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_fix_n"
   emitCallTo with image, fixes, "rt_gc_scan_mark_new"
   pin with labels, "gc_fix_n", image
-  emitList with image, [139, 14, 131, 225, 248, 72, 1, 206, 233]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_fix_w"
   pin with labels, "gc_fix_d", image
   emitList with image, [133, 219, 15, 133]
@@ -440,7 +451,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_fwd_s"
   emitCallTo with image, fixes, "rt_gc_fwd_one"
   pin with labels, "gc_fwd_s", image
-  emitList with image, [139, 14, 131, 225, 248, 72, 1, 206, 233]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_fwd"
   pin with labels, "gc_fwd_d", image
   emitList with image, [72, 137, 125, 216]
@@ -493,14 +504,14 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_uobj_n"
   emitCallTo with image, fixes, "rt_gc_scan_upd"
   pin with labels, "gc_uobj_n", image
-  emitList with image, [139, 14, 131, 225, 248, 72, 1, 206, 233]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_uobj"
   pin with labels, "gc_uobj_d", image
   emitList with image, [76, 137, 222]
   pin with labels, "gc_mv", image
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_mv_d"
-  emitList with image, [139, 14, 131, 225, 248, 72, 137, 77, 208, 139, 70, 4, 133, 192, 15, 132]
+  emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 137, 77, 208, 139, 70, 4, 133, 192, 15, 132]
   emitRel with image, fixes, "gc_mv_s"
   emitList with image, [131, 224, 254, 76, 137, 223, 72, 1, 199, 72, 57, 247, 15, 132]
   emitRel with image, fixes, "gc_mv_c"
