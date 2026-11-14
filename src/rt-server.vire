@@ -207,7 +207,7 @@ define emitListenMux with image, fixes, labels
   emitList with image, [139, 77, 168, 72, 141, 21]
   emitRel with image, fixes, "srv_born"
   emitList with image, [137, 4, 138, 233]
-  emitRel with image, fixes, "srv_peekgo"
+  emitRel with image, fixes, "srv_mux"
   pin with labels, "srv_findn", image
   emitList with image, [255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_find"
