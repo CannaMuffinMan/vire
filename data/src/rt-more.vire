@@ -662,7 +662,12 @@ define emitMore with image, fixes, labels
   pin with labels, "memcpy_done", image
   emitList with image, [195]
   pin with labels, "memcpy_oom", image
-  emitFail with image, fixes, "msg_oom"
+  ~ Skip rt_fail's trap unwind (trap_sp can look like a heap pointer after
+  ~ compact). Always print msg_oom and ExitProcess(1).
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "msg_oom"
+  emitList with image, [233]
+  emitRel with image, fixes, "rt_fail_exit"
 
   ~ Unused list/map capacity is not a leaf. GC scans the whole allocation, so
   ~ leftover from-space bytes there look like heap pointers after the first
