@@ -124,6 +124,31 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
+      - name: FAIL_BEFORE silent skip exited 0; skip now fails closed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $base = "103f189e54630f11a127907a84b91faa1b59375c"
+          $old = git show "${base}:tools/redis-prove-windows.ps1"
+          if ($LASTEXITCODE -ne 0) { throw "git show $base redis-prove-windows.ps1 failed" }
+          if ($old -notmatch '(?s)if \(\$null -eq \$redis\) \{.*?exit 0') {
+            throw "FAIL_BEFORE: $base redis-prove-windows.ps1 missing silent skip exit 0"
+          }
+          $oldSkip = @'
+          $redis = $null
+          if ($null -eq $redis) {
+            Write-Output "REDIS_SERVER_UNAVAILABLE on this Windows runner (no redis-server.exe / Memurai). Decode and adversarial fake-server proofs still ran. Live SET/GET against a real Redis binary was not executed here."
+            Write-Output "redis windows prove ok (decode+adv; live redis residual)"
+            exit 0
+          }
+          '@
+          & pwsh -NoProfile -Command $oldSkip
+          if ($LASTEXITCODE -ne 0) { throw "FAIL_BEFORE expected old skip path exit 0, got $LASTEXITCODE" }
+          Write-Output "FAIL_BEFORE skip path exit 0 at $base"
+          & pwsh -File tools/redis-prove-windows.ps1 -SkipPathSelfTest
+          if ($LASTEXITCODE -eq 0) { throw "new redis-prove-windows.ps1 must exit non-zero on skip path" }
+          Write-Output "PASS_AFTER skip path exit $LASTEXITCODE (fail closed)"
       - run: pwsh -File tools/redis-prove-windows.ps1
   publish:
     runs-on: ubuntu-latest
