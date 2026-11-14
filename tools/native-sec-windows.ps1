@@ -257,15 +257,26 @@ function Apply-SecWiden([string]$Tree) {
         if (-not $t.Contains('"Sleep"')) { throw "sec widen IAT insert failed in $pe" }
         [IO.File]::WriteAllText($pe, $t)
     }
-    $needle = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
-    $insert = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $sleep = "  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n"
+    $needles = @(
+        "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`"",
+        "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    )
     $hit = 0
     foreach ($more in @((Join-Path $Tree "src/rt-more.vire"), (Join-Path $Tree "data/src/rt-more.vire"))) {
         if (-not (Test-Path -LiteralPath $more)) { continue }
         $t = [IO.File]::ReadAllText($more).Replace("`r`n", "`n")
         if ($t.Contains("iat_sl")) { $hit = $hit + 1; continue }
-        if (-not $t.Contains($needle)) { throw "sec widen insert point missing in $more" }
-        $t = $t.Replace($needle, $insert)
+        $matched = $false
+        foreach ($needle in $needles) {
+            if ($t.Contains($needle)) {
+                $insert = $needle.Replace("  emitCallTo with image, fixes, `"rt_check_path`"`n", "  emitCallTo with image, fixes, `"rt_check_path`"`n" + $sleep)
+                $t = $t.Replace($needle, $insert)
+                $matched = $true
+                break
+            }
+        }
+        if (-not $matched) { throw "sec widen insert point missing in $more" }
         [IO.File]::WriteAllText($more, $t.Replace("`n", "`r`n"))
         $hit = $hit + 1
     }

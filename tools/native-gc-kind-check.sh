@@ -43,7 +43,7 @@ PY
 }
 
 run_guest gc-kind-stress "$ROOT/tests/native/gc-kind-stress.vire" 200000000 "gc-kind-stress ok" 0x200000
-run_guest gc-split-nopressure "$ROOT/tests/native/gc-split-nopressure.vire" 200000000 "split ok" 0x200000
+run_guest gc-split-nopressure "$ROOT/tests/native/gc-split-nopressure.vire" 200000000 "split ok" 0x600000
 
 run_textcat() {
   local keep="$1"
