@@ -174,6 +174,87 @@ define emitMore with image, fixes, labels
   pin with labels, "upd_ret", image
   emitList with image, [195]
 
+  ~ Tagged slots only. Walking every qword treated 33554432 (arena size) as a
+  ~ heap pointer when VirtualAlloc sat below 32MB; gen2 then emitted
+  ~ `mov rcx, 0xd4d328` instead of `mov rcx, 0x2000000`.
+  pin with labels, "rt_gc_mark_tagged", image
+  emitList with image, [72, 131, 248, 2, 15, 132]
+  emitRel with image, fixes, "mtag_go"
+  emitList with image, [72, 131, 248, 4, 15, 132]
+  emitRel with image, fixes, "mtag_go"
+  emitList with image, [72, 131, 248, 5, 15, 132]
+  emitRel with image, fixes, "mtag_go"
+  emitList with image, [72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "mtag_go"
+  emitList with image, [195]
+  pin with labels, "mtag_go", image
+  emitList with image, [72, 137, 208, 233]
+  emitRel with image, fixes, "rt_gc_mark"
+
+  pin with labels, "rt_gc_mark_tagged_new", image
+  emitList with image, [72, 131, 248, 2, 15, 132]
+  emitRel with image, fixes, "mtagn_go"
+  emitList with image, [72, 131, 248, 4, 15, 132]
+  emitRel with image, fixes, "mtagn_go"
+  emitList with image, [72, 131, 248, 5, 15, 132]
+  emitRel with image, fixes, "mtagn_go"
+  emitList with image, [72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "mtagn_go"
+  emitList with image, [195]
+  pin with labels, "mtagn_go", image
+  emitList with image, [72, 137, 208, 233]
+  emitRel with image, fixes, "rt_gc_mark_new"
+
+  pin with labels, "rt_gc_update_slot", image
+  emitList with image, [72, 139, 1, 72, 131, 248, 2, 15, 132]
+  emitRel with image, fixes, "uslot_go"
+  emitList with image, [72, 131, 248, 4, 15, 132]
+  emitRel with image, fixes, "uslot_go"
+  emitList with image, [72, 131, 248, 5, 15, 132]
+  emitRel with image, fixes, "uslot_go"
+  emitList with image, [72, 131, 248, 6, 15, 132]
+  emitRel with image, fixes, "uslot_go"
+  emitList with image, [195]
+  pin with labels, "uslot_go", image
+  emitList with image, [72, 131, 193, 8, 233]
+  emitRel with image, fixes, "rt_gc_update"
+
+  ~ 24-byte list/map/bytes header: only +16 is a buffer pointer.
+  ~ Larger non-leaf payloads are tagged (tag, payload) pairs.
+  pin with labels, "rt_gc_scan_mark_new", image
+  emitList with image, [139, 14, 131, 225, 248, 131, 249, 24, 15, 133]
+  emitRel with image, fixes, "scanm_pairs"
+  emitList with image, [72, 139, 70, 24, 233]
+  emitRel with image, fixes, "rt_gc_mark_new"
+  pin with labels, "scanm_pairs", image
+  emitList with image, [72, 141, 126, 8, 76, 141, 4, 15]
+  pin with labels, "scanm_loop", image
+  emitList with image, [76, 57, 199, 15, 131]
+  emitRel with image, fixes, "scanm_ret"
+  emitList with image, [72, 139, 7, 72, 139, 87, 8, 87, 65, 80]
+  emitCallTo with image, fixes, "rt_gc_mark_tagged_new"
+  emitList with image, [65, 88, 95, 72, 131, 199, 16, 233]
+  emitRel with image, fixes, "scanm_loop"
+  pin with labels, "scanm_ret", image
+  emitList with image, [195]
+
+  pin with labels, "rt_gc_scan_upd", image
+  emitList with image, [139, 14, 131, 225, 248, 131, 249, 24, 15, 133]
+  emitRel with image, fixes, "scanu_pairs"
+  emitList with image, [72, 141, 78, 24, 233]
+  emitRel with image, fixes, "rt_gc_update"
+  pin with labels, "scanu_pairs", image
+  emitList with image, [72, 141, 126, 8, 76, 141, 4, 15]
+  pin with labels, "scanu_loop", image
+  emitList with image, [76, 57, 199, 15, 131]
+  emitRel with image, fixes, "scanu_ret"
+  emitList with image, [72, 137, 249, 87, 65, 80]
+  emitCallTo with image, fixes, "rt_gc_update_slot"
+  emitList with image, [65, 88, 95, 72, 131, 199, 16, 233]
+  emitRel with image, fixes, "scanu_loop"
+  pin with labels, "scanu_ret", image
+  emitList with image, [195]
+
   pin with labels, "rt_gc", image
   emitPro with image
   emitList with image, [72, 137, 93, 248, 72, 137, 117, 240, 72, 137, 125, 232, 72, 141, 5]
@@ -206,9 +287,9 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_stk", image
   emitList with image, [76, 57, 238, 15, 131]
   emitRel with image, fixes, "gc_stk_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitList with image, [72, 139, 6, 72, 139, 86, 8]
+  emitCallTo with image, fixes, "rt_gc_mark_tagged"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_stk"
   pin with labels, "gc_stk_done", image
   emitList with image, [76, 137, 246]
@@ -217,9 +298,9 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_frm", image
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_frm_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitList with image, [72, 139, 6, 72, 139, 86, 8]
+  emitCallTo with image, fixes, "rt_gc_mark_tagged"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_frm"
   pin with labels, "gc_frm_done", image
   emitList with image, [72, 141, 53]
@@ -229,9 +310,9 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_trp", image
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_trp_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitList with image, [72, 139, 6, 72, 139, 86, 8]
+  emitCallTo with image, fixes, "rt_gc_mark_tagged"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_trp"
   pin with labels, "gc_trp_done", image
   emitList with image, [72, 137, 238, 185]
@@ -261,15 +342,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_fix_n"
   emitList with image, [247, 6, 1, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "gc_fix_n"
-  emitList with image, [131, 225, 248, 72, 141, 126, 8, 72, 137, 240, 72, 1, 200]
-  emitList with image, [72, 137, 69, 224]
-  pin with labels, "gc_fix_p", image
-  emitList with image, [72, 59, 125, 224, 15, 131]
-  emitRel with image, fixes, "gc_fix_n"
-  emitList with image, [72, 139, 7]
-  emitCallTo with image, fixes, "rt_gc_mark_new"
-  emitList with image, [72, 131, 199, 8, 233]
-  emitRel with image, fixes, "gc_fix_p"
+  emitCallTo with image, fixes, "rt_gc_scan_mark_new"
   pin with labels, "gc_fix_n", image
   emitList with image, [139, 14, 131, 225, 248, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_fix_w"
@@ -294,8 +367,8 @@ define emitMore with image, fixes, labels
   emitList with image, [76, 57, 238, 15, 131]
   emitRel with image, fixes, "gc_ustk_d"
   emitList with image, [72, 137, 241]
-  emitCallTo with image, fixes, "rt_gc_update"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitCallTo with image, fixes, "rt_gc_update_slot"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_ustk"
   pin with labels, "gc_ustk_d", image
   emitList with image, [76, 137, 246]
@@ -305,8 +378,8 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_ufrm_d"
   emitList with image, [72, 137, 241]
-  emitCallTo with image, fixes, "rt_gc_update"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitCallTo with image, fixes, "rt_gc_update_slot"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_ufrm"
   pin with labels, "gc_ufrm_d", image
   emitList with image, [72, 141, 53]
@@ -317,8 +390,8 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_utrp_d"
   emitList with image, [72, 137, 241]
-  emitCallTo with image, fixes, "rt_gc_update"
-  emitList with image, [72, 131, 198, 8, 233]
+  emitCallTo with image, fixes, "rt_gc_update_slot"
+  emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_utrp"
   pin with labels, "gc_utrp_d", image
   emitList with image, [72, 137, 238, 185]
@@ -347,14 +420,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_uobj_n"
   emitList with image, [247, 6, 1, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "gc_uobj_n"
-  emitList with image, [131, 225, 248, 72, 141, 126, 8, 72, 137, 240, 72, 1, 200, 72, 137, 69, 224]
-  pin with labels, "gc_uobj_w", image
-  emitList with image, [72, 59, 125, 224, 15, 131]
-  emitRel with image, fixes, "gc_uobj_n"
-  emitList with image, [72, 137, 249]
-  emitCallTo with image, fixes, "rt_gc_update"
-  emitList with image, [72, 131, 199, 8, 233]
-  emitRel with image, fixes, "gc_uobj_w"
+  emitCallTo with image, fixes, "rt_gc_scan_upd"
   pin with labels, "gc_uobj_n", image
   emitList with image, [139, 14, 131, 225, 248, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_uobj"
