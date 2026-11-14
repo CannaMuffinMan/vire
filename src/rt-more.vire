@@ -491,7 +491,8 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_fix_d", image
   emitList with image, [133, 219, 15, 133]
   emitRel with image, fixes, "gc_fix"
-  emitList with image, [76, 137, 223, 76, 137, 222]
+  ~ r11 is volatile; mark/scan calls clobber it. 224 holds heap+327680.
+  emitList with image, [76, 139, 93, 224, 76, 137, 223, 76, 137, 222]
   pin with labels, "gc_fwd", image
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_fwd_d"
@@ -549,7 +550,7 @@ define emitMore with image, fixes, labels
   emitList with image, [139, 14, 129, 225, 248, 255, 255, 1, 72, 1, 206, 233]
   emitRel with image, fixes, "gc_uobj"
   pin with labels, "gc_uobj_d", image
-  emitList with image, [76, 137, 222]
+  emitList with image, [76, 139, 93, 224, 76, 137, 222]
   pin with labels, "gc_mv", image
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_mv_d"
