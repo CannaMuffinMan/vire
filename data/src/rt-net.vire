@@ -151,12 +151,8 @@ define parkNet with image, labels
     emitU32 with image, 0
     let li be li + 1
   end
-  pin with labels, "srv_sbuf", image
-  let pi be 0
-  while pi < 65536
-    emitU64 with image, 0
-    let pi be pi + 1
-  end
+  pin with labels, "srv_sbase", image
+  emitU64 with image, 0
   return image
 end
 
