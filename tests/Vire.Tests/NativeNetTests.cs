@@ -29,6 +29,9 @@ public class NativeNetTests
         Assert.DoesNotContain("270500008a00", packedFixes);
         Assert.DoesNotContain("6f0500008a00", packedFixes);
         Assert.Contains("select", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("ioctlsocket", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("rt_sock_nb", server);
+        Assert.Contains("2147796606", server);
         Assert.Contains("srv_doac", server);
         Assert.Contains("243, 171", server);
         Assert.Contains("131, 249, 64", server);
@@ -98,6 +101,7 @@ public class NativeNetTests
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.Contains("select", imports);
+            Assert.Contains("ioctlsocket", imports);
             Assert.Contains("setsockopt", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);
             Assert.DoesNotContain("GetProcAddress", imports);

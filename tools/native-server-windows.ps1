@@ -193,7 +193,8 @@ $afterExe = Compile-Health
 $pe = [IO.File]::ReadAllBytes($afterExe)
 $ascii = [Text.Encoding]::ASCII.GetString($pe)
 if ($ascii -notlike "*select*") { throw "PE missing select" }
-Write-Output "health_pe_iat select SO_RCVTIMEO/SO_SNDTIMEO mux"
+if ($ascii -notlike "*ioctlsocket*") { throw "PE missing ioctlsocket" }
+Write-Output "health_pe_iat select ioctlsocket SO_RCVTIMEO/SO_SNDTIMEO mux"
 
 $after = Start-HealthExe $afterExe
 Write-Output "health_listen 127.0.0.1:$($after.Port)"
