@@ -1,7 +1,7 @@
-# Same-source FAIL_BEFORE / PASS_AFTER for tagged GC walks.
+# Same-source FAIL_BEFORE / PASS_AFTER for conservative-mark / precise-update GC.
 # Compiler is the pinned WS compile-native + rt-ws fixture (a6dde53 bytes).
-# FAIL_BEFORE: that compiler on 103f189e rt-more (qword-as-pointer walks).
-# PASS_AFTER: that compiler on HEAD rt-more (tagged slots). No branch fetch.
+# FAIL_BEFORE: that compiler on 103f189e rt-more (rewrites ambiguous ints).
+# PASS_AFTER: that compiler on HEAD rt-more (pin ambiguous, update tagged only).
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -12,13 +12,23 @@ Write-Output "pass_after_sha $((git rev-parse HEAD).Trim())"
 Write-Output "fixture_rt_ws_sha256 2a0d152692b18feb9458f6220900081827b3344b748639f603011997e322f2e3"
 Write-Output "fixture_compile_native_sha256 d86df081935e3bce9cbfba3ce1fec79c5aa229336be53ade0569a72d960b07bd"
 
-function Get-FileSha256([string]$Path) {
-    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+function Get-NormSha256([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { throw "missing fixture $Path" }
+    $text = [IO.File]::ReadAllText($Path) -replace "`r`n", "`n" -replace "`r", "`n"
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text))
+        return -join ($bytes | ForEach-Object { $_.ToString("x2") })
+    } finally { $sha.Dispose() }
 }
 
 function Assert-Fixture {
-    $ws = Get-FileSha256 (Join-Path $FixDir "rt-ws.vire")
-    $cn = Get-FileSha256 (Join-Path $FixDir "compile-native.vire")
+    $wsPath = Join-Path $FixDir "rt-ws.vire"
+    $cnPath = Join-Path $FixDir "compile-native.vire"
+    $ws = Get-NormSha256 $wsPath
+    $cn = Get-NormSha256 $cnPath
+    Write-Output "fixture_rt_ws_got $ws"
+    Write-Output "fixture_compile_native_got $cn"
     if ($ws -ne "2a0d152692b18feb9458f6220900081827b3344b748639f603011997e322f2e3") { throw "fixture rt-ws.vire sha $ws" }
     if ($cn -ne "d86df081935e3bce9cbfba3ce1fec79c5aa229336be53ade0569a72d960b07bd") { throw "fixture compile-native.vire sha $cn" }
 }
@@ -103,7 +113,9 @@ function Invoke-FixtureSelfhost([string]$Dir) {
 
 Assert-Fixture
 $more = Get-Content -Raw (Join-Path $Root "src/rt-more.vire")
-if ($more -notmatch 'rt_gc_mark_tagged') { throw "HEAD rt-more missing tagged GC walk" }
+if ($more -notmatch 'rt_gc_mark_pin') { throw "HEAD rt-more missing pin mark" }
+if ($more -notmatch 'rt_gc_fwd_one') { throw "HEAD rt-more missing pin-aware compact" }
+if ($more -notmatch 'emitKindHdr') { throw "HEAD rt-more missing header kind" }
 if ($more -notmatch 'try_zero_loop') { throw "HEAD rt-more missing payload zero" }
 
 git cat-file -t $FailSha 2>$null | Out-Null

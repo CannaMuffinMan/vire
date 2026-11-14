@@ -13,7 +13,9 @@ ws=$(sha256sum "$FIX/rt-ws.vire" | awk '{print $1}')
 cn=$(sha256sum "$FIX/compile-native.vire" | awk '{print $1}')
 test "$ws" = "2a0d152692b18feb9458f6220900081827b3344b748639f603011997e322f2e3"
 test "$cn" = "d86df081935e3bce9cbfba3ce1fec79c5aa229336be53ade0569a72d960b07bd"
-grep -q 'rt_gc_mark_tagged' src/rt-more.vire
+grep -q 'rt_gc_mark_pin' src/rt-more.vire
+grep -q 'rt_gc_fwd_one' src/rt-more.vire
+grep -q 'emitKindHdr' src/rt-more.vire
 grep -q 'try_zero_loop' src/rt-more.vire
 cmp -s src/rt-more.vire data/src/rt-more.vire
 cmp -s compile-native.vire data/compile-native.vire
