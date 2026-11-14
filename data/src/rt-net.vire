@@ -149,7 +149,11 @@ define parkNet with image, labels
     let fi be fi + 1
   end
   pin with labels, "srv_peek", image
-  emitU64 with image, 0
+  let pi be 0
+  while pi < 2048
+    emitU64 with image, 0
+    let pi be pi + 1
+  end
   return image
 end
 
