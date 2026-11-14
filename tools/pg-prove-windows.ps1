@@ -137,16 +137,16 @@ function Stop-PgWait {
         Write-Output "pg_ctl_stop_exception $($_.Exception.Message)"
     }
     $pidFile = Join-Path $PgData "postmaster.pid"
-    $pid = $null
+    $postmasterPid = $null
     if (Test-Path -LiteralPath $pidFile) {
-        try { $pid = [int]((Get-Content -LiteralPath $pidFile -TotalCount 1).Trim()) } catch { }
+        try { $postmasterPid = [int]((Get-Content -LiteralPath $pidFile -TotalCount 1).Trim()) } catch { }
     }
-    if ($pid) {
-        $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+    if ($postmasterPid) {
+        $proc = Get-Process -Id $postmasterPid -ErrorAction SilentlyContinue
         if ($proc) {
-            Write-Output "pg_wait_pid $pid"
+            Write-Output "pg_wait_pid $postmasterPid"
             if (-not $proc.WaitForExit(15000)) {
-                try { Stop-Process -Id $pid -Force -ErrorAction Stop } catch { }
+                try { Stop-Process -Id $postmasterPid -Force -ErrorAction Stop } catch { }
                 $proc.WaitForExit(5000) | Out-Null
             }
         }
