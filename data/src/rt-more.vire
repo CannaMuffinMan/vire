@@ -1725,9 +1725,12 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 77, 248, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  ~ Path bytes are not heap pointers. Leaving them unmarked rewrote gen2 PE.
+  emitLeaf with image
   emitList with image, [72, 137, 69, 240, 185]
   emitU32 with image, 1024
   emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
   emitList with image, [72, 137, 69, 232, 72, 141, 13]
   emitRel with image, fixes, "dot_path"
   emitList with image, [186]
@@ -1903,7 +1906,7 @@ define emitMore with image, fixes, labels
   pin with labels, "rt_write", image
   emitPro with image
   emitPop2 with image
-  emitList with image, [76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 2, 15, 133]
+  emitList with image, [72, 199, 69, 216, 255, 255, 255, 255, 72, 199, 69, 184, 0, 0, 0, 0, 76, 137, 69, 248, 76, 137, 77, 240, 72, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "write_pathbad"
   emitList with image, [72, 137, 85, 232, 72, 137, 209]
   emitCallTo with image, fixes, "rt_check_path"
@@ -1916,25 +1919,61 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 85, 224, 72, 139, 2, 72, 129, 248]
   emitU32 with image, 2000000
   emitJcc with image, fixes, 135, "write_big"
+  ~ Dest nlink must stay 1 (hardlink refuse) before the tmp+MoveFileEx replace.
   emitList with image, [72, 139, 77, 232, 72, 141, 73, 8, 186]
   emitU32 with image, 1073741824
   emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40]
   emitU32 with image, 2097280
   emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
   emitRel with image, fixes, "iat_cf"
-  emitList with image, [72, 131, 248, 255, 15, 133]
-  emitRel with image, fixes, "write_have"
-  emitList with image, [72, 139, 77, 232, 72, 141, 73, 8, 186]
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "write_tmp_build"
+  emitList with image, [72, 137, 69, 216, 72, 137, 193]
+  emitCallTo with image, fixes, "rt_bind_path"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [185]
+  emitU32 with image, 64
+  emitList with image, [232]
+  emitRel with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 192, 72, 139, 77, 216, 72, 137, 194, 255, 21]
+  emitRel with image, fixes, "iat_fi"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [72, 139, 85, 192, 247, 2]
+  emitU32 with image, 1024
+  emitList with image, [15, 133]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [131, 122, 40, 1, 15, 135]
+  emitRel with image, fixes, "write_close_path"
+  emitList with image, [72, 139, 77, 216, 255, 21]
+  emitRel with image, fixes, "iat_ch"
+  pin with labels, "write_tmp_build", image
+  ~ Atomic replace: write dest+".tmp" then MoveFileExA(REPLACE_EXISTING).
+  emitList with image, [72, 139, 77, 232, 72, 139, 1, 72, 131, 192, 5, 15, 130]
+  emitRel with image, fixes, "write_fail"
+  emitList with image, [72, 137, 193]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitList with image, [72, 137, 69, 184, 72, 137, 193, 72, 139, 85, 232, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 184, 72, 139, 77, 232, 72, 139, 9, 198, 4, 8, 46, 198, 68, 8, 1, 116, 198, 68, 8, 2, 109, 198, 68, 8, 3, 112, 198, 68, 8, 4, 0]
+  emitList with image, [72, 139, 77, 184, 186]
   emitU32 with image, 1073741824
   emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 1, 0, 0, 0, 199, 68, 36, 40]
   emitU32 with image, 2097280
   emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
   emitRel with image, fixes, "iat_cf"
+  emitList with image, [72, 131, 248, 255, 15, 133]
+  emitRel with image, fixes, "write_tmp_ok"
+  emitList with image, [72, 139, 77, 184, 186]
+  emitU32 with image, 1073741824
+  emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40]
+  emitU32 with image, 2097280
+  emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
+  emitRel with image, fixes, "iat_cf"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "write_fail"
-  emitList with image, [233]
-  emitRel with image, fixes, "write_ready"
-  pin with labels, "write_have", image
+  pin with labels, "write_tmp_ok", image
   emitList with image, [72, 137, 69, 216, 72, 137, 193]
   emitCallTo with image, fixes, "rt_bind_path"
   emitList with image, [133, 192, 15, 132]
@@ -1957,13 +1996,6 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "iat_sp"
   emitList with image, [72, 139, 77, 216, 255, 21]
   emitRel with image, fixes, "iat_se"
-  emitList with image, [72, 139, 69, 216, 233]
-  emitRel with image, fixes, "write_ready"
-  pin with labels, "write_ready", image
-  emitList with image, [72, 137, 69, 216, 72, 137, 193]
-  emitCallTo with image, fixes, "rt_bind_path"
-  emitList with image, [133, 192, 15, 132]
-  emitRel with image, fixes, "write_close_path"
   pin with labels, "write_bytes", image
   emitList with image, [72, 139, 77, 216, 76, 139, 85, 224, 73, 141, 82, 8, 77, 139, 2, 76, 141, 13]
   emitRel with image, fixes, "written"
@@ -1971,6 +2003,12 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "iat_wf"
   emitList with image, [72, 139, 77, 216, 255, 21]
   emitRel with image, fixes, "iat_ch"
+  emitList with image, [72, 139, 77, 184, 72, 139, 85, 232, 72, 141, 82, 8, 65, 184]
+  emitU32 with image, 1
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "iat_mv"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "write_fail"
   emitList with image, [76, 139, 69, 248, 76, 139, 77, 240, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16]
   emitEpi with image
   pin with labels, "write_pathbad", image
@@ -1982,8 +2020,11 @@ define emitMore with image, fixes, labels
   pin with labels, "write_fail", image
   emitFail with image, fixes, "msg_write"
   pin with labels, "write_close_path", image
-  emitList with image, [72, 139, 77, 216, 255, 21]
+  emitList with image, [72, 139, 77, 216, 72, 131, 249, 255, 15, 132]
+  emitRel with image, fixes, "write_close_skip"
+  emitList with image, [255, 21]
   emitRel with image, fixes, "iat_ch"
+  pin with labels, "write_close_skip", image
   emitFail with image, fixes, "msg_path"
 
   pin with labels, "rt_args", image

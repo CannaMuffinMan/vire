@@ -26,6 +26,10 @@ public class NativePathSafetyTests
         Assert.Contains("SetFilePointerEx", pe);
         Assert.Contains("SetEndOfFile", pe);
         Assert.Contains("GetFinalPathNameByHandleA", pe);
+        Assert.Contains("VirtualQuery", pe);
+        Assert.Contains("MoveFileExA", pe);
+        Assert.Contains("iat_vq", pe);
+        Assert.Contains("iat_mv", pe);
         Assert.Contains("iat_ga", pe);
         Assert.Contains("iat_fi", pe);
         Assert.Contains("iat_ue", pe);
@@ -64,6 +68,7 @@ public class NativePathSafetyTests
         Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", more);
         Assert.Contains("iat_sp", more);
         Assert.Contains("iat_se", more);
+        Assert.Contains("iat_mv", more);
         Assert.Contains("rt_memcpy", more);
         Assert.Contains("iat_fi", rt);
         Assert.Contains("iat_fi", more);
@@ -93,8 +98,20 @@ public class NativePathSafetyTests
         int crash = rt.IndexOf("pin with labels, \"crash_filter\"", StringComparison.Ordinal);
         int after = rt.IndexOf("pin with labels, \"rt_push_int\"", crash);
         string slice = rt.Substring(crash, after - crash);
-        Assert.DoesNotContain("iat_cf", slice);
+        Assert.Contains("iat_cf", slice);
+        Assert.Contains("crash_abs", slice);
+        Assert.Contains("crash_ready", slice);
+        Assert.DoesNotContain("rt_bind_path", slice);
+        Assert.DoesNotContain("crash_log_path", slice);
+        Assert.Contains("72, 199, 68, 36, 32, 1, 0, 0, 0", slice);
+        Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", slice);
         Assert.Contains("crash_rip_msg", slice);
+        int prep = rt.IndexOf("pin with labels, \"rt_crash_prepare\"", StringComparison.Ordinal);
+        string prepSlice = rt.Substring(prep, crash - prep);
+        Assert.Contains("rt_bind_path", prepSlice);
+        Assert.Contains("iat_ga", prepSlice);
+        Assert.Contains("1024", prepSlice);
+        Assert.Contains("data_dir_path", prepSlice);
     }
 
     [Fact]

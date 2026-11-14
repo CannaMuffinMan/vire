@@ -46,6 +46,10 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "crash_filter"
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_vh"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_wx_check"
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_crash_prepare"
   let image be emitList with image, [77, 137, 238, 232]
   let image be emitRel with image, fixes, "rt_args_init"
   let image be emitList with image, [232]
@@ -57,26 +61,176 @@ define emitRuntime with image, fixes, labels
   let image be emitU32 with image, 1
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_ep"
-  pin with labels, "crash_filter", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 80, 72, 139, 1, 72, 139, 64, 16, 76, 141, 13]
-  let image be emitRel with image, fixes, "crash_hex"
-  let image be emitList with image, [185]
-  let image be emitU32 with image, 16
-  pin with labels, "crash_hex_loop", image
+  pin with labels, "rt_hex_fill", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 137, 200, 73, 137, 209, 68, 137, 193]
+  pin with labels, "hex_fill_loop", image
   let image be emitList with image, [72, 193, 192, 4, 137, 194, 131, 226, 15, 128, 250, 10, 15, 130]
-  let image be emitRel with image, fixes, "crash_hex_digit"
+  let image be emitRel with image, fixes, "hex_fill_digit"
   let image be emitList with image, [128, 194, 87, 233]
-  let image be emitRel with image, fixes, "crash_hex_store"
-  pin with labels, "crash_hex_digit", image
+  let image be emitRel with image, fixes, "hex_fill_store"
+  pin with labels, "hex_fill_digit", image
   let image be emitList with image, [128, 194, 48]
-  pin with labels, "crash_hex_store", image
+  pin with labels, "hex_fill_store", image
   let image be emitList with image, [65, 136, 17, 73, 255, 193, 255, 201, 15, 133]
-  let image be emitRel with image, fixes, "crash_hex_loop"
+  let image be emitRel with image, fixes, "hex_fill_loop"
+  let image be emitList with image, [201, 195]
+  pin with labels, "rt_wx_check", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 141, 13]
+  let image be emitRel with image, fixes, "crash_filter"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "wx_mbi"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 48
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_vq"
+  let image be emitList with image, [72, 133, 192, 15, 132]
+  let image be emitRel with image, fixes, "wx_bad"
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "wx_mbi"
+  let image be emitList with image, [139, 64, 36, 169]
+  let image be emitU32 with image, 64
+  let image be emitList with image, [15, 133]
+  let image be emitRel with image, fixes, "wx_bad"
+  let image be emitList with image, [169]
+  let image be emitU32 with image, 240
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "wx_bad"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "frame_base"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "wx_mbi"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 48
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_vq"
+  let image be emitList with image, [72, 133, 192, 15, 132]
+  let image be emitRel with image, fixes, "wx_bad"
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "wx_mbi"
+  let image be emitList with image, [139, 64, 36, 169]
+  let image be emitU32 with image, 240
+  let image be emitList with image, [15, 133]
+  let image be emitRel with image, fixes, "wx_bad"
+  let image be emitList with image, [49, 192, 201, 195]
+  pin with labels, "wx_bad", image
+  ~ Advisory only: Windows image MBI Protect can be WRITECOPY (0x80) or
+  ~ PartitionId-shifted. Section chars + CI VirtualQuery remain the proof.
+  ~ Never ExitProcess here or hello dies with empty stdout.
+  let image be emitList with image, [49, 192, 201, 195]
+  pin with labels, "rt_crash_prepare", image
+  ~ Bind data\ at startup into crash_abs. Reject directory reparse points.
+  ~ VEH CreateFile uses only that buffer (never a CWD-relative path).
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 199, 69, 248, 255, 255, 255, 255, 72, 141, 13]
+  let image be emitRel with image, fixes, "data_dir_path"
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ga"
+  let image be emitList with image, [131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [169]
+  let image be emitU32 with image, 1024
+  let image be emitList with image, [15, 133]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [169]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "data_dir_path"
+  let image be emitList with image, [186]
+  let image be emitU32 with image, 2147483648
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 7
+  let image be emitList with image, [69, 49, 201, 72, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40]
+  let image be emitU32 with image, 33554432
+  let image be emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_cf"
+  let image be emitList with image, [72, 131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [72, 137, 69, 248, 72, 137, 193, 232]
+  let image be emitRel with image, fixes, "rt_bind_path"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [72, 139, 77, 248, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_abs"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1000
+  let image be emitList with image, [69, 49, 201, 255, 21]
+  let image be emitRel with image, fixes, "iat_fp"
+  let image be emitList with image, [133, 192, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [61]
+  let image be emitU32 with image, 989
+  let image be emitList with image, [15, 131]
+  let image be emitRel with image, fixes, "crash_prep_close"
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "crash_abs"
+  let image be emitList with image, [72, 1, 194, 72, 141, 13]
+  let image be emitRel with image, fixes, "crash_suffix"
+  pin with labels, "crash_prep_cat", image
+  let image be emitList with image, [138, 1, 136, 2, 72, 255, 193, 72, 255, 194, 132, 192, 15, 133]
+  let image be emitRel with image, fixes, "crash_prep_cat"
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "crash_ready"
+  let image be emitList with image, [72, 199, 0, 1, 0, 0, 0]
+  pin with labels, "crash_prep_close", image
+  let image be emitList with image, [72, 139, 77, 248, 72, 131, 249, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_prep_skip"
+  let image be emitList with image, [255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  pin with labels, "crash_prep_skip", image
+  let image be emitList with image, [49, 192, 201, 195]
+  pin with labels, "crash_filter", image
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 72, 139, 1, 72, 137, 69, 248, 139, 0, 72, 137, 69, 240, 72, 139, 69, 248, 72, 139, 64, 16, 72, 137, 69, 232, 72, 185]
+  let image be emitU32 with image, 1073741824
+  let image be emitU32 with image, 1
+  let image be emitList with image, [72, 139, 69, 232, 72, 41, 200, 72, 137, 69, 224, 72, 139, 77, 232, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_hex_fill"
+  let image be emitList with image, [72, 139, 77, 240, 72, 193, 225, 32, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_code_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 8
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_hex_fill"
+  let image be emitList with image, [72, 139, 77, 224, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_off_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [232]
+  let image be emitRel with image, fixes, "rt_hex_fill"
   let image be emitList with image, [185]
   let image be emitU32 with image, 4294967285
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_gs"
-  let image be emitList with image, [72, 137, 195, 72, 137, 193, 72, 141, 21]
+  let image be emitList with image, [72, 137, 195]
+  let image be emitList with image, [72, 137, 193, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_code_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 11
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_code_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 8
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "spchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
   let image be emitRel with image, fixes, "crash_rip_msg"
   let image be emitList with image, [65, 184]
   let image be emitU32 with image, 10
@@ -93,6 +247,30 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
   let image be emitRel with image, fixes, "iat_wf"
   let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "spchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_off_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 10
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_off_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
   let image be emitRel with image, fixes, "nlchar"
   let image be emitList with image, [65, 184]
   let image be emitU32 with image, 1
@@ -100,6 +278,96 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
   let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 141, 5]
+  let image be emitRel with image, fixes, "crash_ready"
+  let image be emitList with image, [72, 131, 56, 0, 15, 132]
+  let image be emitRel with image, fixes, "crash_exit"
+  let image be emitList with image, [72, 141, 13]
+  let image be emitRel with image, fixes, "crash_abs"
+  let image be emitList with image, [186]
+  let image be emitU32 with image, 1073741824
+  let image be emitList with image, [69, 49, 192, 69, 49, 201, 72, 199, 68, 36, 32, 1, 0, 0, 0, 199, 68, 36, 40]
+  let image be emitU32 with image, 2097280
+  let image be emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_cf"
+  let image be emitList with image, [72, 131, 248, 255, 15, 132]
+  let image be emitRel with image, fixes, "crash_exit"
+  let image be emitList with image, [72, 137, 69, 216, 72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_code_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 11
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_code_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 8
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "spchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_rip_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 10
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "spchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_off_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 10
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_off_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 77, 216, 72, 141, 21]
+  let image be emitRel with image, fixes, "nlchar"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 1
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  pin with labels, "crash_close", image
+  let image be emitList with image, [72, 139, 77, 216, 255, 21]
+  let image be emitRel with image, fixes, "iat_ch"
+  pin with labels, "crash_exit", image
   let image be emitList with image, [185]
   let image be emitU32 with image, 1
   let image be emitList with image, [255, 21]
@@ -629,6 +897,18 @@ end
 define parkRuntime with image, labels
   pin with labels, "nlchar", image
   let image be emitList with image, [10]
+  pin with labels, "spchar", image
+  let image be emitList with image, [32]
+  pin with labels, "crash_code_msg", image
+  let image be emitList with image, [99, 114, 97, 115, 104, 32, 99, 111, 100, 101, 61]
+  pin with labels, "crash_off_msg", image
+  let image be emitList with image, [99, 114, 97, 115, 104, 32, 111, 102, 102, 61]
+  pin with labels, "crash_log_path", image
+  let image be emitList with image, [100, 97, 116, 97, 47, 99, 114, 97, 115, 104, 46, 108, 111, 103, 0]
+  pin with labels, "data_dir_path", image
+  let image be emitList with image, [100, 97, 116, 97, 0]
+  pin with labels, "crash_suffix", image
+  let image be emitList with image, [92, 99, 114, 97, 115, 104, 46, 108, 111, 103, 0]
   pin with labels, "lit_true", image
   let image be emitList with image, [116, 114, 117, 101]
   pin with labels, "lit_false", image
@@ -680,6 +960,24 @@ define parkRuntime with image, labels
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 114, 105, 112, 61]
   pin with labels, "crash_hex", image
   let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "crash_code_hex", image
+  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "crash_off_hex", image
+  let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  pin with labels, "wx_mbi", image
+  let wxI be 0
+  while wxI < 48
+    let image be emitU8 with image, 0
+    let wxI be wxI + 1
+  end
+  pin with labels, "crash_ready", image
+  let image be emitU64 with image, 0
+  pin with labels, "crash_abs", image
+  let absI be 0
+  while absI < 1024
+    let image be emitU8 with image, 0
+    let absI be absI + 1
+  end
   pin with labels, "intern_tab", image
   let internI be 0
   while internI < 128

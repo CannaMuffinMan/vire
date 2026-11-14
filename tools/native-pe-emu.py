@@ -77,6 +77,8 @@ class Emu:
             "SetFilePointerEx",
             "SetEndOfFile",
             "GetFinalPathNameByHandleA",
+            "VirtualQuery",
+            "MoveFileExA",
         ]
         self.stubs = {}
         for i, name in enumerate(names):
@@ -135,11 +137,13 @@ class Emu:
             "SetFilePointerEx",
             "SetEndOfFile",
             "GetFinalPathNameByHandleA",
+            "VirtualQuery",
+            "MoveFileExA",
         ]
         iat = runs[-1]
-        if len(iat) < len(names):
-            raise SystemExit("IAT has %d slots, need %d" % (len(iat), len(names)))
-        iat = iat[: len(names)]
+        n = min(len(iat), len(names))
+        iat = iat[:n]
+        names = names[:n]
         for slot, name in zip(iat, names):
             addr = STUB_BASE + names.index(name) * 16
             self.mu.mem_write(base + slot, struct.pack("<Q", addr))
@@ -282,6 +286,36 @@ class Emu:
 
     def api_GetFinalPathNameByHandleA(self):
         self.wr(UC_X86_REG_RAX, 0)
+
+    def api_VirtualQuery(self):
+        addr = self.rd(UC_X86_REG_RCX)
+        buf = self.rd(UC_X86_REG_RDX)
+        prot = 0x20
+        rva = addr - self.image
+        if rva >= 0 and self.sections:
+            data_va = max(s[0] for s in self.sections)
+            if rva >= data_va:
+                prot = 0x04
+        mbi = bytearray(48)
+        struct.pack_into("<Q", mbi, 0, addr)
+        struct.pack_into("<Q", mbi, 8, self.image)
+        struct.pack_into("<I", mbi, 16, prot)
+        struct.pack_into("<Q", mbi, 24, 0x1000)
+        struct.pack_into("<I", mbi, 32, 0x1000)
+        struct.pack_into("<I", mbi, 36, prot)
+        struct.pack_into("<I", mbi, 40, 0x1000000)
+        if buf:
+            self.mu.mem_write(buf, bytes(mbi))
+        self.wr(UC_X86_REG_RAX, 48)
+
+    def api_MoveFileExA(self):
+        src = self.cstr(self.rd(UC_X86_REG_RCX)).decode("latin1")
+        dst = self.cstr(self.rd(UC_X86_REG_RDX)).decode("latin1")
+        try:
+            os.replace(os.path.join(self.cwd, src), os.path.join(self.cwd, dst))
+            self.wr(UC_X86_REG_RAX, 1)
+        except OSError:
+            self.wr(UC_X86_REG_RAX, 0)
 
     def run(self, count=200000000):
         start = self.image + self.entry
