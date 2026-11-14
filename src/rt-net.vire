@@ -1,4 +1,6 @@
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
+
+use "src/rt-server.vire"
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
 ~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe
 ~ returns unsafe (client answers 400 and closes) for NUL, bare LF, lone CR,
@@ -57,7 +59,7 @@ define applyPackedFixes with fixes, base, raw, names
 end
 
 define netNames
-  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdrs", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "rt_save_frame", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "hu_fold", "hu_frame"]
+  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdrs", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "rt_save_frame", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "hu_fold", "hu_frame", "rt_alloc_leaf"]
 end
 
 define emitNetRuntime with image, fixes, labels, has_route, need_net
@@ -67,7 +69,8 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return (emitTcpClient with image, fixes, labels)
+    let image be emitTcpClient with image, fixes, labels
+    return emitServerRuntime with image, fixes, labels
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -117,6 +120,43 @@ define parkNet with image, labels
   emitU64 with image, 0
   pin with labels, "tcp_socks", image
   emitU64 with image, 0
+  pin with labels, "server_cap", image
+  emitU64 with image, 0
+  pin with labels, "srv_listen", image
+  emitU64 with image, 0
+  pin with labels, "srv_tv", image
+  emitU64 with image, 0
+  pin with labels, "srv_born", image
+  let bi be 0
+  while bi < 64
+    emitU32 with image, 0
+    let bi be bi + 1
+  end
+  pin with labels, "srv_slots", image
+  let si be 0
+  while si < 64
+    emitU64 with image, 0
+    let si be si + 1
+  end
+  pin with labels, "srv_fdset", image
+  emitU64 with image, 0
+  let fi be 0
+  while fi < 65
+    emitU64 with image, 0
+    let fi be fi + 1
+  end
+  pin with labels, "srv_slen", image
+  let li be 0
+  while li < 64
+    emitU32 with image, 0
+    let li be li + 1
+  end
+  pin with labels, "srv_sbuf", image
+  let pi be 0
+  while pi < 2048
+    emitU64 with image, 0
+    let pi be pi + 1
+  end
   return image
 end
 
@@ -171,6 +211,8 @@ define emitTcpClient with image, fixes, labels
   let image be emitIat with image, fixes, "iat_cn"
   emitList with image, [133, 192, 15, 133]
   emitRel with image, fixes, "conn_close"
+  emitList with image, [72, 139, 77, 240]
+  emitCallTo with image, fixes, "rt_sock_timeouts"
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "tcp_socks"
   emitList with image, [72, 139, 85, 240, 72, 137, 17, 186]

@@ -87,6 +87,7 @@ Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-server.vire") (Join-Path $Src "rt-server.vire") -Force
 foreach ($blob in @(
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt"
@@ -101,6 +102,7 @@ $pairs = @(
     @("src/rt.vire", "data/src/rt.vire"),
     @("src/rt-more.vire", "data/src/rt-more.vire"),
     @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/rt-server.vire", "data/src/rt-server.vire"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
     @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),
@@ -173,4 +175,16 @@ $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
 if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
-Write-Output "native selfhost handoff ok"
+$run = 1
+while ($run -lt 3) {
+    $run = $run + 1
+    if (Test-Path $gen2Hex) { Remove-Item -Force $gen2Hex }
+    $r = Invoke-Bounded -Name ("gen2_native_" + $run) -TimeoutSec 2400 -FilePath $g1 -ArgumentList @(
+        "data/compile-native.vire", "data/gen2.hex"
+    )
+    if ($r.StdOut -notmatch "compiled") { throw "gen2_native_$run missing compiled" }
+    $h2b = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
+    Write-Output ("gen2_sha256_run" + $run + " " + $h2b)
+    if ($h1 -ne $h2b) { throw "gen1/gen2 SHA-256 differ on run $run" }
+}
+Write-Output "native selfhost handoff ok gen1=gen2 runs=3"

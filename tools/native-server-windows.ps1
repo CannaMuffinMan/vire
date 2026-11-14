@@ -1,0 +1,310 @@
+# FAIL_BEFORE / PASS_AFTER: native PE listen mux, timeouts, 20k requests, hang isolation.
+$ErrorActionPreference = "Stop"
+$Root = Split-Path -Parent $PSScriptRoot
+Set-Location -LiteralPath $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
+$env:VIRE_BUDGET = "5000000"
+$env:VIRE_HEADLESS = "1"
+$Data = Join-Path $Root "data"
+$VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
+if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
+$BaseSha = "7fd41b8814442a4348478c409c7720ad2b925dd9"
+$AfterSha = (git rev-parse HEAD).Trim()
+Write-Output "fail_before_sha $BaseSha"
+Write-Output "pass_after_sha $AfterSha"
+if ($env:GITHUB_SHA) { Write-Output "pass_after_github_sha $($env:GITHUB_SHA)" }
+
+function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
+    $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
+    if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { throw "bad hex $HexPath" }
+    $bytes = New-Object byte[] ($hex.Length / 2)
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+        $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)
+    }
+    [System.IO.File]::WriteAllBytes($ExePath, $bytes)
+}
+
+function Invoke-Vire {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+    $leaf = [IO.Path]::GetFileName($Args[0])
+    $savedBudget = $env:VIRE_BUDGET
+    if ($leaf -eq "compile-native.vire" -or $leaf -eq "compiler.vire") {
+        $Args = @("--compiler") + $Args
+        Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    }
+    try {
+        $out = & dotnet exec $VireDll @Args
+        $code = $LASTEXITCODE
+        if ($null -ne $out) { $out | Write-Host }
+        if ($null -eq $code) { return 0 }
+        return [int]$code
+    } finally {
+        if ($savedBudget) { $env:VIRE_BUDGET = $savedBudget }
+    }
+}
+
+function Wait-Listen([string]$OutFile, [string]$ErrFile, $Proc, [int]$Sec) {
+    $deadline = (Get-Date).AddSeconds($Sec)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path $OutFile) {
+            $txt = Get-Content -Raw $OutFile
+            if ($txt -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
+        }
+        if ($Proc.HasExited) {
+            $so = if (Test-Path $OutFile) { Get-Content -Raw $OutFile } else { "" }
+            $se = if (Test-Path $ErrFile) { Get-Content -Raw $ErrFile } else { "" }
+            throw "server exited $($Proc.ExitCode) out=$so err=$se"
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    throw "did not print listening port"
+}
+
+function Start-HealthExe([string]$Exe) {
+    $outFile = Join-Path $Data "native-server.out.txt"
+    $errFile = Join-Path $Data "native-server.err.txt"
+    if (Test-Path $outFile) { Remove-Item -Force $outFile }
+    if (Test-Path $errFile) { Remove-Item -Force $errFile }
+    $p = Start-Process -FilePath $Exe -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $port = Wait-Listen $outFile $errFile $p 30
+    return @{ Proc = $p; Port = $port; Out = $outFile; Err = $errFile }
+}
+
+function New-V4Client([int]$WaitMs) {
+    $c = New-Object System.Net.Sockets.TcpClient([Net.Sockets.AddressFamily]::InterNetwork)
+    $c.ReceiveTimeout = $WaitMs
+    $c.SendTimeout = $WaitMs
+    return $c
+}
+
+function Get-Health([int]$Port, [int]$WaitMs) {
+    $c = New-V4Client $WaitMs
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        $c.Connect([Net.IPAddress]::Loopback, $Port)
+        $s = $c.GetStream()
+        $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`n`r`n")
+        $s.Write($req, 0, $req.Length)
+        $buf = New-Object byte[] 4096
+        $n = 0
+        try { $n = $s.Read($buf, 0, $buf.Length) } catch { $n = 0 }
+        $sw.Stop()
+        $txt = if ($n -gt 0) { [Text.Encoding]::ASCII.GetString($buf, 0, $n) } else { "" }
+        return @{ Ok = ($txt -match "HTTP/1.1 200 "); Ms = $sw.ElapsedMilliseconds; Text = $txt }
+    } finally {
+        try { $c.Close() } catch { }
+    }
+}
+
+function Get-BrowserHealth([int]$Port, [int]$WaitMs) {
+    $c = New-V4Client $WaitMs
+    try {
+        $c.Connect([Net.IPAddress]::Loopback, $Port)
+        $s = $c.GetStream()
+        $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: 127.0.0.1`r`nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)`r`nAccept: text/html,application/json`r`nContent-Type: text/plain`r`nContent-Length: 0`r`n`r`n")
+        $s.Write($req, 0, $req.Length)
+        $buf = New-Object byte[] 4096
+        $n = 0
+        try { $n = $s.Read($buf, 0, $buf.Length) } catch { $n = 0 }
+        $txt = if ($n -gt 0) { [Text.Encoding]::ASCII.GetString($buf, 0, $n) } else { "" }
+        return @{ Ok = ($txt -match "HTTP/1.1 200 "); Text = $txt }
+    } finally {
+        try { $c.Close() } catch { }
+    }
+}
+
+function Compile-Health {
+    Copy-Item (Join-Path $Root "guest-health.vire") (Join-Path $Data "guest-health.vire") -Force
+    $hex = Join-Path $Data "guest-health-server.hex"
+    $exe = Join-Path $Data "guest-health-server.exe"
+    if (Test-Path $hex) { Remove-Item -Force $hex }
+    $code = Invoke-Vire compile-native.vire data/guest-health.vire data/guest-health-server.hex
+    if ($code -ne 0) { throw "compile health exit $code" }
+    Convert-HexToExe $hex $exe
+    return $exe
+}
+
+git cat-file -e "$BaseSha^{commit}" 2>$null
+if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin native-compiler }
+
+$Snap = Join-Path $Data "native-server-snap"
+New-Item -ItemType Directory -Force -Path $Snap | Out-Null
+$SnapFiles = @(
+    "src/pe.vire", "src/rt-net.vire", "src/rt-server.vire", "compile-native.vire",
+    "src/rt-net-blob.txt", "src/rt-net-pins.txt", "src/rt-net-fixes.txt",
+    "src/rt-net-json-blob.txt", "src/rt-net-json-pins.txt", "src/rt-net-json-fixes.txt",
+    "data/src/pe.vire", "data/src/rt-net.vire", "data/src/rt-server.vire", "data/compile-native.vire",
+    "data/src/rt-net-blob.txt", "data/src/rt-net-pins.txt", "data/src/rt-net-fixes.txt",
+    "data/src/rt-net-json-blob.txt", "data/src/rt-net-json-pins.txt", "data/src/rt-net-json-fixes.txt"
+)
+foreach ($rel in $SnapFiles) {
+    $src = Join-Path $Root $rel
+    if (Test-Path $src) {
+        $dest = Join-Path $Snap $rel
+        New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+        Copy-Item $src $dest -Force
+    }
+}
+
+Write-Output "phase fail-before $BaseSha"
+git checkout $BaseSha -- src/pe.vire src/rt-net.vire compile-native.vire data/src/pe.vire data/src/rt-net.vire data/compile-native.vire src/rt-net-blob.txt src/rt-net-pins.txt src/rt-net-fixes.txt src/rt-net-json-blob.txt src/rt-net-json-pins.txt src/rt-net-json-fixes.txt data/src/rt-net-blob.txt data/src/rt-net-pins.txt data/src/rt-net-fixes.txt data/src/rt-net-json-blob.txt data/src/rt-net-json-pins.txt data/src/rt-net-json-fixes.txt
+if (Test-Path (Join-Path $Root "src/rt-server.vire")) { Remove-Item (Join-Path $Root "src/rt-server.vire") -Force }
+if (Test-Path (Join-Path $Root "data/src/rt-server.vire")) { Remove-Item (Join-Path $Root "data/src/rt-server.vire") -Force }
+$beforeExe = Compile-Health
+$before = Start-HealthExe $beforeExe
+$idle = New-V4Client 2000
+$idle.Connect([Net.IPAddress]::Loopback, $before.Port)
+$idle.Close()
+Start-Sleep -Milliseconds 400
+$idleHealth = @{ Ok = $false; Text = "" }
+if (-not $before.Proc.HasExited) { $idleHealth = Get-Health $before.Port 1500 }
+Write-Output ("fail_before_idle_close exited={0} health_ok={1}" -f $before.Proc.HasExited, $idleHealth.Ok)
+if (-not $before.Proc.HasExited -and $idleHealth.Ok) {
+    $br = Get-BrowserHealth $before.Port 2000
+    Write-Output ("fail_before_browser_headers ok={0}" -f $br.Ok)
+    if (-not $br.Ok) { Write-Output "FAIL_BEFORE at $BaseSha extra headers returned empty or non-200" }
+}
+if ($before.Proc.HasExited -or -not $idleHealth.Ok) {
+    Write-Output "FAIL_BEFORE at $BaseSha connect-then-close crashed or silenced the PE"
+}
+if (-not $before.Proc.HasExited) { try { $before.Proc.Kill() } catch { } }
+
+$before = Start-HealthExe $beforeExe
+$hang = New-V4Client 800
+$hang.Connect([Net.IPAddress]::Loopback, $before.Port)
+$hs = $hang.GetStream()
+$partial = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`n")
+$hs.Write($partial, 0, $partial.Length)
+Start-Sleep -Milliseconds 200
+$blocked = Get-Health $before.Port 800
+Write-Output ("fail_before_overlap_ms {0} ok={1}" -f $blocked.Ms, $blocked.Ok)
+try { $hang.Close() } catch { }
+try { $before.Proc.Kill() } catch { }
+if ($blocked.Ok) { throw "FAIL_BEFORE expected hang to stall overlapping /health" }
+Write-Output "FAIL_BEFORE at $BaseSha overlapping /health stalled while a client hung"
+
+foreach ($rel in $SnapFiles) {
+    $src = Join-Path $Snap $rel
+    if (Test-Path $src) { Copy-Item $src (Join-Path $Root $rel) -Force }
+}
+
+Write-Output "phase pass-after $AfterSha"
+$afterExe = Compile-Health
+$pe = [IO.File]::ReadAllBytes($afterExe)
+$ascii = [Text.Encoding]::ASCII.GetString($pe)
+if ($ascii -notlike "*select*") { throw "PE missing select" }
+if ($ascii -notlike "*ioctlsocket*") { throw "PE missing ioctlsocket" }
+Write-Output "health_pe_iat select ioctlsocket SO_RCVTIMEO/SO_SNDTIMEO mux"
+
+$after = Start-HealthExe $afterExe
+Write-Output "health_listen 127.0.0.1:$($after.Port)"
+if ($after.Proc.HasExited) {
+    $so = if (Test-Path $after.Out) { Get-Content -Raw $after.Out } else { "" }
+    $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
+    throw "server exited $($after.Proc.ExitCode) after listen out=$so err=$se"
+}
+$warm = Get-Health $after.Port 2000
+if (-not $warm.Ok) {
+    $so = if (Test-Path $after.Out) { Get-Content -Raw $after.Out } else { "" }
+    $se = if (Test-Path $after.Err) { Get-Content -Raw $after.Err } else { "" }
+    throw "warmup /health failed out=$so err=$se text=$($warm.Text)"
+}
+Write-Output "PASS_AFTER warmup /health 200"
+$advA = New-V4Client 15000
+$advA.Connect([Net.IPAddress]::Loopback, $after.Port)
+$advA.GetStream().Write([Text.Encoding]::ASCII.GetBytes("X"), 0, 1)
+Start-Sleep -Milliseconds 150
+$advB = Get-Health $after.Port 2000
+Write-Output ("adversary_B_ms {0} ok={1} A_connected={2}" -f $advB.Ms, $advB.Ok, $advA.Connected)
+if (-not $advB.Ok) { throw "client B /health failed while A held one byte" }
+if ($advB.Ms -gt 1500) { throw "client B too slow $($advB.Ms)ms while A held" }
+if (-not $advA.Connected) { throw "client A dropped while serving B" }
+$until = (Get-Date).AddSeconds(8)
+while ((Get-Date) -lt $until -and $advA.Connected) { Start-Sleep -Milliseconds 200 }
+if ($after.Proc.HasExited) { throw "server died when A timed out" }
+$advC = Get-Health $after.Port 2000
+if (-not $advC.Ok) { throw "server silent after A timeout" }
+try { $advA.Close() } catch { }
+Write-Output "PASS_AFTER adversary A 1-byte B /health 200 while A connected; A timeout leaves server up"
+$idle2 = New-V4Client 2000
+$idle2.Connect([Net.IPAddress]::Loopback, $after.Port)
+$idle2.Close()
+Start-Sleep -Milliseconds 200
+if ($after.Proc.HasExited) { throw "connect-then-close killed the server" }
+$afterIdle = Get-Health $after.Port 2000
+if (-not $afterIdle.Ok) { throw "server silent after connect-then-close" }
+Write-Output "PASS_AFTER connect-then-close still serves"
+
+$hold = New-V4Client 5000
+$hold.Connect([Net.IPAddress]::Loopback, $after.Port)
+Start-Sleep -Milliseconds 150
+$afterHold = Get-Health $after.Port 2000
+if (-not $afterHold.Ok) { throw "idle connect stalled others" }
+Write-Output "PASS_AFTER idle connect does not stall /health"
+try { $hold.Close() } catch { }
+
+$hang2 = New-V4Client 5000
+$hang2.Connect([Net.IPAddress]::Loopback, $after.Port)
+$hs2 = $hang2.GetStream()
+$hs2.Write($partial, 0, $partial.Length)
+Start-Sleep -Milliseconds 100
+$live = Get-Health $after.Port 2000
+Write-Output ("pass_after_overlap_ms {0} ok={1}" -f $live.Ms, $live.Ok)
+if (-not $live.Ok) { throw "hanging client stalled /health" }
+if ($live.Ms -gt 1500) { throw "overlapping /health too slow $($live.Ms)ms" }
+Write-Output "PASS_AFTER hang isolation /health while slowloris held"
+
+$brOk = Get-BrowserHealth $after.Port 2000
+if (-not $brOk.Ok) { throw "browser headers got empty or non-200: $($brOk.Text)" }
+Write-Output "PASS_AFTER full browser header set /health 200"
+
+$ok = 0
+$loadSw = [Diagnostics.Stopwatch]::StartNew()
+$jobs = @()
+1..8 | ForEach-Object {
+    $jobs += Start-Job -ScriptBlock {
+        param($Port)
+        $n = 0
+        for ($i = 0; $i -lt 2500; $i++) {
+            $c = New-Object System.Net.Sockets.TcpClient([Net.Sockets.AddressFamily]::InterNetwork)
+            $c.ReceiveTimeout = 5000
+            $c.Connect([Net.IPAddress]::Loopback, $Port)
+            $s = $c.GetStream()
+            $req = [Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`n`r`n")
+            $s.Write($req, 0, $req.Length)
+            $buf = New-Object byte[] 2048
+            $got = $s.Read($buf, 0, $buf.Length)
+            $c.Close()
+            $t = [Text.Encoding]::ASCII.GetString($buf, 0, $got)
+            if ($t -match "HTTP/1.1 200 ") { $n++ }
+        }
+        return $n
+    } -ArgumentList $after.Port
+}
+$ok = ($jobs | Wait-Job | Receive-Job | Measure-Object -Sum).Sum
+Remove-Job $jobs -Force
+$loadSw.Stop()
+Write-Output ("load_health_ok {0} ms {1}" -f $ok, $loadSw.ElapsedMilliseconds)
+if ($ok -lt 20000) { throw "expected 20000 health ok, got $ok" }
+if ($after.Proc.HasExited) { throw "server died during load exit $($after.Proc.ExitCode)" }
+Write-Output "PASS_AFTER 20000 /health requests at $AfterSha"
+
+try { $hang2.Close() } catch { }
+$disc = New-V4Client 2000
+$disc.Connect([Net.IPAddress]::Loopback, $after.Port)
+$ds = $disc.GetStream()
+$ds.Write($partial, 0, $partial.Length)
+$disc.Close()
+Start-Sleep -Milliseconds 200
+$afterDrop = Get-Health $after.Port 2000
+if (-not $afterDrop.Ok) { throw "disconnect mid-request killed the server" }
+Write-Output "PASS_AFTER client disconnect mid-request server still serves"
+if ($after.Proc.HasExited) { throw "server exited after disconnect" }
+
+try { $after.Proc.Kill() } catch { }
+$gen1 = Join-Path $Data "gen1.exe"
+if (Test-Path $gen1) {
+    Write-Output "native-selfhost gen1 present; gen1=gen2 owned by native-selfhost-windows"
+}
+Write-Output "native server windows ok"
+exit 0
