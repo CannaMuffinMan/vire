@@ -194,7 +194,6 @@ $pe = [IO.File]::ReadAllBytes($afterExe)
 $ascii = [Text.Encoding]::ASCII.GetString($pe)
 if ($ascii -notlike "*select*") { throw "PE missing select" }
 if ($ascii -notlike "*ioctlsocket*") { throw "PE missing ioctlsocket" }
-if ($ascii -notlike "*WSAGetLastError*") { throw "PE missing WSAGetLastError" }
 Write-Output "health_pe_iat select ioctlsocket SO_RCVTIMEO/SO_SNDTIMEO mux"
 
 $after = Start-HealthExe $afterExe

@@ -176,21 +176,6 @@ define emitListenMux with image, fixes, labels
   emitRel with image, fixes, "srv_slots"
   emitList with image, [72, 199, 4, 202, 0, 0, 0, 0, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_zero"
-  ~ Per-slot 8192-byte windows: VirtualAlloc so the compiler PE is not 512KB of zeros.
-  emitList with image, [49, 201, 186]
-  emitU32 with image, 524288
-  emitList with image, [65, 184]
-  emitU32 with image, 12288
-  emitList with image, [65, 185]
-  emitU32 with image, 4
-  let image be emitIat with image, fixes, "iat_va"
-  emitList with image, [72, 133, 192, 15, 132]
-  emitRel with image, fixes, "srv_fail"
-  emitList with image, [72, 141, 13]
-  emitRel with image, fixes, "srv_sbase"
-  emitList with image, [72, 137, 1, 72, 137, 193, 186]
-  emitU32 with image, 524288
-  emitCallTo with image, fixes, "rt_bzero"
 
   pin with labels, "srv_mux", image
   emitCallTo with image, fixes, "rt_note_wait"
@@ -236,15 +221,8 @@ define emitListenMux with image, fixes, labels
   emitRel with image, fixes, "srv_listen"
   emitList with image, [49, 210, 69, 49, 192]
   let image be emitIat with image, fixes, "iat_ac"
-  emitList with image, [72, 131, 248, 255, 15, 133]
-  emitRel with image, fixes, "srv_accok"
-  let image be emitIat with image, fixes, "iat_wge"
-  emitList with image, [61]
-  emitU32 with image, 10035
-  emitList with image, [15, 132]
+  emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "srv_clients"
-  emitJmpTo with image, fixes, "srv_clients"
-  pin with labels, "srv_accok", image
   emitList with image, [72, 137, 69, 184]
   emitList with image, [72, 139, 77, 184]
   emitCallTo with image, fixes, "rt_sock_timeouts"
@@ -294,54 +272,41 @@ define emitListenMux with image, fixes, labels
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "srv_cn"
   pin with labels, "srv_peekgo", image
-  ~ Consume into the per-slot 8192-byte window. Overflow is 431.
-  emitList with image, [139, 69, 172, 72, 139, 21]
-  emitRel with image, fixes, "srv_sbase"
-  emitList with image, [72, 105, 192]
-  emitU32 with image, 8192
-  emitList with image, [72, 1, 194, 72, 141, 13]
+  ~ Consume into per-slot 256-byte windows (same 16KB park as srv_peek). Overflow 431.
+  emitList with image, [139, 69, 172, 72, 141, 21]
+  emitRel with image, fixes, "srv_sbuf"
+  emitList with image, [72, 193, 224, 8, 72, 1, 194, 72, 141, 13]
   emitRel with image, fixes, "srv_slen"
   emitList with image, [139, 69, 172, 139, 4, 129, 72, 1, 194, 185]
-  emitU32 with image, 8192
+  emitU32 with image, 256
   emitList with image, [41, 193, 15, 132]
   emitRel with image, fixes, "srv_431"
   emitList with image, [65, 137, 200, 69, 49, 201, 72, 139, 77, 176]
   let image be emitIat with image, fixes, "iat_rv"
-  emitList with image, [72, 131, 248, 255, 15, 133]
-  emitRel with image, fixes, "srv_rvok"
-  let image be emitIat with image, fixes, "iat_wge"
-  emitList with image, [61]
-  emitU32 with image, 10035
-  emitList with image, [15, 132]
+  emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "srv_cn"
-  emitJmpTo with image, fixes, "srv_drop"
-  pin with labels, "srv_rvok", image
   emitList with image, [72, 133, 192, 15, 132]
   emitRel with image, fixes, "srv_drop"
   emitList with image, [139, 77, 172, 72, 141, 21]
   emitRel with image, fixes, "srv_slen"
-  emitList with image, [1, 4, 138, 139, 20, 138, 72, 139, 13]
-  emitRel with image, fixes, "srv_sbase"
-  emitList with image, [139, 69, 172, 72, 105, 192]
-  emitU32 with image, 8192
-  emitList with image, [72, 1, 193]
+  emitList with image, [1, 4, 138, 139, 20, 138, 72, 141, 13]
+  emitRel with image, fixes, "srv_sbuf"
+  emitList with image, [139, 69, 172, 72, 193, 224, 8, 72, 1, 193]
   emitCallTo with image, fixes, "rt_net_hdrend"
   emitList with image, [72, 131, 248, 255, 15, 133]
   emitRel with image, fixes, "srv_have"
   emitList with image, [139, 77, 172, 72, 141, 21]
   emitRel with image, fixes, "srv_slen"
   emitList with image, [129, 60, 138]
-  emitU32 with image, 8192
+  emitU32 with image, 256
   emitList with image, [15, 131]
   emitRel with image, fixes, "srv_431"
   emitJmpTo with image, fixes, "srv_cn"
   pin with labels, "srv_have", image
   emitCallTo with image, fixes, "rt_server_reset"
-  emitList with image, [72, 139, 77, 176, 72, 139, 21]
-  emitRel with image, fixes, "srv_sbase"
-  emitList with image, [139, 69, 172, 72, 105, 192]
-  emitU32 with image, 8192
-  emitList with image, [72, 1, 194, 76, 141, 5]
+  emitList with image, [72, 139, 77, 176, 72, 141, 21]
+  emitRel with image, fixes, "srv_sbuf"
+  emitList with image, [139, 69, 172, 72, 193, 224, 8, 72, 1, 194, 76, 141, 5]
   emitRel with image, fixes, "srv_slen"
   emitList with image, [139, 69, 172, 69, 139, 4, 128]
   emitCallTo with image, fixes, "rt_net_fromslot"
