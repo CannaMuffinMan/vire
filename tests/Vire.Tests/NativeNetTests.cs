@@ -31,12 +31,17 @@ public class NativeNetTests
         Assert.Contains("select", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("ioctlsocket", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("rt_sock_nb", server);
+        Assert.Contains("rt_sock_block", server);
+        Assert.Contains("rt_net_fromslot", server);
         Assert.Contains("2147796606", server);
+        Assert.Contains("WSAGetLastError", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("10035", server);
+        Assert.Contains("srv_sbuf", net);
         Assert.Contains("srv_doac", server);
-        Assert.Contains("243, 171", server);
         Assert.Contains("131, 249, 64", server);
-        Assert.Contains("while fi < 64", net);
-        Assert.Contains("while pi < 2048", net);
+        Assert.Contains("131, 56, 65", server);
+        Assert.Contains("while fi < 65", net);
+        Assert.Contains("while pi < 65536", net);
         Assert.Contains("rt_json", net);
         Assert.Contains("rt_parse", net);
         Assert.Contains("hu_fold", net);
@@ -102,6 +107,7 @@ public class NativeNetTests
             Assert.Contains("GetTickCount", imports);
             Assert.Contains("select", imports);
             Assert.Contains("ioctlsocket", imports);
+            Assert.Contains("WSAGetLastError", imports);
             Assert.Contains("setsockopt", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);
             Assert.DoesNotContain("GetProcAddress", imports);

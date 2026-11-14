@@ -1,5 +1,6 @@
 ~ Native PE health clone of FCG GET /health and GET /api/health.
-~ capability: server (listen). Per-request step/while budget reset; 5M cap unchanged.
+~ capability: server (listen). Per-request rt_server_reset notes a wait so
+~ the native 2e6 while spin cap does not kill the mux. 5M interpreter cap unchanged.
 ~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
 ~ to this token). Both paths are unauthenticated in the Node inventory.
 
@@ -16,6 +17,6 @@ define route with method, path, body
 end
 
 define main
-  ~ explicit server capability: listen resets the 5M step unit per request
+  ~ listen: server capability; rt_server_reset / rt_note_wait per turn
   listen with 18080
 end

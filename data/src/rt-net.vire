@@ -120,15 +120,12 @@ define parkNet with image, labels
   emitU64 with image, 0
   pin with labels, "tcp_socks", image
   emitU64 with image, 0
-  pin with labels, "step_cell", image
-  emitU64 with image, 0
   pin with labels, "server_cap", image
   emitU64 with image, 0
   pin with labels, "srv_listen", image
   emitU64 with image, 0
   pin with labels, "srv_tv", image
   emitU64 with image, 0
-  parkMsg with image, labels, "msg_step", "program ran too long and was stopped"
   pin with labels, "srv_born", image
   let bi be 0
   while bi < 64
@@ -144,13 +141,19 @@ define parkNet with image, labels
   pin with labels, "srv_fdset", image
   emitU64 with image, 0
   let fi be 0
-  while fi < 64
+  while fi < 65
     emitU64 with image, 0
     let fi be fi + 1
   end
-  pin with labels, "srv_peek", image
+  pin with labels, "srv_slen", image
+  let li be 0
+  while li < 64
+    emitU32 with image, 0
+    let li be li + 1
+  end
+  pin with labels, "srv_sbuf", image
   let pi be 0
-  while pi < 2048
+  while pi < 65536
     emitU64 with image, 0
     let pi be pi + 1
   end
