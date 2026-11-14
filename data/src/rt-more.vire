@@ -207,6 +207,7 @@ define emitMore with image, fixes, labels
   emitU32 with image, 3
   emitList with image, [187]
   emitU32 with image, 1
+  pin with labels, "markpn_ret", image
   emitList with image, [195]
   pin with labels, "markpn_or", image
   emitList with image, [131, 72, 4, 2, 195]
