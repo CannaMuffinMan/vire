@@ -294,8 +294,7 @@ class Emu:
 
 def main():
     emu = Emu(sys.argv[1])
-    count = int(sys.argv[2]) if len(sys.argv) > 2 else 200000000
-    emu.run(count=count)
+    emu.run()
     bump = emu.rd(UC_X86_REG_R12)
     used = (bump - HEAP_BASE) if emu.heap else 0
     sys.stdout.buffer.write(b"EXIT " + str(emu.exit_code).encode() + b"\n")

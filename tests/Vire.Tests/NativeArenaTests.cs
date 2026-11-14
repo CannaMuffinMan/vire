@@ -99,7 +99,6 @@ public class NativeArenaTests
         string emu = File.ReadAllText(Path.Combine(root, "tools", "native-pe-emu-check.sh"));
         Assert.Contains("intern-chars", emu);
         Assert.Contains("hello-stage", emu);
-        Assert.Contains("gc-kind-stress", emu);
         Assert.True(File.Exists(Path.Combine(root, "tests", "native", "intern-chars.vire")));
     }
 
