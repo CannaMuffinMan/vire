@@ -189,31 +189,49 @@ $StaleSha = "8f07846"
 Write-Output "phase fail-before replace/hex/take_arg $StaleSha"
 Restore-RuntimeFrom $StaleSha
 $repSrc = Join-Path $Work "gc-replace-nearfull-before.vire"
-Set-Keep (Join-Path $Root "tests/native/gc-replace-nearfull.vire") $repSrc 470
+Set-Keep (Join-Path $Root "tests/native/gc-replace-nearfull.vire") $repSrc 490
 $beforeRep = Compile-Run "replace-before" $repSrc
 Write-Output "before_replace exit=$($beforeRep.Exit) out=$($beforeRep.Out)"
 if ($beforeRep.Out.Contains("crash ") -or $beforeRep.Out.Contains("replace corrupt")) {
-    Write-Output "FAIL_BEFORE replace crash at $StaleSha keep=470"
+    Write-Output "FAIL_BEFORE replace crash at $StaleSha keep=490"
 } else {
     throw "fail-before replace at $StaleSha expected crash, got exit=$($beforeRep.Exit) out=$($beforeRep.Out)"
 }
 $hexSrc = Join-Path $Work "gc-hex-nearfull-before.vire"
-Set-Keep (Join-Path $Root "tests/native/gc-hex-nearfull.vire") $hexSrc 470
+Set-Keep (Join-Path $Root "tests/native/gc-hex-nearfull.vire") $hexSrc 490
 $beforeHex = Compile-Run "hex-before" $hexSrc
 Write-Output "before_hex exit=$($beforeHex.Exit) out=$($beforeHex.Out)"
 if ($beforeHex.Out.Contains("crash ") -or $beforeHex.Out.Contains("hex corrupt")) {
-    Write-Output "FAIL_BEFORE hex crash at $StaleSha keep=470"
+    Write-Output "FAIL_BEFORE hex crash at $StaleSha keep=490"
 } else {
     throw "fail-before hex at $StaleSha expected crash, got exit=$($beforeHex.Exit) out=$($beforeHex.Out)"
 }
 $argSrc = Join-Path $Work "gc-takearg-nearfull-before.vire"
-Set-Keep (Join-Path $Root "tests/native/gc-takearg-nearfull.vire") $argSrc 470
+Set-Keep (Join-Path $Root "tests/native/gc-takearg-nearfull.vire") $argSrc 490
 $beforeArg = Compile-Run "takearg-before" $argSrc
 Write-Output "before_take_arg exit=$($beforeArg.Exit) out=$($beforeArg.Out)"
 if ($beforeArg.Out.Contains("crash ") -or $beforeArg.Out.Contains("take_arg corrupt")) {
-    Write-Output "FAIL_BEFORE take_arg crash at $StaleSha keep=470"
+    Write-Output "FAIL_BEFORE take_arg crash at $StaleSha keep=490"
 } else {
     throw "fail-before take_arg at $StaleSha expected crash, got exit=$($beforeArg.Exit) out=$($beforeArg.Out)"
+}
+$ttSrc = Join-Path $Work "gc-list-totext-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-list-totext-nearfull.vire") $ttSrc 470
+$beforeTt = Compile-Run "list-totext-before" $ttSrc
+Write-Output "before_list_totext exit=$($beforeTt.Exit) out=$($beforeTt.Out)"
+if ($beforeTt.Out.Contains("crash ") -or $beforeTt.Out.Contains("tt corrupt")) {
+    Write-Output "FAIL_BEFORE list_totext crash at $StaleSha keep=470"
+} else {
+    throw "fail-before list_totext at $StaleSha expected crash, got exit=$($beforeTt.Exit) out=$($beforeTt.Out)"
+}
+$mtSrc = Join-Path $Work "gc-map-totext-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-map-totext-nearfull.vire") $mtSrc 470
+$beforeMt = Compile-Run "map-totext-before" $mtSrc
+Write-Output "before_map_totext exit=$($beforeMt.Exit) out=$($beforeMt.Out)"
+if ($beforeMt.Out.Contains("crash ") -or $beforeMt.Out.Contains("mt corrupt")) {
+    Write-Output "FAIL_BEFORE map_totext crash at $StaleSha keep=470"
+} else {
+    throw "fail-before map_totext at $StaleSha expected crash, got exit=$($beforeMt.Exit) out=$($beforeMt.Out)"
 }
 
 Write-Output "phase pass-after replace/hex/take_arg $AfterSha"
@@ -244,7 +262,10 @@ $extraKinds = @(
     @{ Name = "to_text"; Src = "tests/native/gc-to_text-nearfull.vire"; Kind = "to_text" },
     @{ Name = "add"; Src = "tests/native/gc-add-nearfull.vire"; Kind = "add" },
     @{ Name = "keys"; Src = "tests/native/gc-keys-nearfull.vire"; Kind = "keys" },
-    @{ Name = "extend"; Src = "tests/native/gc-extend-nearfull.vire"; Kind = "extend" }
+    @{ Name = "extend"; Src = "tests/native/gc-extend-nearfull.vire"; Kind = "extend" },
+    @{ Name = "tt"; Src = "tests/native/gc-list-totext-nearfull.vire"; Kind = "tt" },
+    @{ Name = "mt"; Src = "tests/native/gc-map-totext-nearfull.vire"; Kind = "mt" },
+    @{ Name = "tah"; Src = "tests/native/gc-tah-nearfull.vire"; Kind = "tah" }
 )
 foreach ($k in $extraKinds) {
     foreach ($keep in @(300, 470, 478, 482, 490)) {

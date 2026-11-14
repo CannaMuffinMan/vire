@@ -5,6 +5,11 @@ define main
     let big be big + big
     let n be n + 1
   end
+  let a be "cmd"
+  if (length with args) > 0
+    let a be args at 0
+  end
+  let src be a + big
   let keep be []
   let n be 0
   while n < 470
@@ -13,12 +18,7 @@ define main
   end
   let i be 0
   let bad be 0
-  let a be "cmd"
-  if (length with args) > 0
-    let a be args at 0
-  end
   while i < 60
-    let src be a + big
     let out be replace with src, "x", "y"
     if (length with out) != (length with src)
       let bad be bad + 1

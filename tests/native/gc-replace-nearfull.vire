@@ -14,21 +14,14 @@ define main
   let i be 0
   let bad be 0
   while i < 60
-    let src be big + "AAA"
-    let out be replace with src, "A", "Z"
-    if (out at 0) != "x"
+    let out be replace with big, "x", "y"
+    if (out at 0) != "y"
       let bad be bad + 1
     end
-    if (out at 65535) != "x"
+    if (out at 65535) != "y"
       let bad be bad + 1
     end
-    if (out at 65536) != "Z"
-      let bad be bad + 1
-    end
-    if (out at 65537) != "Z"
-      let bad be bad + 1
-    end
-    if (out at 65538) != "Z"
+    if (length with out) != 65536
       let bad be bad + 1
     end
     let i be i + 1

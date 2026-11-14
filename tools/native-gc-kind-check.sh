@@ -144,4 +144,9 @@ for keep in 300 470 478 482 490; do
   run_nearfull keys "$ROOT/tests/native/gc-keys-nearfull.vire" "$keep"
   run_nearfull extend "$ROOT/tests/native/gc-extend-nearfull.vire" "$keep"
 done
+for keep in 300 470; do
+  run_nearfull tt "$ROOT/tests/native/gc-list-totext-nearfull.vire" "$keep"
+  run_nearfull mt "$ROOT/tests/native/gc-map-totext-nearfull.vire" "$keep"
+  run_nearfull tah "$ROOT/tests/native/gc-tah-nearfull.vire" "$keep"
+done
 echo "native gc-kind check ok"

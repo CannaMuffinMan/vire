@@ -841,16 +841,20 @@ define emitMore with image, fixes, labels
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232]
   pin with labels, "to_list_item", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 82, 16, 72, 139, 69, 216, 72, 193, 224, 4, 72, 1, 194, 72, 139, 2, 76, 139, 82, 8, 76, 137, 210]
   emitParkSlot with image, fixes, 240
   emitParkSlot with image, fixes, 232
-  emitList with image, [72, 139, 85, 240, 72, 139, 82, 16, 72, 139, 69, 216, 72, 193, 224, 4, 72, 1, 194, 72, 139, 2, 76, 139, 82, 8, 76, 137, 210]
   emitCallTo with image, fixes, "rt_to_text"
   emitList with image, [72, 137, 85, 208]
   emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitParkSlot with image, fixes, 240
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 208
   emitList with image, [72, 139, 77, 232, 72, 139, 85, 208]
   emitCallTo with image, fixes, "rt_buf_text"
+  emitUnparkSlot with image, 208
+  emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232, 72, 255, 69, 216, 233]
   emitRel with image, fixes, "to_list_loop"
@@ -890,31 +894,35 @@ define emitMore with image, fixes, labels
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232]
   pin with labels, "to_map_key", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 69, 216, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 82, 8, 72, 139, 77, 232]
   emitParkSlot with image, fixes, 240
   emitParkSlot with image, fixes, 232
-  emitList with image, [72, 139, 85, 240, 72, 139, 69, 216, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 82, 8, 72, 139, 77, 232]
   emitCallTo with image, fixes, "rt_buf_text"
   emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232]
   emitParkSlot with image, fixes, 240
   emitParkSlot with image, fixes, 232
-  emitList with image, [72, 137, 193, 72, 141, 21]
+  emitList with image, [72, 139, 77, 232, 72, 141, 21]
   emitRel with image, fixes, "lp_colon"
   emitCallTo with image, fixes, "rt_buf_text"
   emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232]
+  emitList with image, [72, 139, 85, 240, 72, 139, 69, 216, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 66, 16, 76, 139, 82, 24, 76, 137, 210]
   emitParkSlot with image, fixes, 240
   emitParkSlot with image, fixes, 232
-  emitList with image, [72, 139, 85, 240, 72, 139, 69, 216, 72, 193, 224, 5, 72, 139, 82, 16, 72, 1, 194, 72, 139, 66, 16, 76, 139, 82, 24, 76, 137, 210]
   emitCallTo with image, fixes, "rt_to_text"
   emitList with image, [72, 137, 85, 208]
   emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitParkSlot with image, fixes, 240
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 208
   emitList with image, [72, 139, 77, 232, 72, 139, 85, 208]
   emitCallTo with image, fixes, "rt_buf_text"
+  emitUnparkSlot with image, 208
+  emitUnparkSlot with image, 232
   emitUnparkSlot with image, 240
   emitList with image, [72, 137, 69, 232, 72, 255, 69, 216, 233]
   emitRel with image, fixes, "to_map_loop"
