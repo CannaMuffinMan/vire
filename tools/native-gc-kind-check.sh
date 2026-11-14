@@ -43,6 +43,7 @@ PY
 }
 
 run_guest gc-kind-stress "$ROOT/tests/native/gc-kind-stress.vire" 200000000 "gc-kind-stress ok" 0x200000
+run_guest gc-split-nopressure "$ROOT/tests/native/gc-split-nopressure.vire" 200000000 "split ok" 0x200000
 
 run_textcat() {
   local keep="$1"
@@ -137,5 +138,10 @@ for keep in 300 470 478 482 490; do
   run_nearfull replace "$ROOT/tests/native/gc-replace-nearfull.vire" "$keep"
   run_nearfull hex "$ROOT/tests/native/gc-hex-nearfull.vire" "$keep"
   run_nearfull take_arg "$ROOT/tests/native/gc-takearg-nearfull.vire" "$keep"
+  run_nearfull split "$ROOT/tests/native/gc-split-nearfull.vire" "$keep"
+  run_nearfull to_text "$ROOT/tests/native/gc-to_text-nearfull.vire" "$keep"
+  run_nearfull add "$ROOT/tests/native/gc-add-nearfull.vire" "$keep"
+  run_nearfull keys "$ROOT/tests/native/gc-keys-nearfull.vire" "$keep"
+  run_nearfull extend "$ROOT/tests/native/gc-extend-nearfull.vire" "$keep"
 done
 echo "native gc-kind check ok"

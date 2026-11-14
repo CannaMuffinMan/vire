@@ -1,0 +1,34 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let obj be { "k": "v" }
+  let out be json with obj
+  let bad be 0
+  if (out at 0) != "{"
+    let bad be bad + 1
+  end
+  if (find with out, "k") < 0
+    let bad be bad + 1
+  end
+  if (find with out, "v") < 0
+    let bad be bad + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "json ok"
+  end
+  if bad != 0
+    say "json corrupt"
+    say bad
+  end
+end

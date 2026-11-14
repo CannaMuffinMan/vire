@@ -257,8 +257,8 @@ function Apply-SecWiden([string]$Tree) {
         if (-not $t.Contains('"Sleep"')) { throw "sec widen IAT insert failed in $pe" }
         [IO.File]::WriteAllText($pe, $t)
     }
-    $needle = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
-    $insert = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $needle = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $insert = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
     $hit = 0
     foreach ($more in @((Join-Path $Tree "src/rt-more.vire"), (Join-Path $Tree "data/src/rt-more.vire"))) {
         if (-not (Test-Path -LiteralPath $more)) { continue }

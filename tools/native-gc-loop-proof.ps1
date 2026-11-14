@@ -233,6 +233,29 @@ foreach ($k in $kinds) {
     }
     Write-Output ("PASS_AFTER " + $k.Name + " keep 300..490 fail-closed at $AfterSha")
 }
+$splitNp = Compile-Run "split-nopressure" (Join-Path $Root "tests/native/gc-split-nopressure.vire")
+Write-Output "after_split_nopressure exit=$($splitNp.Exit) out=$($splitNp.Out)"
+if ($splitNp.Exit -ne 0 -or "$($splitNp.Out)" -notmatch "split ok") {
+    throw "pass-after split nopressure expected split ok, got exit=$($splitNp.Exit) out=$($splitNp.Out)"
+}
+Write-Output "PASS_AFTER split nopressure at $AfterSha"
+$extraKinds = @(
+    @{ Name = "split"; Src = "tests/native/gc-split-nearfull.vire"; Kind = "split" },
+    @{ Name = "to_text"; Src = "tests/native/gc-to_text-nearfull.vire"; Kind = "to_text" },
+    @{ Name = "add"; Src = "tests/native/gc-add-nearfull.vire"; Kind = "add" },
+    @{ Name = "keys"; Src = "tests/native/gc-keys-nearfull.vire"; Kind = "keys" },
+    @{ Name = "extend"; Src = "tests/native/gc-extend-nearfull.vire"; Kind = "extend" }
+)
+foreach ($k in $extraKinds) {
+    foreach ($keep in @(300, 470, 478, 482, 490)) {
+        $src = Join-Path $Work ("gc-" + $k.Name + "-$keep.vire")
+        Set-Keep (Join-Path $Root $k.Src) $src $keep
+        $got = Compile-Run ($k.Name + "-$keep") $src
+        Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
+        Assert-NearfullClosed $got $k.Kind $keep "pass-after"
+    }
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300,470,478,482,490 fail-closed at $AfterSha")
+}
 
 Write-Output "native gc/loop proof ok"
 Write-Output "note: a truly infinite accept loop is not shown in CI; ticks/rt_note_wait reset the 2e6 spin counter per turn, then this job shuts down after 2.5e6 counted trips."

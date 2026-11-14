@@ -1,0 +1,38 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let dest be [1]
+  let extra be [2, 3]
+  extend with dest, extra
+  let bad be 0
+  if (length with dest) != 3
+    let bad be bad + 1
+  end
+  if (dest at 0) != 1
+    let bad be bad + 1
+  end
+  if (dest at 1) != 2
+    let bad be bad + 1
+  end
+  if (dest at 2) != 3
+    let bad be bad + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "extend ok"
+  end
+  if bad != 0
+    say "extend corrupt"
+    say bad
+  end
+end
