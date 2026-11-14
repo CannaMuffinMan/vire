@@ -124,6 +124,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
+      - name: FAIL_BEFORE silent skip exited 0; skip now fails closed
+        run: pwsh -File tools/redis-skip-path-guard.ps1
       - run: pwsh -File tools/redis-prove-windows.ps1
   publish:
     runs-on: ubuntu-latest
