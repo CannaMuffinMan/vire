@@ -147,6 +147,8 @@ done
 for keep in 300 470; do
   run_nearfull tt "$ROOT/tests/native/gc-list-totext-nearfull.vire" "$keep"
   run_nearfull mt "$ROOT/tests/native/gc-map-totext-nearfull.vire" "$keep"
-  run_nearfull tah "$ROOT/tests/native/gc-tah-nearfull.vire" "$keep"
 done
+# Full 40-loop tah at keep 470/482 is the Windows PE proof (native speed, bump
+# ~0x1fff270). Unicorn of 40 loops times out; sample keep 300 only.
+run_nearfull tah "$ROOT/tests/native/gc-tah-nearfull.vire" 300
 echo "native gc-kind check ok"

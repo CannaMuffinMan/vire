@@ -19,7 +19,7 @@ define main
   end
   let i be 0
   let bad be 0
-  while i < 3
+  while i < 40
     let xs be []
     let j be 0
     while j < 300

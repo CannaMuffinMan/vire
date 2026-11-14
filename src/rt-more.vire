@@ -610,8 +610,20 @@ define emitMore with image, fixes, labels
   ~ memmove: compact can copy an object left by less than its size.
   ~ dest < src: forward. dest > src: copy from the end. Count is r8, not rax
   ~ (rax is often a leftover heap pointer; adding it unmapped-read in emu).
+  ~ Dest must stay inside the 32MB arena; a stale dest+count writes unmapped
+  ~ (tah keep 470/482 at bump ~0x1fff270). Src may be interned in the PE.
   emitList with image, [77, 133, 192, 15, 132]
   emitRel with image, fixes, "memcpy_done"
+  emitList with image, [76, 139, 21]
+  emitRel with image, fixes, "heap_cell"
+  emitList with image, [76, 57, 209, 15, 130]
+  emitRel with image, fixes, "memcpy_oom"
+  emitList with image, [77, 141, 154]
+  emitU32 with image, 33554432
+  emitList with image, [74, 141, 4, 1, 15, 128]
+  emitRel with image, fixes, "memcpy_oom"
+  emitList with image, [76, 57, 216, 15, 135]
+  emitRel with image, fixes, "memcpy_oom"
   emitList with image, [72, 57, 209, 15, 130]
   emitRel with image, fixes, "memcpy_fwd"
   emitList with image, [76, 1, 193, 76, 1, 194]
@@ -623,6 +635,8 @@ define emitMore with image, fixes, labels
   emitList with image, [138, 2, 136, 1, 72, 255, 193, 72, 255, 194, 73, 255, 200, 117, 241]
   pin with labels, "memcpy_done", image
   emitList with image, [195]
+  pin with labels, "memcpy_oom", image
+  emitFail with image, fixes, "msg_oom"
 
   ~ Unused list/map capacity is not a leaf. GC scans the whole allocation, so
   ~ leftover from-space bytes there look like heap pointers after the first
