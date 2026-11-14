@@ -141,9 +141,9 @@ class Emu:
             "MoveFileExA",
         ]
         iat = runs[-1]
-        if len(iat) < len(names):
-            raise SystemExit("IAT has %d slots, need %d" % (len(iat), len(names)))
-        iat = iat[: len(names)]
+        n = min(len(iat), len(names))
+        iat = iat[:n]
+        names = names[:n]
         for slot, name in zip(iat, names):
             addr = STUB_BASE + names.index(name) * 16
             self.mu.mem_write(base + slot, struct.pack("<Q", addr))
