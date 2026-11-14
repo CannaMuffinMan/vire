@@ -172,9 +172,9 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "markp_ret"
   ~ Conservative hits must be a real header (leaf or kind 1/2). Dirty OS
   ~ frames otherwise pin interiors and the bump never drops (gc-churn OOM).
-  emitList with image, [137, 202, 193, 234, 26, 131, 226, 3, 246, 193, 1, 15, 133]
-  emitRel with image, fixes, "markp_kind"
-  emitList with image, [131, 250, 1, 15, 132]
+  ~ Kind 1/2 only. Leaf bit0 is also used for pin-gap fillers; pinning those
+  ~ from dirty OS frames freezes [dest,pin) and gc-churn OOMs on Windows.
+  emitList with image, [137, 202, 193, 234, 26, 131, 226, 3, 131, 250, 1, 15, 132]
   emitRel with image, fixes, "markp_kind"
   emitList with image, [131, 250, 2, 15, 132]
   emitRel with image, fixes, "markp_kind"
@@ -219,9 +219,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "markpn_ret"
   emitList with image, [139, 8, 247, 193, 6, 0, 0, 0, 15, 133]
   emitRel with image, fixes, "markpn_ret"
-  emitList with image, [137, 202, 193, 234, 26, 131, 226, 3, 246, 193, 1, 15, 133]
-  emitRel with image, fixes, "markpn_kind"
-  emitList with image, [131, 250, 1, 15, 132]
+  emitList with image, [137, 202, 193, 234, 26, 131, 226, 3, 131, 250, 1, 15, 132]
   emitRel with image, fixes, "markpn_kind"
   emitList with image, [131, 250, 2, 15, 132]
   emitRel with image, fixes, "markpn_kind"
@@ -567,7 +565,8 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_fill_e", image
   emitList with image, [72, 137, 248, 72, 41, 240, 131, 248, 8, 15, 130]
   emitRel with image, fixes, "gc_fill_skip"
-  emitList with image, [131, 200, 1, 137, 6, 199, 70, 4]
+  ~ Gap filler: size | kind 3. Not a leaf, so conservative pin will not keep it.
+  emitList with image, [13, 0, 0, 0, 12, 137, 6, 199, 70, 4]
   emitU32 with image, 0
   emitList with image, [72, 137, 254, 233]
   emitRel with image, fixes, "gc_fill"
