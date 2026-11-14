@@ -31,4 +31,10 @@ echo "$out" | grep -q 'EXIT 0'
 printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -d '\r' > "$WORKDIR/hello.txt"
 printf 'hello from stage\n' > "$WORKDIR/hello-want.txt"
 cmp -s "$WORKDIR/hello.txt" "$WORKDIR/hello-want.txt"
+cp "$ROOT/tests/native/gc-kind-stress.vire" "$WORKDIR/gc-kind-stress.vire"
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/gc-kind-stress.vire data/native-pe-emu/gc-kind-stress.hex
+out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/gc-kind-stress.hex")"
+echo "$out"
+echo "$out" | grep -q 'EXIT 0'
+printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -d '\r' | grep -qx 'gc-kind-stress ok'
 echo "native pe emu ok"
