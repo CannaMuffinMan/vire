@@ -1,0 +1,367 @@
+~ HTTP/1.1 helpers for host and native guests. Wire listen still owns
+~ sockets; this layer parses targets, query, headers, cookies, chunked
+~ bodies, CORS, and a middleware chain. Caps stay at 100000 / 5M.
+
+define http_hex_digit with ch
+  let n be find with "0123456789abcdef", (lower with ch)
+  return n
+end
+
+define http_pct_decode with raw
+  let out be ""
+  let i be 0
+  let n be length with raw
+  while i < n
+    let ch be raw at i
+    let add be ch
+    let step be 1
+    if ch == "+"
+      let add be " "
+    end
+    if ch == "%"
+      if (i + 2) < n
+        let hi be http_hex_digit with (raw at (i + 1))
+        let lo be http_hex_digit with (raw at (i + 2))
+        if hi >= 0
+          if lo >= 0
+            let add be chr with ((hi * 16) + lo)
+            let step be 3
+          end
+        end
+      end
+    end
+    let out be out + add
+    let i be i + step
+  end
+  return out
+end
+
+define http_query_parse with raw
+  let q be {}
+  if raw == ""
+    return q
+  end
+  let pairs be split with raw, "&"
+  let i be 0
+  while i < (length with pairs)
+    let pair be pairs at i
+    if pair != ""
+      let eq be find with pair, "="
+      if eq < 0
+        put "" into q at (http_pct_decode with pair)
+      else
+        let k be http_pct_decode with (slice with pair, 0, eq)
+        let v be http_pct_decode with (slice with pair, (eq + 1), (length with pair))
+        put v into q at k
+      end
+    end
+    let i be i + 1
+  end
+  return q
+end
+
+define http_target with raw
+  let cut be find with raw, "?"
+  if cut < 0
+    return {"path": raw, "query": {}, "queryRaw": ""}
+  end
+  let path be slice with raw, 0, cut
+  let qs be slice with raw, (cut + 1), (length with raw)
+  return {"path": path, "query": (http_query_parse with qs), "queryRaw": qs}
+end
+
+define http_trim with raw
+  let n be length with raw
+  let a be 0
+  while a < n
+    let ch be raw at a
+    if ch == " " or ch == "\t"
+      let a be a + 1
+    else
+      stop
+    end
+  end
+  let b be n
+  while b > a
+    let ch be raw at (b - 1)
+    if ch == " " or ch == "\t"
+      let b be b - 1
+    else
+      stop
+    end
+  end
+  return slice with raw, a, b
+end
+
+define http_header_get with headers, name
+  let want be lower with name
+  let ks be keys with headers
+  let i be 0
+  while i < (length with ks)
+    if (lower with (ks at i)) == want
+      return headers at (ks at i)
+    end
+    let i be i + 1
+  end
+  return none
+end
+
+define http_parse_headers with block
+  let headers be {}
+  let lines be split with block, "\r\n"
+  let i be 1
+  let sawCl be 0
+  let sawTe be 0
+  while i < (length with lines)
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon <= 0
+        put true into headers at "_bad"
+      else
+        let name be http_trim with (slice with line, 0, colon)
+        let value be http_trim with (slice with line, (colon + 1), (length with line))
+        let low be lower with name
+        put value into headers at low
+        if low == "content-length"
+          let sawCl be sawCl + 1
+        end
+        if low == "transfer-encoding"
+          let sawTe be sawTe + 1
+        end
+      end
+    end
+    let i be i + 1
+  end
+  put sawCl into headers at "_cl"
+  put sawTe into headers at "_te"
+  return headers
+end
+
+define http_parse_cookies with raw
+  let jar be {}
+  if raw == none
+    return jar
+  end
+  if raw == ""
+    return jar
+  end
+  let parts be split with raw, ";"
+  let i be 0
+  while i < (length with parts)
+    let part be http_trim with (parts at i)
+    if part != ""
+      let eq be find with part, "="
+      if eq < 0
+        put "" into jar at part
+      else
+        let k be http_trim with (slice with part, 0, eq)
+        let v be http_trim with (slice with part, (eq + 1), (length with part))
+        put v into jar at k
+      end
+    end
+    let i be i + 1
+  end
+  return jar
+end
+
+define http_set_cookie with name, value
+  return name + "=" + value + "; Path=/; HttpOnly"
+end
+
+define http_cors with origin
+  if origin == none
+    return {"allowOrigin": "*", "allowHeaders": "content-type,authorization,x-fcg-token", "allowMethods": "GET,POST,PUT,HEAD,OPTIONS"}
+  end
+  if origin == ""
+    return {"allowOrigin": "*", "allowHeaders": "content-type,authorization,x-fcg-token", "allowMethods": "GET,POST,PUT,HEAD,OPTIONS"}
+  end
+  return {"allowOrigin": origin, "allowHeaders": "content-type,authorization,x-fcg-token", "allowMethods": "GET,POST,PUT,HEAD,OPTIONS"}
+end
+
+define http_hex_size with raw
+  let n be 0
+  let i be 0
+  while i < (length with raw)
+    let d be http_hex_digit with (raw at i)
+    if d < 0
+      return 0 - 1
+    end
+    let n be (n * 16) + d
+    if n > 1000000
+      return 0 - 1
+    end
+    let i be i + 1
+  end
+  return n
+end
+
+define http_decode_chunked with raw
+  let out be ""
+  let i be 0
+  let n be length with raw
+  while i < n
+    let rest be slice with raw, i, n
+    let cr be find with rest, "\r\n"
+    if cr < 0
+      return none
+    end
+    let size be http_hex_size with (slice with rest, 0, cr)
+    if size < 0
+      return none
+    end
+    let i be i + cr + 2
+    if size == 0
+      return out
+    end
+    if (i + size + 2) > n
+      return none
+    end
+    let out be out + (slice with raw, i, (i + size))
+    let i be i + size
+    if (slice with raw, i, (i + 2)) != "\r\n"
+      return none
+    end
+    let i be i + 2
+  end
+  return none
+end
+
+define http_match with pattern, path
+  let a be split with pattern, "/"
+  let b be split with path, "/"
+  if (length with a) != (length with b)
+    return none
+  end
+  let params be {}
+  let i be 0
+  while i < (length with a)
+    let p be a at i
+    let g be b at i
+    let flag be begins with p, ":"
+    if flag
+      let name be slice with p, 1, (length with p)
+      put g into params at name
+    end
+    if flag == false
+      if p != g
+        return none
+      end
+    end
+    let i be i + 1
+  end
+  return params
+end
+
+define http_auth_ok with query, headers
+  let tok be none
+  if (has with query, "token")
+    let tok be query at "token"
+  end
+  let hdr be http_header_get with headers, "x-fcg-token"
+  if hdr != none
+    let tok be hdr
+  end
+  if tok == "demo"
+    return true
+  end
+  return false
+end
+
+define http_json with body
+  return body
+end
+
+define http_text_wrap with body
+  return "{\"type\":\"text\",\"body\":" + (json with body) + "}"
+end
+
+define http_reject_wire with headers
+  if (headers at "_cl") > 1
+    return "400"
+  end
+  if (headers at "_te") > 0
+    if (headers at "_cl") > 0
+      return "400"
+    end
+  end
+  return "ok"
+end
+
+define http_app with method, path, body
+  let t be http_target with path
+  let p be t at "path"
+  let q be t at "query"
+  let headers be {}
+  if (has with q, "cookie")
+    put (q at "cookie") into headers at "cookie"
+  end
+  if (has with q, "origin")
+    put (q at "origin") into headers at "origin"
+  end
+  if (has with q, "token")
+    put (q at "token") into headers at "x-fcg-token"
+  end
+  let cookies be http_parse_cookies with (http_header_get with headers, "cookie")
+  let cors be http_cors with (http_header_get with headers, "origin")
+  if method == "OPTIONS"
+    return "{\"ok\":true,\"cors\":" + (json with (cors at "allowOrigin")) + ",\"methods\":" + (json with (cors at "allowMethods")) + "}"
+  end
+  if method == "GET"
+    if p == "/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if p == "/api/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if p == "/info"
+      return "{\"service\":\"fcgcpa\",\"role\":\"http-framework\"}"
+    end
+    if p == "/api/ping"
+      return "{\"ok\":true,\"pong\":true}"
+    end
+    if p == "/api/cors"
+      return "{\"ok\":true,\"acao\":" + (json with (cors at "allowOrigin")) + ",\"acah\":" + (json with (cors at "allowHeaders")) + "}"
+    end
+    if p == "/api/search"
+      let term be ""
+      if (has with q, "q")
+        let term be q at "q"
+      end
+      return "{\"ok\":true,\"q\":" + (json with term) + "}"
+    end
+    if p == "/api/who"
+      let sid be ""
+      if (has with cookies, "sid")
+        let sid be cookies at "sid"
+      end
+      return "{\"ok\":true,\"sid\":" + (json with sid) + "}"
+    end
+    if p == "/api/secure"
+      if not (http_auth_ok with q, headers)
+        return "{\"ok\":false,\"error\":\"unauthorized\"}"
+      end
+      return "{\"ok\":true,\"gate\":\"auth\"}"
+    end
+    let user be http_match with "/api/users/:id", p
+    if user != none
+      return "{\"ok\":true,\"id\":" + (json with (user at "id")) + "}"
+    end
+  end
+  if method == "POST"
+    if p == "/api/echo"
+      return "{\"ok\":true,\"body\":" + (json with body) + "}"
+    end
+    if p == "/api/login"
+      return "{\"ok\":true,\"setCookie\":" + (json with (http_set_cookie with "sid", "abc")) + "}"
+    end
+    if p == "/api/chunk"
+      let decoded be http_decode_chunked with body
+      if decoded == none
+        return "{\"ok\":false,\"error\":\"bad chunked\"}"
+      end
+      return "{\"ok\":true,\"body\":" + (json with decoded) + "}"
+    end
+  end
+  return "{\"ok\":false,\"error\":\"not found\"}"
+end

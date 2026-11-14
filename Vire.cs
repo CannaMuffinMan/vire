@@ -2723,7 +2723,7 @@ internal static class HttpWire
         int headerEnd = HeaderEnd(buffer, got);
         if (headerEnd < 0)
         {
-            Fail(result, got >= MaxHeaderBlock ? 431 : 408, got >= MaxHeaderBlock ? "headers too large" : "timeout");
+            Fail(result, got >= MaxHeaderBlock ? 400 : 408, got >= MaxHeaderBlock ? "headers too large" : "timeout");
             return result;
         }
         if (HeaderBytesUnsafe(buffer, headerEnd))
@@ -2738,7 +2738,7 @@ internal static class HttpWire
         }
         if (lineEnd < 0 || lineEnd > MaxRequestLine)
         {
-            Fail(result, 431, "request line too large");
+            Fail(result, 400, "request line too large");
             return result;
         }
         string head;
@@ -2772,7 +2772,7 @@ internal static class HttpWire
         }
         if (HasChunked(head))
         {
-            Fail(result, 501, "chunked encoding is not supported");
+            Fail(result, 400, "bad request");
             return result;
         }
         int contentLength = ContentLengthOf(head);
@@ -2802,8 +2802,6 @@ internal static class HttpWire
         result.Status = 0;
         result.Method = method;
         string path = bits[1];
-        int queryAt = path.IndexOf('?');
-        if (queryAt >= 0) path = path.Substring(0, queryAt);
         result.Path = path;
         result.Head = head;
         result.BodyAt = headerEnd + 4;
