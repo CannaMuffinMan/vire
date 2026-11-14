@@ -13,7 +13,11 @@ define emitRuntime with image, fixes, labels
   let image be emitU32 with image, 4294967285
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_gs"
-  let image be emitList with image, [72, 137, 195, 49, 201, 186]
+  ~ rbx is the GC mark-new flag during compact. Keep the stdout handle in a
+  ~ PE cell so rt_fail_exit/say can WriteFile after a dest-past-arena OOM.
+  let image be emitList with image, [72, 137, 195, 72, 137, 29]
+  let image be emitRel with image, fixes, "stdout_cell"
+  let image be emitList with image, [49, 201, 186]
   let image be emitU32 with image, 33554432
   let image be emitList with image, [65, 184]
   let image be emitU32 with image, 12288
@@ -58,7 +62,8 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, "iat_ep"
   pin with labels, "crash_filter", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 80, 72, 139, 1, 72, 139, 64, 16, 76, 141, 13]
+  ~ EXCEPTION_RECORD at [rcx]; RIP at +16; AV address at ExceptionInformation[1] (+40).
+  let image be emitList with image, [85, 72, 137, 229, 72, 131, 236, 80, 72, 139, 1, 72, 137, 69, 240, 72, 139, 64, 16, 76, 141, 13]
   let image be emitRel with image, fixes, "crash_hex"
   let image be emitList with image, [185]
   let image be emitU32 with image, 16
@@ -80,6 +85,36 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "crash_rip_msg"
   let image be emitList with image, [65, 184]
   let image be emitU32 with image, 10
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_hex"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 16
+  let image be emitList with image, [76, 141, 13]
+  let image be emitRel with image, fixes, "written"
+  let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
+  let image be emitRel with image, fixes, "iat_wf"
+  let image be emitList with image, [72, 139, 69, 240, 72, 139, 64, 40, 76, 141, 13]
+  let image be emitRel with image, fixes, "crash_hex"
+  let image be emitList with image, [185]
+  let image be emitU32 with image, 16
+  pin with labels, "crash_addr_loop", image
+  let image be emitList with image, [72, 193, 192, 4, 137, 194, 131, 226, 15, 128, 250, 10, 15, 130]
+  let image be emitRel with image, fixes, "crash_addr_digit"
+  let image be emitList with image, [128, 194, 87, 233]
+  let image be emitRel with image, fixes, "crash_addr_store"
+  pin with labels, "crash_addr_digit", image
+  let image be emitList with image, [128, 194, 48]
+  pin with labels, "crash_addr_store", image
+  let image be emitList with image, [65, 136, 17, 73, 255, 193, 255, 201, 15, 133]
+  let image be emitRel with image, fixes, "crash_addr_loop"
+  let image be emitList with image, [72, 137, 217, 72, 141, 21]
+  let image be emitRel with image, fixes, "crash_addr_msg"
+  let image be emitList with image, [65, 184]
+  let image be emitU32 with image, 6
   let image be emitList with image, [76, 141, 13]
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
@@ -362,6 +397,8 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [76, 137, 202, 76, 137, 192, 76, 41, 200, 73, 137, 192, 233]
   let image be emitRel with image, fixes, "say_write"
   pin with labels, "say_write", image
+  let image be emitList with image, [72, 139, 29]
+  let image be emitRel with image, fixes, "stdout_cell"
   let image be emitList with image, [72, 137, 217, 76, 141, 13]
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32]
@@ -392,7 +429,9 @@ define emitRuntime with image, fixes, labels
   let image be emitU32 with image, 2
   let image be emitList with image, [73, 137, 77, 8, 73, 131, 197, 16, 255, 32]
   pin with labels, "rt_fail_exit", image
-  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 76, 139, 1, 72, 141, 81, 8, 72, 137, 217, 76, 141, 13]
+  let image be emitList with image, [85, 72, 137, 229, 72, 129, 236, 128, 0, 0, 0, 76, 139, 1, 72, 141, 81, 8, 72, 139, 29]
+  let image be emitRel with image, fixes, "stdout_cell"
+  let image be emitList with image, [72, 137, 217, 76, 141, 13]
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32]
   let image be emitU32 with image, 0
@@ -677,12 +716,16 @@ define parkRuntime with image, labels
   let image be emitU64 with image, 0
   pin with labels, "heap_cell", image
   let image be emitU64 with image, 0
+  pin with labels, "stdout_cell", image
+  let image be emitU64 with image, 0
   pin with labels, "gc_busy", image
   let image be emitU64 with image, 0
   pin with labels, "wait_cell", image
   let image be emitU64 with image, 0
   pin with labels, "crash_rip_msg", image
   let image be emitList with image, [99, 114, 97, 115, 104, 32, 114, 105, 112, 61]
+  pin with labels, "crash_addr_msg", image
+  let image be emitList with image, [32, 97, 100, 100, 114, 61]
   pin with labels, "crash_hex", image
   let image be emitList with image, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   pin with labels, "intern_tab", image

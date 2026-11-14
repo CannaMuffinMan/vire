@@ -55,6 +55,7 @@ public class NativeArenaTests
         string rt = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
         string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
         Assert.Contains("pin with labels, \"heap_cell\", image", rt);
+        Assert.Contains("pin with labels, \"stdout_cell\", image", rt);
         Assert.Contains("pin with labels, \"intern_tab\", image", rt);
         Assert.Contains("let image be emitRel with image, fixes, \"heap_cell\"", rt);
         Assert.Contains("emitRel with image, fixes, \"intern_tab\"", more);
