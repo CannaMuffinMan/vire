@@ -476,7 +476,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_trp"
   pin with labels, "gc_trp_done", image
   pin with labels, "gc_fix", image
-  emitList with image, [49, 219, 76, 137, 222]
+  emitList with image, [76, 139, 93, 224, 49, 219, 76, 137, 222]
   pin with labels, "gc_fix_w", image
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_fix_d"
@@ -537,7 +537,7 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_utrp"
   pin with labels, "gc_utrp_d", image
-  emitList with image, [76, 137, 222]
+  emitList with image, [76, 139, 93, 224, 76, 137, 222]
   pin with labels, "gc_uobj", image
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_uobj_d"
@@ -561,7 +561,16 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 249, 72, 137, 242, 76, 139, 69, 208]
   emitCallTo with image, fixes, "rt_memcpy"
   pin with labels, "gc_mv_c", image
-  emitList with image, [139, 70, 4, 131, 224, 254, 76, 137, 223, 72, 1, 199, 199, 71, 4]
+  emitList with image, [76, 139, 93, 224, 139, 70, 4, 131, 224, 254, 76, 137, 223, 72, 1, 199]
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "heap_cell"
+  emitList with image, [72, 57, 199, 15, 130]
+  emitRel with image, fixes, "memcpy_oom"
+  emitList with image, [72, 5]
+  emitU32 with image, 33554432
+  emitList with image, [72, 57, 199, 15, 131]
+  emitRel with image, fixes, "memcpy_oom"
+  emitList with image, [199, 71, 4]
   emitU32 with image, 0
   pin with labels, "gc_mv_s", image
   emitList with image, [72, 139, 77, 208, 72, 1, 206, 233]
