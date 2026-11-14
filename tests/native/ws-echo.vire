@@ -1,0 +1,3 @@
+define main
+  ws_listen with 0
+end

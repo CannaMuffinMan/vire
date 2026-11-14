@@ -1,0 +1,298 @@
+~ SHA-1 for RFC 6455 Sec-WebSocket-Accept. 32-bit words as [hi16, lo16].
+~ Guest code only. No TLS. Digest length is 20 bytes.
+
+define sha1Copy with src
+  return [src at 0, src at 1]
+end
+
+define sha1BitAnd16 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 16
+    if ((x % 2) == 1) and ((y % 2) == 1)
+      let r be r + p
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define sha1BitXor16 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 16
+    if (x % 2) != (y % 2)
+      let r be r + p
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define sha1BitOr16 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 16
+    if ((x % 2) == 1) or ((y % 2) == 1)
+      let r be r + p
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define sha1And with a, b
+  let hi be sha1BitAnd16 with (a at 0), (b at 0)
+  let lo be sha1BitAnd16 with (a at 1), (b at 1)
+  return [hi, lo]
+end
+
+define sha1Xor with a, b
+  let hi be sha1BitXor16 with (a at 0), (b at 0)
+  let lo be sha1BitXor16 with (a at 1), (b at 1)
+  return [hi, lo]
+end
+
+define sha1Or with a, b
+  let hi be sha1BitOr16 with (a at 0), (b at 0)
+  let lo be sha1BitOr16 with (a at 1), (b at 1)
+  return [hi, lo]
+end
+
+define sha1Not with a
+  return [65535 - (a at 0), 65535 - (a at 1)]
+end
+
+define sha1Add with a, b
+  let lo be (a at 1) + (b at 1)
+  let c be 0
+  if lo >= 65536
+    let lo be lo - 65536
+    let c be 1
+  end
+  let hi be (a at 0) + (b at 0) + c
+  if hi >= 65536
+    let hi be hi - 65536
+  end
+  return [hi, lo]
+end
+
+define sha1Shl1 with w
+  let hi be w at 0
+  let lo be w at 1
+  let hi2 be hi + hi
+  if hi2 >= 65536
+    let hi2 be hi2 - 65536
+  end
+  if lo >= 32768
+    let hi2 be hi2 + 1
+    if hi2 >= 65536
+      let hi2 be hi2 - 65536
+    end
+  end
+  let lo2 be lo + lo
+  if lo2 >= 65536
+    let lo2 be lo2 - 65536
+  end
+  return [hi2, lo2]
+end
+
+define sha1Shr1 with w
+  let hi be w at 0
+  let lo be w at 1
+  let lo2 be idiv with lo, 2
+  if (hi % 2) == 1
+    let lo2 be lo2 + 32768
+  end
+  let hi2 be idiv with hi, 2
+  return [hi2, lo2]
+end
+
+define sha1ShlN with w, n
+  let i be 0
+  let v be sha1Copy with w
+  while i < n
+    let v be sha1Shl1 with v
+    let i be i + 1
+  end
+  return v
+end
+
+define sha1ShrN with w, n
+  let i be 0
+  let v be sha1Copy with w
+  while i < n
+    let v be sha1Shr1 with v
+    let i be i + 1
+  end
+  return v
+end
+
+define sha1Rotl with w, n
+  let left be sha1ShlN with w, n
+  let right be sha1ShrN with w, (32 - n)
+  return sha1Xor with left, right
+end
+
+define sha1LoadWord with buf, i
+  let b0 be buf at i
+  let b1 be buf at (i + 1)
+  let b2 be buf at (i + 2)
+  let b3 be buf at (i + 3)
+  let hi be (b0 * 256) + b1
+  let lo be (b2 * 256) + b3
+  return [hi, lo]
+end
+
+define sha1StoreWord with out, w
+  push with out, (idiv with (w at 0), 256)
+  push with out, (w at 0) % 256
+  push with out, (idiv with (w at 1), 256)
+  push with out, (w at 1) % 256
+  return out
+end
+
+define sha1K0
+  return [23170, 31129]
+end
+
+define sha1K1
+  return [28377, 60321]
+end
+
+define sha1K2
+  return [36635, 48348]
+end
+
+define sha1K3
+  return [51810, 49622]
+end
+
+define sha1Iv
+  return [[26437, 8961], [61389, 43913], [39098, 56574], [4146, 21622], [50130, 57840]]
+end
+
+define sha1Compress with state, block
+  let w be []
+  let t be 0
+  while t < 16
+    push with w, (sha1LoadWord with block, (t * 4))
+    let t be t + 1
+  end
+  while t < 80
+    let x be sha1Xor with (w at (t - 3)), (w at (t - 8))
+    let x be sha1Xor with x, (w at (t - 14))
+    let x be sha1Xor with x, (w at (t - 16))
+    push with w, (sha1Rotl with x, 1)
+    let t be t + 1
+  end
+  let a be sha1Copy with (state at 0)
+  let b be sha1Copy with (state at 1)
+  let c be sha1Copy with (state at 2)
+  let d be sha1Copy with (state at 3)
+  let e be sha1Copy with (state at 4)
+  let t be 0
+  while t < 80
+    let f be a
+    let k be sha1K0
+    if t < 20
+      let f be sha1Or with (sha1And with b, c), (sha1And with (sha1Not with b), d)
+      let k be sha1K0
+    end
+    if (t >= 20) and (t < 40)
+      let f be sha1Xor with (sha1Xor with b, c), d
+      let k be sha1K1
+    end
+    if (t >= 40) and (t < 60)
+      let f be sha1Or with (sha1Or with (sha1And with b, c), (sha1And with b, d)), (sha1And with c, d)
+      let k be sha1K2
+    end
+    if t >= 60
+      let f be sha1Xor with (sha1Xor with b, c), d
+      let k be sha1K3
+    end
+    let temp be sha1Add with (sha1Rotl with a, 5), f
+    let temp be sha1Add with temp, e
+    let temp be sha1Add with temp, k
+    let temp be sha1Add with temp, (w at t)
+    let e be d
+    let d be c
+    let c be sha1Rotl with b, 30
+    let b be a
+    let a be temp
+    let t be t + 1
+  end
+  put (sha1Add with (state at 0), a) into state at 0
+  put (sha1Add with (state at 1), b) into state at 1
+  put (sha1Add with (state at 2), c) into state at 2
+  put (sha1Add with (state at 3), d) into state at 3
+  put (sha1Add with (state at 4), e) into state at 4
+  return state
+end
+
+define sha1Pad with buf
+  let n be length with buf
+  let out be []
+  let i be 0
+  while i < n
+    push with out, (buf at i)
+    let i be i + 1
+  end
+  push with out, 128
+  while ((length with out) % 64) != 56
+    push with out, 0
+  end
+  let bits be n * 8
+  push with out, 0
+  push with out, 0
+  push with out, 0
+  push with out, 0
+  push with out, (idiv with bits, 16777216)
+  let bits be bits % 16777216
+  push with out, (idiv with bits, 65536)
+  let bits be bits % 65536
+  push with out, (idiv with bits, 256)
+  push with out, (bits % 256)
+  return out
+end
+
+define sha1_bytes with buf
+  let state be sha1Iv
+  let padded be sha1Pad with buf
+  let i be 0
+  let n be length with padded
+  while i < n
+    let block be slice with padded, i, (i + 64)
+    let state be sha1Compress with state, block
+    let i be i + 64
+  end
+  let out be []
+  let j be 0
+  while j < 5
+    let out be sha1StoreWord with out, (state at j)
+    let j be j + 1
+  end
+  return out
+end
+
+define sha1_hex with buf
+  return hex with (sha1_bytes with buf)
+end

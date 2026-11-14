@@ -59,6 +59,7 @@ jobs:
       - run: bash tools/native-arena-check.sh
       - run: bash tools/native-sec-emu-check.sh
       - run: bash tools/l1-residuals-check.sh
+      - run: bash tools/gen2-emitfix-if-check.sh
   selfhost-windows:
     runs-on: windows-latest
     steps:
@@ -87,6 +88,7 @@ jobs:
       - run: pwsh -File tools/schema-prove-windows.ps1
       - run: pwsh -File tools/native-tcp-windows.ps1
       - run: pwsh -File tools/native-list-cap-proof.ps1
+      - run: pwsh -File tools/native-ws-windows.ps1
   native-selfhost-windows:
     runs-on: windows-latest
     steps:
@@ -125,6 +127,18 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build vire.csproj -c Release
       - run: pwsh -File tools/redis-prove-windows.ps1
+  native-emitfix-if-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - run: pwsh -File tools/gen2-emitfix-if-windows.ps1
   publish:
     runs-on: ubuntu-latest
     steps:

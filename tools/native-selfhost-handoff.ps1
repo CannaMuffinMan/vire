@@ -87,6 +87,7 @@ Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
 Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
 Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
+Copy-Item (Join-Path $Root "src/rt-ws.vire") (Join-Path $Src "rt-ws.vire") -Force
 foreach ($blob in @(
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt"
@@ -101,6 +102,7 @@ $pairs = @(
     @("src/rt.vire", "data/src/rt.vire"),
     @("src/rt-more.vire", "data/src/rt-more.vire"),
     @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/rt-ws.vire", "data/src/rt-ws.vire"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
     @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),
@@ -172,5 +174,49 @@ $h1 = (Get-FileHash -Algorithm SHA256 $gen1Hex).Hash.ToLowerInvariant()
 $h2 = (Get-FileHash -Algorithm SHA256 $gen2Hex).Hash.ToLowerInvariant()
 Write-Output "gen1_sha256 $h1"
 Write-Output "gen2_sha256 $h2"
-if ($h1 -ne $h2) { throw "gen1/gen2 SHA-256 differ" }
+if ($h1 -ne $h2) {
+    $s1 = [System.IO.File]::ReadAllText($gen1Hex).Trim()
+    $s2 = [System.IO.File]::ReadAllText($gen2Hex).Trim()
+    Write-Output ("gen1_hex_chars " + $s1.Length)
+    Write-Output ("gen2_hex_chars " + $s2.Length)
+    $n = [Math]::Min($s1.Length, $s2.Length)
+    $i = 0
+    while ($i -lt $n -and $s1[$i] -eq $s2[$i]) { $i++ }
+    Write-Output ("gen_hex_first_diff " + $i)
+    if ($i -lt $n) {
+        $a = [Math]::Max(0, $i - 16)
+        $b = [Math]::Min($n, $i + 16)
+        Write-Output ("gen1_at_diff " + $s1.Substring($a, $b - $a))
+        Write-Output ("gen2_at_diff " + $s2.Substring($a, $b - $a))
+    }
+    $ndiff = 0
+    $shown = 0
+    for ($j = 0; $j -lt $n; $j++) {
+        if ($s1[$j] -ne $s2[$j]) {
+            $ndiff++
+            if ($shown -lt 8) {
+                Write-Output ("gen_hex_diff_at " + $j)
+                $shown++
+            }
+        }
+    }
+    Write-Output ("gen_hex_ndiff " + $ndiff)
+    $k = 1024
+    while ($k -lt $n -and $s1[$k] -eq $s2[$k]) { $k++ }
+    Write-Output ("gen_hex_first_body_diff " + $k)
+    if ($k -lt $n) {
+        $even = $k - ($k % 2)
+        $a = [Math]::Max(0, $even - 16)
+        $b = [Math]::Min($n, $even + 32)
+        Write-Output ("gen1_at_body " + $s1.Substring($a, $b - $a))
+        Write-Output ("gen2_at_body " + $s2.Substring($a, $b - $a))
+        Write-Output ("gen_body_file_off " + ($even / 2))
+    }
+    if ($s1.Length -ge 440 -and $s2.Length -ge 440) {
+        $t1 = $s1.Remove(432, 8).Insert(432, "00000000")
+        $t2 = $s2.Remove(432, 8).Insert(432, "00000000")
+        Write-Output ("gen_hex_checksum_stripped_equal " + ($t1 -eq $t2))
+    }
+    throw "gen1/gen2 SHA-256 differ"
+}
 Write-Output "native selfhost handoff ok"

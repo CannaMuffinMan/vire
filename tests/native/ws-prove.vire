@@ -1,0 +1,115 @@
+use "src/rt-sha1.vire"
+use "src/rt-ws-proto.vire"
+
+define showBad with name, got
+  if (got at 0) == "ok"
+    say (name + " ok")
+    return 0
+  end
+  say (name + " " + (got at 1))
+  return 1
+end
+
+define main
+  let nfail be 0
+  let abc be ws_ascii_bytes with "abc"
+  let nfail be nfail + (showBad with "sha1 abc", ["ok", (sha1_hex with (abc at 1))])
+  if (sha1_hex with (abc at 1)) != "a9993e364706816aba3e25717850c26c9cd0d89d"
+    say "sha1 abc mismatch"
+    let nfail be nfail + 1
+  end
+  let empty be []
+  if (sha1_hex with empty) != "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    say "sha1 empty mismatch"
+    let nfail be nfail + 1
+  end
+  let acc be ws_rfc_accept_example
+  let nfail be nfail + (showBad with "rfc6455 1.3", acc)
+  if (acc at 0) == "ok"
+    say (acc at 1)
+  end
+  let hi be ws_ascii_bytes with "hi"
+  let payload be hi at 1
+  let fr be ws_write_frame with 1, 1, payload
+  let nfail be nfail + (showBad with "write text", fr)
+  let i be 0
+  let key be [1, 2, 3, 4]
+  let n be length with payload
+  let built be ws_write_frame with 1, 1, payload
+  let raw be built at 1
+  let client be []
+  push with client, (raw at 0)
+  push with client, ((raw at 1) + 128)
+  push with client, 1
+  push with client, 2
+  push with client, 3
+  push with client, 4
+  let i be 0
+  while i < n
+    let v be raw at (2 + i)
+    let k be key at (i % 4)
+    let x be 0
+    let p be 1
+    let a be v
+    let b be k
+    let bit be 0
+    while bit < 8
+      if (a % 2) != (b % 2)
+        let x be x + p
+      end
+      let a be idiv with a, 2
+      let b be idiv with b, 2
+      let p be p + p
+      let bit be bit + 1
+    end
+    push with client, x
+    let i be i + 1
+  end
+  let parsed be ws_parse_frame with client
+  let nfail be nfail + (showBad with "parse masked", parsed)
+  let badm be [129, 1, 97]
+  let got be ws_parse_frame with badm
+  if (got at 0) != "bad"
+    say "unmasked missed"
+    let nfail be nfail + 1
+  end
+  if (got at 1) != "unmasked"
+    say "unmasked why"
+    let nfail be nfail + 1
+  end
+  let over be [129, 255, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+  let got be ws_parse_frame with over
+  if (got at 0) != "bad"
+    say "len64 missed"
+    let nfail be nfail + 1
+  end
+  let big be [129, 255, 0, 0, 0, 0, 0, 1, 0, 1]
+  let got be ws_parse_frame with big
+  if (got at 0) != "bad"
+    say "oversize missed"
+    let nfail be nfail + 1
+  end
+  let ctl be [8, 129, 1, 2, 3, 4, 0]
+  let got be ws_parse_frame with ctl
+  if (got at 0) != "bad"
+    say "frag-ctl missed"
+    let nfail be nfail + 1
+  end
+  let utf be [129, 129, 0, 0, 0, 0, 128]
+  let got be ws_parse_frame with utf
+  if (got at 0) != "bad"
+    say "utf8 missed"
+    let nfail be nfail + 1
+  end
+  let badk be ws_accept_key with (chr with 128)
+  if (badk at 0) != "bad"
+    say "bad key missed"
+    let nfail be nfail + 1
+  end
+  if nfail == 0
+    say "WS PROVE pass"
+    halt with 0
+  end
+  say "WS PROVE fail"
+  halt with 1
+end
