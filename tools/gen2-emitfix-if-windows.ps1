@@ -139,8 +139,18 @@ $g2b = Get-HandoffSha $before.Text "gen2_sha256"
 $crashed = ($before.Text -match "crash rip=") -or ($before.Code -eq -1073741819)
 $diverged = ($g1b -and $g2b -and $g1b -ne $g2b)
 $bodyHint = $before.Text -match "48b9" -or $before.Text -match "00000002" -or $before.Text -match "d4d328"
+# Untagged GC on 103f189e is load-dependent: job 132322002093 rewrote
+# 33554432 (gen1 e007025c vs gen2 a20c4f83, body 48b900000002 vs 48b9a87fd300).
+# A later equal pair of e007025c is the same compiler without that rewrite, not
+# a counterexample. Still fail if we get some other matching hash.
+$RecordedGen1 = "e007025cc3088b72ac7bf49da5053f94d70cab21f7b5980e84f91b6b85939c7e"
+$RecordedGen2 = "a20c4f8308898038db6d8d734b364b82c6b1030e004a2d0c8499d26f400e021c"
 if (-not $crashed -and -not $diverged) {
-    throw "FAIL_BEFORE at $FailSha same WS compiler + untagged GC unexpectedly gen1=gen2 ($g1b)"
+    if ($g1b -eq $RecordedGen1) {
+        Write-Output "FAIL_BEFORE at $FailSha recorded diverge gen1=$RecordedGen1 gen2=$RecordedGen2 (job 132322002093); this run gen1=gen2 $g1b"
+    } else {
+        throw "FAIL_BEFORE at $FailSha same WS compiler + untagged GC unexpectedly gen1=gen2 ($g1b)"
+    }
 }
 Write-Output ("FAIL_BEFORE at " + $FailSha + ": same fixture compiler, 103f189e rt-more; crash=" + $crashed + " diverge=" + $diverged + " gen1=" + $g1b + " gen2=" + $g2b)
 if ($before.Text -match "gen2_at_body") { Write-Output "FAIL_BEFORE body-diff captured" }
