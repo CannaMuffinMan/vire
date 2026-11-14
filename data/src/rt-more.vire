@@ -107,7 +107,8 @@ define emitMore with image, fixes, labels
   ~ request (list/map 24-byte headers become 32). GC mark walks non-leaf
   ~ objects to (size & ~7); a dirty tail looks like heap pointers after the
   ~ first compact and AVs in rt_at (Windows 0x140004740) once gen1's heap
-  ~ crosses into GC — one extra emitFix `if` at 103f189e is enough.
+  ~ crosses into GC. Tip 103f189e plus one extra emitFix if still selfhosts;
+  ~ the same if plus the WS emit graph (the #68 compiler) crashes.
   emitList with image, [73, 137, 192, 72, 141, 81, 248, 72, 137, 193]
   emitList with image, [72, 133, 210, 15, 132]
   emitRel with image, fixes, "try_zero_done"
