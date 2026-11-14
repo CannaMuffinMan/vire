@@ -1,0 +1,17 @@
+~ Native PE: static site/ plus FCG health JSON.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if path == "/api/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18081
+end
