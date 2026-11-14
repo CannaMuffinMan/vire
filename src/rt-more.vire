@@ -331,6 +331,8 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "fwd_pin"
   emitList with image, [72, 137, 248, 76, 41, 216, 131, 200, 1, 137, 70, 4, 72, 1, 207, 195]
   pin with labels, "fwd_pin", image
+  ~ Identity forward and dest = max(dest, pin_end). Fillers are written after
+  ~ memcpy, because dest writes would smash from-space sizes gc_mv still walks.
   emitList with image, [72, 137, 240, 76, 41, 216, 131, 200, 1, 137, 70, 4, 72, 141, 4, 14, 72, 57, 199, 15, 131]
   emitRel with image, fixes, "fwd_pin_ok"
   emitList with image, [72, 137, 199]
@@ -347,6 +349,7 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "heap_cell"
   emitList with image, [77, 137, 211, 73, 129, 195]
   emitU32 with image, 327680
+  emitList with image, [76, 137, 93, 224]
   emitList with image, [77, 57, 220, 15, 134]
   emitRel with image, fixes, "gc_done"
   emitList with image, [76, 137, 222]
@@ -354,11 +357,11 @@ define emitMore with image, fixes, labels
   emitList with image, [76, 57, 230, 15, 131]
   emitRel with image, fixes, "gc_hdr_done"
   emitList with image, [139, 14, 247, 193, 6, 0, 0, 0, 15, 133]
-  emitRel with image, fixes, "gc_done"
-  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 16, 15, 130]
-  emitRel with image, fixes, "gc_done"
+  emitRel with image, fixes, "gc_heap_bad"
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 8, 15, 130]
+  emitRel with image, fixes, "gc_heap_bad"
   emitList with image, [72, 137, 240, 72, 1, 200, 76, 57, 224, 15, 135]
-  emitRel with image, fixes, "gc_done"
+  emitRel with image, fixes, "gc_heap_bad"
   emitList with image, [199, 70, 4]
   emitU32 with image, 0
   emitList with image, [72, 137, 198, 233]
@@ -369,10 +372,6 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_stk", image
   emitList with image, [76, 57, 238, 15, 131]
   emitRel with image, fixes, "gc_stk_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
-  emitList with image, [72, 139, 70, 8]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
   emitList with image, [72, 139, 6, 72, 139, 86, 8]
   emitCallTo with image, fixes, "rt_gc_mark_tagged"
   emitList with image, [72, 131, 198, 16, 233]
@@ -384,10 +383,6 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_frm", image
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_frm_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
-  emitList with image, [72, 139, 70, 8]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
   emitList with image, [72, 139, 6, 72, 139, 86, 8]
   emitCallTo with image, fixes, "rt_gc_mark_tagged"
   emitList with image, [72, 131, 198, 16, 233]
@@ -400,17 +395,13 @@ define emitMore with image, fixes, labels
   pin with labels, "gc_trp", image
   emitList with image, [72, 57, 254, 15, 131]
   emitRel with image, fixes, "gc_trp_done"
-  emitList with image, [72, 139, 6]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
-  emitList with image, [72, 139, 70, 8]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
   emitList with image, [72, 139, 6, 72, 139, 86, 8]
   emitCallTo with image, fixes, "rt_gc_mark_tagged"
   emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_trp"
   pin with labels, "gc_trp_done", image
   emitList with image, [72, 137, 238, 185]
-  emitU32 with image, 64
+  emitU32 with image, 1
   pin with labels, "gc_rbp", image
   emitList with image, [72, 133, 246, 15, 132]
   emitRel with image, fixes, "gc_rbp_done"
@@ -525,6 +516,49 @@ define emitMore with image, fixes, labels
   emitRel with image, fixes, "gc_mv"
   pin with labels, "gc_mv_d", image
   emitList with image, [76, 139, 101, 216]
+  emitList with image, [76, 139, 93, 224, 76, 137, 222]
+  pin with labels, "gc_fill", image
+  emitList with image, [76, 57, 230, 15, 131]
+  emitRel with image, fixes, "gc_fill_d"
+  emitList with image, [139, 14, 247, 193, 6, 0, 0, 0, 15, 133]
+  emitRel with image, fixes, "gc_fill_h"
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 8, 15, 130]
+  emitRel with image, fixes, "gc_fill_h"
+  emitList with image, [72, 141, 4, 14, 76, 57, 224, 15, 135]
+  emitRel with image, fixes, "gc_fill_h"
+  emitList with image, [72, 1, 206, 233]
+  emitRel with image, fixes, "gc_fill"
+  pin with labels, "gc_fill_h", image
+  emitList with image, [72, 137, 247, 72, 131, 199, 8]
+  pin with labels, "gc_fill_s", image
+  emitList with image, [76, 57, 231, 15, 131]
+  emitRel with image, fixes, "gc_fill_e"
+  emitList with image, [139, 15, 247, 193, 6, 0, 0, 0, 15, 133]
+  emitRel with image, fixes, "gc_fill_n"
+  emitList with image, [129, 225, 248, 255, 255, 1, 131, 249, 8, 15, 130]
+  emitRel with image, fixes, "gc_fill_n"
+  emitList with image, [72, 141, 4, 15, 76, 57, 224, 15, 135]
+  emitRel with image, fixes, "gc_fill_n"
+  emitList with image, [233]
+  emitRel with image, fixes, "gc_fill_e"
+  pin with labels, "gc_fill_n", image
+  emitList with image, [72, 131, 199, 8, 233]
+  emitRel with image, fixes, "gc_fill_s"
+  pin with labels, "gc_fill_e", image
+  emitList with image, [72, 137, 248, 72, 41, 240, 131, 248, 8, 15, 130]
+  emitRel with image, fixes, "gc_fill_skip"
+  emitList with image, [131, 200, 1, 137, 6, 199, 70, 4]
+  emitU32 with image, 0
+  emitList with image, [72, 137, 254, 233]
+  emitRel with image, fixes, "gc_fill"
+  pin with labels, "gc_fill_skip", image
+  emitList with image, [72, 137, 254, 233]
+  emitRel with image, fixes, "gc_fill"
+  pin with labels, "gc_fill_d", image
+  emitList with image, [233]
+  emitRel with image, fixes, "gc_done"
+  pin with labels, "gc_heap_bad", image
+  emitFail with image, fixes, "msg_gc_heap"
   pin with labels, "gc_done", image
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "gc_busy"
@@ -534,8 +568,16 @@ define emitMore with image, fixes, labels
   emitEpi with image
 
   pin with labels, "rt_memcpy", image
+  ~ memmove: compact can copy an object left by less than its size.
   emitList with image, [77, 133, 192, 15, 132]
   emitRel with image, fixes, "memcpy_done"
+  emitList with image, [72, 57, 209, 15, 131]
+  emitRel with image, fixes, "memcpy_fwd"
+  emitList with image, [72, 1, 193, 72, 1, 194]
+  pin with labels, "memcpy_back", image
+  emitList with image, [72, 255, 201, 72, 255, 202, 138, 2, 136, 1, 73, 255, 200, 117, 241]
+  emitList with image, [195]
+  pin with labels, "memcpy_fwd", image
   pin with labels, "memcpy_loop", image
   emitList with image, [138, 2, 136, 1, 72, 255, 193, 72, 255, 194, 73, 255, 200, 117, 241]
   pin with labels, "memcpy_done", image
@@ -2647,6 +2689,7 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_bigtxt", "text is too large to write"
   parkMsg with image, labels, "msg_oom", "out of memory"
   parkMsg with image, labels, "msg_gc", "gc header"
+  parkMsg with image, labels, "msg_gc_heap", "gc heap corrupt"
   parkMsg with image, labels, "msg_number", "number needs text or a number"
   parkMsg with image, labels, "msg_nan", "that text is not a number"
   parkMsg with image, labels, "ext_exe", ".exe"

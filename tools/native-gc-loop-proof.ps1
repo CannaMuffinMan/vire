@@ -105,6 +105,12 @@ if ($afterGc.Exit -ne 0 -or $afterGc.Out -ne "7") {
     throw "pass-after gc-churn expected 7 exit 0, got exit=$($afterGc.Exit) out=$($afterGc.Out)"
 }
 Write-Output "PASS_AFTER gc-churn at $AfterSha"
+$afterKind = Compile-Run "gc-kind-stress-after" (Join-Path $Root "tests/native/gc-kind-stress.vire")
+Write-Output "after_kind exit=$($afterKind.Exit) out=$($afterKind.Out)"
+if ($afterKind.Exit -ne 0 -or $afterKind.Out -ne "gc-kind-stress ok") {
+    throw "pass-after gc-kind-stress expected gc-kind-stress ok exit 0, got exit=$($afterKind.Exit) out=$($afterKind.Out)"
+}
+Write-Output "PASS_AFTER gc-kind-stress at $AfterSha"
 $afterTurns = Compile-Run "while-turns-after" (Join-Path $Root "tests/native/while-turns.vire")
 Write-Output "after_turns exit=$($afterTurns.Exit) out=$($afterTurns.Out)"
 if ($afterTurns.Exit -ne 0 -or $afterTurns.Out -ne "ok") {

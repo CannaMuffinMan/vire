@@ -60,6 +60,7 @@ jobs:
       - run: bash tools/native-sec-emu-check.sh
       - run: bash tools/l1-residuals-check.sh
       - run: bash tools/gen2-emitfix-if-check.sh
+      - run: bash tools/native-gc-kind-check.sh
   selfhost-windows:
     runs-on: windows-latest
     steps:
