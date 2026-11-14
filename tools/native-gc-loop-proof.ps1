@@ -167,6 +167,73 @@ for ($keep = 300; $keep -le 490; $keep++) {
 }
 Write-Output "PASS_AFTER textcat keep 300..490 fail-closed at $AfterSha"
 
+function Set-Keep {
+    param([string]$Src, [string]$Dst, [int]$Keep)
+    $text = [IO.File]::ReadAllText($Src)
+    $updated = $text.Replace("while n < 470", "while n < $Keep")
+    [IO.File]::WriteAllText($Dst, $updated)
+}
+
+function Assert-NearfullClosed {
+    param($Result, [string]$Kind, [int]$Keep, [string]$Phase)
+    $out = "$($Result.Out)"
+    if ($out.Contains("$Kind corrupt") -or $out.Contains("crash ")) {
+        throw "$Phase $Kind keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("$Kind ok")) { return }
+    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    throw "$Phase $Kind keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+}
+
+$StaleSha = "8f07846"
+Write-Output "phase fail-before replace/hex/take_arg $StaleSha"
+Restore-RuntimeFrom $StaleSha
+$repSrc = Join-Path $Work "gc-replace-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-replace-nearfull.vire") $repSrc 470
+$beforeRep = Compile-Run "replace-before" $repSrc
+Write-Output "before_replace exit=$($beforeRep.Exit) out=$($beforeRep.Out)"
+if ($beforeRep.Out.Contains("crash ") -or $beforeRep.Out.Contains("replace corrupt")) {
+    Write-Output "FAIL_BEFORE replace crash at $StaleSha keep=470"
+} else {
+    throw "fail-before replace at $StaleSha expected crash, got exit=$($beforeRep.Exit) out=$($beforeRep.Out)"
+}
+$hexSrc = Join-Path $Work "gc-hex-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-hex-nearfull.vire") $hexSrc 470
+$beforeHex = Compile-Run "hex-before" $hexSrc
+Write-Output "before_hex exit=$($beforeHex.Exit) out=$($beforeHex.Out)"
+if ($beforeHex.Out.Contains("crash ") -or $beforeHex.Out.Contains("hex corrupt")) {
+    Write-Output "FAIL_BEFORE hex crash at $StaleSha keep=470"
+} else {
+    throw "fail-before hex at $StaleSha expected crash, got exit=$($beforeHex.Exit) out=$($beforeHex.Out)"
+}
+$argSrc = Join-Path $Work "gc-takearg-nearfull-before.vire"
+Set-Keep (Join-Path $Root "tests/native/gc-takearg-nearfull.vire") $argSrc 470
+$beforeArg = Compile-Run "takearg-before" $argSrc
+Write-Output "before_take_arg exit=$($beforeArg.Exit) out=$($beforeArg.Out)"
+if ($beforeArg.Out.Contains("crash ") -or $beforeArg.Out.Contains("take_arg corrupt")) {
+    Write-Output "FAIL_BEFORE take_arg crash at $StaleSha keep=470"
+} else {
+    throw "fail-before take_arg at $StaleSha expected crash, got exit=$($beforeArg.Exit) out=$($beforeArg.Out)"
+}
+
+Write-Output "phase pass-after replace/hex/take_arg $AfterSha"
+Restore-RuntimeFrom $AfterSha
+$kinds = @(
+    @{ Name = "replace"; Src = "tests/native/gc-replace-nearfull.vire"; Kind = "replace" },
+    @{ Name = "hex"; Src = "tests/native/gc-hex-nearfull.vire"; Kind = "hex" },
+    @{ Name = "take_arg"; Src = "tests/native/gc-takearg-nearfull.vire"; Kind = "take_arg" }
+)
+foreach ($k in $kinds) {
+    for ($keep = 300; $keep -le 490; $keep++) {
+        $src = Join-Path $Work ("gc-" + $k.Name + "-$keep.vire")
+        Set-Keep (Join-Path $Root $k.Src) $src $keep
+        $got = Compile-Run ($k.Name + "-$keep") $src
+        Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
+        Assert-NearfullClosed $got $k.Kind $keep "pass-after"
+    }
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300..490 fail-closed at $AfterSha")
+}
+
 Write-Output "native gc/loop proof ok"
 Write-Output "note: a truly infinite accept loop is not shown in CI; ticks/rt_note_wait reset the 2e6 spin counter per turn, then this job shuts down after 2.5e6 counted trips."
 exit 0

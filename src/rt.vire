@@ -327,8 +327,11 @@ define emitRuntime with image, fixes, labels
   let image be emitList with image, [233]
   let image be emitRel with image, fixes, "say_write"
   pin with labels, "say_coll", image
+  let image be emitList with image, [72, 137, 209]
+  let image be emitParkRcx with image
   let image be emitList with image, [232]
   let image be emitRel with image, fixes, "rt_to_text"
+  let image be emitUnparkRcx with image
   let image be emitList with image, [233]
   let image be emitRel with image, fixes, "say_text"
   pin with labels, "say_text", image
@@ -470,8 +473,10 @@ define emitRuntime with image, fixes, labels
   pin with labels, "read_open", image
   let image be emitList with image, [184]
   let image be emitU32 with image, 2
+  let image be emitParkSlot with image, 216
   let image be emitList with image, [72, 139, 77, 216]
   let image be emitCallTo with image, fixes, "rt_check_path"
+  let image be emitUnparkSlot with image, 216
   let image be emitList with image, [72, 139, 85, 216, 72, 141, 74, 8, 186]
   let image be emitU32 with image, 2147483648
   let image be emitList with image, [65, 184]

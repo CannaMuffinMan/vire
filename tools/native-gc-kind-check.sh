@@ -86,9 +86,56 @@ raise SystemExit(f"textcat keep={keep} unexpected out={text!r} faults={faults}")
 PY
 }
 
+run_nearfull() {
+  local kind="$1"
+  local src="$2"
+  local keep="$3"
+  python3 - "$src" "$WORKDIR/${kind}-$keep.vire" "$keep" <<'PY'
+import sys
+src, dst, keep = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(src, encoding="utf-8").read().replace("while n < 470", f"while n < {keep}", 1)
+open(dst, "w", encoding="utf-8").write(text)
+PY
+  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/${kind}-$keep.vire" "data/native-gc-kind/${kind}-$keep.hex"
+  local out
+  out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/${kind}-$keep.hex" 0 || true)"
+  echo "$out"
+  python3 - "$kind" "$keep" "$out" <<'PY'
+import sys
+kind, keep, out = sys.argv[1], sys.argv[2], sys.argv[3]
+faults = ""
+for line in out.splitlines():
+    if line.startswith("FAULTS "):
+        faults = line[len("FAULTS "):]
+body = []
+on = False
+for line in out.splitlines():
+    if line.strip() == "STDOUT_BEGIN":
+        on = True
+        continue
+    if line.strip() == "STDOUT_END":
+        on = False
+        continue
+    if on:
+        body.append(line.replace("\r", ""))
+text = "\n".join(body)
+if faults not in ("[]",):
+    raise SystemExit(f"{kind} keep={keep} crashed faults={faults}")
+if f"{kind} corrupt" in text:
+    raise SystemExit(f"{kind} keep={keep} corrupt")
+if f"{kind} ok" in text or "out of memory" in text:
+    print(f"{kind} keep={keep} fail-closed ok")
+    raise SystemExit(0)
+raise SystemExit(f"{kind} keep={keep} unexpected out={text!r} faults={faults}")
+PY
+}
+
 # Full 300..490 is the Windows PE proof (native speed). Unicorn samples the
 # crash keeps plus a fitting keep.
 for keep in 300 470 478 482 490; do
   run_textcat "$keep"
+  run_nearfull replace "$ROOT/tests/native/gc-replace-nearfull.vire" "$keep"
+  run_nearfull hex "$ROOT/tests/native/gc-hex-nearfull.vire" "$keep"
+  run_nearfull take_arg "$ROOT/tests/native/gc-takearg-nearfull.vire" "$keep"
 done
 echo "native gc-kind check ok"
