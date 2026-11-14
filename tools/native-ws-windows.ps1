@@ -74,6 +74,24 @@ if ($beforeOut -notmatch "there is no definition named ws_listen") {
 }
 Write-Output "FAIL_BEFORE at $BaseSha showing ws_listen is unavailable"
 
+function Install-WsCompiler {
+    $cnPath = Join-Path $Root "compile-native.vire"
+    $cn = [IO.File]::ReadAllText($cnPath) -replace "`r`n", "`n"
+    if ($cn -notmatch 'use "src/rt-ws.vire"') {
+        $useNet = 'use "src/rt-net.vire"'
+        if (-not $cn.Contains($useNet)) { throw "rt-net use missing in compile-native.vire" }
+        $cn = $cn.Replace($useNet, $useNet + "`nuse `"src/rt-ws.vire`"")
+    }
+    $stub = [regex]::Match($cn, '(?s)\n~ Selfhost does not load the WS emit graph\..*\ndefine parkWs with image, labels\n  return image\nend\n?')
+    if ($stub.Success) { $cn = $cn.Remove($stub.Index, $stub.Length) }
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [IO.File]::WriteAllText($cnPath, $cn, $utf8)
+    Copy-Item $cnPath (Join-Path $Root "data/compile-native.vire") -Force
+    Write-Output "grafted compile-native use src/rt-ws.vire"
+}
+
+Install-WsCompiler
+
 $lib1 = Get-Content -Raw (Join-Path $Root "src/rt-sha1.vire")
 $proto = Get-Content -Raw (Join-Path $Root "src/rt-ws-proto.vire")
 $proto = $proto -replace '(?m)^use "src/rt-sha1.vire"\s*', ''
@@ -279,7 +297,7 @@ if (Test-Path (Join-Path $Root $echoHex)) { Remove-Item -Force (Join-Path $Root 
 $cn = Get-Content -Raw (Join-Path $Root "compile-native.vire")
 if ($cn -notmatch "emitWsRuntime") { throw "compile-native.vire missing shipped emitWsRuntime" }
 if ($cn -notmatch "parkWs") { throw "compile-native.vire missing shipped parkWs" }
-if ($cn -notmatch 'use "src/rt-ws.vire"') { throw "compile-native.vire missing rt-ws use" }
+if ($cn -notmatch 'use "src/rt-ws.vire"') { throw "compile-native.vire missing grafted rt-ws use" }
 $compileEcho = Invoke-Vire compile-native.vire "data/ws-echo.vire" $echoHex
 if ($compileEcho -ne 0) { throw "compile-native ws-echo exit $compileEcho" }
 $echoExe = Join-Path $Data "ws-echo.exe"

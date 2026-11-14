@@ -420,7 +420,7 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 57, 247, 15, 131]
   emitRel with image, fixes, "gc_rbp_n"
   emitList with image, [72, 139, 7]
-  emitCallTo with image, fixes, "rt_gc_mark_pin"
+  emitCallTo with image, fixes, "rt_gc_mark"
   emitList with image, [72, 131, 199, 8, 233]
   emitRel with image, fixes, "gc_rbp_w"
   pin with labels, "gc_rbp_n", image
@@ -491,8 +491,20 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 238, 185]
   emitU32 with image, 64
   pin with labels, "gc_urbp", image
+  emitList with image, [72, 133, 246, 15, 132]
+  emitRel with image, fixes, "gc_urbp_d"
+  emitList with image, [72, 137, 247, 72, 129, 239]
+  emitU32 with image, 128
   pin with labels, "gc_urbp_w", image
+  emitList with image, [72, 57, 247, 15, 131]
+  emitRel with image, fixes, "gc_urbp_n"
+  emitList with image, [72, 137, 249]
+  emitCallTo with image, fixes, "rt_gc_update"
+  emitList with image, [72, 131, 199, 8, 233]
+  emitRel with image, fixes, "gc_urbp_w"
   pin with labels, "gc_urbp_n", image
+  emitList with image, [72, 139, 54, 255, 201, 15, 133]
+  emitRel with image, fixes, "gc_urbp"
   pin with labels, "gc_urbp_d", image
   emitList with image, [76, 137, 222]
   pin with labels, "gc_uobj", image

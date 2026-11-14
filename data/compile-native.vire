@@ -2,7 +2,6 @@
 
 use "src/pe.vire"
 use "src/rt-net.vire"
-use "src/rt-ws.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -1882,5 +1881,14 @@ define main
   let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)
   say "compiled"
+end
+
+~ Selfhost does not load the WS emit graph. Prove/graft replaces these.
+define emitWsRuntime with image, fixes, labels
+  return image
+end
+
+define parkWs with image, labels
+  return image
 end
 
