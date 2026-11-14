@@ -144,6 +144,7 @@ define emitListenMux with image, fixes, labels
   pin with labels, "srv_mux", image
   emitCallTo with image, fixes, "rt_note_wait"
   emitCallTo with image, fixes, "rt_server_reset"
+  emitList with image, [199, 69, 164, 0, 0, 0, 0]
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "srv_fdset"
   emitList with image, [199, 0, 0, 0, 0, 0]
@@ -159,12 +160,14 @@ define emitListenMux with image, fixes, labels
   emitRel with image, fixes, "srv_addn"
   emitList with image, [72, 137, 193]
   emitCallTo with image, fixes, "rt_fd_add"
+  emitList with image, [255, 69, 164]
   pin with labels, "srv_addn", image
   emitList with image, [139, 77, 168, 255, 193, 131, 249, 64]
   emitJcc with image, fixes, 140, "srv_addc"
-  ~ nfds ignored on Win64; timeout NULL so listen stays in the wait set
-  ~ until a connection is pending. A 50ms timeval was returning 0 with an
-  ~ empty set every iteration, so accept never ran and /health got 0 bytes.
+  ~ Zero parked clients: blocking accept (FAIL_BEFORE sequential GET).
+  ~ Otherwise select so a hung slot cannot own accept.
+  emitList with image, [131, 125, 164, 0, 15, 132]
+  emitRel with image, fixes, "srv_doac"
   emitList with image, [185]
   emitU32 with image, 1
   emitList with image, [72, 141, 21]
@@ -176,6 +179,7 @@ define emitListenMux with image, fixes, labels
   emitCallTo with image, fixes, "rt_fd_has"
   emitList with image, [133, 192, 15, 132]
   emitRel with image, fixes, "srv_clients"
+  pin with labels, "srv_doac", image
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "srv_listen"
   emitList with image, [49, 210, 69, 49, 192]
