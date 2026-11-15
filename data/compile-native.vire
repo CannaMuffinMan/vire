@@ -1821,6 +1821,10 @@ define main
   end
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
+  ~ Parse of PE+#71+#ELF sources is one long while run. ticks sets wait_cell so
+  ~ rt_loop_tick resets the 2e6 consecutive-trip counter (same as accept loops).
+  ~ Guarded caps stay 32MB / 100000 / 5M / MaxCalls 64.
+  let pulse be ticks
   let wantElf be linux
   if (length with files) > 2
     if (files at 2) == "pe"
@@ -1841,10 +1845,12 @@ define main
     end
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
+  let pulse2 be ticks
   let i be 0
   let hasRoute be false
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
+    let pulse3 be ticks
     if ((funcs at i) at "name") == "route"
       if ((funcs at i) at "nparams") == 3
         let hasRoute be true
