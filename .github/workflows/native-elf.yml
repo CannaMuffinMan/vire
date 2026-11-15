@@ -19,6 +19,8 @@ jobs:
         run: bash tools/native-elf-hello.sh
       - name: files read/write syscalls
         run: bash tools/native-elf-files.sh
+      - name: openat O_NOFOLLOW FAIL_BEFORE/PASS_AFTER
+        run: bash tools/native-elf-nofollow.sh
       - name: loopback TCP connect/listen
         run: bash tools/native-elf-tcp.sh
       - name: selfhost gen1=gen2

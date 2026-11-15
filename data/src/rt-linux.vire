@@ -254,13 +254,105 @@ define emitLinuxStubs with image, fixes, labels
   let image be emitHex with image, "81ce"
   let image be emitU32 with image, 512
   pin with labels, "cf_open", image
-  let image be emitHex with image, "4889dfba"
+  ~ Walk each path component with openat(O_NOFOLLOW|O_CLOEXEC). Intermediate
+  ~ names use O_DIRECTORY. Reject absolute paths and '..'. AT_FDCWD start.
+  let image be emitHex with image, "4154415541568975f04989dd41bc"
+  let image be emitU32 with image, 4294967196
+  let image be emitHex with image, "803b2f0f84"
+  let image be emitRel with image, fixes, "cf_fail"
+  pin with labels, "cf_skip", image
+  let image be emitHex with image, "41807d002f0f85"
+  let image be emitRel with image, fixes, "cf_comp"
+  let image be emitHex with image, "49ffc5e9"
+  let image be emitRel with image, fixes, "cf_skip"
+  pin with labels, "cf_comp", image
+  let image be emitHex with image, "41807d00000f84"
+  let image be emitRel with image, fixes, "cf_empty"
+  let image be emitHex with image, "4d89ee"
+  pin with labels, "cf_scan", image
+  let image be emitHex with image, "41803e000f84"
+  let image be emitRel with image, fixes, "cf_got"
+  let image be emitHex with image, "41803e2f0f84"
+  let image be emitRel with image, fixes, "cf_got"
+  let image be emitHex with image, "49ffc6e9"
+  let image be emitRel with image, fixes, "cf_scan"
+  pin with labels, "cf_got", image
+  let image be emitHex with image, "4c89f14c29e983f9020f85"
+  let image be emitRel with image, fixes, "cf_ndd"
+  let image be emitHex with image, "6641817d002e2e0f84"
+  let image be emitRel with image, fixes, "cf_fail"
+  pin with labels, "cf_ndd", image
+  let image be emitHex with image, "83f9010f85"
+  let image be emitRel with image, fixes, "cf_real"
+  let image be emitHex with image, "41807d002e0f85"
+  let image be emitRel with image, fixes, "cf_real"
+  let image be emitHex with image, "4d89f5e9"
+  let image be emitRel with image, fixes, "cf_skip"
+  pin with labels, "cf_real", image
+  let image be emitHex with image, "418a068845ec41c606008b55f081ca"
+  let image be emitU32 with image, 655360
+  let image be emitHex with image, "807dec000f84"
+  let image be emitRel with image, fixes, "cf_last"
+  let image be emitHex with image, "ba"
+  let image be emitU32 with image, 720896
+  pin with labels, "cf_last", image
+  let image be emitHex with image, "b8"
+  let image be emitU32 with image, 257
+  let image be emitHex with image, "4489e74c89ee41ba"
   let image be emitU32 with image, 420
-  let image be emitSys with image, 2
+  let image be emitHex with image, "0f05"
   let image be emitSysNeg1 with image
-  let image be emitHex with image, "488d65f85bc9"
+  let image be emitHex with image, "8a4dec41880e4885c00f88"
+  let image be emitRel with image, fixes, "cf_fail"
+  let image be emitHex with image, "807dec000f84"
+  let image be emitRel with image, fixes, "cf_done"
+  let image be emitHex with image, "4181fc"
+  let image be emitU32 with image, 4294967196
+  let image be emitHex with image, "0f84"
+  let image be emitRel with image, fixes, "cf_keepdir"
+  let image be emitHex with image, "504489e7b8"
+  let image be emitU32 with image, 3
+  let image be emitHex with image, "0f0558"
+  pin with labels, "cf_keepdir", image
+  let image be emitHex with image, "4189c44d89f549ffc5e9"
+  let image be emitRel with image, fixes, "cf_skip"
+  pin with labels, "cf_empty", image
+  let image be emitHex with image, "4181fc"
+  let image be emitU32 with image, 4294967196
+  let image be emitHex with image, "0f85"
+  let image be emitRel with image, fixes, "cf_empty_fd"
+  let image be emitHex with image, "488d35"
+  let image be emitRel with image, fixes, "cf_dot"
+  let image be emitHex with image, "ba"
+  let image be emitU32 with image, 720896
+  let image be emitHex with image, "b8"
+  let image be emitU32 with image, 257
+  let image be emitHex with image, "bf"
+  let image be emitU32 with image, 4294967196
+  let image be emitHex with image, "0f05"
+  let image be emitSysNeg1 with image
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "cf_ret"
+  pin with labels, "cf_empty_fd", image
+  let image be emitHex with image, "4489e0e9"
+  let image be emitRel with image, fixes, "cf_ret"
+  pin with labels, "cf_done", image
+  let image be emitHex with image, "4181fc"
+  let image be emitU32 with image, 4294967196
+  let image be emitHex with image, "0f84"
+  let image be emitRel with image, fixes, "cf_ret"
+  let image be emitHex with image, "504489e7b8"
+  let image be emitU32 with image, 3
+  let image be emitHex with image, "0f0558"
+  pin with labels, "cf_ret", image
+  let image be emitHex with image, "415e415d415c488d65f85bc9"
   let image be emitLoadRbx with image, fixes
   let image be emitHex with image, "c3"
+  pin with labels, "cf_fail", image
+  let image be emitHex with image, "48c7c0ffffffffe9"
+  let image be emitRel with image, fixes, "cf_ret"
+  pin with labels, "cf_dot", image
+  let image be emitHex with image, "2e00"
 
   pin with labels, "stub_sz", image
   let image be emitSaveRbx with image, fixes
@@ -288,6 +380,15 @@ define emitLinuxStubs with image, fixes, labels
   let image be emitU32 with image, 4294967160
   let image be emitHex with image, "25"
   let image be emitU32 with image, 61440
+  let image be emitHex with image, "3d"
+  let image be emitU32 with image, 40960
+  let image be emitHex with image, "75"
+  let image be emitU8 with image, 14
+  let image be emitHex with image, "b8"
+  let image be emitU32 with image, 1056
+  let image be emitHex with image, "c9"
+  let image be emitLoadRbx with image, fixes
+  let image be emitHex with image, "c3"
   let image be emitHex with image, "3d"
   let image be emitU32 with image, 16384
   let image be emitHex with image, "75"

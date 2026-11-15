@@ -690,10 +690,8 @@ sealed class Machine
             VirePaths.RefuseProgram(path, line, col);
             try
             {
-                string parent = Path.GetDirectoryName(path);
-                if (parent != null && parent.Length > 0) Directory.CreateDirectory(parent);
                 if (VirePaths.NormalizedExtension(path) == ".vc") VireSeal.WritePacked(path, text);
-                else VireFiles.WriteAllText(path, text);
+                else VirePaths.WriteAllTextInside(path, text, root, line, col);
             }
             catch (IOException) { throw new VireError("could not write that file", line, col); }
             catch (UnauthorizedAccessException) { throw new VireError("could not write that file", line, col); }

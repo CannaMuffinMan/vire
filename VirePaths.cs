@@ -212,10 +212,21 @@ static class VirePaths
     public static void AppendAllTextInside(string path, string text, string root, int line, int column)
     {
         string parent = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+        if (!string.IsNullOrEmpty(parent) && !OperatingSystem.IsLinux()) Directory.CreateDirectory(parent);
         using FileStream fs = OpenFile(path, FileMode.Append, FileAccess.Write, root, line, column);
         ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
         using StreamWriter writer = new StreamWriter(fs, leaveOpen: false);
+        writer.Write(text);
+        writer.Flush();
+    }
+
+    public static void WriteAllTextInside(string path, string text, string root, int line, int column)
+    {
+        string parent = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(parent) && !OperatingSystem.IsLinux()) Directory.CreateDirectory(parent);
+        using FileStream fs = OpenFile(path, FileMode.Create, FileAccess.Write, root, line, column);
+        ConfirmOpenedWritable(fs.SafeFileHandle, root, line, column);
+        using StreamWriter writer = new StreamWriter(fs, new UTF8Encoding(false));
         writer.Write(text);
         writer.Flush();
     }
@@ -241,7 +252,11 @@ static class VirePaths
         int widenMs = TestToctouDelayMs;
         if (widenMs > 0 && widenMs < 2000)
             Thread.Sleep(widenMs);
-        FileStream fs = new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
+        FileStream fs;
+        if (OperatingSystem.IsLinux())
+            fs = OpenFileLinux(path, mode, access, root, line, column);
+        else
+            fs = new FileStream(path, mode, access, FileShare.ReadWrite | FileShare.Delete);
         if (OperatingSystem.IsLinux() && existed)
         {
             ulong d2;
@@ -604,4 +619,88 @@ static class VirePaths
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
     static extern int LinuxFStatArm64(int fd, out LinuxStatArm64 stat);
+
+    const int LinuxAtFdcwd = -100;
+    const int LinuxORdonly = 0;
+    const int LinuxOWronly = 1;
+    const int LinuxORdwr = 2;
+    const int LinuxOCreat = 64;
+    const int LinuxOTrunc = 512;
+    const int LinuxOAppend = 1024;
+    const int LinuxODirectory = 65536;
+    const int LinuxONofollow = 131072;
+    const int LinuxOCloexec = 524288;
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static FileStream OpenFileLinux(string path, FileMode mode, FileAccess access, string root, int line, int column)
+    {
+        string rootFull = Path.GetFullPath(root);
+        string full = Path.GetFullPath(path);
+        if (!InFolder(rootFull, full))
+            throw new VireError("files stay inside the program folder", line, column);
+        string rel = Path.GetRelativePath(rootFull, full).Replace('\\', '/');
+        if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
+            throw new VireError("files stay inside the program folder", line, column);
+        int flags = LinuxOCloexec | LinuxONofollow;
+        if (access == FileAccess.Read) flags |= LinuxORdonly;
+        else if (access == FileAccess.ReadWrite) flags |= LinuxORdwr;
+        else flags |= LinuxOWronly;
+        if (mode == FileMode.Create || mode == FileMode.Truncate) flags |= LinuxOCreat | LinuxOTrunc;
+        else if (mode == FileMode.Append) flags |= LinuxOCreat | LinuxOAppend;
+        else if (mode == FileMode.CreateNew) flags |= LinuxOCreat;
+        bool mkdir = mode != FileMode.Open && mode != FileMode.Truncate;
+        int fd = LinuxOpenAtWalk(rootFull, rel, flags, mkdir, line, column);
+        return new FileStream(new SafeFileHandle(new IntPtr(fd), true), access, 4096, false);
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    static int LinuxOpenAtWalk(string root, string rel, int leafFlags, bool mkdir, int line, int column)
+    {
+        int dir = LinuxOpenAt(LinuxAtFdcwd, root, LinuxORdonly | LinuxODirectory | LinuxOCloexec, 0);
+        if (dir < 0)
+            throw new VireError("files stay inside the program folder", line, column);
+        string[] parts = (rel ?? ".").Split('/');
+        int last = parts.Length - 1;
+        while (last >= 0 && (parts[last] == "" || parts[last] == ".")) last--;
+        if (last < 0)
+            return dir;
+        for (int i = 0; i <= last; i++)
+        {
+            string part = parts[i];
+            if (part.Length == 0 || part == ".") continue;
+            if (part == "..")
+            {
+                LinuxClose(dir);
+                throw new VireError("files stay inside the program folder", line, column);
+            }
+            bool leaf = i == last;
+            int fl = leaf ? leafFlags : (LinuxORdonly | LinuxODirectory | LinuxONofollow | LinuxOCloexec);
+            int next = LinuxOpenAt(dir, part, fl, 420);
+            if (next < 0 && !leaf && mkdir)
+            {
+                LinuxMkdirAt(dir, part, 493);
+                next = LinuxOpenAt(dir, part, fl, 420);
+            }
+            if (next < 0)
+            {
+                LinuxClose(dir);
+                throw new VireError("files stay inside the program folder", line, column);
+            }
+            LinuxClose(dir);
+            dir = next;
+        }
+        return dir;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "openat", SetLastError = true)]
+    static extern int LinuxOpenAt(int dirfd, string path, int flags, int mode);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "close", SetLastError = true)]
+    static extern int LinuxClose(int fd);
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [DllImport("libc", EntryPoint = "mkdirat", SetLastError = true)]
+    static extern int LinuxMkdirAt(int dirfd, string path, int mode);
 }
