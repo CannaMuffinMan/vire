@@ -105,6 +105,64 @@ function Invoke-Vire {
     }
 }
 
+function Remove-PathRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Attempts = 8
+    )
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $delayMs = 200
+    for ($i = 1; $i -le $Attempts; $i++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            if (-not (Test-Path -LiteralPath $Path)) { return }
+        } catch {
+            if ($i -eq $Attempts) { throw }
+            Write-Output "pg_remove_retry $i $($_.Exception.Message)"
+            Start-Sleep -Milliseconds $delayMs
+            $delayMs = [Math]::Min(2000, $delayMs * 2)
+        }
+    }
+}
+
+function Stop-PgWait {
+    param(
+        [Parameter(Mandatory = $true)][string]$PgCtl,
+        [Parameter(Mandatory = $true)][string]$PgData
+    )
+    if (-not (Test-Path -LiteralPath $PgData)) { return }
+    try {
+        & $PgCtl -D $PgData -m fast -w stop
+    } catch {
+        Write-Output "pg_ctl_stop_exception $($_.Exception.Message)"
+    }
+    $pidFile = Join-Path $PgData "postmaster.pid"
+    $postmasterPid = $null
+    if (Test-Path -LiteralPath $pidFile) {
+        try { $postmasterPid = [int]((Get-Content -LiteralPath $pidFile -TotalCount 1).Trim()) } catch { }
+    }
+    if ($postmasterPid) {
+        $proc = Get-Process -Id $postmasterPid -ErrorAction SilentlyContinue
+        if ($proc) {
+            Write-Output "pg_wait_pid $postmasterPid"
+            if (-not $proc.WaitForExit(15000)) {
+                try { Stop-Process -Id $postmasterPid -Force -ErrorAction Stop } catch { }
+                $proc.WaitForExit(5000) | Out-Null
+            }
+        }
+    }
+    Get-CimInstance Win32_Process -Filter "Name = 'postgres.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.CommandLine -and $_.CommandLine.Contains($PgData)) {
+            Write-Output "pg_stop_orphan $($_.ProcessId)"
+            try {
+                $orphan = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+                if ($orphan) { $orphan.WaitForExit(5000) | Out-Null }
+            } catch { }
+        }
+    }
+}
+
 function Find-PgBin {
     $candidates = @()
     if ($env:PGBIN) { $candidates += $env:PGBIN }
@@ -148,9 +206,12 @@ $PgPort = 55432
 if ($env:PGPORT) { $PgPort = [int]$env:PGPORT }
 $PgUser = "vire"
 $PgDb = "vire"
-if (Test-Path $PgData) { Remove-Item -Recurse -Force $PgData }
-$initdb = Join-Path $PgBin "initdb.exe"
 $pgctl = Join-Path $PgBin "pg_ctl.exe"
+if (Test-Path $PgData) {
+    Stop-PgWait -PgCtl $pgctl -PgData $PgData
+    Remove-PathRetry -Path $PgData
+}
+$initdb = Join-Path $PgBin "initdb.exe"
 $createdb = Join-Path $PgBin "createdb.exe"
 $env:PGPASSWORD = "ThrowawayVireCi1"
 & $initdb -D $PgData -U $PgUser --auth=trust --auth-local=trust --no-sync --locale=C --encoding=UTF8
@@ -171,6 +232,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "pg_ctl start exit $LASTEXITCODE"
 }
 $started = $true
+$proofError = $null
 try {
     & $createdb -h 127.0.0.1 -p $PgPort -U $PgUser $PgDb
     if ($LASTEXITCODE -ne 0) { throw "createdb exit $LASTEXITCODE" }
@@ -240,8 +302,21 @@ try {
     Write-Output "pg host pe match"
     Write-Output "PASS_AFTER at $AfterSha host and gen1 PE pg stdout identical"
     Write-Output "pg windows prove ok"
+} catch {
+    $proofError = $_
 } finally {
-    if ($started) {
-        try { & $pgctl -D $PgData -m fast -w stop | Out-Null } catch { }
+    $cleanupError = $null
+    try {
+        if ($started) {
+            Stop-PgWait -PgCtl $pgctl -PgData $PgData
+        }
+        if (Test-Path -LiteralPath $PgData) {
+            Remove-PathRetry -Path $PgData
+        }
+    } catch {
+        $cleanupError = $_
+        Write-Output "pg_cleanup_error $($_.Exception.Message)"
     }
 }
+if ($proofError) { throw $proofError }
+if ($cleanupError) { throw $cleanupError }

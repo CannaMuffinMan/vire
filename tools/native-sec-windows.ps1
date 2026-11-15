@@ -257,15 +257,26 @@ function Apply-SecWiden([string]$Tree) {
         if (-not $t.Contains('"Sleep"')) { throw "sec widen IAT insert failed in $pe" }
         [IO.File]::WriteAllText($pe, $t)
     }
-    $needle = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
-    $insert = "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [185]`n  emitU32 with image, 400`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    $sleep = "  emitList with image, [185]`n  emitU32 with image, 800`n  emitList with image, [255, 21]`n  emitRel with image, fixes, `"iat_sl`"`n"
+    $needles = @(
+        "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitUnparkSlot with image, 240`n  emitUnparkSlot with image, 232`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`"",
+        "  emitCallTo with image, fixes, `"rt_check_path`"`n  emitList with image, [72, 139, 77, 232]`n  emitCallTo with image, fixes, `"rt_banned`""
+    )
     $hit = 0
     foreach ($more in @((Join-Path $Tree "src/rt-more.vire"), (Join-Path $Tree "data/src/rt-more.vire"))) {
         if (-not (Test-Path -LiteralPath $more)) { continue }
         $t = [IO.File]::ReadAllText($more).Replace("`r`n", "`n")
         if ($t.Contains("iat_sl")) { $hit = $hit + 1; continue }
-        if (-not $t.Contains($needle)) { throw "sec widen insert point missing in $more" }
-        $t = $t.Replace($needle, $insert)
+        $matched = $false
+        foreach ($needle in $needles) {
+            if ($t.Contains($needle)) {
+                $insert = $needle.Replace("  emitCallTo with image, fixes, `"rt_check_path`"`n", "  emitCallTo with image, fixes, `"rt_check_path`"`n" + $sleep)
+                $t = $t.Replace($needle, $insert)
+                $matched = $true
+                break
+            }
+        }
+        if (-not $matched) { throw "sec widen insert point missing in $more" }
         [IO.File]::WriteAllText($more, $t.Replace("`n", "`r`n"))
         $hit = $hit + 1
     }
@@ -575,8 +586,8 @@ function Invoke-WidenJunctionRace([string]$WriteExe, [string]$Tag, [string]$Outs
     $p = Start-Process -FilePath $WriteExe -WorkingDirectory $Work -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
     $swapped = $false
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    while ($sw.ElapsedMilliseconds -lt 350 -and -not $p.HasExited) {
-        Start-Sleep -Milliseconds 40
+    while ($sw.ElapsedMilliseconds -lt 750 -and -not $p.HasExited) {
+        Start-Sleep -Milliseconds 50
         try {
             Invoke-WalkSwapNow
             $swapped = $true
@@ -601,19 +612,32 @@ function Invoke-WidenJunctionRace([string]$WriteExe, [string]$Tag, [string]$Outs
     return @{ Text = $outsideText; Code = $p.ExitCode; Swapped = $swapped }
 }
 
-$f5v = Invoke-WidenJunctionRace (Join-Path $Work "f5-vuln.exe") "f5-vuln" "f5-slot.txt" "HACKED"
-if ($f5v.Text -ne "HACKED") { throw "f5 fail-before missing: 3d9fc58 widened PE did not write outside (got $($f5v.Text) code=$($f5v.Code)). 0/0 is a failed gate." }
-Write-Host "f5_two_process_race vuln victim_hits=1 rounds=1 sec=0.400"
-$f5f = Invoke-WidenJunctionRace (Join-Path $Work "f5.exe") "f5-fixed" "f5-slot.txt" "HACKED"
-if ($f5f.Text -eq "HACKED") { throw "f5 pass-after failed: fixed widened PE wrote outside" }
-Write-Host "f5_two_process_race fixed victim_hits=0 rounds=1"
+function Invoke-WidenUntil([string]$WriteExe, [string]$Tag, [string]$OutsideLeaf, [string]$HitText, [bool]$MustHit, [int]$MaxRounds) {
+    $hits = 0
+    $rounds = 0
+    for ($r = 1; $r -le $MaxRounds; $r++) {
+        $rounds = $r
+        $got = Invoke-WidenJunctionRace $WriteExe ($Tag + "-r" + $r) $OutsideLeaf $HitText
+        if ($got.Text -eq $HitText) {
+            $hits = $hits + 1
+            if ($MustHit) { break }
+        }
+    }
+    if ($MustHit) {
+        if ($hits -lt 1) {
+            throw ($Tag + " fail-before missing: 3d9fc58 widened PE did not write outside in " + $MaxRounds + " rounds (last outside not " + $HitText + "). 0/0 is a failed gate.")
+        }
+        Write-Host ($Tag + " victim_hits=1 rounds=" + $rounds)
+    } else {
+        if ($hits -ne 0) { throw ($Tag + " pass-after failed: fixed widened PE wrote outside") }
+        Write-Host ($Tag + " victim_hits=0 rounds=" + $rounds)
+    }
+}
 
-$wv = Invoke-WidenJunctionRace (Join-Path $Work "walk-vuln.exe") "walk-vuln" "note.txt" "hacked"
-if ($wv.Text -ne "hacked") { throw "f_walk fail-before missing: 3d9fc58 widened PE did not write outside (got $($wv.Text) code=$($wv.Code)). 0/0 is a failed gate." }
-Write-Host "f_walk_then_open vuln outside_hits=1 rounds=1 sec=0.400"
-$wf = Invoke-WidenJunctionRace (Join-Path $Work "walk.exe") "walk-fixed" "note.txt" "hacked"
-if ($wf.Text -eq "hacked") { throw "f_walk pass-after failed: fixed PE wrote outside" }
-Write-Host "f_walk_then_open fixed outside_hits=0 rounds=1"
+Invoke-WidenUntil (Join-Path $Work "f5-vuln.exe") "f5_two_process_race vuln" "f5-slot.txt" "HACKED" $true 20
+Invoke-WidenUntil (Join-Path $Work "f5.exe") "f5_two_process_race fixed" "f5-slot.txt" "HACKED" $false 8
+Invoke-WidenUntil (Join-Path $Work "walk-vuln.exe") "f_walk_then_open vuln" "note.txt" "hacked" $true 20
+Invoke-WidenUntil (Join-Path $Work "walk.exe") "f_walk_then_open fixed" "note.txt" "hacked" $false 8
 Write-Host "f_walk_then_open GetFinalPathNameByHandle identity closed"
 
 if ($script:DefenderBlocked) {

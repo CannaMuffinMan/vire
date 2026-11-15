@@ -1,0 +1,11 @@
+~ Grow a list past 100000 then `at` a string key. FAIL_BEFORE smashes intern
+~ (bit 32 / garbage length / rt_at fault). PASS_AFTER is fail-closed.
+define main
+  let xs be []
+  let i be 0
+  while i < 100001
+    let xs be push with xs, "id"
+    let i be i + 1
+  end
+  say xs at "id"
+end

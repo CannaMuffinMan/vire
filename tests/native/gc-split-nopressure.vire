@@ -1,0 +1,35 @@
+define main
+  let p64 be "p"
+  let n be 0
+  while n < 6
+    let p64 be p64 + p64
+    let n be n + 1
+  end
+  let i be 0
+  let bad be 0
+  while i < 2
+    let s be p64
+    let j be 0
+    while j < 199
+      let s be s + "," + p64
+      let j be j + 1
+    end
+    let parts be split with s, ","
+    if (length with parts) != 200
+      let bad be bad + 1
+    end
+    if (parts at 0) != p64
+      let bad be bad + 1
+    end
+    if (parts at 199) != p64
+      let bad be bad + 1
+    end
+    if (parts at 100) != p64
+      let bad be bad + 1
+    end
+    let i be i + 1
+  end
+  if bad == 0
+    say "split ok"
+  end
+end

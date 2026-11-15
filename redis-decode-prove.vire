@@ -1,0 +1,110 @@
+use "src/rt-redis.vire"
+
+define proveOk with tag, buf, wantK
+  let got be redis_decode_full with buf
+  if (got at 0) != "ok"
+    say tag + " FAIL expected ok got " + (got at 0) + " " + (got at 1)
+    return 1
+  end
+  let v be got at 1
+  if (v at "k") != wantK
+    say tag + " FAIL kind " + (v at "k") + " want " + wantK
+    return 1
+  end
+  say tag + " PASS " + (redis_show with v)
+  return 0
+end
+
+define proveBad with tag, buf, needle
+  let got be redis_decode_full with buf
+  if (got at 0) != "bad"
+    say tag + " FAIL expected reject got " + (got at 0)
+    return 1
+  end
+  let why be got at 1
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    return 1
+  end
+  say tag + " REJECT " + why
+  return 0
+end
+
+define nestStar with n
+  let s be ""
+  let i be 0
+  while i < n
+    let s be s + "*1\r\n"
+    let i be i + 1
+  end
+  return s + "+x\r\n"
+end
+
+define main
+  let fails be 0
+  let nfail be proveOk with "SIMPLE ok", "+OK\r\n", "+"
+  let fails be fails + nfail
+  let nfail be proveOk with "ERROR err", "-ERR nope\r\n", "-"
+  let fails be fails + nfail
+  let nfail be proveOk with "INT 3", ":3\r\n", ":"
+  let fails be fails + nfail
+  let nfail be proveOk with "INT neg", ":-7\r\n", ":"
+  let fails be fails + nfail
+  let nfail be proveOk with "BULK foo", "$3\r\nfoo\r\n", "$"
+  let fails be fails + nfail
+  let nfail be proveOk with "BULK empty", "$0\r\n\r\n", "$"
+  let fails be fails + nfail
+  let nfail be proveOk with "BULK null", "$-1\r\n", "$"
+  let fails be fails + nfail
+  let nfail be proveOk with "ARRAY two", "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", "*"
+  let fails be fails + nfail
+  let nfail be proveOk with "ARRAY nested", "*2\r\n$1\r\na\r\n*1\r\n:2\r\n", "*"
+  let fails be fails + nfail
+  let nfail be proveOk with "ARRAY null", "*-1\r\n", "*"
+  let fails be fails + nfail
+  let nfail be proveOk with "ARRAY empty", "*0\r\n", "*"
+  let fails be fails + nfail
+
+  let enc be redis_encode with ["PING"]
+  if enc != "*1\r\n$4\r\nPING\r\n"
+    say "ENC ping FAIL " + enc
+    let fails be fails + 1
+  else
+    say "ENC ping PASS"
+  end
+  let enc2 be redis_encode with ["SET", "k", "v"]
+  if enc2 != "*3\r\n$3\r\nSET\r\n$1\r\nk\r\n$1\r\nv\r\n"
+    say "ENC set FAIL " + enc2
+    let fails be fails + 1
+  else
+    say "ENC set PASS"
+  end
+
+  let nfail be proveBad with "ADV oversize bulk", "$999999999\r\nxxxx", "oversize"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV overflow length", "$2147483648\r\n", "overflow"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV negative length", "$-2\r\n", "negative"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV truncated", "$5\r\nfoo", "truncated"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV bare LF", "+OK\n", "bare LF"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV bad CRLF", "$3\r\nfoo\n", "CRLF"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV oversize array", "*100000\r\n", "oversize array"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV too-deep", (nestStar with 20), "too-deep"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV bad type", "?0\r\n", "bad type"
+  let fails be fails + nfail
+  let nfail be proveBad with "ADV RESP3 map", "%1\r\n+a\r\n+b\r\n", "bad type"
+  let fails be fails + nfail
+
+  if fails == 0
+    say "REDIS DECODE PROVE pass"
+  else
+    say "REDIS DECODE PROVE fails " + (text with fails)
+    halt with 1
+  end
+end

@@ -53,6 +53,18 @@ FIPS 1M SHA (`crypto-mb.vire` / `tests/native/million-hash.vire`) builds a 1_000
 
 Net recv 1000000 (`src/rt-net.vire`), listen body 1MB, intern table 128 (`src/rt-more.vire:1211`), trap slots 384, `MaxRuns` 8. Unchanged.
 
+### Gen2 crash after #73 (GC unused slots)
+
+`parseClimb` is already a same-precedence loop (`prec + 1` only for the right operand). The iterative `emitExpr` stack used a **map** per frame (`e`/`p`/`i`/`no`/`yes`/`done`). `rt_map_new` allocates cap 4 (128 bytes) and does not zero unused pairs. List grow copies only `length` then leaves the rest of `cap` untouched. GC mark-compact walks the whole allocation (non-leaf). After the first compact, leftover from-space bytes in those holes look like heap pointers, get relocated, and the gen1 PE ACCESS_VIOLATIONs while emitting gen2 once the runtime image is large enough (#66, #71). Tip-sized gen1 can miss the first GC.
+
+**Fix (cap, this PR):** hitting 100000 must `rt_fail` `list is too large` — re-check after grow, clamp grow to 100000, same gate on `rt_map_put` / `rt_list_cat`. Do not raise the cap. Unchecked overflow smashed intern (bit 32) and faulted `rt_at` / `rt_texteq` (Windows `0x140004695`, Linux `0x4035eb`).
+
+**Lane 1 `emitFix` (needed here):** deferred `fixes` (one map per call/jmp/lea) is what hits the cap during gen2. #82 includes #78's early rt_* rel32 patch so gen2 can finish *under* 100000. It is a size fix, not a cap raise. ELF backend stays in #78.
+
+**Also:** `rt_bzero` on unused list/map slots; `emitExpr` 6-slot list frames. MaxCalls 64.
+
+Windows prove: FAIL_BEFORE list at `5b10ea5f` (100001 pushes, no `list is too large`); FAIL_BEFORE SHA at `04724f2c`. PASS_AFTER fail-closed plus 3× `native-selfhost-handoff` + `native-net-windows` with one SHA.
+
 ## Proof
 
 `tools/native-limits-check.sh` (Linux) and `tools/native-limits-windows.ps1` (Windows) print `FAIL_BEFORE at <base SHA>` by actually running `git show` of `compile-native.vire` at `origin/native-compiler`, then `PASS_AFTER` on HEAD. Windows also runs the gen1 PE and requires host stdout = PE stdout.

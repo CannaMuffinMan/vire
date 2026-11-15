@@ -1,0 +1,29 @@
+use "src/rt-redis.vire"
+
+define oneCase with port, tag, needle
+  let h be redis_open with port
+  send with h, (redis_encode with ["PING"])
+  let got be redis_read with h
+  close with h
+  if (got at 0) != "bad"
+    say tag + " FAIL expected reject got " + (got at 0)
+    halt with 1
+  end
+  let why be got at 1
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    halt with 1
+  end
+  say tag + " REJECT " + why
+  return 0
+end
+
+define main
+  let a be args
+  let port be number with (a at 0)
+  oneCase with port, "ADV TCP oversize bulk", "oversize"
+  oneCase with port, "ADV TCP truncated", "truncated"
+  oneCase with port, "ADV TCP bad CRLF", "CRLF"
+  oneCase with port, "ADV TCP too-deep", "too-deep"
+  say "REDIS ADV PROVE pass"
+end

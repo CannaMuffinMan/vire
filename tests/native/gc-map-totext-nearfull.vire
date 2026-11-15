@@ -1,0 +1,43 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let p64 be "p"
+  let n be 0
+  while n < 6
+    let p64 be p64 + p64
+    let n be n + 1
+  end
+  let i be 0
+  let bad be 0
+  while i < 3
+    let m be {}
+    let j be 0
+    while j < 100
+      put j into m at (p64 + (text with j))
+      let j be j + 1
+    end
+    let mt be text with m
+    if (find with mt, (p64 + "99")) < 0
+      let bad be bad + 1
+    end
+    let i be i + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "mt ok"
+  end
+  if bad != 0
+    say "mt corrupt"
+    say bad
+  end
+end
