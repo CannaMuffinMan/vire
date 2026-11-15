@@ -1,7 +1,8 @@
 # Same-source FAIL_BEFORE / PASS_AFTER for conservative-mark / precise-update GC.
 # Compiler is the pinned WS compile-native + rt-ws fixture (a6dde53 bytes).
 # FAIL_BEFORE: that compiler on 103f189e rt-more (rewrites ambiguous ints).
-# PASS_AFTER: that compiler on HEAD rt-more (pin ambiguous, update tagged only).
+# PASS_AFTER: that compiler on HEAD rt-more (pin ambiguous, update tagged only)
+# plus HEAD pe.vire so F5 MoveFileExA (iat_mv) is in the fixture IAT map.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -85,7 +86,7 @@ function Install-SameCompiler([string]$Tree, [bool]$FixedGc) {
         [IO.File]::WriteAllBytes($path, $ws)
     }
     if ($FixedGc) {
-        foreach ($rel in @("src/rt-more.vire", "data/src/rt-more.vire")) {
+        foreach ($rel in @("src/rt-more.vire", "data/src/rt-more.vire", "src/pe.vire", "data/src/pe.vire")) {
             [IO.File]::Copy((Join-Path $Root $rel), (Join-Path $Tree $rel), $true)
         }
     }

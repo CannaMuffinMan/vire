@@ -250,7 +250,9 @@ define emitRuntime with image, fixes, labels
   let image be emitRel with image, fixes, "written"
   let image be emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 255, 21]
   let image be emitRel with image, fixes, "iat_wf"
-  let image be emitList with image, [72, 139, 69, 240, 72, 139, 64, 40, 76, 141, 13]
+  ~ [rbp-8]=EXCEPTION_RECORD*; [rbp-16]=ExceptionCode; Info[1] is Record+40.
+  ~ Loading [rbp-16] here treats the code as a pointer and re-enters VEH.
+  let image be emitList with image, [72, 139, 69, 248, 72, 139, 64, 40, 76, 141, 13]
   let image be emitRel with image, fixes, "crash_hex"
   let image be emitList with image, [185]
   let image be emitU32 with image, 16
