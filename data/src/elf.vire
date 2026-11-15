@@ -29,11 +29,11 @@ define pokePhdr with head, off, type, flags, offset, vaddr, filesz, memsz, align
 end
 
 define elfIatNames
-  return ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp"]
+  return ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp", "iat_vq", "iat_mv"]
 end
 
 define elfStubNames
-  return ["stub_gs", "stub_wf", "stub_ep", "stub_va", "stub_cf", "stub_rf", "stub_sz", "stub_ch", "stub_cl", "stub_ga", "stub_fi", "stub_ue", "stub_vh", "stub_sp", "stub_se", "stub_fp"]
+  return ["stub_gs", "stub_wf", "stub_ep", "stub_va", "stub_cf", "stub_rf", "stub_sz", "stub_ch", "stub_cl", "stub_ga", "stub_fi", "stub_ue", "stub_vh", "stub_sp", "stub_se", "stub_fp", "stub_vq", "stub_mv"]
 end
 
 define elfNetIatNames
