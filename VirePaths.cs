@@ -627,9 +627,24 @@ static class VirePaths
     const int LinuxOCreat = 64;
     const int LinuxOTrunc = 512;
     const int LinuxOAppend = 1024;
-    const int LinuxODirectory = 65536;
-    const int LinuxONofollow = 131072;
     const int LinuxOCloexec = 524288;
+
+    // fcntl O_DIRECTORY / O_NOFOLLOW differ on asm-generic (ARM64) vs x86-64.
+    static int LinuxODirectory()
+    {
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ||
+            RuntimeInformation.ProcessArchitecture == Architecture.Arm)
+            return 16384;
+        return 65536;
+    }
+
+    static int LinuxONofollow()
+    {
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ||
+            RuntimeInformation.ProcessArchitecture == Architecture.Arm)
+            return 32768;
+        return 131072;
+    }
 
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static FileStream OpenFileLinux(string path, FileMode mode, FileAccess access, string root, int line, int column)
@@ -641,7 +656,7 @@ static class VirePaths
         string rel = Path.GetRelativePath(rootFull, full).Replace('\\', '/');
         if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
             throw new VireError("files stay inside the program folder", line, column);
-        int flags = LinuxOCloexec | LinuxONofollow;
+        int flags = LinuxOCloexec | LinuxONofollow();
         if (access == FileAccess.Read) flags |= LinuxORdonly;
         else if (access == FileAccess.ReadWrite) flags |= LinuxORdwr;
         else flags |= LinuxOWronly;
@@ -656,7 +671,7 @@ static class VirePaths
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     static int LinuxOpenAtWalk(string root, string rel, int leafFlags, bool mkdir, int line, int column)
     {
-        int dir = LinuxOpenAt(LinuxAtFdcwd, root, LinuxORdonly | LinuxODirectory | LinuxOCloexec, 0);
+        int dir = LinuxOpenAt(LinuxAtFdcwd, root, LinuxORdonly | LinuxODirectory() | LinuxOCloexec, 0);
         if (dir < 0)
             throw new VireError("files stay inside the program folder", line, column);
         string[] parts = (rel ?? ".").Split('/');
@@ -674,7 +689,7 @@ static class VirePaths
                 throw new VireError("files stay inside the program folder", line, column);
             }
             bool leaf = i == last;
-            int fl = leaf ? leafFlags : (LinuxORdonly | LinuxODirectory | LinuxONofollow | LinuxOCloexec);
+            int fl = leaf ? leafFlags : (LinuxORdonly | LinuxODirectory() | LinuxONofollow() | LinuxOCloexec);
             int next = LinuxOpenAt(dir, part, fl, 420);
             if (next < 0 && !leaf && mkdir)
             {

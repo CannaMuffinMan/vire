@@ -22,7 +22,7 @@ run_guest() {
   local want="$4"
   local maxbump="$5"
   cp "$src" "$WORKDIR/$name.vire"
-  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/$name.vire" "data/native-gc-kind/$name.hex"
+  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/$name.vire" "data/native-gc-kind/$name.hex" pe
   local out
   out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/$name.hex" "$count")"
   echo "$out"
@@ -53,7 +53,7 @@ src, dst, keep = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(src, encoding="utf-8").read().replace("while n < 470", f"while n < {keep}", 1)
 open(dst, "w", encoding="utf-8").write(text)
 PY
-  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/textcat-$keep.vire" "data/native-gc-kind/textcat-$keep.hex"
+  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/textcat-$keep.vire" "data/native-gc-kind/textcat-$keep.hex" pe
   local out
   out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/textcat-$keep.hex" 0 || true)"
   echo "$out"
@@ -103,7 +103,7 @@ src, dst, keep = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(src, encoding="utf-8").read().replace("while n < 470", f"while n < {keep}", 1)
 open(dst, "w", encoding="utf-8").write(text)
 PY
-  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/${kind}-$keep.vire" "data/native-gc-kind/${kind}-$keep.hex"
+  VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire "data/native-gc-kind/${kind}-$keep.vire" "data/native-gc-kind/${kind}-$keep.hex" pe
   local out
   out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/${kind}-$keep.hex" 0 || true)"
   echo "$out"

@@ -32,7 +32,7 @@ printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -
 printf 'hello from stage\n' > "$WORKDIR/hello-want.txt"
 cmp -s "$WORKDIR/hello.txt" "$WORKDIR/hello-want.txt"
 cp "$ROOT/tests/native/gc-kind-stress.vire" "$WORKDIR/gc-kind-stress.vire"
-VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/gc-kind-stress.vire data/native-pe-emu/gc-kind-stress.hex
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/gc-kind-stress.vire data/native-pe-emu/gc-kind-stress.hex pe
 out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/gc-kind-stress.hex")"
 echo "$out"
 echo "$out" | grep -q 'EXIT 0'

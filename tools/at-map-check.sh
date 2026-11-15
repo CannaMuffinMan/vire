@@ -56,7 +56,7 @@ if [[ "$host_n" != "$Want" ]]; then
   echo "FAIL host at-map stdout" >&2
   exit 1
 fi
-VIRE_BUDGET= dotnet exec "$VireDll" --compiler compile-native.vire data/at-map.vire data/at-map.hex
+VIRE_BUDGET= dotnet exec "$VireDll" --compiler compile-native.vire data/at-map.vire data/at-map.hex pe
 emu=$(python3 tools/native-pe-emu.py data/at-map.hex)
 echo "$emu"
 if [[ "$emu" != *$Want* ]]; then
@@ -74,7 +74,7 @@ if [[ "$host_none" != *"at needs a list, text, or map"* ]]; then
   echo "FAIL host none-at message" >&2
   exit 1
 fi
-VIRE_BUDGET= dotnet exec "$VireDll" --compiler compile-native.vire data/at-none.vire data/at-none.hex
+VIRE_BUDGET= dotnet exec "$VireDll" --compiler compile-native.vire data/at-none.vire data/at-none.hex pe
 emu_none=$(python3 tools/native-pe-emu.py data/at-none.hex || true)
 echo "$emu_none"
 if [[ "$emu_none" != *"at needs a list, text, or map"* ]]; then

@@ -80,7 +80,7 @@ public class NativePathSafetyTests
         Assert.DoesNotContain("emitSys with image, 2\r", linux);
         string paths = File.ReadAllText(Path.Combine(Root(), "VirePaths.cs"));
         Assert.Contains("LinuxOpenAtWalk", paths);
-        Assert.Contains("LinuxONofollow", paths);
+        Assert.Contains("LinuxONofollow()", paths);
         Assert.Contains("WriteAllTextInside", paths);
     }
 
