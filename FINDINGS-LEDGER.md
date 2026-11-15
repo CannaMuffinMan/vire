@@ -165,7 +165,7 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Fix: RIP on stdout (no `crash-rip.txt`). Startup `rt_crash_prepare` rejects `FILE_ATTRIBUTE_REPARSE_POINT` on `data`, `rt_bind_path`s the directory, stores absolute `crash_abs`. VEH CreateFile uses only that buffer.
 - Fail-before: `7fd41b88` (no dedicated log); junction leak `1600038` writes `crash.log` through `data\` junction.
 - Pass-after: this SHA, junctioned `data\` does not receive `crash.log`; real `data\crash.log` still gets `crash code/rip/off`.
-- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code. Crash before `rt_crash_prepare` (null at very first instruction) skips the log.
+- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code. Crash before `rt_crash_prepare` (null at very first instruction) skips the log. After `rt_crash_prepare` binds `data\` and stores `crash_abs`, a post-startup junction swap of that directory is not re-checked: VEH still opens the bound absolute path (`CREATE_NEW` + `FILE_FLAG_OPEN_REPARSE_POINT`).
 
 ## F7 junction test accepts any nonzero exit
 
