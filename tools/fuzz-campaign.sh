@@ -13,7 +13,7 @@ if [[ -z "${VIRE_FUZZ_ITERS:-}" ]]; then
   fi
 fi
 export VIRE_HEADLESS=1
-echo "fuzz-campaign iters=$VIRE_FUZZ_ITERS seconds=$VIRE_FUZZ_SECONDS"
+echo "fuzz-campaign iters=$VIRE_FUZZ_ITERS seconds=$VIRE_FUZZ_SECONDS seed=${VIRE_FUZZ_SEED:-20261030}"
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter "FullyQualifiedName~Fuzz"
 if [[ "${VIRE_FUZZ_NATIVE:-0}" == "1" ]]; then
   bash tools/fuzz-native-pe.sh

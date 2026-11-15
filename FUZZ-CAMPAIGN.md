@@ -27,9 +27,23 @@ New grammar seeds: `tests/fuzz/corpus/grammar-builtins.vire`, `grammar-lists.vir
 | native PE (Linux Unicorn) | Host `compile-native.vire` of mutated tiny guests, `tools/native-pe-emu.py` | `FAULTS []`, heap mapping `0x2000000` (32MB) |
 | native PE (Windows CI) | Same guests as real `.exe` plus `mklink /J` junction probe | AV / hang / `secret` leak recorded under `tests/fuzz/findings/` |
 
-Mutator: LCG `state = state * 1664525 + 1013904223`, seed `20261030` xor per target. Every finding is minimized (`FuzzCore.MinimizeText`) and hashed (SHA-256).
+Mutator: LCG `state = state * 1664525 + 1013904223`. Default PR tests still use `20261030` xor per target. Time-boxed runs take `VIRE_FUZZ_SEED` (this Canna run: `71115000`) plus `+101…+104`. Every finding is minimized (`FuzzCore.MinimizeText`) and hashed (SHA-256).
 
-## This session (Linux)
+## Canna 20-minute run (2026-11-15)
+
+Linux in-process, harness on `cursor/fuzz-campaign-856d`. Base seed **`71115000`** (not `20261030`). `VIRE_FUZZ_SECONDS=300` per target.
+
+| Target | Seed | Executions | Seconds | Findings |
+|---|---:|---:|---:|---:|
+| frontend | 71115101 | 644169 | 300.000 | 0 |
+| builtins | 71115102 | 1636151 | 300.000 | 0 |
+| gc | 71115103 | 170530 | 300.001 | 0 |
+| path | 71115104 | 2000000 | 170.601 | 0 |
+| path top-up | 71116008 | 1570044 | 130.000 | 0 |
+
+Wall clock ~20 min (17m50s testhost + 2m10s path top-up after the 2M-iter cap). **Findings: none.** `workflow_dispatch` of `fuzz.yml` for Windows PE returned 403 from this integration.
+
+## Earlier session (Linux)
 
 Host: Ubuntu 24.04, SDK 10.0.404. In-process campaign `VIRE_FUZZ_SECONDS=90` per target (wall ~6 min after earlier 45s/120s shakedowns).
 

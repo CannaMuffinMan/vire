@@ -13,7 +13,7 @@ static class FuzzCore
 {
     public const int DefaultSeed = 20261030;
     public const int DefaultIters = 400;
-    public const int MaxIters = 2000000;
+    public const int MaxIters = 8000000;
     public const int MaxInput = 4096;
     public const int HangMs = 4000;
 
@@ -35,6 +35,37 @@ static class FuzzCore
         if (!int.TryParse(raw.Trim(), out value) || value < 0) return 0;
         if (value > 7200) value = 7200;
         return value;
+    }
+
+    public static int BaseSeed()
+    {
+        string raw = Environment.GetEnvironmentVariable("VIRE_FUZZ_SEED");
+        if (string.IsNullOrWhiteSpace(raw)) return DefaultSeed;
+        int value;
+        if (!int.TryParse(raw.Trim(), out value) || value == 0) return DefaultSeed;
+        return value;
+    }
+
+    public static int SeedFor(string target)
+    {
+        string key = "VIRE_FUZZ_SEED_" + (target ?? "").ToUpperInvariant();
+        string raw = Environment.GetEnvironmentVariable(key);
+        int value;
+        if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw.Trim(), out value) && value != 0)
+            return value;
+        int baseSeed = BaseSeed();
+        if (baseSeed == DefaultSeed)
+        {
+            if (target == "frontend") return DefaultSeed ^ 3;
+            if (target == "builtins") return DefaultSeed ^ 11;
+            if (target == "gc") return DefaultSeed ^ 17;
+            if (target == "path") return DefaultSeed ^ 29;
+        }
+        if (target == "frontend") return baseSeed + 101;
+        if (target == "builtins") return baseSeed + 102;
+        if (target == "gc") return baseSeed + 103;
+        if (target == "path") return baseSeed + 104;
+        return baseSeed;
     }
 
     public static int NativePeIters()
@@ -322,7 +353,7 @@ static class FuzzCore
         text.AppendLine("- classification: **" + classification + "**");
         text.AppendLine("- sha256: `" + sha + "`");
         text.AppendLine("- reproducer: `" + Rel(path) + "`");
-        text.AppendLine("- seed: `" + DefaultSeed + "` (see campaign log for iteration)");
+        text.AppendLine("- seed: `" + (Environment.GetEnvironmentVariable("VIRE_FUZZ_LAST_SEED") ?? BaseSeed().ToString()) + "`");
         text.AppendLine();
         text.AppendLine("## Root cause");
         text.AppendLine();
@@ -409,6 +440,7 @@ sealed class FuzzFinding
 sealed class FuzzStats
 {
     public string Target;
+    public int Seed;
     public long Executions;
     public double Seconds;
     public int Findings;
@@ -417,7 +449,7 @@ sealed class FuzzStats
 
     public override string ToString()
     {
-        return Target + ": executions=" + Executions + " seconds=" + Seconds.ToString("0.000")
+        return Target + ": seed=" + Seed + " executions=" + Executions + " seconds=" + Seconds.ToString("0.000")
             + " findings=" + Findings + " hangs=" + Hangs + " crashes=" + Crashes;
     }
 }
@@ -446,15 +478,16 @@ sealed class FuzzLog
         text.AppendLine("- utc: " + DateTime.UtcNow.ToString("o"));
         text.AppendLine("- VIRE_FUZZ_ITERS: " + (Environment.GetEnvironmentVariable("VIRE_FUZZ_ITERS") ?? "(default " + FuzzCore.DefaultIters + ")"));
         text.AppendLine("- VIRE_FUZZ_SECONDS: " + (Environment.GetEnvironmentVariable("VIRE_FUZZ_SECONDS") ?? "0"));
+        text.AppendLine("- VIRE_FUZZ_SEED: " + (Environment.GetEnvironmentVariable("VIRE_FUZZ_SEED") ?? "(default " + FuzzCore.DefaultSeed + ")"));
         text.AppendLine();
         text.AppendLine("## Executions");
         text.AppendLine();
-        text.AppendLine("| Target | Executions | Seconds | Findings | Hangs | Crashes |");
-        text.AppendLine("|---|---:|---:|---:|---:|---:|");
+        text.AppendLine("| Target | Seed | Executions | Seconds | Findings | Hangs | Crashes |");
+        text.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
         for (int i = 0; i < Stats.Count; i++)
         {
             FuzzStats s = Stats[i];
-            text.AppendLine("| " + s.Target + " | " + s.Executions + " | " + s.Seconds.ToString("0.000") + " | " + s.Findings + " | " + s.Hangs + " | " + s.Crashes + " |");
+            text.AppendLine("| " + s.Target + " | " + s.Seed + " | " + s.Executions + " | " + s.Seconds.ToString("0.000") + " | " + s.Findings + " | " + s.Hangs + " | " + s.Crashes + " |");
         }
         text.AppendLine();
         text.AppendLine("## Findings");

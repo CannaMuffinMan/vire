@@ -22,10 +22,15 @@ public class FuzzCampaignTests
     [Fact]
     public void CampaignTargetsRunDeterministically()
     {
-        RunTimed("frontend", FuzzCore.DefaultSeed ^ 3, DriveFrontend);
-        RunTimed("builtins", FuzzCore.DefaultSeed ^ 11, DriveBuiltins);
-        RunTimed("gc", FuzzCore.DefaultSeed ^ 17, DriveGc);
-        RunTimed("path", FuzzCore.DefaultSeed ^ 29, DrivePaths);
+        string only = Environment.GetEnvironmentVariable("VIRE_FUZZ_ONLY") ?? "";
+        if (only.Length == 0 || only == "frontend")
+            RunTimed("frontend", FuzzCore.SeedFor("frontend"), DriveFrontend);
+        if (only.Length == 0 || only == "builtins")
+            RunTimed("builtins", FuzzCore.SeedFor("builtins"), DriveBuiltins);
+        if (only.Length == 0 || only == "gc")
+            RunTimed("gc", FuzzCore.SeedFor("gc"), DriveGc);
+        if (only.Length == 0 || only == "path")
+            RunTimed("path", FuzzCore.SeedFor("path"), DrivePaths);
         Log.WriteReport();
         foreach (FuzzFinding finding in Log.Findings)
             Console.WriteLine("FINDING " + finding.Classification + " " + finding.Path + " " + finding.RootCause);
@@ -37,6 +42,8 @@ public class FuzzCampaignTests
         FuzzRng rng = new FuzzRng(seed);
         FuzzStats stats = new FuzzStats();
         stats.Target = target;
+        stats.Seed = seed;
+        Environment.SetEnvironmentVariable("VIRE_FUZZ_LAST_SEED", seed.ToString());
         int seconds = FuzzCore.Seconds();
         int cap = seconds > 0 ? FuzzCore.MaxIters : FuzzCore.Iters();
         Stopwatch clock = Stopwatch.StartNew();
