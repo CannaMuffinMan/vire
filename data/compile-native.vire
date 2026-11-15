@@ -1,6 +1,7 @@
-~ Compile let, if, calls, and read into a native Windows executable.
+~ Compile let, if, calls, and read into a native Windows PE or Linux ELF executable.
 
 use "src/pe.vire"
+use "src/elf.vire"
 use "src/rt-net.vire"
 
 define isLetter with ch
@@ -1226,7 +1227,7 @@ define emitBoolAcc with gen
 end
 
 define builtinArity with nm
-  if nm == "args" or nm == "ticks"
+  if nm == "args" or nm == "ticks" or nm == "linux"
     return 0
   end
   if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
@@ -1330,6 +1331,10 @@ define emitAtom with gen, funcs, func, expr
     end
     if nm == "ticks"
       emitCall with gen, "rt_ticks"
+      return true
+    end
+    if nm == "linux"
+      emitCall with gen, "rt_linux"
       return true
     end
     let found be findFunc with funcs, nm
@@ -1816,9 +1821,24 @@ define main
   end
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
+  let wantElf be linux
+  if (length with files) > 2
+    if (files at 2) == "pe"
+      let wantElf be false
+    end
+    if (files at 2) == "elf"
+      let wantElf be true
+    end
+  end
   let opened be openImage
+  if wantElf
+    let opened be openElfImage
+  end
   if hits at "net"
     let opened be openNetImage
+    if wantElf
+      let opened be openElfNetImage
+    end
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
   let i be 0
@@ -1857,6 +1877,13 @@ define main
     put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
+  if wantElf
+    put (finishElfImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
+    let exe be buildElf with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base")
+    write with (files at 1), (hex with exe)
+    say "compiled"
+    return none
+  end
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)
