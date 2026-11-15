@@ -1,0 +1,34 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let m be { "a": 1, "b": 2 }
+  let ks be keys with m
+  let bad be 0
+  if (length with ks) != 2
+    let bad be bad + 1
+  end
+  if (has with m, (ks at 0)) == false
+    let bad be bad + 1
+  end
+  if (has with m, (ks at 1)) == false
+    let bad be bad + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "keys ok"
+  end
+  if bad != 0
+    say "keys corrupt"
+    say bad
+  end
+end

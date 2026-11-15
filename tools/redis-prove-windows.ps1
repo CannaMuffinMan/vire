@@ -1,6 +1,15 @@
 # Fail-before / pass-after: guest RESP2 Redis client on loopback TCP (#64).
 # Caps unchanged. No TLS. Windows Defender untouched.
+# Live proof against a real redis-server.exe is required; skip is never a pass.
+param(
+    [switch]$SkipPathSelfTest
+)
 $ErrorActionPreference = "Stop"
+if ($SkipPathSelfTest) {
+    Write-Output "REDIS_SERVER_UNAVAILABLE SkipPathSelfTest forced skip condition (no live Redis)"
+    Write-Output "live SET/GET against a real Redis binary was not executed"
+    throw "redis windows prove cannot pass without a live Redis server"
+}
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 . (Join-Path $PSScriptRoot "native-host-info.ps1")
@@ -215,40 +224,33 @@ if ($hostAdvNorm -ne $peAdvNorm) {
 Write-Output "PASS_AFTER host and gen1 PE adversarial stdout identical"
 try { $advFix.Halt() } catch { }
 
+$RedisZipUrl = "https://github.com/tporadowski/redis/releases/download/v5.0.14.1/Redis-x64-5.0.14.1.zip"
+$RedisZipSha256 = "018ea18a35876383cbb5f4cd0258adfc87747cf9d619bce1cf73a2e36f720ccf"
+
+function Fail-RedisLiveUnavailable([string]$Reason) {
+    Write-Output "REDIS_SERVER_UNAVAILABLE $Reason"
+    Write-Output "live SET/GET against a real Redis binary was not executed"
+    throw "redis windows prove cannot pass without a live Redis server"
+}
+
 function Start-RedisWindows {
     $bind = "127.0.0.1"
     $port = 16379
-    $server = $null
     $zip = Join-Path $Data "redis-win.zip"
     $dir = Join-Path $Data "redis-win"
-    $urls = @(
-        "https://github.com/tporadowski/redis/releases/download/v5.0.14.1/Redis-x64-192.168.1.1.zip",
-        "https://github.com/microsoftarchive/redis/releases/download/win-3.0.504/Redis-x64-3.0.504.zip"
-    )
-    foreach ($url in $urls) {
-        try {
-            Write-Output "redis_download $url"
-            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-            if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
-            Expand-Archive -Path $zip -DestinationPath $dir -Force
-            $server = Get-ChildItem -Path $dir -Recurse -Filter "redis-server.exe" | Select-Object -First 1
-            if ($null -ne $server) { break }
-        } catch {
-            Write-Output ("redis_download_fail " + $_.Exception.Message)
-        }
+    Write-Output "redis_download $RedisZipUrl"
+    Invoke-WebRequest -Uri $RedisZipUrl -OutFile $zip -UseBasicParsing
+    if (-not (Test-Path $zip)) { throw "redis zip missing after download" }
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+    Write-Output "redis_zip_sha256 $hash"
+    if ($hash -ne $RedisZipSha256) {
+        Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+        throw "redis zip sha256 mismatch: got $hash expected $RedisZipSha256"
     }
-    if ($null -eq $server) {
-        $choco = Get-Command choco -ErrorAction SilentlyContinue
-        if ($choco) {
-            try {
-                & choco install redis-64 -y --no-progress
-                $server = Get-ChildItem -Path "C:\Program Files\Redis" -Filter "redis-server.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-            } catch {
-                Write-Output ("choco_redis_fail " + $_.Exception.Message)
-            }
-        }
-    }
-    if ($null -eq $server) { return $null }
+    if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+    $server = Get-ChildItem -Path $dir -Recurse -Filter "redis-server.exe" | Select-Object -First 1
+    if ($null -eq $server) { throw "redis zip extracted without redis-server.exe" }
     Write-Output ("redis_server_exe " + $server.FullName)
     $proc = Start-Process -FilePath $server.FullName -ArgumentList @(
         "--port", "$port", "--bind", $bind
@@ -266,7 +268,7 @@ function Start-RedisWindows {
     }
     if (-not $ok) {
         try { Stop-Process -Id $proc.Id -Force } catch { }
-        return $null
+        throw "redis-server.exe started but 127.0.0.1:$port never accepted TCP"
     }
     Write-Output "redis_listen ${bind}:$port"
     return @{ Port = $port; Proc = $proc }
@@ -274,10 +276,7 @@ function Start-RedisWindows {
 
 $redis = Start-RedisWindows
 if ($null -eq $redis) {
-    Write-Output "REDIS_SERVER_UNAVAILABLE on this Windows runner (no redis-server.exe / Memurai). Decode and adversarial fake-server proofs still ran. Live SET/GET against a real Redis binary was not executed here."
-    Write-Output "gen1_hello_and_gen2_sha covered by job native-selfhost-windows on this PR"
-    Write-Output "redis windows prove ok (decode+adv; live redis residual)"
-    exit 0
+    Fail-RedisLiveUnavailable "Start-RedisWindows returned null"
 }
 
 try {
