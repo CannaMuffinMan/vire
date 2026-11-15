@@ -1,0 +1,63 @@
+~ Allocate lists, maps, and bytes, churn junk so GC runs, then check survivors.
+define main
+  let lists be []
+  let maps be []
+  let blobs be []
+  let i be 0
+  while i < 200
+    let xs be []
+    let j be 0
+    while j < 30
+      let n be (i * 30) + j
+      let xs be push with xs, n
+      let j be j + 1
+    end
+    let m be {}
+    put i into m at "n"
+    let b be bytes
+    let k be 0
+    while k < 24
+      let b be push with b, k
+      let k be k + 1
+    end
+    let lists be push with lists, xs
+    let maps be push with maps, m
+    let blobs be push with blobs, b
+    let junk be []
+    let t be 0
+    while t < 80
+      let junk be push with junk, t
+      let t be t + 1
+    end
+    let i be i + 1
+  end
+  let i be 0
+  while i < 200
+    let xs be lists at i
+    if (xs at 0) != (i * 30)
+      say "list-lo"
+      halt with 1
+    end
+    let hi be (i * 30) + 29
+    if (xs at 29) != hi
+      say "list-hi"
+      halt with 1
+    end
+    let m be maps at i
+    if (m at "n") != i
+      say "map"
+      halt with 1
+    end
+    let b be blobs at i
+    if (b at 0) != 0
+      say "bytes-lo"
+      halt with 1
+    end
+    if (b at 23) != 23
+      say "bytes-hi"
+      halt with 1
+    end
+    let i be i + 1
+  end
+  say "gc-kind-stress ok"
+end

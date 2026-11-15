@@ -1,0 +1,33 @@
+define main
+  let big be "x"
+  let n be 0
+  while n < 16
+    let big be big + big
+    let n be n + 1
+  end
+  let keep be []
+  let n be 0
+  while n < 470
+    let keep be push with keep, (big + "K")
+    let n be n + 1
+  end
+  let xs be ["a", "b", "c"]
+  let t be text with xs
+  let m be { "k": 1 }
+  let u be text with m
+  let bad be 0
+  if (t at 0) != "["
+    let bad be bad + 1
+  end
+  if (u at 0) != "{"
+    let bad be bad + 1
+  end
+  say (length with keep)
+  if bad == 0
+    say "to_text ok"
+  end
+  if bad != 0
+    say "to_text corrupt"
+    say bad
+  end
+end

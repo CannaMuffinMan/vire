@@ -27,6 +27,13 @@ public class NativeArenaTests
         Assert.Contains("pin with labels, \"rt_gc\", image", more);
         Assert.Contains("pin with labels, \"rt_note_wait\", image", more);
         Assert.Contains("33554432", more);
+        Assert.DoesNotContain("gc_rbp", more);
+        Assert.DoesNotContain("gc_urbp", more);
+        int mv = more.IndexOf("pin with labels, \"gc_mv_c\", image", StringComparison.Ordinal);
+        Assert.True(mv >= 0);
+        string afterMv = more.Substring(mv, 500);
+        Assert.DoesNotContain("139, 70, 4, 131, 224, 254, 76, 137, 223, 72, 1, 199", afterMv);
+        Assert.Contains("76, 139, 93, 224", afterMv);
     }
 
     [Fact]
@@ -55,6 +62,7 @@ public class NativeArenaTests
         string rt = File.ReadAllText(Path.Combine(root, "src", "rt.vire"));
         string more = File.ReadAllText(Path.Combine(root, "src", "rt-more.vire"));
         Assert.Contains("pin with labels, \"heap_cell\", image", rt);
+        Assert.Contains("pin with labels, \"stdout_cell\", image", rt);
         Assert.Contains("pin with labels, \"intern_tab\", image", rt);
         Assert.Contains("let image be emitRel with image, fixes, \"heap_cell\"", rt);
         Assert.Contains("emitRel with image, fixes, \"intern_tab\"", more);
@@ -99,6 +107,7 @@ public class NativeArenaTests
         string emu = File.ReadAllText(Path.Combine(root, "tools", "native-pe-emu-check.sh"));
         Assert.Contains("intern-chars", emu);
         Assert.Contains("hello-stage", emu);
+        Assert.Contains("gc-kind-stress", emu);
         Assert.True(File.Exists(Path.Combine(root, "tests", "native", "intern-chars.vire")));
     }
 
