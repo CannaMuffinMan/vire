@@ -1,0 +1,10 @@
+define main
+  let parts be split with "a,b,c", ","
+  say (parts at 1)
+  say ("hello" at 0)
+  say ("ab" + "cd")
+  say (text with [1, 2])
+  say (has with {"k": 1}, "k")
+  parse with "[1,true,null]"
+  say (json with {"a": 2})
+end

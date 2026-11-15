@@ -1,0 +1,11 @@
+define main
+  let xs be []
+  let i be 0
+  while i < 8
+    let xs be push with xs, i
+    let i be i + 1
+  end
+  say (xs at 0)
+  say (xs at -1)
+  say (length with xs)
+end

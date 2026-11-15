@@ -8,10 +8,41 @@ permissions:
 jobs:
   fuzz-long:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build vire.csproj -c Release
+      - name: in-process campaign (time boxed)
+        run: |
+          export VIRE_FUZZ_SECONDS=600
+          bash tools/fuzz-campaign.sh
+      - name: bounded native PE via Unicorn
+        run: |
+          export VIRE_FUZZ_NATIVE_ITERS=4
+          export VIRE_FUZZ_NATIVE_SECONDS=180
+          bash tools/fuzz-native-pe.sh
+  fuzz-windows:
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1 (tag v4)
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
-      - run: bash tools/fuzz-long.sh
+      - run: dotnet build vire.csproj -c Release
+      - name: short in-process fuzz
+        shell: pwsh
+        run: |
+          $env:VIRE_FUZZ_ITERS = "800"
+          $env:VIRE_FUZZ_SECONDS = "60"
+          $env:VIRE_HEADLESS = "1"
+          dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter "FullyQualifiedName~Fuzz"
+      - name: bounded native PE runtime
+        shell: pwsh
+        run: |
+          $env:VIRE_FUZZ_NATIVE_ITERS = "4"
+          $env:VIRE_FUZZ_NATIVE_SECONDS = "180"
+          pwsh -File tools/fuzz-windows.ps1
