@@ -475,6 +475,12 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 131, 198, 16, 233]
   emitRel with image, fixes, "gc_trp"
   pin with labels, "gc_trp_done", image
+  ~ No native rbp walk. Saved rbp on Windows is not a frame pointer: following
+  ~ it pins the heap (bump never drops) or treats payloads as stack slots.
+  ~ Precise roots are the VM stack, Vire frame, and trap slots. Every heap
+  ~ pointer that must survive rt_alloc/GC is parked there (emitParkSlot, tag
+  ~ 2). A missed park is an uncaught stale pointer; do not mask it with a
+  ~ conservative frame scan.
   pin with labels, "gc_fix", image
   emitList with image, [76, 139, 93, 224, 49, 219, 76, 137, 222]
   pin with labels, "gc_fix_w", image
@@ -561,7 +567,13 @@ define emitMore with image, fixes, labels
   emitList with image, [72, 137, 249, 72, 137, 242, 76, 139, 69, 208]
   emitCallTo with image, fixes, "rt_memcpy"
   pin with labels, "gc_mv_c", image
-  emitList with image, [76, 139, 93, 224, 139, 70, 4, 131, 224, 254, 76, 137, 223, 72, 1, 199]
+  ~ rdi is still dest: rt_memcpy only clobbers rax/r9/rcx/rdx/r8 (and the
+  ~ dest cursor in rcx). Do not reload [rsi+4] after the copy. On an
+  ~ overlapping slide-left (dest < src < dest+size) the forward copy already
+  ~ overwrote the source header, so eax would be object bytes (0x78787878
+  ~ in one trace). Out of range looked like OOM; in range wrote into a live
+  ~ object. r11 is the to-space base (not dest).
+  emitList with image, [76, 139, 93, 224]
   emitList with image, [72, 139, 5]
   emitRel with image, fixes, "heap_cell"
   emitList with image, [72, 57, 199, 15, 130]
@@ -663,7 +675,9 @@ define emitMore with image, fixes, labels
   emitList with image, [195]
   pin with labels, "memcpy_oom", image
   ~ Skip rt_fail's trap unwind (trap_sp can look like a heap pointer after
-  ~ compact). rbx is the mark-new flag here; rt_fail_exit loads stdout_cell.
+  ~ compact). rbx is the mark-new flag here; rt_fail_exit loads stdout_cell
+  ~ so WriteFile does not take a clobbered handle. Defense-in-depth only:
+  ~ a stale dest must not be papered over by this fail-closed path.
   ~ Always print msg_oom and ExitProcess(1).
   emitList with image, [72, 141, 13]
   emitRel with image, fixes, "msg_oom"

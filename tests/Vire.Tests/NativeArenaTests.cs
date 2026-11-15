@@ -27,6 +27,13 @@ public class NativeArenaTests
         Assert.Contains("pin with labels, \"rt_gc\", image", more);
         Assert.Contains("pin with labels, \"rt_note_wait\", image", more);
         Assert.Contains("33554432", more);
+        Assert.DoesNotContain("gc_rbp", more);
+        Assert.DoesNotContain("gc_urbp", more);
+        int mv = more.IndexOf("pin with labels, \"gc_mv_c\", image", StringComparison.Ordinal);
+        Assert.True(mv >= 0);
+        string afterMv = more.Substring(mv, 500);
+        Assert.DoesNotContain("139, 70, 4, 131, 224, 254, 76, 137, 223, 72, 1, 199", afterMv);
+        Assert.Contains("76, 139, 93, 224", afterMv);
     }
 
     [Fact]

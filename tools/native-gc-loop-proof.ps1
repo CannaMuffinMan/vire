@@ -138,9 +138,13 @@ function Assert-TextcatClosed {
     if ($out.Contains("textcat corrupt") -or $out.Contains("crash ")) {
         throw "$Phase textcat keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
     }
-    if ($Result.Exit -eq 0 -and $out.Contains("textcat ok")) { return }
-    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
-    throw "$Phase textcat keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+    # ~keep x 64KB fits the 32MB arena through 482; 490 x 65552 exceeds it.
+    if ($Keep -ge 490 -and $Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    if ($out.Contains("out of memory")) {
+        throw "$Phase textcat keep=$Keep OOM is FAIL while live set should fit: exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("$Keep") -and $out.Contains("textcat ok")) { return }
+    throw "$Phase textcat keep=$Keep expected '$Keep' + 'textcat ok', got exit=$($Result.Exit) out=$out"
 }
 
 $TextCrashSha = "37bf201c744f5e37e88463effb9d1c5e6e30d3b3"
@@ -165,7 +169,7 @@ for ($keep = 300; $keep -le 490; $keep++) {
     Write-Output "after_textcat keep=$keep exit=$($got.Exit) out=$($got.Out)"
     Assert-TextcatClosed $got $keep "pass-after"
 }
-Write-Output "PASS_AFTER textcat keep 300..490 fail-closed at $AfterSha"
+Write-Output "PASS_AFTER textcat keep 300..490 exact at $AfterSha"
 
 function Set-Keep {
     param([string]$Src, [string]$Dst, [int]$Keep)
@@ -180,9 +184,12 @@ function Assert-NearfullClosed {
     if ($out.Contains("$Kind corrupt") -or $out.Contains("crash ")) {
         throw "$Phase $Kind keep=$Keep crash/corrupt exit=$($Result.Exit) out=$out"
     }
-    if ($Result.Exit -eq 0 -and $out.Contains("$Kind ok")) { return }
-    if ($Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
-    throw "$Phase $Kind keep=$Keep expected ok or out of memory, got exit=$($Result.Exit) out=$out"
+    if ($Keep -ge 490 -and $Result.Exit -eq 1 -and $out.Contains("out of memory")) { return }
+    if ($out.Contains("out of memory")) {
+        throw "$Phase $Kind keep=$Keep OOM is FAIL while live set should fit: exit=$($Result.Exit) out=$out"
+    }
+    if ($Result.Exit -eq 0 -and $out.Contains("$Keep") -and $out.Contains("$Kind ok")) { return }
+    throw "$Phase $Kind keep=$Keep expected '$Keep' + '$Kind ok', got exit=$($Result.Exit) out=$out"
 }
 
 $StaleSha = "8f07846"
@@ -232,7 +239,7 @@ foreach ($k in $kinds) {
         Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
         Assert-NearfullClosed $got $k.Kind $keep "pass-after"
     }
-    Write-Output ("PASS_AFTER " + $k.Name + " keep 300..490 fail-closed at $AfterSha")
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300..490 exact at $AfterSha")
 }
 $splitNp = Compile-Run "split-nopressure" (Join-Path $Root "tests/native/gc-split-nopressure.vire")
 Write-Output "after_split_nopressure exit=$($splitNp.Exit) out=$($splitNp.Out)"
@@ -257,8 +264,11 @@ foreach ($k in $extraKinds) {
         $got = Compile-Run ($k.Name + "-$keep") $src
         Write-Output ("after_" + $k.Name + " keep=$keep exit=$($got.Exit) out=$($got.Out)")
         Assert-NearfullClosed $got $k.Kind $keep "pass-after"
+        if ($k.Name -eq "tah" -and ($keep -eq 470 -or $keep -eq 482)) {
+            Write-Output ("PASS_AFTER tah keep=$keep exact at $AfterSha")
+        }
     }
-    Write-Output ("PASS_AFTER " + $k.Name + " keep 300,470,478,482,490 fail-closed at $AfterSha")
+    Write-Output ("PASS_AFTER " + $k.Name + " keep 300,470,478,482,490 exact at $AfterSha")
 }
 
 Write-Output "native gc/loop proof ok"

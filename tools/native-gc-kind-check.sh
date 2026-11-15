@@ -80,8 +80,14 @@ if faults not in ("[]",):
     raise SystemExit(f"textcat keep={keep} crashed faults={faults}")
 if "textcat corrupt" in text:
     raise SystemExit(f"textcat keep={keep} corrupt")
-if "textcat ok" in text or "out of memory" in text:
-    print(f"textcat keep={keep} fail-closed ok")
+k = int(keep)
+if k >= 490 and "out of memory" in text:
+    print(f"textcat keep={keep} arena-full ok")
+    raise SystemExit(0)
+if "out of memory" in text:
+    raise SystemExit(f"textcat keep={keep} OOM while live set should fit out={text!r}")
+if keep in text and "textcat ok" in text:
+    print(f"textcat keep={keep} exact ok")
     raise SystemExit(0)
 raise SystemExit(f"textcat keep={keep} unexpected out={text!r} faults={faults}")
 PY
@@ -124,8 +130,14 @@ if faults not in ("[]",):
     raise SystemExit(f"{kind} keep={keep} crashed faults={faults}")
 if f"{kind} corrupt" in text:
     raise SystemExit(f"{kind} keep={keep} corrupt")
-if f"{kind} ok" in text or "out of memory" in text:
-    print(f"{kind} keep={keep} fail-closed ok")
+k = int(keep)
+if k >= 490 and "out of memory" in text:
+    print(f"{kind} keep={keep} arena-full ok")
+    raise SystemExit(0)
+if "out of memory" in text:
+    raise SystemExit(f"{kind} keep={keep} OOM while live set should fit out={text!r}")
+if keep in text and f"{kind} ok" in text:
+    print(f"{kind} keep={keep} exact ok")
     raise SystemExit(0)
 raise SystemExit(f"{kind} keep={keep} unexpected out={text!r} faults={faults}")
 PY
