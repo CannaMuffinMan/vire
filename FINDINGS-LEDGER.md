@@ -223,6 +223,15 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Proof: `F13` + `bash tools/native-arena-check.sh`.
 - Residual: none.
 
+## Linux ELF openat / O_NOFOLLOW (PR #78 security)
+
+- Status: **fixed on this head**
+- Exposure: Linux `stub_cf` used `open(2)` on the whole path. `O_NOFOLLOW` was absent, so a `data/` directory symlink (or leaf symlink) was followed and `write` landed outside the program folder. Host `write` used `File.WriteAllText` after a path-string check (same parent-swap class as walk-then-open). F6 crash files stay stdout-only (`crash_filter` has no `iat_cf`); Linux VEH stubs are nops, so there is no `data/crash.log` writer to hijack.
+- Fix: `stub_cf` walks components with `openat` (`257`) relative to `AT_FDCWD`, `O_NOFOLLOW|O_CLOEXEC` on every name, `O_DIRECTORY` on intermediates, reject `'..'` and absolute paths. Host `OpenFile` / `WriteAllTextInside` uses the same walk from the program-root dir fd.
+- Fail-before: `6d5414b2e0a26ef2f8148846edc59cf5dbded278` ELF write through `data -> outside` sets outside=`HACKED` (`tools/native-elf-nofollow.sh`).
+- Pass-after: HEAD ELF refuses; outside=`KEEP`; host compiler leaf symlink on `data/*.hex` stays `KEEP`.
+- Residual TOCTOU: bind is open-then-check on Windows (`rt_bind_path` + `readlink` `/proc/self/fd` via `stub_fp`). Linux leaf/parent follow is closed at open. Replace-`data`-with-symlink *after* `openat` of `data` but *before* leaf `openat` can still race; that is the remaining TOCTOU, same class as handle-vs-path, fail-closed on `O_NOFOLLOW` of the leaf. Caps 32MB / list 100000 / 5M / MaxCalls 64 unchanged.
+
 ## Dependency inventory
 
 Runtime `vire.csproj`: no PackageReference. SDK pin `10.0.403`. Test-only xunit 2.9.3 / Microsoft.NET.Test.Sdk. `dotnet list package --vulnerable` to be recorded in the PR report. No CVE IDs invented.

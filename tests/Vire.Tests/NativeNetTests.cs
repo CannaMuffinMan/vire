@@ -69,6 +69,14 @@ public class NativeNetTests
             Assert.True(compiled.Code == 0, DualMode.Norm(compiled.Out + " " + compiled.Err));
             Assert.Contains("compiled", DualMode.Norm(compiled.Out));
             byte[] pe = HexToPe(root, hexRel);
+            if (OperatingSystem.IsLinux())
+            {
+                Assert.Equal(0x7f, pe[0]);
+                Assert.Equal((byte)'F', pe[3]);
+                byte[] okCrlfElf = new byte[] { 5, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x4F, 0x4B, 0x0D, 0x0A, 0 };
+                Assert.True(IndexOf(pe, okCrlfElf) >= 0, "parked txt_sp_ok must be CR LF");
+                return;
+            }
             string ascii = Encoding.ASCII.GetString(pe);
             HashSet<string> imports = PeImports.Names(pe);
             Assert.Contains("ws2_32.dll", ascii.ToLowerInvariant());
@@ -108,6 +116,12 @@ public class NativeNetTests
             DualMode.Proc json = DualMode.RunVire(root, new string[] { "compile-native.vire", jsonSrc, jsonHex }, root);
             Assert.Equal(0, hello.Code);
             Assert.Equal(0, json.Code);
+            if (OperatingSystem.IsLinux())
+            {
+                Assert.Equal(0x7f, HexToPe(root, helloHex)[0]);
+                Assert.Equal(0x7f, HexToPe(root, jsonHex)[0]);
+                return;
+            }
             HashSet<string> helloImp = PeImports.Names(HexToPe(root, helloHex));
             HashSet<string> jsonImp = PeImports.Names(HexToPe(root, jsonHex));
             AssertStockKernel32(helloImp);
@@ -155,6 +169,12 @@ public class NativeNetTests
             DualMode.Proc compiled = DualMode.RunVire(root, new string[] { "compile-native.vire", src, hex }, root);
             Assert.Equal(0, compiled.Code);
             byte[] pe = HexToPe(root, hex);
+            if (OperatingSystem.IsLinux())
+            {
+                Assert.Equal(0x7f, pe[0]);
+                Assert.Contains("CreateProcessA", Encoding.ASCII.GetString(pe));
+                return;
+            }
             HashSet<string> imports = PeImports.Names(pe);
             Assert.DoesNotContain("CreateProcessA", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);

@@ -77,6 +77,16 @@ public class NativePathSafetyTests
         Assert.Contains("rt_bind_path", rt);
         Assert.Contains("path_space", more);
         Assert.Contains("read_space", rt);
+        string linux = File.ReadAllText(Path.Combine(Root(), "src", "rt-linux.vire"));
+        Assert.Contains("emitU32 with image, 257", linux);
+        Assert.Contains("emitU32 with image, 655360", linux);
+        Assert.Contains("emitU32 with image, 720896", linux);
+        Assert.DoesNotContain("emitSys with image, 2\n", linux);
+        Assert.DoesNotContain("emitSys with image, 2\r", linux);
+        string paths = File.ReadAllText(Path.Combine(Root(), "VirePaths.cs"));
+        Assert.Contains("LinuxOpenAtWalk", paths);
+        Assert.Contains("LinuxONofollow()", paths);
+        Assert.Contains("WriteAllTextInside", paths);
     }
 
     [Fact]
