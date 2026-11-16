@@ -29,7 +29,25 @@ New grammar seeds: `tests/fuzz/corpus/grammar-builtins.vire`, `grammar-lists.vir
 
 Mutator: LCG `state = state * 1664525 + 1013904223`. Default PR tests still use `20261030` xor per target. Time-boxed runs take `VIRE_FUZZ_SEED` (this Canna run: `71115000`) plus `+101…+104`. Every finding is minimized (`FuzzCore.MinimizeText`) and hashed (SHA-256).
 
-## Canna 20-minute run (2026-11-15)
+## Post-merge brief run (2026-11-16)
+
+Merged `origin/native-compiler` `6e969fc2`. In-process `VIRE_FUZZ_SEED=71117000`, 40s/target.
+
+| Target | Seed | Executions | Seconds | Findings |
+|---|---:|---:|---:|---:|
+| frontend | 71117101 | 74052 | 40.000 | 0 |
+| builtins | 71117102 | 191568 | 40.000 | 0 |
+| gc | 71117103 | 21842 | 40.001 | 0 |
+| path | 71117104 | 430927 | 40.000 | 0 |
+
+Native PE Unicorn (`pe` format flag): 2 clean (`hello-stage`, corpus hello), 1 fail-closed compile (`grammar-lists`), **2 isolated product faults** from `grammar-builtins`:
+
+- `tests/fuzz/findings/native-pe-json-map.vire` — `json with {"a": 2}` → Unicorn `UC_ERR_READ_UNMAPPED`
+- `tests/fuzz/findings/native-pe-parse-array.vire` — `parse with "[1,true,null]"` → Unicorn `UC_ERR_WRITE_UNMAPPED`
+
+Not fixed here (harness-only PR).
+
+## Canna 20-minute run (2026-11-15, pre-merge)
 
 Linux in-process, harness on `cursor/fuzz-campaign-856d`. Base seed **`71115000`** (not `20261030`). `VIRE_FUZZ_SECONDS=300` per target.
 

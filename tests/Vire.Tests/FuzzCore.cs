@@ -473,7 +473,7 @@ sealed class FuzzLog
         StringBuilder text = new StringBuilder();
         text.AppendLine("# Fuzz campaign run");
         text.AppendLine();
-        text.AppendLine("- tip: `227c0e0a22c817492d090fa2443ed9f264ecb644`");
+        text.AppendLine("- tip: `6e969fc2e9c94f537bad69b948e56670096c2a1b` (merged native-compiler)");
         text.AppendLine("- host: " + Environment.OSVersion);
         text.AppendLine("- utc: " + DateTime.UtcNow.ToString("o"));
         text.AppendLine("- VIRE_FUZZ_ITERS: " + (Environment.GetEnvironmentVariable("VIRE_FUZZ_ITERS") ?? "(default " + FuzzCore.DefaultIters + ")"));
