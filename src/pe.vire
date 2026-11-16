@@ -146,10 +146,10 @@ define openImage
   let image be bytes
   let labels be {}
   let fixes be []
-  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetFinalPathNameByHandleA"]
-  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_fp"]
-  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp"]
-  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_fp"]
+  let names be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetFinalPathNameByHandleA", "VirtualQuery", "MoveFileExA"]
+  let ilts be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_fp", "ilt_vq", "ilt_mv"]
+  let iats be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp", "iat_vq", "iat_mv"]
+  let hints be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_fp", "hint_vq", "hint_mv"]
   let i be 0
   while i < (length with names)
     pin with labels, (ilts at i), image
@@ -194,10 +194,10 @@ define openNetImage
   let image be bytes
   let labels be {}
   let fixes be []
-  let k32 be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetFinalPathNameByHandleA", "GetTickCount"]
-  let kilt be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_fp", "ilt_gt"]
-  let kiat be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp", "iat_gt"]
-  let khint be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_fp", "hint_gt"]
+  let k32 be ["GetStdHandle", "WriteFile", "ExitProcess", "VirtualAlloc", "CreateFileA", "ReadFile", "GetFileSize", "CloseHandle", "GetCommandLineA", "GetFileAttributesA", "GetFileInformationByHandle", "SetUnhandledExceptionFilter", "AddVectoredExceptionHandler", "SetFilePointerEx", "SetEndOfFile", "GetFinalPathNameByHandleA", "VirtualQuery", "MoveFileExA", "GetTickCount"]
+  let kilt be ["ilt_gs", "ilt_wf", "ilt_ep", "ilt_va", "ilt_cf", "ilt_rf", "ilt_sz", "ilt_ch", "ilt_cl", "ilt_ga", "ilt_fi", "ilt_ue", "ilt_vh", "ilt_sp", "ilt_se", "ilt_fp", "ilt_vq", "ilt_mv", "ilt_gt"]
+  let kiat be ["iat_gs", "iat_wf", "iat_ep", "iat_va", "iat_cf", "iat_rf", "iat_sz", "iat_ch", "iat_cl", "iat_ga", "iat_fi", "iat_ue", "iat_vh", "iat_sp", "iat_se", "iat_fp", "iat_vq", "iat_mv", "iat_gt"]
+  let khint be ["hint_gs", "hint_wf", "hint_ep", "hint_va", "hint_cf", "hint_rf", "hint_sz", "hint_ch", "hint_cl", "hint_ga", "hint_fi", "hint_ue", "hint_vh", "hint_sp", "hint_se", "hint_fp", "hint_vq", "hint_mv", "hint_gt"]
   let ws be ["WSAStartup", "socket", "bind", "listen", "accept", "recv", "send", "closesocket", "setsockopt", "getsockname", "connect"]
   let wilt be ["ilt_wsa", "ilt_sk", "ilt_bd", "ilt_ln", "ilt_ac", "ilt_rv", "ilt_sd", "ilt_cs", "ilt_ss", "ilt_gn", "ilt_cn"]
   let wiat be ["iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn", "iat_cn"]

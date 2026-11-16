@@ -57,10 +57,10 @@ public class CopilotFindingsTests
         string more = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-more.vire"));
         Assert.Contains("iat_se", more);
         Assert.Contains("iat_sp", more);
-        int have = more.IndexOf("pin with labels, \"write_have\"", StringComparison.Ordinal);
-        int ready = more.IndexOf("pin with labels, \"write_ready\"", StringComparison.Ordinal);
-        string slice = more.Substring(have, ready - have);
-        Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", slice);
+        Assert.Contains("iat_mv", more);
+        Assert.Contains("write_tmp_ok", more);
+        Assert.Contains("write_tmp_build", more);
+        Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", more);
     }
 
     [Fact]
@@ -70,10 +70,24 @@ public class CopilotFindingsTests
         int crash = rt.IndexOf("pin with labels, \"crash_filter\"", StringComparison.Ordinal);
         int next = rt.IndexOf("pin with labels, \"rt_push_int\"", crash);
         string slice = rt.Substring(crash, next - crash);
-        Assert.DoesNotContain("crash_path", slice);
-        Assert.DoesNotContain("iat_cf", slice);
+        Assert.Contains("crash_abs", slice);
+        Assert.Contains("crash_ready", slice);
+        Assert.DoesNotContain("crash_log_path", slice);
+        Assert.Contains("iat_cf", slice);
+        Assert.DoesNotContain("rt_bind_path", slice);
+        Assert.DoesNotContain("rt_alloc", slice);
+        Assert.Contains("72, 199, 68, 36, 32, 1, 0, 0, 0", slice);
+        Assert.DoesNotContain("72, 199, 68, 36, 32, 2, 0, 0, 0", slice);
         Assert.Contains("iat_gs", slice);
+        Assert.Contains("crash_code_msg", slice);
+        Assert.Contains("crash_off_msg", slice);
         Assert.DoesNotContain("crash-rip.txt", rt);
+        int prep = rt.IndexOf("pin with labels, \"rt_crash_prepare\"", StringComparison.Ordinal);
+        string prepSlice = rt.Substring(prep, crash - prep);
+        Assert.Contains("rt_bind_path", prepSlice);
+        Assert.Contains("iat_ga", prepSlice);
+        Assert.Contains("data_dir_path", prepSlice);
+        Assert.Contains("crash_abs", prepSlice);
     }
 
     [Fact]
@@ -95,6 +109,10 @@ public class CopilotFindingsTests
         Assert.Contains("mklink /H", ps1);
         Assert.Contains("7c7c8ea3dcc4030ba8714fc2330d30b67f8d6867", ps1);
         Assert.Contains("do not let that become the function output", ps1);
+        string lane = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tools", "native-security-windows.ps1"));
+        Assert.Contains("f4_vq_text", lane);
+        Assert.Contains("MoveFileExA", lane);
+        Assert.Contains("20261113", lane);
     }
 
     [Fact]

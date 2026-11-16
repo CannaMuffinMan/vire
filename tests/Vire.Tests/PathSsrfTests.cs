@@ -270,6 +270,56 @@ public class PathSsrfTests
     }
 
     [Fact]
+    public void LinuxHostWriteRefusesParentSymlink()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string dir = Path.Combine(Path.GetTempPath(), "vire-host-nf-" + Guid.NewGuid().ToString("n"));
+        string outside = Path.Combine(Path.GetTempPath(), "vire-host-nf-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "note.txt"), "KEEP");
+        File.WriteAllText(Path.Combine(dir, "prog.vire"), "define main\n  write with \"data/note.txt\", \"HACKED\"\nend\n");
+        try
+        {
+            Directory.Delete(Path.Combine(dir, "data"));
+            Directory.CreateSymbolicLink(Path.Combine(dir, "data"), outside);
+            int code = Program.Execute(new string[] { Path.Combine(dir, "prog.vire") });
+            Assert.Equal(1, code);
+            Assert.Equal("KEEP", File.ReadAllText(Path.Combine(outside, "note.txt")));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+            try { Directory.Delete(outside, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void LinuxHostWriteRefusesLeafSymlink()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string dir = Path.Combine(Path.GetTempPath(), "vire-host-leaf-" + Guid.NewGuid().ToString("n"));
+        string outside = Path.Combine(Path.GetTempPath(), "vire-host-leaf-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(Path.Combine(dir, "data"));
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "hex.txt"), "KEEP");
+        File.CreateSymbolicLink(Path.Combine(dir, "data", "out.hex"), Path.Combine(outside, "hex.txt"));
+        File.WriteAllText(Path.Combine(dir, "prog.vire"), "define main\n  write with \"data/out.hex\", \"HACKED\"\nend\n");
+        try
+        {
+            int code = Program.Execute(new string[] { Path.Combine(dir, "prog.vire") });
+            Assert.Equal(1, code);
+            Assert.Equal("KEEP", File.ReadAllText(Path.Combine(outside, "hex.txt")));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+            try { Directory.Delete(outside, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void HostCheckThenOpenToctouFailBeforePassAfter()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-host-toctou-" + Guid.NewGuid().ToString("n"));

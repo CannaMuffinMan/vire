@@ -15,9 +15,9 @@ No CVE IDs. Caps/sandbox/Defender unchanged.
 | F1 | yes | 7c7c8ea TIMEOUT 3s vs after `[1, 2, 1, 2]` exit 0 | — |
 | F2 | yes | linux-x64 + ARM F2; ARM filter now also `HardLinkCannotRewriteDepsLock` | full ARM suite unrun |
 | F3 | yes | before `that expression is not ready`; after Unicorn `3` | — |
-| F4 | yes | Unicorn + Windows `f4_double_read` / intern section | intern may sit in RW `.data`; property is copy-before-NUL |
-| F5 | yes | Unicorn nlink; Windows hardlink; **until-hit then fixed==0** | walk-then-open is a separate gate (`f_walk`) |
-| F6 | yes | emit no `iat_cf`; **crash PE after VEH** + `mklink /H` KEEP | — |
+| F4 | yes | Unicorn + Windows `f4_double_read` / intern section; **W^X** PE `.text` `0x60000020` / `.data` `0xC0000040` + `VirtualQuery` / SEC_IMAGE + silent `rt_wx_check` | intern may sit in RW `.data`; property is copy-before-NUL |
+| F5 | yes | Unicorn nlink; Windows hardlink; **until-hit then fixed==0**; dest nlink==1 then **tmp + MoveFileExA** atomic replace under `data/` | walk-then-open is a separate gate (`f_walk`) |
+| F6 | yes | stdout `crash code/rip/off`; startup `rt_crash_prepare` bind+no-reparse into `crash_abs`; VEH CreateFile only that absolute path | log skipped if prepare fails (junctioned `data\`) or `CREATE_NEW` exists |
 | F7 | yes | `42770835327` printed `files stay inside the program folder` | — |
 | F8 | yes | `and 255` on host; `mov rcx,imm64` in compile-native; host+Unicorn `[0, 0, 1]` for 2^31 / 2^39 / 2^31+1 | — |
 | F9 | yes | PackZipSigned gone | — |
@@ -144,14 +144,28 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Fail-before: 7c7c8ea write PE in Unicorn `walk-open-race` and Windows `walk-vuln.exe` until first outside hit.
 - Pass-after: this SHA write PE refuses; outside stays `SECRET-KEEP-ME-LONG`.
 
+## F4 W^X (this lane)
+
+- Status: **implemented**; Windows `VirtualQuery` after `SEC_IMAGE` map plus in-process `rt_wx_check`
+- FAIL_BEFORE: `7fd41b88` IAT has no `VirtualQuery`
+- PASS_AFTER: this SHA IAT includes `VirtualQuery`; hello PE `.text` not writable, `.data` not executable; hello still prints `hello from vire`
+- Residual: `SEC_IMAGE` mapping is the loader's section protect, not a second running process's `VirtualQueryEx`
+
+## F5 atomic replace (this lane)
+
+- Status: **implemented** in native `rt_write`
+- FAIL_BEFORE: `7fd41b88` had no `MoveFileExA`; dest was truncated in place
+- PASS_AFTER: dest nlink==1, write `dest.tmp`, `MoveFileExA`; two-process reader must not see mixed OLD/NEW
+- Residual: empty reads during create of a brand-new name are possible before the first successful replace
+
 ## F6 crash log hardlink truncate
 
 - Status: **fixed**; Windows crash PE this push
-- Exposure: `crash-rip.txt` CREATE_ALWAYS in cwd.
-- Fix: RIP only to stdout; unused `crash-rip.txt` pool bytes removed.
-- Fail-before: 7c7c8ea hello PE, patch `call fn_main` after VEH to `xor rax,rax; mov rax,[rax]`.
-- Pass-after: this SHA same patch → stdout `crash rip=`, **no** `crash-rip.txt`.
-- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code.
+- Exposure: `crash-rip.txt` CREATE_ALWAYS; later relative `data/crash.log` CREATE_NEW followed a junctioned `data\` outside the program folder.
+- Fix: RIP on stdout (no `crash-rip.txt`). Startup `rt_crash_prepare` rejects `FILE_ATTRIBUTE_REPARSE_POINT` on `data`, `rt_bind_path`s the directory, stores absolute `crash_abs`. VEH CreateFile uses only that buffer.
+- Fail-before: `7fd41b88` (no dedicated log); junction leak `1600038` writes `crash.log` through `data\` junction.
+- Pass-after: this SHA, junctioned `data\` does not receive `crash.log`; real `data\crash.log` still gets `crash code/rip/off`.
+- Residual: stdout crash hex is intended. Patch is a test fixture in `data/native-sec-windows`, not product code. Crash before `rt_crash_prepare` (null at very first instruction) skips the log. After `rt_crash_prepare` binds `data\` and stores `crash_abs`, a post-startup junction swap of that directory is not re-checked: VEH still opens the bound absolute path (`CREATE_NEW` + `FILE_FLAG_OPEN_REPARSE_POINT`).
 
 ## F7 junction test accepts any nonzero exit
 
@@ -208,6 +222,15 @@ Delivered runtime is **.NET 10** (`dotnet exec` / `dotnet publish` single-file `
 - Fix: grep `1048576`; keep 32MB arena greps on rt/more.
 - Proof: `F13` + `bash tools/native-arena-check.sh`.
 - Residual: none.
+
+## Linux ELF openat / O_NOFOLLOW (PR #78 security)
+
+- Status: **fixed on this head**
+- Exposure: Linux `stub_cf` used `open(2)` on the whole path. `O_NOFOLLOW` was absent, so a `data/` directory symlink (or leaf symlink) was followed and `write` landed outside the program folder. Host `write` used `File.WriteAllText` after a path-string check (same parent-swap class as walk-then-open). F6 crash files stay stdout-only (`crash_filter` has no `iat_cf`); Linux VEH stubs are nops, so there is no `data/crash.log` writer to hijack.
+- Fix: `stub_cf` walks components with `openat` (`257`) relative to `AT_FDCWD`, `O_NOFOLLOW|O_CLOEXEC` on every name, `O_DIRECTORY` on intermediates, reject `'..'` and absolute paths. Host `OpenFile` / `WriteAllTextInside` uses the same walk from the program-root dir fd.
+- Fail-before: `6d5414b2e0a26ef2f8148846edc59cf5dbded278` ELF write through `data -> outside` sets outside=`HACKED` (`tools/native-elf-nofollow.sh`).
+- Pass-after: HEAD ELF refuses; outside=`KEEP`; host compiler leaf symlink on `data/*.hex` stays `KEEP`.
+- Residual TOCTOU: bind is open-then-check on Windows (`rt_bind_path` + `readlink` `/proc/self/fd` via `stub_fp`). Linux leaf/parent follow is closed at open. Replace-`data`-with-symlink *after* `openat` of `data` but *before* leaf `openat` can still race; that is the remaining TOCTOU, same class as handle-vs-path, fail-closed on `O_NOFOLLOW` of the leaf. Caps 32MB / list 100000 / 5M / MaxCalls 64 unchanged.
 
 ## Dependency inventory
 

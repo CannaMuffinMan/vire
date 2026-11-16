@@ -66,6 +66,10 @@ Host check-then-open: `RefuseReparse` then `File.*` by path lost a `renameat2` s
 - `/interrogate`: two Grok adversaries, not four (Opus weekly cap). Findings F5 and F6 survived reruns and were fixed. Remaining "emu follows leaf symlink" was an emu `stat` vs `lstat` bug and was fixed in the stub.
 - `/blast-radius`: host hardlink test; Unicorn nlink2 does not `CREATE_ALWAYS`; write uses SetEndOfFile; hello still prints.
 
+### F-Linux. ELF `open(2)` followed parent/leaf symlinks
+
+Linux `CreateFileA` shim was `syscall 2` without `O_NOFOLLOW`. **Fixed** with component `openat` + `O_NOFOLLOW|O_CLOEXEC` and host `LinuxOpenAtWalk`. Proof: `tools/native-elf-nofollow.sh` (Ubuntu). Residual: TOCTOU between directory `openat` and leaf `openat` if `data` is swapped for a symlink in that window; leaf still cannot follow. F6 remains stdout RIP; no `data/crash.log` create.
+
 ## Caps
 
 32MB arena, `ProgramStepCap` 5_000_000, list 100_000: unchanged.

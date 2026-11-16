@@ -1,6 +1,7 @@
-~ Compile let, if, calls, and read into a native Windows executable.
+~ Compile let, if, calls, and read into a native Windows PE or Linux ELF executable.
 
 use "src/pe.vire"
+use "src/elf.vire"
 use "src/rt-net.vire"
 
 define isLetter with ch
@@ -1207,14 +1208,24 @@ define pool with gen, raw
   return name
 end
 
-define findFunc with funcs, nm
+define indexFuncs with funcs
+  ~ One map so emit does not rescan the function list on every call.
+  ~ Native while counters are per-loop and never reset; a linear findFunc
+  ~ over PE+#71+#ELF (~151 funcs × thousands of calls) trips 2e6.
+  let m be {}
   let i be 0
   let n be length with funcs
   while i < n
-    if ((funcs at i) at "name") == nm
-      return {"ok": true, "func": funcs at i}
-    end
+    put (funcs at i) into m at ((funcs at i) at "name")
     let i be i + 1
+  end
+  return m
+end
+
+define findFunc with gen, nm
+  let m be gen at "byName"
+  if has with m, nm
+    return {"ok": true, "func": m at nm}
   end
   return {"ok": false}
 end
@@ -1226,7 +1237,7 @@ define emitBoolAcc with gen
 end
 
 define builtinArity with nm
-  if nm == "args" or nm == "ticks"
+  if nm == "args" or nm == "ticks" or nm == "linux"
     return 0
   end
   if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
@@ -1332,7 +1343,11 @@ define emitAtom with gen, funcs, func, expr
       emitCall with gen, "rt_ticks"
       return true
     end
-    let found be findFunc with funcs, nm
+    if nm == "linux"
+      emitCall with gen, "rt_linux"
+      return true
+    end
+    let found be findFunc with gen, nm
     if found at "ok"
       if ((found at "func") at "nparams") == 0
         emitCall with gen, "rt_save_frame"
@@ -1394,7 +1409,7 @@ define emitExpr with gen, funcs, func, root
       let user be 0
       if arity < 0
         let user be 1
-        let found be findFunc with funcs, nm
+        let found be findFunc with gen, nm
         if not (found at "ok")
           put true into gen at "bad"
           put ("there is no definition named " + nm) into gen at "why"
@@ -1801,26 +1816,34 @@ define main
     halt with 1
   end
   let funcs be loaded at "funcs"
-  let saw be false
-  let i be 0
-  while i < (length with funcs)
-    if ((funcs at i) at "name") == "main"
-      let saw be true
-    end
-    let i be i + 1
-  end
-  if not saw
+  let byName be indexFuncs with funcs
+  if not (has with byName, "main")
     say "a vire program needs define main"
     say "compile failed"
     halt with 1
   end
   let hits be {"net": loaded at "needNet", "json": loaded at "needJson"}
   say "needs-ok"
+  let wantElf be linux
+  if (length with files) > 2
+    if (files at 2) == "pe"
+      let wantElf be false
+    end
+    if (files at 2) == "elf"
+      let wantElf be true
+    end
+  end
   let opened be openImage
+  if wantElf
+    let opened be openElfImage
+  end
   if hits at "net"
     let opened be openNetImage
+    if wantElf
+      let opened be openElfNetImage
+    end
   end
-  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": ""}
+  let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": "", "byName": byName}
   let i be 0
   let hasRoute be false
   while i < (length with funcs)
@@ -1857,6 +1880,13 @@ define main
     put (parkNet with (gen at "image"), (gen at "labels")) into gen at "image"
   end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
+  if wantElf
+    put (finishElfImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
+    let exe be buildElf with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base")
+    write with (files at 1), (hex with exe)
+    say "compiled"
+    return none
+  end
   put (finishImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "hints"), (opened at "ilts"), (opened at "iats")) into gen at "image"
   let exe be buildPe with (gen at "image"), ((gen at "labels") at "code"), ((gen at "labels") at "desc"), ((gen at "labels") at "frame_base"), (opened at "impSize")
   write with (files at 1), (hex with exe)
