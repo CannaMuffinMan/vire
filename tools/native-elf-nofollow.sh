@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# FAIL_BEFORE: Linux ELF CreateFile shim uses open(2) and follows parent/leaf
-# symlinks. PASS_AFTER: openat(O_NOFOLLOW) refuses; outside stays KEEP.
+# FAIL_BEFORE: pinned pre-O_NOFOLLOW ELF SHA (6d5414b2 from #78 proof).
+# Linux ELF CreateFile shim uses open(2) and follows parent/leaf symlinks.
+# Do not use origin/native-compiler: after #78 that tip already has openat(O_NOFOLLOW).
+# PASS_AFTER: openat(O_NOFOLLOW) refuses; outside stays KEEP.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -12,6 +14,14 @@ BEFORE_SHA="${NATIVE_ELF_NOFOLLOW_BEFORE:-6d5414b2e0a26ef2f8148846edc59cf5dbded2
 AFTER_SHA="$(git rev-parse HEAD)"
 echo "fail_before_sha $BEFORE_SHA"
 echo "pass_after_sha $AFTER_SHA"
+if git show "$BEFORE_SHA:src/rt-linux.vire" 2>/dev/null | grep -q O_NOFOLLOW; then
+  echo "FAIL_BEFORE pin $BEFORE_SHA already has O_NOFOLLOW (need a pre-openat SHA)" >&2
+  exit 1
+fi
+if ! git show "$BEFORE_SHA:compile-native.vire" | grep -q buildElf; then
+  echo "FAIL_BEFORE pin $BEFORE_SHA is not an ELF tree (need ELF without O_NOFOLLOW)" >&2
+  exit 1
+fi
 
 hex_to_bin() {
   python3 - "$1" "$2" <<'PY'
