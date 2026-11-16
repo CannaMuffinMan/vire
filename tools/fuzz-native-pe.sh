@@ -50,7 +50,8 @@ PY
   rel="data/fuzz-native/g$i.vire"
   hexrel="data/fuzz-native/g$i.hex"
   set +e
-  VIRE_BUDGET= dotnet exec "$VIRE_DLL" --compiler compile-native.vire "$rel" "$hexrel" >"$WORKDIR/g$i.compile.out" 2>"$WORKDIR/g$i.compile.err"
+  # Linux compile-native defaults to ELF after #78; force PE for Unicorn PE emu.
+  VIRE_BUDGET= dotnet exec "$VIRE_DLL" --compiler compile-native.vire "$rel" "$hexrel" pe >"$WORKDIR/g$i.compile.out" 2>"$WORKDIR/g$i.compile.err"
   code=$?
   set -e
   if [[ $code -ne 0 ]]; then

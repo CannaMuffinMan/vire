@@ -1,6 +1,6 @@
-# Fuzz campaign (native-compiler tip `227c0e0a22c817492d090fa2443ed9f264ecb644`)
+# Fuzz campaign (merged `native-compiler` tip `6e969fc2e9c94f537bad69b948e56670096c2a1b`)
 
-Branch: `cursor/fuzz-campaign-856d`. Does not touch `cursor/native-security-lane9-a95f` (PR #71) or PR #78.
+Branch: `cursor/fuzz-campaign-856d`. Harness-only on top of #71 (Windows W^X / `MoveFileExA`) and #78 (Linux ELF + `openat` `O_NOFOLLOW`). Linux native PE fuzz passes the `pe` compile-native format flag so Unicorn still sees a PE image.
 
 Hard caps asserted unchanged: native arena **32MB** (`33554432`), guest list **100000**, steps **5_000_000**, `MaxCalls` **64**. No sandbox weakening, no Defender changes, no outside compilers.
 

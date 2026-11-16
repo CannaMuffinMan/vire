@@ -51,7 +51,7 @@ for ($i = 0; $i -lt $n; $i++) {
     Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
     $outFile = Join-Path $Work "g$i.compile.out"
     $errFile = Join-Path $Work "g$i.compile.err"
-    $p = Start-Process -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "--compiler", "compile-native.vire", $rel, $hexRel) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $p = Start-Process -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "--compiler", "compile-native.vire", $rel, $hexRel, "pe") -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
     if (-not $p.WaitForExit(120000)) {
         try { $p.Kill($true) } catch { }
         Write-Output "HANG compile g$i"
