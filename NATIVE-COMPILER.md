@@ -1,5 +1,15 @@
 # Native compiler notes
 
+## Status (Nov 17, 2026): self-host proof closed
+
+The gen1 = gen2 identical-binary self-host proof described under "Next change" below is done. The native compiler compiles itself and the second generation is byte-identical to the first, on both targets:
+
+- Windows (PE): first proven in CI at PR #40 (merged 7c7c8ea), re-proven on every security lane since. At the current tip (PR #78 merge 6e969fc2) gen1 = gen2 hash 4478d315 across 5 repeated Windows runs.
+- Linux (ELF): gen1 = gen2 hash faf29c8c at PR #78 merge 6e969fc2.
+
+The rule stays the same: no merge without proof on real machines. The rest of this file is the original Nov 5 work log, kept for history.
+
+
 This file records the native self-host work from the chat that ended when the budget ran out. It is a work log, not a claim that Vire is finished.
 
 Active tree: `D:\_scratch\worktrees\vire-e-len`.
@@ -141,7 +151,7 @@ These were already in the tree before the relocation and `ends` work. They are w
 - A second full host rebuild while one is running.
 - Raising the 32MB arena, the step cap, or the list cap to make self-compile pass.
 
-## Next change, when there is budget
+## Next change, when there is budget (done, see Status at top)
 
 Make `rt_alloc` stop at the same 32MB the mapping reserves, and cut the compiler's allocations until a self-compile fits. Then:
 
@@ -150,3 +160,5 @@ Make `rt_alloc` stop at the same 32MB the mapping reserves, and cut the compiler
 3. Compile `data/hello-stage.vire` and require the text `hello from stage` and exit 0.
 4. Have that exe compile `data/compile-native.vire` to a second hex.
 5. Compare SHA-256. A match is the self-host proof. Anything short of that is not done.
+
+
