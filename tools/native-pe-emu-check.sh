@@ -37,4 +37,17 @@ out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/gc-kind-stress.hex")"
 echo "$out"
 echo "$out" | grep -q 'EXIT 0'
 printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -d '\r' | grep -qx 'gc-kind-stress ok'
+cp "$ROOT/tests/fuzz/findings/native-pe-json-map.vire" "$WORKDIR/json-map.vire"
+cp "$ROOT/tests/fuzz/findings/native-pe-parse-array.vire" "$WORKDIR/parse-array.vire"
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/json-map.vire data/native-pe-emu/json-map.hex pe
+out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/json-map.hex")"
+echo "$out"
+echo "$out" | grep -q 'EXIT 0'
+echo "$out" | grep -q 'FAULTS \[\]'
+printf '%s\n' "$out" | awk '/STDOUT_BEGIN/{p=1;next} /STDOUT_END/{p=0} p' | tr -d '\r' | tr -d ' ' | grep -qx '{"a":2}'
+VIRE_BUDGET= "${VIRE[@]}" --compiler compile-native.vire data/native-pe-emu/parse-array.vire data/native-pe-emu/parse-array.hex pe
+out="$(python3 "$ROOT/tools/native-pe-emu.py" "$WORKDIR/parse-array.hex")"
+echo "$out"
+echo "$out" | grep -q 'EXIT 0'
+echo "$out" | grep -q 'FAULTS \[\]'
 echo "native pe emu ok"
