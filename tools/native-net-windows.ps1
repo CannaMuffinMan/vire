@@ -300,13 +300,13 @@ $malReq = [System.Text.Encoding]::ASCII.GetBytes("GET /health`r`n`r`n")
 [void](Assert-AdversaryStatus "malformed_line" $malReq "400")
 
 # Exactly 16384 bytes, no leftover write after the 16KiB header cap, so
-# closesocket cannot RST and drop the 431.
+# closesocket cannot RST and drop the 400.
 $huge = "GET / HTTP/1.1`r`nHost: x`r`n"
 $pad = "X: " + ("y" * 240) + "`r`n"
 while ($huge.Length + $pad.Length -le 16384) { $huge += $pad }
 if ($huge.Length -lt 16384) { $huge += "Z" * (16384 - $huge.Length) }
 $hugeBytes = [System.Text.Encoding]::ASCII.GetBytes($huge)
-[void](Assert-AdversaryStatus "oversize_headers" $hugeBytes "431")
+[void](Assert-AdversaryStatus "oversize_headers" $hugeBytes "400")
 
 # Well-formed GET /health with extra request fields. RFC 9112 allows them.
 # 200 is required. Request Set-Cookie must not appear in the response.
@@ -325,7 +325,7 @@ if ($injectBody -cne $want) { throw "crlf_request_header body $injectBody" }
 [void](Assert-AdversaryStatus "cr_in_header_value" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`ry`r`n`r`n")) "400")
 [void](Assert-AdversaryStatus "obs_fold" ([System.Text.Encoding]::ASCII.GetBytes("GET /health HTTP/1.1`r`nHost: x`r`nX-Foo: bar`r`n folded`r`n`r`n")) "400")
 [void](Assert-AdversaryStatus "dup_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nContent-Length: 0`r`nContent-Length: 5`r`n`r`nhello")) "400")
-[void](Assert-AdversaryStatus "te_and_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nTransfer-Encoding: chunked`r`nContent-Length: 5`r`n`r`nhello")) "501")
+[void](Assert-AdversaryStatus "te_and_content_length" ([System.Text.Encoding]::ASCII.GetBytes("POST /health HTTP/1.1`r`nHost: x`r`nTransfer-Encoding: chunked`r`nContent-Length: 5`r`n`r`nhello")) "400")
 
 $partial = $null
 $c = New-Object System.Net.Sockets.TcpClient

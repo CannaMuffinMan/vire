@@ -1,0 +1,10 @@
+~ Ten-route HTTP guest for host interpreter vs native gen1 PE.
+use "src/http.vire"
+
+define route with method, path, body
+  return http_app with method, path, body
+end
+
+define main
+  listen with 18081
+end

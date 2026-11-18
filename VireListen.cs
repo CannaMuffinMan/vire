@@ -176,7 +176,7 @@ static class VireListen
             if (got >= HttpWire.MaxHeaderBlock)
             {
                 HttpWire.Result oversized = HttpWire.ParseHeaders(buffer, got);
-                SendParseFail(stream, oversized.Status == 0 ? 431 : oversized.Status, oversized);
+                SendParseFail(stream, oversized.Status == 0 ? 400 : oversized.Status, oversized);
                 return;
             }
             int before = got;
@@ -223,7 +223,9 @@ static class VireListen
         string path = parsed.Path;
         string head = parsed.Head;
         string body = parsed.Body;
-        bool health = path == "/health" && (method == "GET" || method == "HEAD");
+        int qAt = path.IndexOf('?');
+        string sitePath = qAt >= 0 ? path.Substring(0, qAt) : path;
+        bool health = sitePath == "/health" && (method == "GET" || method == "HEAD");
         bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
         if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
         {
@@ -235,11 +237,11 @@ static class VireListen
             SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
-        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, path, head, line, root))
+        if ((method == "GET" || method == "HEAD") && TrySite(stream, method, sitePath, head, line, root))
             return;
         object result;
         int maxOutput;
-        bool chain = path == "/block" || path == "/chain";
+        bool chain = sitePath == "/block" || sitePath == "/chain";
         if (chain) Monitor.Enter(ListenHooks.ChainRouteLock);
         try
         {
