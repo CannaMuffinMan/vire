@@ -1,0 +1,18 @@
+~ FCG API entry. Lives at repo root so `use` can load api/.
+~ Listen program: api/fcg-routes.vire. Payments stay off.
+
+use "api/redis-cmd.vire"
+use "api/fcg-routes.vire"
+
+define main
+  let port be 18080
+  let redis be 6379
+  if (length with args) > 0
+    let port be number with (args at 0)
+  end
+  if (length with args) > 1
+    let redis be number with (args at 1)
+  end
+  write with "data/fcg-cfg.json", json with {"redisPort": redis}
+  listen with port
+end
