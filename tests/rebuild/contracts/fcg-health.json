@@ -1,0 +1,52 @@
+{
+  "id": "fcg-health",
+  "source": "in-tree api/fcgcpa.vire GET /health body; guest-health.vire also serves GET /api/health with the same body. L5 inventory of fcgcpa-prod main 5cc110206f8f42ee25c127f2bfbe0f8bcd6067f4: both paths unauthenticated. This tree cannot re-open the private Node handler.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_health",
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    },
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    },
+    {
+      "name": "get_nope",
+      "method": "GET",
+      "path": "/nope",
+      "status": 200,
+      "native_http_status_note": "Host VireListen.StatusOf maps body \"status\":404 to HTTP 404. Native rt_net_sendhttp always sends HTTP 200 for a successful route return. This case records native wire status 200 plus the 404 JSON body. Do not claim HTTP 404 is proven on native.",
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+    }
+  ]
+}
