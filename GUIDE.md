@@ -213,7 +213,7 @@ say now
 
 `fetch with "https://example.com"` performs one HTTP GET. The address must start with `http://` or `https://`. The wait is at most 5 seconds, and the body is at most 1,000,000 bytes.
 
-Native compiled programs use `tls_connect` / `tls_listen` / `tls_send` / `tls_recv` / `tls_close` for HTTPS on the loopback TCP path (see `docs/native-tls.md`). Certificate checks stay on. There is no flag that turns them off.
+Native compiled programs use `tls_connect` / `tls_send` / `tls_recv` / `tls_close` for outbound HTTPS on the loopback TCP path (see `docs/native-tls.md`). Native `tls_listen` is fail-closed. Certificate checks stay on. There is no flag that turns them off. CA files stay under `data/` or `site/` (empty CA uses the system store).
 
 ## 10. Packages
 

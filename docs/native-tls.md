@@ -2,46 +2,63 @@
 
 ## Goal
 
-Native Vire programs can serve and call HTTPS so the FCG stack can be rebuilt in Vire. This lane adds `tls_connect`, `tls_listen`, `tls_send`, `tls_recv`, and `tls_close`. Existing TCP `connect` / `listen` / `send` / `recv` / `close` are unchanged.
+Outbound TLS for the FCG stack: HTTPS upstream calls and (with the Postgres lane) `sslmode=require`. Go sidecars never listen TLS; edge/Railway terminates inbound TLS. Guest APIs: `tls_connect`, `tls_send`, `tls_recv`, `tls_close`. `tls_listen` stays **fail-closed** on native ELF (unproven; host interpreter still serves TLS). Existing TCP `connect` / `listen` / `send` / `recv` / `close` are unchanged.
 
 ## Linux choice (OS TLS stack)
 
-Linux has no SChannel equivalent. The kernel does not perform the handshake. Native **TLS guests** are dynamically linked (`PT_INTERP` `/lib64/ld-linux-x86-64.so.2`, `DT_NEEDED` `libssl.so.3`) and call OpenSSL 3. Plain and TCP-only guests stay static syscall ELFs (no libc, no libssl).
+Linux has no SChannel. The kernel does not perform the handshake.
 
-Windows native PE: the guest APIs exist; the PE path fail-closes with a message until an SChannel handshake is proven on a Windows box. The host interpreter uses `SslStream` on both OS. This VM proved ELF + host on Linux.
+**Only TLS guests** are dynamically linked (`PT_INTERP` `/lib64/ld-linux-x86-64.so.2`, `DT_NEEDED` `libssl.so.3` and `libcrypto.so.3`). Hello, TCP-only, and selfhost ELFs stay **static** syscall images (no libc, no OpenSSL).
 
-A from-scratch TLS 1.3 in Vire was not used: it would duplicate OpenSSL/SChannel and could not be fully tested against known vectors in this lane.
+### Supply chain / version
+
+| Point | Choice |
+|---|---|
+| Why OpenSSL 3, not a from-scratch TLS 1.3 | Handshake and PKI are not something this lane can fully test against known vectors in Vire. |
+| Why `.so.3` not bundled | Distro OpenSSL gets CVE patches; we do not vendor a copy. Tradeoff: the guest trusts the host's `libssl.so.3` / `libcrypto.so.3` (same as any dynamically linked Linux binary). |
+| Minimum version | `OpenSSL_version_num() >= 0x30000000` (3.0.0). Below that, `tls_connect` fail-closes. Loading `libssl.so.3` already requires the OPENSSL_3.0 ELF version. |
+| Not used for non-TLS | If a program never calls `tls_*`, the image has no INTERP and no DT_NEEDED. |
+
+Windows native PE: APIs exist; the PE path fail-closes until SChannel is proven. Host `SslStream` runs on both OS.
 
 ## Guest API
 
 ```
 tls_connect with host, port, name, ca
-tls_listen with port, cert, key
 tls_send with handle, text
 tls_recv with handle, size
 tls_close with handle
+tls_listen with port, cert, key   ~ native ELF fail-closed; host interpreter only
 ```
 
-- `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate. `ca` is a PEM file under `data/` or `site/`. Empty `ca` (`""`) uses the system trust store. Validation is on. There is no skip-verify flag.
-- `tls_listen` binds like `listen` (`127.0.0.1` unless `VIRE_BIND=public` on the host interpreter). `cert` and `key` are PEM paths under `data/` or `site/`. Guest `define route with method, path, body` is required. Native ELF wraps `accept` / `recv` / `send` / `close` with `SSL_accept` / `SSL_read` / `SSL_write` / `SSL_shutdown`.
+- `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate.
+- `ca` empty (`""`) uses the system trust store (`SSL_CTX_set_default_verify_paths` / OS roots). A non-empty `ca` must pass the same **data/ / site/** sandbox as `read` (`rt_check_path` on ELF, `SafePath` on the host). Traversal and paths outside that gate fail closed. OpenSSL never sees a path that skipped the gate.
+- Validation is on. There is no skip-verify flag.
 - Recv cap 1_000_000 bytes, same as TCP.
 
 ## Security review
 
 | Rule | Status |
 |---|---|
-| Certificate validation on by default | Host: `SslClientAuthenticationOptions` with custom root store or system roots. Native ELF: `SSL_CTX_set_verify(SSL_VERIFY_PEER)` plus `SSL_set1_host` and `SSL_get_verify_result == 0`. Empty CA uses `SSL_CTX_set_default_verify_paths`. |
-| No protocol downgrade | Host: `SslProtocols.Tls12 \| Tls13` only. Native: `SSL_CTX_set_min_proto_version(TLS1_2)` and `SSL_CTX_set_max_proto_version(TLS1_3)`. |
-| No insecure flags enabled by default | Host: `EncryptionPolicy.RequireEncryption`. No `AllowAny`. Native: no `SSL_VERIFY_NONE`, no `SSL_OP_LEGACY_SERVER_CONNECT` set by this runtime. |
-| No secrets committed | Test certs are generated at test time under `data/` and are gitignored as build outputs. |
-| Caps | Arena 32MB, list 100000, steps 5M unchanged. Sandbox paths still `data/` / `site/`. Native `connect` still refuses non-loopback. |
-| Dynamic ELF only for TLS guests | TCP/hello/selfhost images are still static. |
+| Certificate validation on by default | Host: `SslClientAuthenticationOptions` with custom root or system roots. Native ELF: `SSL_CTX_set_verify(SSL_VERIFY_PEER)`, `SSL_set1_host`, `SSL_get_verify_result == 0`. |
+| No protocol downgrade | Host: `Tls12 \| Tls13`. Native: min TLS1.2 / max TLS1.3 via `SSL_CTX_ctrl`. |
+| No insecure flags by default | No skip-verify, no `SSL_VERIFY_NONE`. |
+| Path sandbox | CA/cert files: `data/` or `site/` only. Empty CA = system store, not an arbitrary libc `open`. |
+| Caps | Arena 32MB, list 100000, steps 5M unchanged. Native `connect` still refuses non-loopback. |
+| Dynamic ELF only for TLS guests | TCP/hello/selfhost images stay static. |
+
+## Postgres / HTTPS (coordinate with #95)
+
+Do not implement SQL on this branch. `#95` owns the native database client. Design only:
+
+- `sslmode=require` should call the same `tls_connect` (or a thin wrapper) after the TCP `connect`, with `name` = server hostname and `ca` empty (system store) or a PEM under `data/`.
+- HTTPS upstream: `tls_connect` + `tls_send` of an HTTP/1.1 request + `tls_recv`. Still loopback-only on native until the net sandbox grows.
 
 ## Tests
 
-- Host: `tests/Vire.Tests/TlsTests.cs` (handshake vs `openssl s_server` / `s_client` where available).
-- Native ELF: `tools/native-elf-tls.sh` (real OpenSSL / Python `ssl` peer). Proven on Linux: dynamic `libssl.so.3` guest, `SSL_connect` vs a TLS 1.2+ echo, `SSL_write` of `ping` observed by the peer. `tls_recv`→`say` on that guest is still empty (host `TlsTests` covers interpreter recv vs `openssl s_server`). PE SChannel is fail-closed.
+- Host: `tests/Vire.Tests/TlsTests.cs` (handshake vs `openssl s_server`; DualMode refuses `../` and `/etc/...` CA paths).
+- Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping round-trip vs a TLS 1.2+ peer).
 
 ## Shared files
 
-This lane touches `compile-native.vire`, `src/elf.vire`, `Vire.cs`, `Compiled.cs`, `VireNet.cs`, `VireListen.cs`, `tools/stage-compiler-src.sh`. New files: `src/rt-tls.vire`, `VireTls.cs`, this doc, tests and the ELF prove script. `src/rt-net.vire` was not modified.
+`compile-native.vire`, `src/elf.vire`, `Vire.cs`, `Compiled.cs`, `VireNet.cs`, `VireListen.cs`, `tools/stage-compiler-src.sh`. New: `src/rt-tls.vire`, `VireTls.cs`, this doc, tests, prove script. `src/rt-net.vire` was not modified.

@@ -328,13 +328,15 @@ define finishElfTlsImage with image, labels, fixes, iats
   poke64 with image, (dyn + 96), 3
   poke64 with image, (dyn + 104), gotb
   poke64 with image, (dyn + 112), 2
-  poke64 with image, (dyn + 120), 528
+  poke64 with image, (dyn + 120), 552
   poke64 with image, (dyn + 128), 20
   poke64 with image, (dyn + 136), 7
   poke64 with image, (dyn + 144), 23
   poke64 with image, (dyn + 152), (va + (labels at "tls_rela"))
   poke64 with image, (dyn + 160), 9
   poke64 with image, (dyn + 168), 24
+  poke64 with image, (dyn + 176), 1
+  poke64 with image, (dyn + 184), ((labels at "tls_needed2") - (labels at "tls_dynstr"))
   return image
 end
 

@@ -52,8 +52,8 @@ define main
   let h be tls_connect with "127.0.0.1", ${PORT}, "localhost", "data/tls-elf-cert.pem"
   tls_send with h, "ping"
   let got be tls_recv with h, 16
-  tls_close with h
   say got
+  tls_close with h
 end
 EOF
 
@@ -76,9 +76,33 @@ if [[ "$CODE" -ne 0 ]]; then
 fi
 echo "$OUT" | grep -qx "ping"
 
+cat > data/tls-badca.vire <<'EOF'
+define main
+  tls_connect with "127.0.0.1", 443, "localhost", "../etc/passwd"
+end
+EOF
+rm -f data/tls-badca.hex
+dotnet exec bin/Release/net10.0/vire.dll --compiler compile-native.vire data/tls-badca.vire data/tls-badca.hex
+python3 - <<'PY'
+from pathlib import Path
+Path("data/tls-badca.elf").write_bytes(bytes.fromhex(Path("data/tls-badca.hex").read_text().strip()))
+PY
+chmod +x data/tls-badca.elf
+set +e
+BAD="$(./data/tls-badca.elf 2>&1)"
+BADCODE=$?
+set -e
+echo "$BAD"
+echo "tls_elf_badca_exit $BADCODE"
+if [[ "$BADCODE" -eq 0 ]]; then
+  echo "tls CA path outside data/ must fail"
+  exit 1
+fi
+echo "$BAD" | grep -E -q "folder|inside|path"
+
 cat > data/tls-listen.vire <<'EOF'
 define route with method, path, body
-  return "{\"ok\":true,\"tls\":true}"
+  return "{\"ok\":true}"
 end
 define main
   tls_listen with 0, "data/tls-elf-cert.pem", "data/tls-elf-key.pem"
@@ -91,20 +115,17 @@ from pathlib import Path
 Path("data/tls-listen.elf").write_bytes(bytes.fromhex(Path("data/tls-listen.hex").read_text().strip()))
 PY
 chmod +x data/tls-listen.elf
-rm -f /tmp/vire-elf-tls-listen.out
-./data/tls-listen.elf >/tmp/vire-elf-tls-listen.out 2>&1 &
-LPID=$!
-for i in $(seq 1 100); do
-  if grep -q "listening on 127.0.0.1:" /tmp/vire-elf-tls-listen.out 2>/dev/null; then break; fi
-  sleep 0.05
-done
-cat /tmp/vire-elf-tls-listen.out
-LPORT="$(sed -n 's/.*listening on 127.0.0.1:\([0-9]*\).*/\1/p' /tmp/vire-elf-tls-listen.out | head -1)"
-echo "tls_listen_port $LPORT"
-echo "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" | openssl s_client -connect 127.0.0.1:${LPORT} -servername localhost -CAfile data/tls-elf-cert.pem -quiet -ign_eof > /tmp/vire-elf-tls-sclient.out 2>/tmp/vire-elf-tls-sclient.err || true
-head -c 400 /tmp/vire-elf-tls-sclient.out; echo
-grep -q "HTTP/1.1" /tmp/vire-elf-tls-sclient.out || grep -q "ok" /tmp/vire-elf-tls-sclient.out
-kill "$LPID" 2>/dev/null || true
-wait "$LPID" 2>/dev/null || true
-echo "PASS_AFTER at $AFTER_SHA ELF TLS handshake vs openssl/python ssl peer"
+set +e
+LOUT="$(./data/tls-listen.elf 2>&1)"
+LCODE=$?
+set -e
+echo "$LOUT"
+echo "tls_listen_elf_exit $LCODE"
+if [[ "$LCODE" -eq 0 ]]; then
+  echo "native tls_listen must stay fail-closed"
+  exit 1
+fi
+echo "$LOUT" | grep -q "fail-closed"
+
+echo "PASS_AFTER at $AFTER_SHA ELF tls_connect ping round-trip; tls_listen fail-closed; CA sandbox on"
 echo "native elf tls ok"

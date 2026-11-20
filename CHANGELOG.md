@@ -2,7 +2,7 @@
 
 ## Native TLS (this branch)
 
-- Guest `tls_connect` / `tls_listen` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 (`docs/native-tls.md`). Cert validation on; TLS 1.2 min. Test certs at test time.
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Native `tls_listen` fail-closed. Test certs at test time.
 
 ## Phase 0
 

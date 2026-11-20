@@ -30,6 +30,27 @@ public class TlsTests
     }
 
     [Fact]
+    public void DualModeTlsConnectRefusesPathTraversal()
+    {
+        DualMode.DualRun run = DualMode.RunSource(
+            "define main\n  tls_connect with \"127.0.0.1\", 443, \"localhost\", \"../etc/passwd\"\nend\n", null);
+        Assert.True(run.Matched, Diff(run));
+        Assert.Equal(1, run.InterpCode);
+        Assert.Contains("folder", DualMode.Norm(run.InterpErr) + DualMode.Norm(run.InterpOut));
+    }
+
+    [Fact]
+    public void DualModeTlsConnectRefusesAbsoluteOutsideGate()
+    {
+        DualMode.DualRun run = DualMode.RunSource(
+            "define main\n  tls_connect with \"127.0.0.1\", 443, \"localhost\", \"/etc/passwd\"\nend\n", null);
+        Assert.True(run.Matched, Diff(run));
+        Assert.Equal(1, run.InterpCode);
+        string err = DualMode.Norm(run.InterpErr) + DualMode.Norm(run.InterpOut);
+        Assert.True(err.Contains("folder") || err.Contains("inside") || err.Contains("path"), err);
+    }
+
+    [Fact]
     public void NativeCompilerWiresTlsBuiltins()
     {
         string root = DualMode.FindRoot();
