@@ -1,0 +1,108 @@
+use "src/rt-pg.vire"
+
+define proveOk with tag, cond, box
+  if cond
+    say tag + " PASS"
+  end
+  if not cond
+    say tag + " FAIL"
+    put (1 + (box at 0)) into box at 0
+  end
+  return box
+end
+
+define proveBad with tag, why, needle, box
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    put (1 + (box at 0)) into box at 0
+  end
+  if (find with why, needle) >= 0
+    say tag + " REJECT " + why
+  end
+  return box
+end
+
+define main
+  let box be [1]
+  let tab be pg_tab
+
+  proveOk with "BE16 258", ((pg_u16be with (pg_be16 with 258), 0, tab) == 258), box
+
+  let t1 be pg_take with "Q", tab
+  proveBad with "truncated header", (t1 at "why"), "truncated", box
+
+  let shortLen be "Q" + (chr with 0) + (chr with 0) + (chr with 0) + (chr with 3)
+  let t2 be pg_take with shortLen, tab
+  proveBad with "length under 4", (t2 at "why"), "bad length", box
+
+  let huge be "Q" + (chr with 0) + (chr with 16) + (chr with 0) + (chr with 0) + "x"
+  let t3 be pg_take with huge, tab
+  proveBad with "oversize length", (t3 at "why"), "oversize", box
+
+  let body be "Q" + (pg_be32 with 8) + "ab"
+  let t4 be pg_take with body, tab
+  proveBad with "truncated body", (t4 at "why"), "truncated", box
+
+  let okm be pg_msg with "Z", "I"
+  let t5 be pg_take with okm, tab
+  let readyOk be 0
+  if (t5 at "ok") == true
+    let readyOk be 1
+  end
+  if (t5 at "t") != "Z"
+    let readyOk be 0
+  end
+  proveOk with "ready take", (readyOk == 1), box
+
+  let row be (chr with 0) + (chr with 1) + (chr with 0) + (chr with 0) + (chr with 0) + (chr with 1) + "7"
+  let cells be pg_rows_parse with row, tab
+  proveOk with "row one cell", ((cells at 0) == "7"), box
+
+  let badRow be (chr with 0) + (chr with 1) + (chr with 0) + (chr with 0) + (chr with 0) + (chr with 9) + "x"
+  proveOk with "row truncated field", ((pg_rows_parse with badRow, tab) == none), box
+
+  let nullRow be (chr with 0) + (chr with 1) + (chr with 255) + (chr with 255) + (chr with 255) + (chr with 255)
+  let nulls be pg_rows_parse with nullRow, tab
+  proveOk with "row null cell", ((nulls at 0) == none), box
+
+  let errp be "C" + "42601" + (chr with 0) + "M" + "syntax" + (chr with 0) + (chr with 0)
+  proveOk with "error fields", ((pg_err with errp, tab) == "42601 syntax"), box
+
+  proveOk with "error empty", ((pg_err with "", tab) == "malformed error"), box
+
+  let fox be pg_hmac with "key", "The quick brown fox jumps over the lazy dog", tab
+  let want be pg_unhex with "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+  proveOk with "HMAC RFC4231-ish", (fox == want), box
+
+  let rt be pg_b64enc with "Man", tab
+  proveOk with "b64 Man", (rt == "TWFu"), box
+  proveOk with "b64 round", ((pg_b64dec with rt, tab) == "Man"), box
+  proveOk with "b64 pad", ((pg_b64dec with "TWE=", tab) == "Ma"), box
+  proveOk with "b64 reject", ((pg_b64dec with "!!!!", tab) == none), box
+
+  let sf be pg_scram_parse_server_first with "r=abcYYY,s=AAAA,i=0", "abc"
+  proveBad with "iter zero", (sf at "why"), "bad iteration", box
+
+  let sf2 be pg_scram_parse_server_first with "r=abcYYY,s=AAAA,i=9000", "abc"
+  proveBad with "iter cap", (sf2 at "why"), "iteration cap", box
+
+  let sf3 be pg_scram_parse_server_first with "r=zzz,s=AAAA,i=2", "abc"
+  proveBad with "nonce prefix", (sf3 at "why"), "nonce mismatch", box
+
+  let sf4 be pg_scram_parse_server_first with "r=abcYYY,i=2", "abc"
+  proveOk with "server-first needs s", ((sf4 at "ok") == false), box
+
+  let kdf be pg_pbkdf2 with "pencil", "salt", 2, tab
+  proveOk with "pbkdf2 two rounds", ((length with kdf) == 32), box
+
+  proveOk with "bool t", ((pg_cell_decode with "t", 16) == true), box
+  proveOk with "int4", ((pg_cell_decode with "7", 23) == 7), box
+
+  if (box at 0) == 1
+    say "PG DECODE PROVE pass"
+  end
+  if (box at 0) != 1
+    say "PG DECODE PROVE fails " + (text with (box at 0))
+    halt with 1
+  end
+end
