@@ -295,7 +295,7 @@ static class VireListen
 
     static string ContentTypeOf(string text)
     {
-        if (text == null) return "application/json; charset=utf-8";
+        if (text == null) return "application/json";
         int i = 0;
         while (i < text.Length)
         {
@@ -305,7 +305,7 @@ static class VireListen
                 i++;
                 continue;
             }
-            if (c == '{' || c == '[') return "application/json; charset=utf-8";
+            if (c == '{' || c == '[') return "application/json";
             return "text/plain; charset=utf-8";
         }
         return "text/plain; charset=utf-8";

@@ -96,7 +96,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | --- | --- | --- |
 | HTTP listen (loopback) | **Present** PE + ELF | `src/rt-net.vire`, `tools/native-net-windows.ps1`, `tools/native-elf-tcp.sh` |
 | HTTP status from JSON `"status"` | **Present** | `rt_net_statusof`; harness `GET /nope` → 404 |
-| Content-Type JSON vs text/plain | **Present** | `rt_net_ctype` + host `ContentTypeOf`; `GET /health` `ok\\n` is text/plain |
+| Content-Type JSON vs text/plain | **Present** | JSON is `application/json` (no charset, Go writeJSON). `rt_net_ctype` + host `ContentTypeOf`; `ok\\n` is text/plain |
 | JSON encode/parse | **Present** | `rt_json` / `rt_parse`, `json-prove.vire` |
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
@@ -151,7 +151,7 @@ Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs nat
 
 Recorded in `tests/rebuild/contracts/`:
 
-- `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
+- `GET /health` → 200, `Content-Type: application/json` (no charset; Go `writeJSON` in fcgbds-go `server.go`), `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
 - `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
 - `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
@@ -167,7 +167,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 ### What this PR does not prove
 
 - Byte-identical Node handler vs Vire (private repo unread)
-- Native listen POST `body` (any use of the parameter segfaults). Host `POST /block` matches the recorded contract. A later rt-net body fix is required before native POST can be paired; this PR does not edit `compile-native.vire` / emitters.
+- Native POST `/block` body read is proven on this branch (bounded leaf heap text). Remaining chain rotate/507/503/migrate is not.
 - Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
 - Remaining sidecar routes beyond the five GET goldens
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
@@ -175,7 +175,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler changes (`compile-native.vire` / emitters were not edited; blob+pins+fixes for `rt_net_statusof` only)
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited.
 
 ## Commands
 
