@@ -196,10 +196,7 @@ for case in doc["cases"]:
     want_h = case.get("headers") or {}
     for hk, hv in want_h.items():
         g = headers.get(hk.lower(), "")
-        if hk.lower() == "content-type":
-            if hv.lower() not in g.lower():
-                mismatches.append("%s content-type got %s want contains %s" % (name, g, hv))
-        elif g.lower() != hv.lower():
+        if g.lower() != hv.lower():
             mismatches.append("%s header %s got %s want %s" % (name, hk, g, hv))
     stripped = body.strip()
     if "body" in case and "body_fields" not in case:
@@ -289,10 +286,7 @@ for case in doc["cases"]:
     if hs != ns:
         mismatches.append("%s status host %s native %s" % (name, hs, ns))
     for k in ["content-type", "cache-control"]:
-        if k == "content-type":
-            if "application/json" not in hh.get(k, "").lower() or "application/json" not in nh.get(k, "").lower():
-                mismatches.append("%s content-type host %s native %s" % (name, hh.get(k), nh.get(k)))
-        elif hh.get(k, "").lower() != nh.get(k, "").lower():
+        if hh.get(k, "").lower() != nh.get(k, "").lower():
             mismatches.append("%s header %s host %s native %s" % (name, k, hh.get(k), nh.get(k)))
     try:
         hj, nj = json.loads(hb), json.loads(nb)

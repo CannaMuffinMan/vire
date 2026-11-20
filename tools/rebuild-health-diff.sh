@@ -146,12 +146,9 @@ for case in cases:
         mismatches.append("%s status got %s want %s" % (name, status, case["status"]))
     want_h = case.get("headers") or {}
     for hk, hv in want_h.items():
-        g = headers.get(hk.lower(), "")
-        if hk.lower() == "content-type":
-            if hv.lower() not in g.lower():
-                mismatches.append("%s content-type got %s want contains %s" % (name, g, hv))
-        elif g.lower() != hv.lower():
-            mismatches.append("%s header %s got %s want %s" % (name, hk, g, hv))
+        got = headers.get(hk.lower(), "")
+        if got.lower() != hv.lower():
+            mismatches.append("%s header %s got %s want %s" % (name, hk, got, hv))
     if body != case["body"]:
         mismatches.append("%s body got %s want %s" % (name, body, case["body"]))
     print("case %s status %s body %s" % (name, status, body))
@@ -218,10 +215,7 @@ for p in sys.argv[3:]:
         for k in keys:
             hv = hh.get(k, "")
             nv = nh.get(k, "")
-            if k == "content-type":
-                if "application/json" not in hv.lower() or "application/json" not in nv.lower():
-                    mismatches.append("%s content-type host %s native %s" % (name, hv, nv))
-            elif hv.lower() != nv.lower():
+            if hv.lower() != nv.lower():
                 mismatches.append("%s header %s host %s native %s" % (name, k, hv, nv))
         if hb != nb:
             mismatches.append("%s body host %s native %s" % (name, hb, nb))

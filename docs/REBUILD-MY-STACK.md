@@ -125,7 +125,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 
 Recorded in `tests/rebuild/contracts/`:
 
-- `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
+- `GET /health` → 200, `Content-Type: application/json` (no charset; Go `writeJSON` in fcgbds-go `server.go`), `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
 - `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
 - `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
@@ -140,6 +140,7 @@ Recorded in `tests/rebuild/contracts/`:
 - Go microservices
 - Payments on, mining network, testnet
 - Compiler changes (`compile-native.vire` / emitters were not edited; blob+pins+fixes for `rt_net_statusof` only)
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset). `compile-native.vire` was not edited.
 
 ## Commands
 
