@@ -1,0 +1,14 @@
+~ FAIL_BEFORE for fcgbc-go GET /pending-transactions.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/pending-transactions"
+      return "{}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

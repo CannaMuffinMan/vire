@@ -293,6 +293,24 @@ static class VireListen
             || msg.IndexOf("while ran too long", StringComparison.Ordinal) >= 0;
     }
 
+    static string ContentTypeOf(string text)
+    {
+        if (text == null) return "application/json; charset=utf-8";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '{' || c == '[') return "application/json; charset=utf-8";
+            return "text/plain; charset=utf-8";
+        }
+        return "text/plain; charset=utf-8";
+    }
+
     static int StatusOf(string text, int fallback)
     {
         if (text == null) return fallback;
@@ -344,7 +362,7 @@ static class VireListen
             data = Encoding.UTF8.GetBytes("{\"error\":\"route failed\"}");
         }
         string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
-            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Type: " + ContentTypeOf(body) + "\r\n"
             + "Content-Length: " + data.Length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"
