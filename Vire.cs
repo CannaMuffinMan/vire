@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 #if WINDOWS
@@ -382,6 +383,7 @@ sealed class Machine
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close",
+        "tls_connect", "tls_listen", "tls_send", "tls_recv", "tls_close",
         "start", "wait", "result", "linux"
     });
 
@@ -617,7 +619,9 @@ sealed class Machine
                 throw new VireError("start takes a definition name and at most one value", line, col);
             need = args.Count;
         }
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv" || name == "tls_send" || name == "tls_recv") need = 2;
+        if (name == "tls_listen") need = 3;
+        if (name == "tls_connect") need = 4;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -734,6 +738,26 @@ sealed class Machine
         if (name == "send") return VireNet.SendAll(args[0], args[1], tcp, line, col);
         if (name == "recv") return VireNet.RecvBound(args[0], args[1], tcp, line, col);
         if (name == "close") return VireNet.CloseHandle(args[0], tcp, line, col);
+        if (name == "tls_connect")
+        {
+            string ca = args[3] as string;
+            if (ca == null) throw new VireError("tls_connect needs a host, a port, a name, and a ca file", line, col);
+            if (ca.Length > 0) ca = SafePath(ca, line, col);
+            return VireTls.Connect(args[0] as string, args[1], args[2] as string, ca, tcp, root, line, col);
+        }
+        if (name == "tls_listen")
+        {
+            if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
+            int tlsPort = RequirePort(args[0], line);
+            string certPath = SafePath(args[1], line, col);
+            string keyPath = SafePath(args[2], line, col);
+            X509Certificate2 cert = VireTls.LoadPemPair(certPath, keyPath, line, col);
+            VireListen.WithCancel(tlsPort, line, root, DispatchRoute, Show, p => ListenPort = p, cert);
+            return null;
+        }
+        if (name == "tls_send") return VireTls.SendAll(args[0], args[1], tcp, line, col);
+        if (name == "tls_recv") return VireTls.RecvBound(args[0], args[1], tcp, line, col);
+        if (name == "tls_close") return VireTls.CloseHandle(args[0], tcp, line, col);
         if (name == "kind") return KindOf(args[0]);
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
