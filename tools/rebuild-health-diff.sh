@@ -146,9 +146,9 @@ for case in cases:
         mismatches.append("%s status got %s want %s" % (name, status, case["status"]))
     want_h = case.get("headers") or {}
     for hk, hv in want_h.items():
-        got = headers.get(hk.lower(), "")
-        if got.lower() != hv.lower():
-            mismatches.append("%s header %s got %s want %s" % (name, hk, got, hv))
+        got_h = headers.get(hk.lower(), "")
+        if got_h.lower() != hv.lower():
+            mismatches.append("%s header %s got %s want %s" % (name, hk, got_h, hv))
     if body != case["body"]:
         mismatches.append("%s body got %s want %s" % (name, body, case["body"]))
     print("case %s status %s body %s" % (name, status, body))
