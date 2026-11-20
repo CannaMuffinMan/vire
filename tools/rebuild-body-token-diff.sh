@@ -124,8 +124,43 @@ else
   echo "FAIL_BEFORE did not reproduce; continuing with current tree still required"
 fi
 
+echo "FAIL_BEFORE header order at a58999b15dc8fc1b2b1fe196dd7a88aa89179630"
+ORDER_SHA=a58999b15dc8fc1b2b1fe196dd7a88aa89179630
+git show "$ORDER_SHA:src/rt-net-blob.txt" > src/rt-net-blob.txt
+git show "$ORDER_SHA:src/rt-net-pins.txt" > src/rt-net-pins.txt
+git show "$ORDER_SHA:src/rt-net-fixes.txt" > src/rt-net-fixes.txt
+compile_guest
+ids="$(run_listen /tmp/vire-hdr-fail.out)"
+HPID="${ids%% *}"
+HPORT="${ids##* }"
+python3 - "$HPORT" <<'PY'
+import socket, sys
+port = int(sys.argv[1])
+req = b"POST /echo HTTP/1.1\r\nHost: x\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello"
+s = socket.create_connection(("127.0.0.1", port), 3)
+s.sendall(req)
+s.settimeout(3)
+chunks = []
+try:
+    while True:
+        d = s.recv(4096)
+        if not d:
+            break
+        chunks.append(d)
+except socket.timeout:
+    pass
+s.close()
+raw = b"".join(chunks)
+print(raw.decode("utf-8", "replace"))
+if b"411" not in raw:
+    raise SystemExit("FAIL_BEFORE expected 411 when Connection precedes Content-Length")
+print("FAIL_BEFORE header-order 411 as required")
+PY
+kill "$HPID" 2>/dev/null || true
+wait "$HPID" 2>/dev/null || true
+
 echo "PASS_AFTER restore working-tree rt-net blob"
-git checkout -- src/rt-net-blob.txt src/rt-net-pins.txt src/rt-net-fixes.txt
+git checkout -- src/rt-net-blob.txt src/rt-net-pins.txt src/rt-net-fixes.txt data/src/rt-net-blob.txt data/src/rt-net-pins.txt data/src/rt-net-fixes.txt 2>/dev/null || git checkout -- src/rt-net-blob.txt src/rt-net-pins.txt src/rt-net-fixes.txt
 compile_guest
 ids="$(run_listen /tmp/vire-body-pass.out)"
 GPID="${ids%% *}"
@@ -156,7 +191,11 @@ r = req(b"POST /echo HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
 assert b"411" in r and b"content length required" in r, r
 r = req(b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1000001\r\nConnection: close\r\n\r\n")
 assert b"413" in r and b"body too large" in r, r
-print("PASS_AFTER 411/413 ok")
+r = req(b"POST /echo HTTP/1.1\r\nHost: x\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: 5\r\n\r\nhello")
+assert b"200" in r and b'"n":5' in r and b"hello" in r, r
+r = req(b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+assert b"400" in r, r
+print("PASS_AFTER 411/413/header-order/dup-CL ok")
 PY
 kill "$GPID" 2>/dev/null || true
 wait "$GPID" 2>/dev/null || true

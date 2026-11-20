@@ -123,10 +123,10 @@ def http_req(method, path, body_send):
         "%s %s HTTP/1.1" % (method, path),
         "Host: 127.0.0.1",
     ]
+    lines.append("Connection: close")
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
-    lines.append("Connection: close")
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)
@@ -211,10 +211,10 @@ def http_req(port, method, path, body_send):
         "%s %s HTTP/1.1" % (method, path),
         "Host: 127.0.0.1",
     ]
+    lines.append("Connection: close")
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
-    lines.append("Connection: close")
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)
