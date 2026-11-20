@@ -107,4 +107,22 @@ try {
     Stop-Process -Id $cp.Id -Force
 }
 
-Write-Host "Windows PE rebuild fcgcpa steps completed on this CouchStation. Linux is not PE proof."
+Write-Host "CouchStation PE: landing-go unauth fixtures (Linux ELF is tools/rebuild-landing-diff.sh; this is not Linux proof)"
+$landingExe = Compile-Guest (Join-Path $Root "tests/rebuild/guests/landing-go.vire") "rebuild-landing-pe"
+$lp = Start-Process -FilePath $landingExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput (Join-Path $Data "rebuild-landing-pe.out") -PassThru
+Start-Sleep -Milliseconds 400
+$lout = Get-Content -Raw (Join-Path $Data "rebuild-landing-pe.out")
+if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $lp.Id -Force; throw "landing PE did not listen" }
+$lport = [int]$Matches[1]
+try {
+    Assert-Case (Read-Http $lport "GET" "/healthz" $null) 200 'ok' "get_healthz"
+    Assert-Case (Read-Http $lport "GET" "/api/capabilities" $null) 200 '{"merch":false,"adsense":false,"adsenseClientId":null,"billing":false}' "get_capabilities"
+    Assert-Case (Read-Http $lport "GET" "/api/auth" $null) 401 'Authentication required.' "get_auth"
+    Assert-Case (Read-Http $lport "GET" "/api/subscription" $null) 503 '{"enabled":false}' "get_subscription"
+    Assert-Case (Read-Http $lport "GET" "/partnership" $null) 307 '{"status":307,"location":"/partners"}' "get_partnership"
+    Assert-Case (Read-Http $lport "GET" "/partners" $null) 503 '{"reason":"data_held"}' "get_partners_held"
+} finally {
+    Stop-Process -Id $lp.Id -Force
+}
+
+Write-Host "Windows PE rebuild fcgcpa + landing-go steps completed on this CouchStation. Linux is not PE proof."

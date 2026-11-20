@@ -65,8 +65,8 @@ end
 ~ regenerating the blob is the remaining fix for those internal roots.
 ~ rt_net_statusof (appended to rt-net-blob) maps JSON "status":N the same way
 ~ host VireListen.StatusOf does. Route replies call it before sendhttp.
-~ rt_net_ctype picks txt_hdrs (JSON) or txt_hdrs_plain when the body is not
-~ JSON (leading `{` / `[` after whitespace), matching host SendApi.
+~ rt_net_ctype picks txt_hdrs (JSON), txt_hdrs_plain, or landing HTML/auth/redirect
+~ prefixes (leading `{` / `[` / `<` after whitespace), matching host SendApi.
 ~ JSON Content-Type is application/json with no charset (Go writeJSON).
 ~ Request body is a heap text: length at [0], bytes at [8], capped by
 ~ Content-Length and HttpWire.MaxRequestBody (1000000). POST/PUT without
@@ -81,7 +81,9 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return (emitTcpClient with image, fixes, labels)
+    ~ Ctype trampoline applied after landing code is pinned (see emitLandingHttp).
+    let image be emitTcpClient with image, fixes, labels
+    return emitLandingHttp with image, fixes, labels, base
   end
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
@@ -97,6 +99,20 @@ define parkNet with image, labels
   ~ JSON listen replies match Go writeJSON: Content-Type application/json, no charset.
   parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json\r\nContent-Length: "
   parkMsg with image, labels, "txt_hdrs_plain", "Content-Type: text/plain; charset=utf-8\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_html", "Content-Type: text/html; charset=utf-8\r\nX-Payments-Enabled: off\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_auth", "Content-Type: text/plain; charset=utf-8\r\nWWW-Authenticate: Basic realm=\"Protected\"\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_pay", "Content-Type: application/json\r\nX-Payments-Enabled: off\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locp", "Content-Type: application/json\r\nLocation: /partners\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locs", "Content-Type: application/json\r\nLocation: /sop\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locm", "Content-Type: application/json\r\nLocation: /sop/access?next=/sop/media-lab\r\nContent-Length: "
+  parkMsg with image, labels, "txt_held", "{\"reason\":\"data_held\"}"
+  parkMsg with image, labels, "txt_suboff", "{\"enabled\":false}"
+  parkMsg with image, labels, "txt_authreq", "Authentication required."
+  parkMsg with image, labels, "txt_st307", "\"status\":307"
+  parkMsg with image, labels, "txt_locp", "\"location\":\"/partners\""
+  parkMsg with image, labels, "txt_locs", "\"location\":\"/sop\"}"
+  parkMsg with image, labels, "txt_locm", "\"location\":\"/sop/access?next=/sop/media-lab\""
+  parkMsg with image, labels, "txt_adsense", "\"adsenseClientId\""
   parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
   parkMsg with image, labels, "txt_GET", "GET"
   parkMsg with image, labels, "txt_POST", "POST"
@@ -159,6 +175,179 @@ define parkNet with image, labels
   emitU64 with image, 0
   pin with labels, "tcp_socks", image
   emitU64 with image, 0
+  return image
+end
+
+~ Landing-go extras: 503 data_held / subscription, 401 auth text, 307 location,
+~ HTML Content-Type, WWW-Authenticate, X-Payments-Enabled. Same needles as host.
+define emitLandingHttp with image, fixes, labels, base
+  put (labels at "rt_net_statusof") into labels at "rt_net_statusof_blob"
+  pin with labels, "rt_net_has", image
+  let image be emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 49, 192]
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "land_has_done"
+  emitList with image, [72, 133, 210]
+  emitJcc with image, fixes, 132, "land_has_done"
+  emitList with image, [76, 139, 1, 76, 139, 10, 77, 133, 201]
+  emitJcc with image, fixes, 132, "land_has_done"
+  emitList with image, [77, 57, 200]
+  emitJcc with image, fixes, 130, "land_has_done"
+  emitList with image, [72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "land_has_i", image
+  emitList with image, [72, 139, 77, 248, 76, 139, 1, 72, 139, 85, 240, 76, 139, 10, 76, 137, 192, 76, 41, 200, 72, 57, 69, 232]
+  emitJcc with image, fixes, 135, "land_has_no"
+  emitList with image, [72, 199, 69, 224, 0, 0, 0, 0]
+  pin with labels, "land_has_j", image
+  emitList with image, [72, 139, 85, 240, 76, 139, 10, 76, 57, 77, 224]
+  emitJcc with image, fixes, 131, "land_has_yes"
+  emitList with image, [72, 139, 77, 248, 76, 141, 81, 8, 76, 3, 85, 232, 76, 3, 85, 224, 69, 15, 182, 18]
+  emitList with image, [72, 139, 85, 240, 76, 141, 90, 8, 76, 3, 93, 224, 69, 15, 182, 27, 69, 56, 218]
+  emitJcc with image, fixes, 133, "land_has_next"
+  emitList with image, [72, 255, 69, 224]
+  emitJmpTo with image, fixes, "land_has_j"
+  pin with labels, "land_has_next", image
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "land_has_i"
+  pin with labels, "land_has_yes", image
+  emitList with image, [184, 1, 0, 0, 0]
+  emitJmpTo with image, fixes, "land_has_done"
+  pin with labels, "land_has_no", image
+  emitList with image, [49, 192]
+  pin with labels, "land_has_done", image
+  emitEpi with image
+  pin with labels, "rt_net_statusof", image
+  let image be emitPro with image
+  emitList with image, [72, 137, 77, 248, 76, 137, 69, 240]
+  emitList with image, [77, 133, 192]
+  emitJcc with image, fixes, 132, "land_st_blob"
+  emitList with image, [76, 137, 193, 72, 141, 21]
+  emitRel with image, fixes, "txt_held"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_sub"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 247, 1, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_sub", image
+  emitList with image, [72, 139, 77, 240, 72, 139, 1, 72, 141, 21]
+  emitRel with image, fixes, "txt_suboff"
+  emitList with image, [72, 59, 2]
+  emitJcc with image, fixes, 133, "land_st_auth"
+  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "txt_suboff"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_auth"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 247, 1, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_auth", image
+  emitList with image, [72, 139, 77, 240, 72, 139, 1, 72, 141, 21]
+  emitRel with image, fixes, "txt_authreq"
+  emitList with image, [72, 59, 2]
+  emitJcc with image, fixes, 133, "land_st_307"
+  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "txt_authreq"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_307"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 145, 1, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_307", image
+  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "txt_st307"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_blob"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 51, 1, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_blob", image
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240]
+  emitCallTo with image, fixes, "rt_net_statusof_blob"
+  emitEpi with image
+
+  pin with labels, "rt_net_ctype_land", image
+  emitList with image, [72, 139, 77, 224, 72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs"
+  emitList with image, [72, 139, 69, 232, 72, 133, 192]
+  emitJcc with image, fixes, 132, "land_ct_keep"
+  emitList with image, [76, 139, 0, 77, 133, 192]
+  emitJcc with image, fixes, 132, "land_ct_keep"
+  emitList with image, [76, 141, 72, 8, 77, 133, 201]
+  emitJcc with image, fixes, 132, "land_ct_keep"
+  pin with labels, "land_ct_ws", image
+  emitList with image, [65, 15, 182, 1, 60, 32]
+  emitJcc with image, fixes, 132, "land_ct_sk"
+  emitList with image, [60, 9]
+  emitJcc with image, fixes, 132, "land_ct_sk"
+  emitList with image, [60, 10]
+  emitJcc with image, fixes, 132, "land_ct_sk"
+  emitList with image, [60, 13]
+  emitJcc with image, fixes, 132, "land_ct_sk"
+  emitList with image, [60, 60]
+  emitJcc with image, fixes, 132, "land_ct_html"
+  emitList with image, [60, 65]
+  emitJcc with image, fixes, 132, "land_ct_auth"
+  emitList with image, [60, 123]
+  emitJcc with image, fixes, 132, "land_ct_obj"
+  emitList with image, [60, 91]
+  emitJcc with image, fixes, 132, "land_ct_keep"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_plain"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_sk", image
+  emitList with image, [73, 255, 193, 73, 255, 200, 77, 133, 201]
+  emitJcc with image, fixes, 132, "land_ct_plain2"
+  emitJmpTo with image, fixes, "land_ct_ws"
+  pin with labels, "land_ct_plain2", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_plain"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_obj", image
+  emitList with image, [72, 139, 69, 232, 72, 133, 192]
+  emitJcc with image, fixes, 132, "land_ct_keep"
+  emitList with image, [76, 139, 0, 76, 141, 72, 8, 73, 131, 248, 32]
+  emitJcc with image, fixes, 130, "land_ct_paychk"
+  emitList with image, [65, 139, 65, 10, 37, 255, 255, 255, 0, 61, 51, 48, 55, 0]
+  emitJcc with image, fixes, 133, "land_ct_paychk"
+  emitList with image, [65, 128, 121, 30, 47]
+  emitJcc with image, fixes, 132, "land_ct_locm"
+  emitList with image, [65, 128, 121, 27, 112]
+  emitJcc with image, fixes, 132, "land_ct_locp"
+  emitJmpTo with image, fixes, "land_ct_locs"
+  pin with labels, "land_ct_paychk", image
+  emitList with image, [73, 131, 248, 8]
+  emitJcc with image, fixes, 130, "land_ct_keep"
+  emitList with image, [65, 129, 121, 2, 109, 101, 114, 99]
+  emitJcc with image, fixes, 132, "land_ct_payh"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_html", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_html"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_locm", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_locm"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_locp", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_locp"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_locs", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_locs"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_auth", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_auth"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_payh", image
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_hdrs_pay"
+  emitJmpTo with image, fixes, "land_ct_keep"
+  pin with labels, "land_ct_keep", image
+  emitList with image, [195]
+  put 233 into image at (base + 6918)
+  push with fixes, {"at": (base + 6919), "to": "rt_net_ctype_land"}
   return image
 end
 

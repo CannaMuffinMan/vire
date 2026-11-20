@@ -22,7 +22,9 @@ public class NativeNetTests
         Assert.Contains("hu_frame", net);
         Assert.Contains("rt_net_hdrunsafe", net);
         Assert.Contains("txt_hdrs_plain", net);
+        Assert.Contains("txt_hdrs_html", net);
         Assert.Contains("rt_net_ctype", net);
+        Assert.Contains("emitLandingHttp", net);
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
         Assert.True(blob.Length % 2 == 0);
         Assert.Equal("e9", blob.Substring(0x62d * 2, 2));
