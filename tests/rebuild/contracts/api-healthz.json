@@ -1,0 +1,25 @@
+{
+  "id": "api-healthz",
+  "source": "api-go GET /healthz golden derived from source, not live. Distinct from Node/fcgcpa /health and from api-go GET /api/health. Go listens on API_GO_ADDR; this guest uses Vire loopback listen.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"status\":\"ok\",\"live\":true}"
+    }
+  ]
+}

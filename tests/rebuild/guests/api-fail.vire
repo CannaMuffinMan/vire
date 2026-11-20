@@ -1,0 +1,14 @@
+~ FAIL_BEFORE for api-go GET /healthz.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/healthz"
+      return "{\"status\":\"down\",\"live\":false}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end
