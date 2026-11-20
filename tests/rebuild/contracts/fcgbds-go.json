@@ -1,0 +1,152 @@
+{
+  "id": "fcgbds-go",
+  "source": "Derived from source, not live: fcgbds-go/internal/httpapi/server.go on fcgcpa-prod 5cc11020. Query nil (main never opens a DB). Minimal fixtures only; no hosts, tokens, or DSNs.",
+  "headers_that_matter": ["content-type", "cache-control"],
+  "volatile_fields": ["ts", "generatedAt", "lastSeenAt", "dayKey"],
+  "volatile_note": "Go uses time.Now RFC3339Nano (and dayKey YYYY-MM-DD, lastSeenAt millis UTC). Native guests have no wall clock; those fields are the placeholder now or 1970-01-01. The harness drops them before JSON equality.",
+  "status_field_note": "Go refused routes and the 400 heartbeat set the HTTP status with WriteHeader and do not put status in JSON. Vire listen maps HTTP status from JSON \"status\":N (host StatusOf / native rt_net_statusof). Goldens therefore include status in those bodies so the status line is 503/400. Compare remaining fields (ok, error) to Go UnavailableBody / sessionId error.",
+  "query_nil_note": "main constructs Server{} so Query and Memory are zero. stats.Build + audit.Totals(nil) + EvidenceSection(nil) are zeros; reviewers TTL map is empty until a heartbeat in the same Go process. This guest is per-request (no shared reviewer map).",
+  "bind_note": "Go ListenHost is 127.0.0.1 unless PORT or HOST is set. Vire native listen always prints 127.0.0.1. Refused ports 7099 and 8778: Go ListenPort error refusing reserved port; this guest says that line and halt 1 before listen.",
+  "cases": [
+    {
+      "name": "get_health",
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "service": "fcgbds-core", "dbConfigured": false, "paymentsEnabled": false }
+    },
+    {
+      "name": "get_healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "service": "fcgbds-core", "dbConfigured": false, "paymentsEnabled": false }
+    },
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "service": "fcgbds-core", "paymentsEnabled": false },
+      "absent_fields": ["dbConfigured"]
+    },
+    {
+      "name": "get_bot_defense_stats",
+      "method": "GET",
+      "path": "/api/bot-defense/stats",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": {
+        "botsBlocked": 0,
+        "totalBotsBlockedPermanent": 0,
+        "challengesIssued": 0,
+        "passRate": 100,
+        "failRate": 0,
+        "last24h": 0,
+        "source": "api-runtime-telemetry",
+        "uptimeSeconds": 0,
+        "botDefenseEnabled": false,
+        "paymentsEnabled": false,
+        "reviewers": { "live": 0, "ttlSeconds": 90, "reviewers": [] }
+      }
+    },
+    {
+      "name": "get_reviewers_live",
+      "method": "GET",
+      "path": "/api/bot-defense/reviewers/live",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "reviewers": { "live": 0, "ttlSeconds": 90, "reviewers": [] } }
+    },
+    {
+      "name": "post_heartbeat_missing_session",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{}",
+      "status": 400,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "error": "sessionId is required" }
+    },
+    {
+      "name": "post_heartbeat_ok",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat?sessionId=abc-1",
+      "body": "",
+      "native_only": true,
+      "native_only_note": "Go accepts sessionId on the query string. Native keep the query on path; host HttpWire strips '?'. Native guests SEGV if route reads POST body, so this guest never inspects body. Host therefore cannot prove JSON-body heartbeat 200 with this binary.",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "reviewers": { "live": 1, "ttlSeconds": 90 } }
+    },
+    {
+      "name": "get_events",
+      "method": "GET",
+      "path": "/api/bot-defense/events",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body": "[]"
+    },
+    {
+      "name": "get_evidence_stats",
+      "method": "GET",
+      "path": "/api/bot-defense/evidence-stats",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": {
+        "paymentsEnabled": false,
+        "evidence": {
+          "reportsIngested": 0,
+          "sent": 0,
+          "blocked": 0,
+          "passed": 0,
+          "falsePositives": 0,
+          "blockRate": 0,
+          "sources": { "rollupRows": 0, "fallbackBulkRows": 0 }
+        },
+        "runtime": { "sent": 0, "blocked": 0, "passed": 0, "blockRate": 0 },
+        "drift": { "sent": 0, "blocked": 0, "passed": 0 }
+      }
+    },
+    {
+      "name": "get_bridge_health",
+      "method": "GET",
+      "path": "/api/fcgbds/bridge/health",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "ok": true, "service": "fcgbds-bridge", "bridgeAuthConfigured": false, "paymentsEnabled": false }
+    },
+    {
+      "name": "get_bridge_stats",
+      "method": "GET",
+      "path": "/api/fcgbds/bridge/stats",
+      "status": 200,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": {
+        "ok": true,
+        "totalStoredSignals": 0,
+        "persistedEvents24h": 0,
+        "byType": {},
+        "byPlatform": {},
+        "latestSignals": [],
+        "paymentsEnabled": false
+      }
+    },
+    { "name": "refuse_post_internal_evaluate", "method": "POST", "path": "/internal/evaluate", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_internal_events", "method": "POST", "path": "/internal/events", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_bridge_status", "method": "GET", "path": "/api/fcgbds/bridge/status", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_signal_ingest", "method": "POST", "path": "/api/fcgbds/bridge/signal/ingest", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_session_attest", "method": "POST", "path": "/api/fcgbds/bridge/session/attest", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_policy_evaluate", "method": "POST", "path": "/api/fcgbds/bridge/policy/evaluate", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_enforcement_callback", "method": "POST", "path": "/api/fcgbds/bridge/enforcement/callback", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_bridge_spec", "method": "GET", "path": "/api/fcgbds/bridge/spec", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_openapi", "method": "GET", "path": "/api/fcgbds/bridge/openapi/v1.json", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_artifact_ingest", "method": "POST", "path": "/api/admin/fcgbds/artifact-ingest", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_post_log_archive", "method": "POST", "path": "/internal/log-archive", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_blocked_by_type", "method": "GET", "path": "/api/bot-defense/blocked-by-type", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_latest_run", "method": "GET", "path": "/api/bot-defense/latest-run", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } },
+    { "name": "refuse_get_daily_history", "method": "GET", "path": "/api/bot-defense/daily-history", "status": 503, "headers": { "content-type": "application/json", "cache-control": "no-store" }, "body_fields": { "ok": false, "error": "unavailable" } }
+  ]
+}
