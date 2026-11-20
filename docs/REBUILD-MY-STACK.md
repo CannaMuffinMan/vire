@@ -10,6 +10,7 @@ Earlier docs that this file does not replace:
 - PR #43 (`docs/finish-line-plan.md` on `cursor/finish-line-plan-0b9c`): Nov 10–13 plan. Native `listen` was **not** on that HEAD. It is on this tree (`src/rt-net.vire`, Linux ELF + Windows PE).
 - L5 inventory (fcgcpa-prod `main` `5cc11020`): native HTTP listen/TLS named as the #1 blocker; native `/health` on Windows PE was the first slice (`guest-health.vire`, `tools/native-net-windows.ps1`).
 - `NATIVE-COMPILER.md` status: gen1 = gen2 self-host is closed on PE and ELF. Do not reopen that work here.
+- PR #92: method doc, health contract, fail-before/pass-after harness. This lane stacks on that work.
 
 ## Method
 
@@ -31,52 +32,61 @@ For each endpoint, freeze a recorded contract (this repo, not a live prod hit):
 - response headers that matter (`Content-Type`, `Connection`, `X-Content-Type-Options`, `Cache-Control`; not `Date`)
 - body (exact bytes when the reference is deterministic; JSON object equality when field order is unspecified)
 
-The FCG health contract lives in `tests/rebuild/contracts/fcg-health.json`. Source of the JSON body is in-tree `api/fcgcpa.vire` plus L5 note that Node `GET /health` and `GET /api/health` are unauthenticated. This token still cannot re-open the private Node handler.
+Contracts live in `tests/rebuild/contracts/`:
+
+- `fcg-health.json` — `GET /health`, `GET /api/health`, `GET /nope`
+- `fcg-info.json` — `GET /info`
+- `fcg-connect.json` — `GET /connect`
+
+Source of the JSON bodies is in-tree `api/fcgcpa.vire` plus L5 note that Node `GET /health` and `GET /api/health` are unauthenticated. This token still cannot re-open the private Node handler.
 
 ### 3. Vire port
 
 Write a `.vire` guest that implements only the captured endpoints. Compile with `compile-native.vire` to a native binary (ELF here, PE on Windows). Do not wrap Node/Go. Do not present a stub as the port.
 
-First slice: `guest-health.vire` (`GET /health`, `GET /api/health`). It already existed; this lane adds the differential harness and the method, it does not re-emit the HTTP runtime.
+`guest-health.vire` serves `GET /health`, `GET /api/health`, `GET /info`, `GET /connect`. Native `rt_net_statusof` maps JSON `"status":N` to the HTTP status line the same way host `VireListen.StatusOf` does.
 
 ### 4. Side-by-side differential harness
 
 `tools/rebuild-health-diff.sh`:
 
-1. Optionally compile a **fail-before** guest that violates the contract and require a mismatch.
-2. Compile the Vire port to ELF.
-3. Bind `127.0.0.1` on an OS port (`listen with 0` in the harness copy).
-4. Replay each recorded request.
-5. Diff status, the headers named in the contract, and body.
+1. Compile a **fail-before** guest that violates the contract and require a mismatch.
+2. Compile the Vire port to ELF (`listen with 0`).
+3. Run the same guest on the **host** interpreter (`listen with 0`).
+4. Replay each recorded request against native and host.
+5. Diff status, the headers named in the contract, and body. Also require host vs native equality on those fields.
 6. Print `PASS_AFTER at <sha>` only when every required case matches.
 
-Reference side is the **recorded contract**, not a live `fcgcpa-prod` process.
+Reference side is the **recorded contract** plus a live host listen of the same guest. Not a live `fcgcpa-prod` process.
 
 ### 5. Proof
 
 A slice is proven when:
 
 - fail-before exits non-zero on a contract miss
-- pass-after matches on the ported cases
-- `tools/native-elf-selfhost.sh` still prints gen1 SHA = gen2 SHA (compiler unchanged)
+- pass-after matches on the ported cases (including `GET /nope` HTTP 404)
+- host vs native match on status, key headers, and body
 - existing tests still run (none skipped or deleted)
+- compiler sources (`compile-native.vire` / emitters) were not edited in this lane; gen1 = gen2 is unchanged from the last closed proof. Re-run `tools/native-elf-selfhost.sh` only if those files change.
 
 ### 6. Human-review flags
 
 Flag, do not paper over:
 
-- HTTP status that the host derives from `"status":N` in JSON (`VireListen.StatusOf`) while native `rt_net_sendhttp` always emits `HTTP/1.1 200` for a successful `route` return
 - TLS (no native TLS server)
 - WebSocket (guest emit exists only as `tests/native/fixtures/gc-tagged-walk/rt-ws.vire`, not in production `compile-native.vire`)
 - unread production Node/Go services
 - nondeterministic bodies (timestamps, ids)
 - auth tokens (`FCG_API_TOKEN` must never be printed; `/health` stays unauthenticated)
 
+HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, same needles as `VireListen.StatusOf`). Reason phrases stay `OK` vs `Error` on native (host uses `Not Found` / `Forbidden`). Contracts compare numeric status, not the reason phrase.
+
 ## Native capabilities (this HEAD)
 
 | Capability | Native status | Evidence |
 | --- | --- | --- |
 | HTTP listen (loopback) | **Present** PE + ELF | `src/rt-net.vire`, `tools/native-net-windows.ps1`, `tools/native-elf-tcp.sh` |
+| HTTP status from JSON `"status"` | **Present** | `rt_net_statusof`; harness `GET /nope` → 404 |
 | JSON encode/parse | **Present** | `rt_json` / `rt_parse`, `json-prove.vire` |
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
@@ -97,10 +107,11 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 
 | Rank | Service / slice | Needs | Native today | Port now? |
 | --- | --- | --- | --- | --- |
-| 1 | `GET /health` and `GET /api/health` JSON | HTTP, JSON | Both present | **This PR.** `guest-health.vire` + `tools/rebuild-health-diff.sh` |
-| 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | Next. Same listen guest, larger contract |
-| 3 | `/payments` and `/mine` 403 bodies | HTTP, JSON, **HTTP status from `"status"`** | Body yes; native HTTP code stays 200 | Flag until native sendhttp maps `StatusOf` |
-| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | All present on native | After 2–3. Needs chain fixtures, not prod data |
+| 1 | `GET /health` and `GET /api/health` JSON | HTTP, JSON | Both present | **Done (PR #92 + this lane).** |
+| 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | **This PR.** Same listen guest, extra contracts |
+| 3 | `fcgbds-go` `GET /health` | HTTP, JSON | Present | **Next native proof.** Golden fields `ok`, `service: fcgbds-core`, `paymentsEnabled: false`. `ts` is now() — compare JSON fields, not exact bytes. Keep separate from Node/`api/fcgcpa.vire` health. |
+| 3b | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | After unauth Go health GETs, or in parallel on the same guest |
+| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | All present on native | After 3. Needs chain fixtures, not prod data |
 | 5 | Host `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen`; native guest has no token gate | Human review: port header check or keep host |
 | 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
@@ -110,28 +121,30 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
 | 12 | Skinned browser, Proof of Rot miner, shop, OAuth clients | unknown | none | Blocked on missing source (PR39) |
 
-### Rank 1 contract (proven on Linux ELF in this lane)
+### Rank 1–2 contracts (proven on Linux ELF in this lane)
 
-Recorded in `tests/rebuild/contracts/fcg-health.json`:
+Recorded in `tests/rebuild/contracts/`:
 
 - `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
-- `GET /nope` → body `{"ok":false,"status":404,"error":"not found"}`. **HTTP status is a human-review flag:** host `StatusOf` yields 404; native route responses are 200. The harness treats HTTP 200 + that body as a documented native gap, not as a silent pass against HTTP 404.
+- `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
+- `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
+- `GET /nope` → HTTP **404**, body `{"ok":false,"status":404,"error":"not found"}` (host `StatusOf` and native `rt_net_statusof`)
 
 ### What this PR does not prove
 
 - Byte-identical Node handler vs Vire (private repo unread)
-- Remaining `api/fcgcpa.vire` routes
+- Remaining `api/fcgcpa.vire` routes (`/payments`, `/mine`, `/chain`, `/block`)
+- Go sidecars (`fcgbds-go` `/health`, `fcgbc-go` `/pending-transactions`, `cpa-go` `/health` text/plain, `rpc-portal-go` `/api/health`, `api-go` `/healthz`). Those contracts are not this PR. `api-go` `/api/health` is not the Node/`fcgcpa` health body.
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler changes (gen1 = gen2 must stay identical because `compile-native.vire` / emitters were not edited)
+- Compiler changes (`compile-native.vire` / emitters were not edited; blob+pins+fixes for `rt_net_statusof` only)
 
 ## Commands
 
 ```text
 bash tools/rebuild-health-diff.sh
-bash tools/native-elf-selfhost.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
