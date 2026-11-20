@@ -2,6 +2,9 @@ data/*
 !data/src/
 !data/src/**
 !data/compile-native.vire
+!data/rebuild/
+!data/rebuild/**
+rebuild-chain-run.vire
 site/
 err.txt
 out.txt

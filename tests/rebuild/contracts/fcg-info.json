@@ -1,0 +1,25 @@
+{
+  "id": "fcg-info",
+  "source": "in-tree api/fcgcpa.vire GET /info. Unauthenticated JSON. Native guest-health.vire serves the same body.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_info",
+      "method": "GET",
+      "path": "/info",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"local\",\"chainId\":\"local-demo\",\"mining\":\"local\",\"miningNetwork\":false,\"payments\":false}"
+    }
+  ]
+}

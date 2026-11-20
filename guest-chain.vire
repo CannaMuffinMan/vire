@@ -1,0 +1,161 @@
+~ Native FCG GET /chain + POST /block against committed genesis fixtures.
+~ Proof = hash of "[1," + json(previous) + "," + json(text) + "]"
+~ POST body is a bounded leaf heap text (rt-net). Do not parse the body as JSON here;
+~ shape checks use string find on the raw request text.
+~ Fixtures: data/rebuild/chain copied to data/chain by tools/rebuild-chain-diff.sh.
+
+define textOk with value
+  try
+    let n be length with value
+    if n > 4096
+      return false
+    end
+    let quoted be json with value
+    if (length with quoted) < 2
+      return false
+    end
+    return true
+  miss problem
+    return false
+  end
+end
+
+define rejectShape with body
+  if (length with body) < 1
+    return "bad"
+  end
+  if not (begins with body, "{")
+    return "bad"
+  end
+  let pos be find with body, "\"text\":"
+  if pos < 0
+    return "need"
+  end
+  let rest be slice with body, (pos + 7), (length with body)
+  if not (begins with rest, "\"")
+    return "notext"
+  end
+  return "ok"
+end
+
+define takeText with body
+  let pos be find with body, "\"text\":"
+  let rest be slice with body, (pos + 7), (length with body)
+  let inner be slice with rest, 1, (length with rest)
+  let cut be find with inner, "\""
+  if cut < 0
+    return ""
+  end
+  return slice with inner, 0, cut
+end
+
+define takeHeadProof
+  let headRaw be read with "data/chain/head.json"
+  let hat be find with headRaw, "\"proof\":\""
+  if hat < 0
+    return ""
+  end
+  let hrest be slice with headRaw, (hat + 9), (length with headRaw)
+  let hcut be find with hrest, "\""
+  if hcut < 0
+    return ""
+  end
+  return slice with hrest, 0, hcut
+end
+
+define takeQuoted with body, key
+  let needle be "\"" + key + "\":\""
+  let pos be find with body, needle
+  if pos < 0
+    return ""
+  end
+  let rest be slice with body, (pos + (length with needle)), (length with body)
+  let cut be find with rest, "\""
+  if cut < 0
+    return ""
+  end
+  return slice with rest, 0, cut
+end
+
+define makeDumped with previous, blockText
+  return "[1," + (json with previous) + "," + (json with blockText) + "]"
+end
+
+define writeAccept with previous, proof, blockText
+  let part be "{\"index\":1,\"previous\":" + (json with previous)
+  let part2 be part + ",\"proof\":"
+  let part3 be part2 + (json with proof)
+  let part4 be part3 + ",\"text\":"
+  let stored0 be part4 + (json with blockText)
+  let stored be stored0 + "}"
+  let genesis be read with "data/chain/blocks.json"
+  let innerChain be slice with genesis, 1, ((length with genesis) - 1)
+  let grown be "[" + innerChain
+  let grown2 be grown + ","
+  let grown3 be grown2 + stored
+  let grown4 be grown3 + "]"
+  write with "data/chain/blocks.json", grown4
+  let headOut be "{\"segment\":1,\"index\":1,\"proof\":" + (json with proof)
+  let headOut2 be headOut + "}"
+  write with "data/chain/head.json", headOut2
+  let reply be "{\"ok\":true,\"accepted\":true,\"index\":1,\"proof\":" + (json with proof)
+  return reply + "}"
+end
+
+define appendBlock with body
+  let shape be rejectShape with body
+  if shape == "bad"
+    return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
+  end
+  if shape == "need"
+    return "{\"ok\":false,\"status\":400,\"error\":\"text is required\"}"
+  end
+  if shape == "notext"
+    return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
+  end
+  let blockText be takeText with body
+  if not (textOk with blockText)
+    return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
+  end
+  let previous be takeHeadProof
+  if previous == ""
+    return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
+  end
+  let dumped be makeDumped with previous, blockText
+  let proof be hash with dumped
+  let given be takeQuoted with body, "proof"
+  if given != ""
+    if given != proof
+      return "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
+    end
+  end
+  let givenPrev be takeQuoted with body, "previous"
+  if givenPrev != ""
+    if givenPrev != previous
+      return "{\"ok\":false,\"status\":400,\"error\":\"previous does not match\"}"
+    end
+  end
+  return writeAccept with previous, proof, blockText
+end
+
+define route with method, path, body
+  if path == "/chain"
+    if method == "GET"
+      try
+        return read with "data/chain/blocks.json"
+      miss problem
+        return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
+      end
+    end
+  end
+  if path == "/block"
+    if method == "POST"
+      return appendBlock with body
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end
