@@ -746,8 +746,8 @@ sealed class Machine
         if (name == "hash")
         {
             string raw = args[0] as string;
-            if (raw == null) raw = Show(args[0]);
-            return VireSeal.HashText(raw);
+            if (raw == null) return VireSeal.HashText(Show(args[0]));
+            return VireSeal.HashGuest(raw);
         }
         if (name == "seal")
         {
