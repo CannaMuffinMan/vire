@@ -24,7 +24,7 @@ public class RebuildSidecarContractTests
         string cpa = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "cpa-health.json"));
         using JsonDocument doc = JsonDocument.Parse(cpa);
         JsonElement c = doc.RootElement.GetProperty("cases")[0];
-        Assert.Equal("text/plain", c.GetProperty("headers").GetProperty("content-type").GetString());
+        Assert.Equal("text/plain; charset=utf-8", c.GetProperty("headers").GetProperty("content-type").GetString());
         Assert.Equal("ok\n", c.GetProperty("body").GetString());
 
         string fcgbds = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "fcgbds-health.json"));

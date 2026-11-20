@@ -146,10 +146,7 @@ for case in doc["cases"]:
     want_h = case.get("headers") or {}
     for hk, hv in want_h.items():
         g = headers.get(hk.lower(), "")
-        if hk.lower() == "content-type":
-            if hv.lower() not in g.lower():
-                mismatches.append("%s content-type got %s want contains %s" % (name, g, hv))
-        elif g.lower() != hv.lower():
+        if g.lower() != hv.lower():
             mismatches.append("%s header %s got %s want %s" % (name, hk, g, hv))
     err = check_body(case, body)
     if err:
@@ -218,17 +215,7 @@ for case in doc["cases"]:
     for k in keys:
         hv = hh.get(k, "")
         nv = nh.get(k, "")
-        if k == "content-type":
-            def kind(v):
-                v = v.lower()
-                if "text/plain" in v:
-                    return "plain"
-                if "application/json" in v:
-                    return "json"
-                return v
-            if kind(hv) != kind(nv):
-                mismatches.append("%s content-type host %s native %s" % (name, hv, nv))
-        elif hv.lower() != nv.lower():
+        if hv.lower() != nv.lower():
             mismatches.append("%s header %s host %s native %s" % (name, k, hv, nv))
     if hb != nb:
         mismatches.append("%s body host %r native %r" % (name, hb, nb))

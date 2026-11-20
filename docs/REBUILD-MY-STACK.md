@@ -132,7 +132,7 @@ Minimal fixtures only (derived from source, not live). No auth, internal hostnam
 
 - `fcgbds-go GET /health` → 200 JSON; fields `ok=true`, `service=fcgbds-core`, `dbConfigured=false`, `paymentsEnabled=false`. Go also sends `ts=now()`; this guest omits `ts`.
 - `fcgbc-go GET /pending-transactions` → 200, body `[]`
-- `cpa-go GET /health` → 200, `Content-Type` text/plain, body `ok\n`
+- `cpa-go GET /health` → 200, `Content-Type: text/plain; charset=utf-8`, body `ok\n`
 - `rpc-portal-go GET /api/health` → 200, `{"ok":true}`
 - `api-go GET /healthz` → 200, `{"status":"ok","live":true}` (Go listen is `API_GO_ADDR`; guest still loopback `listen`)
 
@@ -142,7 +142,7 @@ Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs nat
 
 Recorded in `tests/rebuild/contracts/`:
 
-- `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
+- `GET /health` → 200, `Content-Type: application/json` (no charset; Go `writeJSON` in fcgbds-go `server.go`), `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
 - `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
 - `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
@@ -158,7 +158,7 @@ Recorded in `tests/rebuild/contracts/`:
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler changes (`compile-native.vire` / emitters were not edited; blob+pins+fixes for `rt_net_statusof` only)
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and after `rt_net_statusof` blob pins. `compile-native.vire` was not edited.
 
 ## Commands
 

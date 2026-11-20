@@ -67,6 +67,8 @@ end
 ~ host VireListen.StatusOf does. Route replies call it before sendhttp.
 ~ rt_net_ctype picks txt_hdrs (JSON) or txt_hdrs_plain when the body is not
 ~ JSON (leading `{` / `[` after whitespace), matching host SendApi.
+~ JSON Content-Type is application/json with no charset (Go writeJSON).
+~ text/plain keeps charset=utf-8 (cpa-go health).
 
 define emitNetRuntime with image, fixes, labels, has_route, need_net
   let base be length with image
@@ -88,7 +90,8 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
   parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
   parkMsg with image, labels, "txt_sp_err", " Error\r\n"
-  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json; charset=utf-8\r\nContent-Length: "
+  ~ JSON listen replies match Go writeJSON: Content-Type application/json, no charset.
+  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json\r\nContent-Length: "
   parkMsg with image, labels, "txt_hdrs_plain", "Content-Type: text/plain; charset=utf-8\r\nContent-Length: "
   parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
   parkMsg with image, labels, "txt_GET", "GET"
