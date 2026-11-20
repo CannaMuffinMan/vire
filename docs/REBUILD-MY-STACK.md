@@ -144,7 +144,7 @@ Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs nat
 
 Recorded in `tests/rebuild/contracts/`:
 
-- `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
+- `GET /health` → 200, `Content-Type: application/json` (no charset; Go `writeJSON` in fcgbds-go `server.go`), `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
 - `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
 - `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
@@ -168,7 +168,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler changes (`compile-native.vire` / emitters were not edited; blob+pins+fixes for `rt_net_statusof` only)
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset). `compile-native.vire` was not edited. Blob+pins+fixes for `rt_net_statusof` remain from prior lanes.
 
 ## Commands
 
