@@ -1,6 +1,8 @@
-~ Native PE health clone of FCG GET /health and GET /api/health.
+~ Native health clone of FCG GET /health and GET /api/health (PE and ELF).
 ~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
 ~ to this token). Both paths are unauthenticated in the Node inventory.
+~ Recorded contract: tests/rebuild/contracts/fcg-health.json
+~ Differential harness: tools/rebuild-health-diff.sh
 
 define route with method, path, body
   if method == "GET"
