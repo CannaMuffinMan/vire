@@ -175,7 +175,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited.
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited. Blob+pins+fixes for `rt_net_statusof` remain from prior lanes.
 
 ## Commands
 
