@@ -12,13 +12,14 @@ export VIRE_HEADLESS=1
 unset VIRE_BUDGET || true
 
 AFTER_SHA="$(git rev-parse HEAD)"
+BASE_SHA="$(git rev-parse cursor/rebuild-go-sidecar-health-758b 2>/dev/null || git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
 CONTRACT_DIR="$ROOT/tests/rebuild/contracts"
 FAIL_SRC="$ROOT/tests/rebuild/fail-before-health.vire"
 GOOD_SRC="$ROOT/guest-health.vire"
 VIRE_DLL="$ROOT/bin/Release/net10.0/vire.dll"
 
 shopt -s nullglob
-CONTRACTS=( "$CONTRACT_DIR"/fcg-health.json "$CONTRACT_DIR"/fcg-info.json "$CONTRACT_DIR"/fcg-connect.json )
+CONTRACTS=( "$CONTRACT_DIR"/fcg-health.json "$CONTRACT_DIR"/fcg-info.json "$CONTRACT_DIR"/fcg-connect.json "$CONTRACT_DIR"/fcg-payments.json )
 for c in "${CONTRACTS[@]}"; do
   if [[ ! -f "$c" ]]; then
     echo "missing contract $c"
@@ -152,6 +153,11 @@ for case in cases:
     if body != case["body"]:
         mismatches.append("%s body got %s want %s" % (name, body, case["body"]))
     print("case %s status %s body %s" % (name, status, body))
+    print("--- golden %s ---" % name)
+    print("want status %s" % case["status"])
+    print("got  status %s" % status)
+    print("want body %s" % case["body"])
+    print("got  body %s" % body)
 
 if mismatches:
     print("CONTRACT_MISMATCH")
@@ -229,6 +235,7 @@ print("HOST_NATIVE_MATCH")
 PY
 }
 
+echo "stack_base_sha $BASE_SHA"
 echo "pass_after_sha $AFTER_SHA"
 
 echo "FAIL_BEFORE compile mismatch guest"
@@ -250,7 +257,7 @@ if [[ "$FCODE" -ne 2 ]]; then
   echo "FAIL_BEFORE harness error $FCODE"
   exit 1
 fi
-echo "FAIL_BEFORE at $AFTER_SHA contract mismatch as required"
+echo "FAIL_BEFORE at $BASE_SHA contract mismatch as required"
 
 echo "PASS_AFTER compile guest-health.vire"
 compile_listen_guest "$GOOD_SRC" "rebuild-health"
@@ -272,5 +279,5 @@ echo "host contract ok"
 pair_host_native "$HPORT" "$GPORT"
 stop_guest "$GPID"
 stop_guest "$HPID"
-echo "PASS_AFTER at $AFTER_SHA native ELF matches host listen and recorded FCG health/info/connect contracts"
+echo "PASS_AFTER at $AFTER_SHA native ELF matches host listen and recorded FCG health/info/connect/payments/mine contracts"
 echo "rebuild health diff ok"
