@@ -1,0 +1,118 @@
+~ Native fcgbds-go unauth HTTP (Query nil, payments off, loopback).
+~ Contract: tests/rebuild/contracts/fcgbds-go.json
+~ ts / generatedAt / lastSeenAt / dayKey are placeholders; harness normalizes them.
+~ Refused routes add JSON "status":503 so host StatusOf and native rt_net_statusof
+~ emit HTTP 503. Go UnavailableBody omits that field (documented in the contract).
+
+define unavailable
+  return "{\"ok\":false,\"status\":503,\"error\":\"unavailable\"}"
+end
+
+define statsBody
+  return "{\"botsBlocked\":0,\"totalBotsBlockedPermanent\":0,\"challengesIssued\":0,\"passRate\":100,\"failRate\":0,\"last24h\":0,\"dailyBlockchain\":[{\"dayKey\":\"1970-01-01\",\"blockedTotal\":0,\"anchorHash\":null,\"generatedAt\":\"now\",\"status\":\"live\"}],\"reviewers\":{\"live\":0,\"reviewers\":[],\"ttlSeconds\":90},\"botTests\":{\"sent\":0,\"blocked\":0,\"totalBlockedLifetime\":0,\"passed\":0,\"failed\":0,\"blockRate\":0,\"latestRun\":null,\"blockedByType\":[{\"key\":\"bot-test-worker\",\"label\":\"Classic\",\"count\":0,\"lastBlockedAt\":null,\"active\":false},{\"key\":\"headless-bot-worker\",\"label\":\"Headless\",\"count\":0,\"lastBlockedAt\":null,\"active\":false},{\"key\":\"platform-abuse-worker\",\"label\":\"Platform abuse\",\"count\":0,\"lastBlockedAt\":null,\"active\":false},{\"key\":\"slowdrip-bot-worker\",\"label\":\"Slow drip\",\"count\":0,\"lastBlockedAt\":null,\"active\":false},{\"key\":\"token-replay-worker\",\"label\":\"Token replay\",\"count\":0,\"lastBlockedAt\":null,\"active\":false},{\"key\":\"viewership-inflation-worker\",\"label\":\"Viewership inflation\",\"count\":0,\"lastBlockedAt\":null,\"active\":false}]},\"viewerInflation\":{\"blocked\":0,\"blockedToday\":0,\"lastBlockedAt\":null,\"lastBlockedPlatform\":null},\"source\":\"api-runtime-telemetry\",\"generatedAt\":\"now\",\"uptimeSeconds\":0,\"botDefenseEnabled\":false,\"paymentsEnabled\":false}"
+end
+
+define evidenceBody
+  return "{\"drift\":{\"blocked\":0,\"passed\":0,\"sent\":0},\"evidence\":{\"blockRate\":0,\"blocked\":0,\"falsePositives\":0,\"passed\":0,\"reportsIngested\":0,\"sent\":0,\"sources\":{\"fallbackBulkRows\":0,\"rollupRows\":0}},\"generatedAt\":\"now\",\"paymentsEnabled\":false,\"runtime\":{\"blockRate\":0,\"blocked\":0,\"passed\":0,\"sent\":0}}"
+end
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"dbConfigured\":false,\"ok\":true,\"paymentsEnabled\":false,\"service\":\"fcgbds-core\",\"ts\":\"now\"}"
+    end
+    if path == "/healthz"
+      return "{\"dbConfigured\":false,\"ok\":true,\"paymentsEnabled\":false,\"service\":\"fcgbds-core\",\"ts\":\"now\"}"
+    end
+    if path == "/api/health"
+      return "{\"ok\":true,\"paymentsEnabled\":false,\"service\":\"fcgbds-core\",\"ts\":\"now\"}"
+    end
+    if path == "/api/bot-defense/stats"
+      return statsBody
+    end
+    if path == "/api/bot-defense/reviewers/live"
+      return "{\"ok\":true,\"reviewers\":{\"live\":0,\"reviewers\":[],\"ttlSeconds\":90}}"
+    end
+    if path == "/api/bot-defense/events"
+      return "[]"
+    end
+    if path == "/api/bot-defense/evidence-stats"
+      return evidenceBody
+    end
+    if path == "/api/fcgbds/bridge/health"
+      return "{\"bridgeAuthConfigured\":false,\"ok\":true,\"paymentsEnabled\":false,\"service\":\"fcgbds-bridge\",\"ts\":\"now\"}"
+    end
+    if path == "/api/fcgbds/bridge/stats"
+      return "{\"byPlatform\":{},\"byType\":{},\"latestSignals\":[],\"ok\":true,\"paymentsEnabled\":false,\"persistedEvents24h\":0,\"totalStoredSignals\":0}"
+    end
+    if path == "/api/fcgbds/bridge/status"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/spec"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/openapi/v1.json"
+      return unavailable
+    end
+    if path == "/api/bot-defense/blocked-by-type"
+      return unavailable
+    end
+    if path == "/api/bot-defense/latest-run"
+      return unavailable
+    end
+    if path == "/api/bot-defense/daily-history"
+      return unavailable
+    end
+  end
+  if method == "POST"
+    if (find with path, "/api/bot-defense/reviewers/heartbeat") == 0
+      ~ Native POST body is not read (rt_net guest body SEGV). Go also accepts
+      ~ sessionId on the query string; that path is what the harness sends.
+      if (find with path, "sessionId=") < 0
+        return "{\"error\":\"sessionId is required\",\"status\":400}"
+      end
+      return "{\"ok\":true,\"reviewers\":{\"live\":1,\"reviewers\":[{\"lastSeenAt\":\"now\",\"name\":\"reviewer\",\"source\":\"obs\"}],\"ttlSeconds\":90}}"
+    end
+    if path == "/internal/evaluate"
+      return unavailable
+    end
+    if path == "/internal/events"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/signal/ingest"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/session/attest"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/policy/evaluate"
+      return unavailable
+    end
+    if path == "/api/fcgbds/bridge/enforcement/callback"
+      return unavailable
+    end
+    if path == "/api/admin/fcgbds/artifact-ingest"
+      return unavailable
+    end
+    if path == "/internal/log-archive"
+      return unavailable
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  let port be 0
+  if (length with args) > 0
+    let port be number with (args at 0)
+  end
+  if port == 7099
+    say "refusing reserved port"
+    halt with 1
+  end
+  if port == 8778
+    say "refusing reserved port"
+    halt with 1
+  end
+  listen with port
+end
