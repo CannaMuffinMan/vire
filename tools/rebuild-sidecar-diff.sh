@@ -296,3 +296,5 @@ run_slice cpa "$GUEST_DIR/cpa-fail.vire" "$GUEST_DIR/cpa-health.vire" "$CONTRACT
 run_slice rpc "$GUEST_DIR/rpc-fail.vire" "$GUEST_DIR/rpc-health.vire" "$CONTRACT_DIR/rpc-health.json"
 run_slice apigo "$GUEST_DIR/api-fail.vire" "$GUEST_DIR/api-healthz.vire" "$CONTRACT_DIR/api-healthz.json"
 echo "rebuild sidecar diff ok"
+# Unauth sidecar routes beyond rank-3 health goldens (service-scoped guests).
+bash "$ROOT/tools/rebuild-unauth-sidecar-diff.sh"

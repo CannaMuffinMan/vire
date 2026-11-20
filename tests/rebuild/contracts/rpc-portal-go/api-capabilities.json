@@ -1,0 +1,25 @@
+{
+  "id": "rpc-portal-go/api-capabilities",
+  "source": "rpc-portal-go GET /api/capabilities with empty FCGBC_BASE_URL. Go also sets Cache-Control private max-age=5; native listen is always no-store.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_capabilities",
+      "method": "GET",
+      "path": "/api/capabilities",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"node\":false}"
+    }
+  ]
+}

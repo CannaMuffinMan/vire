@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-events-detailed",
+  "source": "GET /api/events-detailed Upstream nil is 503.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_events_detailed",
+      "method": "GET",
+      "path": "/api/events-detailed",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"Detailed events unavailable\",\"status\":503}\n"
+    }
+  ]
+}

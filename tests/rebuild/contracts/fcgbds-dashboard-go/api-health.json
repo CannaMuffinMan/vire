@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-health",
+  "source": "fcgbds-dashboard-go /api/health. Go Encoder.Encode trailing newline. Native Content-Type application/json without charset (Go uses charset=utf-8).",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}\n"
+    }
+  ]
+}

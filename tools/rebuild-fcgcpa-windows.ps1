@@ -107,4 +107,26 @@ try {
     Stop-Process -Id $cp.Id -Force
 }
 
-Write-Host "Windows PE rebuild fcgcpa steps completed on this CouchStation. Linux is not PE proof."
+Write-Host "CouchStation PE: unauth sidecar guests (rpc-portal-go, edge-go, dev-portal-go, fcgbds-dashboard-go)"
+function Assert-GuestGet([string]$Src, [string]$Stem, [string]$Path, [int]$WantStatus, [string]$WantBody, [string]$Name) {
+    $exe = Compile-Guest $Src $Stem
+    $out = Join-Path $Data "$Stem.out"
+    $p = Start-Process -FilePath $exe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput $out -PassThru
+    Start-Sleep -Milliseconds 400
+    $text = Get-Content -Raw $out
+    if ($text -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $p.Id -Force; throw "$Stem PE did not listen" }
+    $port = [int]$Matches[1]
+    try {
+        Assert-Case (Read-Http $port "GET" $Path $null) $WantStatus $WantBody $Name
+    } finally {
+        Stop-Process -Id $p.Id -Force
+    }
+}
+$guestDir = Join-Path $Root "tests/rebuild/guests"
+Assert-GuestGet (Join-Path $guestDir "rpc-portal-go.vire") "rebuild-rpc-portal-pe" "/api/capabilities" 200 '{"node":false}' "rpc_capabilities"
+Assert-GuestGet (Join-Path $guestDir "rpc-portal-go.vire") "rebuild-rpc-portal-rpc-pe" "/api/rpc" 503 '{"enabled":false,"status":503}' "rpc_rpc_off"
+Assert-GuestGet (Join-Path $guestDir "edge-go.vire") "rebuild-edge-pe" "/healthz" 200 "ok" "edge_healthz"
+Assert-GuestGet (Join-Path $guestDir "dev-portal-go.vire") "rebuild-dev-portal-pe" "/" 503 '{"reason":"dist_missing","status":503}' "dev_dist_missing"
+$dashHealth = '{"ok":true,"service":"fcgbds-dashboard"}' + [char]10
+Assert-GuestGet (Join-Path $guestDir "fcgbds-dashboard-go.vire") "rebuild-dash-pe" "/api/health" 200 $dashHealth "dash_health"
+Write-Host "Windows PE rebuild fcgcpa + unauth sidecar steps completed on this CouchStation. Linux is not PE proof."

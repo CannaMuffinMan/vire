@@ -1,0 +1,14 @@
+~ edge-go unauth /healthz and unknown-host 404 (derived from source, not live).
+~ Reverse-proxy Host map is blocked. This guest never dials *.railway.internal.
+~ Payments stay off. Maintenance is a separate guest.
+
+define route with method, path, body
+  if path == "/healthz"
+    return "ok"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end
