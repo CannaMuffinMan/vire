@@ -143,6 +143,14 @@ def main():
     # Missing Content-Length on POST/PUT -> 411, not a stale body handle.
     retarget(0x9BC, "cl_needcl")
 
+    # Header scan used `jae hddone` when scan == headerEnd. headerEnd is the CR
+    # of the terminating \r\n\r\n, which is also the last header's line CR, so
+    # the last header was never parsed. Connection (or anything) before
+    # Content-Length therefore missed CL and returned 411. Jump to cl_hline
+    # instead: empty line still hits length==0 -> hddone; a last header is
+    # parsed. Duplicate CL is already 400 via cl_notecl.
+    retarget(0x874, "cl_hline")
+
     # After mktext of the body, mark leaf and store; nobody/GET jumps tokengate.
     # Overwrite only the store (8 bytes) with jmp cl_bodyleaf; leave call
     # rt_save_frame at 0xa73 intact so GET / nobody still works.

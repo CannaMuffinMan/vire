@@ -88,7 +88,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 - **Property:** a native listen guest may read `body` only as a heap text whose length is the parsed `Content-Length`, at most `HttpWire.MaxRequestBody` (1_000_000). The object header is marked leaf so GC does not walk payload bytes as pointers. POST/PUT without `Content-Length` is 411 `{"error":"content length required"}`. Oversize CL is 413 `{"error":"body too large"}`. Duplicate/malformed CL stays 400 via the existing parser. The route `body` argument is never a leftover GPR or a `.data` park.
 - **Regression:** `tests/rebuild/guests/body-echo.vire` + `tools/rebuild-body-token-diff.sh`; chain goldens in `tools/rebuild-chain-diff.sh`.
 - **Platforms:** ELF (proven here). PE uses the same blob; `GetEnvironmentVariableA` is on the net kernel32 IAT. CouchStation must re-run the PE commands below.
-- **Residual:** native header scan can miss `Content-Length` when `Connection: close` is sent *before* it (harness puts CL first). Token compare pads 256-byte buffers and XOR-folds (constant-time on the padded copy, not on header parsing). Env token length &lt; 16 means the gate is off (same as host). Arena 32MB / list 100000 / steps 5M unchanged.
+- **Residual:** token compare pads 256-byte buffers and XOR-folds (constant-time on the padded copy, not on header parsing). Env token length &lt; 16 means the gate is off (same as host). Arena 32MB / list 100000 / steps 5M unchanged. Header names are scanned in any order; the last header before `\\r\\n\\r\\n` is included.
 
 ## Native capabilities (this HEAD)
 
@@ -180,7 +180,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited.
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited. Blob+pins+fixes for `rt_net_statusof` remain from prior lanes.
 
 ## Commands
 

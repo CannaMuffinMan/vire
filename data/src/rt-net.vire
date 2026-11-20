@@ -70,7 +70,9 @@ end
 ~ JSON Content-Type is application/json with no charset (Go writeJSON).
 ~ Request body is a heap text: length at [0], bytes at [8], capped by
 ~ Content-Length and HttpWire.MaxRequestBody (1000000). POST/PUT without
-~ Content-Length is 411. Oversize is 413. The route `body` argument is never
+~ Content-Length is 411. Oversize is 413. Headers are scanned to the
+~ terminator including the last line (any order, case-insensitive names).
+~ Duplicate Content-Length is 400. The route `body` argument is never
 ~ a stale pointer. Native FCG_API_TOKEN uses iat_ev (GetEnvironmentVariableA
 ~ / ELF envp scan) and constant-time header compare before fn_route.
 
