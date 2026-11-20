@@ -170,6 +170,20 @@ def cors_ok(h):
 go = int("${GPORT}")
 vire = int("${VPORT}")
 rows = []
+contract = json.loads(open("tests/rebuild/contracts/fcgbc/headers.json").read())
+json_headers = contract["json_headers"]
+options_headers = contract["options_headers"]
+want_by_name = {c["name"]: c for c in contract["cases"]}
+
+def headers_exact(got, want):
+    bad = []
+    for hk, hv in want.items():
+        gv = got.get(hk.lower(), "")
+        if gv.lower() != hv.lower():
+            bad.append("%s got %s want %s" % (hk, gv, hv))
+    if want.get("content-type") == "application/json" and "charset" in got.get("content-type", "").lower():
+        bad.append("content-type has charset")
+    return bad
 
 def add(name, method, path, body=b"", json_eq=False, ignore_status=False, no_nl=False):
     gs, gh, gb = fetch(go, method, path, body)
@@ -177,13 +191,15 @@ def add(name, method, path, body=b"", json_eq=False, ignore_status=False, no_nl=
     note = []
     if gs != vs:
         note.append("status go=%s vire=%s" % (gs, vs))
-    gct = gh.get("content-type", "")
-    vct = vh.get("content-type", "")
-    # Go httptest/net/http may omit charset; live server sets json charset.
-    if "json" not in gct.lower() and method != "OPTIONS":
-        note.append("go content-type %s" % gct)
-    if "json" not in vct.lower() and method != "OPTIONS" and vb:
-        note.append("vire content-type %s" % vct)
+    spec = want_by_name.get(name)
+    want_h = options_headers if method == "OPTIONS" else json_headers
+    if spec:
+        want_h = options_headers if spec["headers"] == "options" else json_headers
+        if vs != spec["status"]:
+            note.append("vire status %s contract %s" % (vs, spec["status"]))
+    hexact = headers_exact(vh, want_h)
+    if hexact:
+        note.append("vire headers " + "; ".join(hexact))
     gc, gm, ga = cors_ok(gh)
     vc, vm, va = cors_ok(vh)
     if not (gc and gm and ga):
@@ -204,7 +220,7 @@ def add(name, method, path, body=b"", json_eq=False, ignore_status=False, no_nl=
     else:
         body_ok = gb == vb
     status_ok = gs == vs
-    proven = status_ok and body_ok and vc and vm and va and gc and gm and ga
+    proven = status_ok and body_ok and vc and vm and va and gc and gm and ga and not hexact
     if ignore_status:
         proven = body_ok and vc and vm and va
         if not status_ok:
@@ -281,7 +297,8 @@ except Exception:
 print("RATE 181+ go_status=%s vire_status=%s error_match=%s retryAfterMs_shape=%s go_ms=%s vire_ms=%s" % (
     gs, vs, rl_ok, shape, json.loads(gb).get("retryAfterMs") if gb else None, json.loads(vb).get("retryAfterMs") if vb else None))
 print("hits_file", open("data/fcgbc-hits.txt").read().strip())
-rows.append(("RATE 180/60s", rl_ok and shape, gs, vs, rl_ok, "" if shape else "retryAfterMs shape", gb[:80], vb[:80]))
+rh = headers_exact(vh, json_headers)
+rows.append(("RATE 180/60s", rl_ok and shape and not rh, gs, vs, rl_ok, ("" if shape else "retryAfterMs shape") + (("; " + "; ".join(rh)) if rh else ""), gb[:80], vb[:80]))
 
 # Negative: malformed method must not reach route (501, not 204/200).
 ns, nh, nb = fetch(vire, "FOO", "/info")

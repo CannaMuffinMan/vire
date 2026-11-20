@@ -30,6 +30,8 @@ Already in `src/rt-crypto.vire` / `hash`. NIST vectors:
 
 Go default (no `Origin`, `NODE_ENV` not production): `Access-Control-Allow-Origin: *` plus the methods/headers strings from `fcgbc-go/server.go`. Native parked those on every `sendhttp` (`src/rt-net.vire` `txt_hdr2`). Host interpreter emits the same when `VIRE_FCGBC_HTTP=1`, and reflects listed origins.
 
+JSON `Content-Type` is `application/json` with **no** `charset=` (`parkNet` `txt_hdrs` and host `SendApi`, cherry-picked from PR #92). Recorded in `tests/rebuild/contracts/fcgbc/headers.json` for Windows exact compare. OPTIONS is 204 + CORS and does not require `Content-Type`.
+
 ## HTTP status
 
 Native `rt_net_statusof` is the PR #93 JSON `"status":N` scan (needles include 429). fcgbc Go bodies do not carry that field, so a small extra scan maps the same error strings host `FcgbcStatus` uses to 400/404/429/503. Empty `route` bodies (OPTIONS) become **204**. Overlap with #93: merge **#92 → #93 → #98**.
