@@ -114,7 +114,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 
 Recorded in `tests/rebuild/contracts/fcg-health.json`:
 
-- `GET /health` → 200, `Content-Type` JSON, `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
+- `GET /health` → 200, `Content-Type: application/json` (no charset; Go `writeJSON` in fcgbds-go `server.go`), `Connection: close`, `nosniff`, `Cache-Control: no-store`, body `{"ok":true,"service":"fcgcpa","payments":false}`
 - `GET /api/health` → same
 - `GET /nope` → body `{"ok":false,"status":404,"error":"not found"}`. **HTTP status is a human-review flag:** host `StatusOf` yields 404; native route responses are 200. The harness treats HTTP 200 + that body as a documented native gap, not as a silent pass against HTTP 404.
 
@@ -125,7 +125,7 @@ Recorded in `tests/rebuild/contracts/fcg-health.json`:
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler changes (gen1 = gen2 must stay identical because `compile-native.vire` / emitters were not edited)
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset). `compile-native.vire` was not edited.
 
 ## Commands
 

@@ -344,7 +344,7 @@ static class VireListen
             data = Encoding.UTF8.GetBytes("{\"error\":\"route failed\"}");
         }
         string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
-            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Type: application/json\r\n"
             + "Content-Length: " + data.Length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"

@@ -133,10 +133,7 @@ for case in contract["cases"]:
     want_h = case.get("headers") or {}
     for hk, hv in want_h.items():
         got = headers.get(hk.lower(), "")
-        if hk.lower() == "content-type":
-            if hv.lower() not in got.lower():
-                mismatches.append("%s content-type got %s want contains %s" % (name, got, hv))
-        elif got.lower() != hv.lower():
+        if got.lower() != hv.lower():
             mismatches.append("%s header %s got %s want %s" % (name, hk, got, hv))
     if body != case["body"]:
         mismatches.append("%s body got %s want %s" % (name, body, case["body"]))
