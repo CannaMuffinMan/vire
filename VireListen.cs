@@ -281,8 +281,101 @@ static class VireListen
         if (text == null) text = show(result);
         if (text == null) text = "null";
         if (text.Length > maxOutput) text = "{\"error\":\"response too large\"}";
-        int code = StatusOf(text, 200);
-        SendApi(stream, code, text, null);
+        bool fcgbc = FcgbcHttp();
+        int code = fcgbc ? FcgbcStatus(method, text) : StatusOf(text, 200);
+        string extra = fcgbc ? FcgbcCors(head) : null;
+        SendApi(stream, code, text, extra);
+    }
+
+    static bool FcgbcHttp()
+    {
+        string v = Environment.GetEnvironmentVariable("VIRE_FCGBC_HTTP");
+        return v == "1";
+    }
+
+    static int FcgbcStatus(string method, string text)
+    {
+        if (method == "OPTIONS") return 204;
+        if (text == null) return 200;
+        if (text.IndexOf("Rate limit exceeded", StringComparison.Ordinal) >= 0) return 429;
+        if (text.IndexOf("mining disabled: chain rules are not executed", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("wallet key operations refused", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("peer broadcast refused", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("refused: behavior is not proven to match the Node service", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("invalid json", StringComparison.Ordinal) >= 0) return 400;
+        if (text.IndexOf("Block not found", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("Session not found", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("contract routes are not implemented", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("\"error\":\"Not found\"", StringComparison.Ordinal) >= 0) return 404;
+        return StatusOf(text, 200);
+    }
+
+    static string HeaderLine(string head, string name)
+    {
+        if (head == null) return "";
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            int colon = line.IndexOf(':');
+            if (colon <= 0) continue;
+            string key = line.Substring(0, colon).Trim(' ', '\t');
+            if (string.Equals(key, name, StringComparison.OrdinalIgnoreCase))
+                return line.Substring(colon + 1).Trim(' ', '\t');
+        }
+        return "";
+    }
+
+    static bool FcgbcLocalOrigin(string origin)
+    {
+        if (origin.StartsWith("https://", StringComparison.Ordinal)) origin = origin.Substring(8);
+        else if (origin.StartsWith("http://", StringComparison.Ordinal)) origin = origin.Substring(7);
+        else return false;
+        if (origin.IndexOf('/') >= 0) return false;
+        int colon = origin.LastIndexOf(':');
+        string host = origin;
+        if (colon > 0) host = origin.Substring(0, colon);
+        return host == "localhost" || host == "127.0.0.1";
+    }
+
+    static string FcgbcCors(string head)
+    {
+        string methods = "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n";
+        string headers = "Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, x-fcgbc-admin-secret\r\n";
+        bool prod = string.Equals(Environment.GetEnvironmentVariable("NODE_ENV"), "production", StringComparison.OrdinalIgnoreCase);
+        string origin = HeaderLine(head, "Origin");
+        string allow = "";
+        if (origin == "")
+        {
+            if (!prod) allow = "Access-Control-Allow-Origin: *\r\n";
+        }
+        else
+        {
+            bool listed = origin == "https://admin.forevercouchgang.space"
+                || origin == "https://rpc.forevercouchgang.space"
+                || origin == "https://forevercouchgang.space"
+                || origin == "https://www.forevercouchgang.space"
+                || origin == "https://app.forevercouchgang.space"
+                || origin == "https://dev.forevercouchgang.space"
+                || origin == "http://localhost:3000"
+                || origin == "http://localhost:3001"
+                || origin == "http://localhost:3002"
+                || origin == "http://localhost:3003"
+                || origin == "http://localhost:5173";
+            string extra = Environment.GetEnvironmentVariable("FCGBC_CORS_ORIGINS");
+            if (string.IsNullOrEmpty(extra)) extra = Environment.GetEnvironmentVariable("CORS_ORIGINS");
+            if (!listed && !string.IsNullOrEmpty(extra))
+            {
+                string[] parts = extra.Split(',');
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (parts[i].Trim() == origin) listed = true;
+                }
+            }
+            if (listed || (!prod && FcgbcLocalOrigin(origin)))
+                allow = "Access-Control-Allow-Origin: " + origin + "\r\nVary: Origin\r\n";
+        }
+        return allow + methods + headers;
     }
 
     static bool IsRequestBudget(VireError err)
@@ -308,6 +401,7 @@ static class VireListen
     static string ReasonOf(int code)
     {
         if (code == 200) return "OK";
+        if (code == 204) return "No Content";
         if (code == 206) return "Partial Content";
         if (code == 400) return "Bad Request";
         if (code == 401) return "Unauthorized";
@@ -317,6 +411,7 @@ static class VireListen
         if (code == 411) return "Length Required";
         if (code == 413) return "Payload Too Large";
         if (code == 416) return "Range Not Satisfiable";
+        if (code == 429) return "Too Many Requests";
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";
