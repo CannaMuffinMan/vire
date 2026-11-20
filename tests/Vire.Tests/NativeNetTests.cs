@@ -31,8 +31,15 @@ public class NativeNetTests
         Assert.DoesNotContain("LoadLibraryA", net);
         string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
         Assert.Contains("use \"src/rt-net.vire\"", native);
+        Assert.Contains("use \"src/rt-ws.vire\"", native);
         Assert.Contains("nm == \"json\"", native);
         Assert.Contains("nm == \"listen\"", native);
+        Assert.Contains("nm == \"ws_listen\"", native);
+        string ws = File.ReadAllText(Path.Combine(root, "src", "rt-ws.vire"));
+        Assert.Equal(ws, File.ReadAllText(Path.Combine(root, "data", "src", "rt-ws.vire")));
+        Assert.Contains("emitWsRuntime", ws);
+        Assert.Contains("rt_sha1", ws);
+        Assert.Contains("258EAFA5-E914-47DA-95CA-C5AB0DC85B11", ws);
         Assert.Contains("nm == \"connect\"", native);
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
