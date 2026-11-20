@@ -31,7 +31,7 @@ Native Windows x64 PE (this tree, proven in `native-security.yml` / Windows jobs
 
 ## Non-guarantees
 
-- There is no TLS server, no authorization on `POST /block`, and no public internet hardening beyond loopback-by-default plus an optional token when `VIRE_BIND` is `public`.
+- Host and native ELF now have TLS (`tls_listen` / `tls_connect`): cert validation on, TLS 1.2 minimum, no skip-verify flag. Native PE TLS is fail-closed until SChannel is proven on Windows. There is still no authorization on `POST /block`, and no public internet hardening beyond loopback-by-default plus an optional token when `VIRE_BIND` is `public`.
 - A person who has the runner and the seal key can still read a compiled program. The seal stops casual reading and casual patches. It does not stop every attack.
 - Windows desktop, the native compiler, and live network samples are outside this guarantee list.
 - Caps stop runaway programs; they do not make a program safe to expose to the internet.

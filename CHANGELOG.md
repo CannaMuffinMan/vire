@@ -1,5 +1,9 @@
 # Changelog
 
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_listen` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 (`docs/native-tls.md`). Cert validation on; TLS 1.2 min. Test certs at test time.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.
