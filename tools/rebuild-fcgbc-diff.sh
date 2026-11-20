@@ -30,6 +30,19 @@ if got == want:
 print("FAIL_BEFORE nist-1m-mismatch")
 PY
 
+python3 - <<'PY'
+from pathlib import Path
+import subprocess
+base = subprocess.check_output(["git", "show", "origin/native-compiler:src/rt-net.vire"], text=True)
+head = Path("src/rt-net.vire").read_text()
+if "txt_OPTIONS" in base or "rt_net_statusof" in base:
+    raise SystemExit("fail-before: origin/native-compiler already has OPTIONS/statusof")
+if "txt_OPTIONS" not in head or "rt_net_statusof" not in head:
+    raise SystemExit("HEAD missing OPTIONS/statusof")
+print("FAIL_BEFORE native parser GET/POST/HEAD/PUT only (no txt_OPTIONS)")
+print("PASS_AFTER sources list OPTIONS + rt_net_statusof")
+PY
+
 echo "sha256_nist host prove (abc + 1M a; full crypto-prove.vire is the existing suite)"
 dotnet exec bin/Release/net10.0/vire.dll crypto-abc.vire
 dotnet exec bin/Release/net10.0/vire.dll tests/native/million-hash.vire > /tmp/vire-million-hash.txt
@@ -209,26 +222,25 @@ add("GET /blockchain", "GET", "/blockchain", json_eq=True)
 add("GET /block/0", "GET", "/block/0", json_eq=True)
 add("GET /block/1", "GET", "/block/1", json_eq=True)
 add("GET /block/1abc", "GET", "/block/1abc", json_eq=True)
-add("GET /block/9", "GET", "/block/9", ignore_status=True)
+add("GET /block/9", "GET", "/block/9", json_eq=True)
 add("GET /wallet/balance/bob", "GET", "/wallet/balance/bob")
 add("GET /wallet/balance/nobody", "GET", "/wallet/balance/nobody")
 add("GET /wallet/couchcred/bob", "GET", "/wallet/couchcred/bob")
 add("GET /wallet/couchcred/nobody", "GET", "/wallet/couchcred/nobody")
-add("POST /transaction", "POST", "/transaction", b"{}", ignore_status=True)
-add("GET /transaction", "GET", "/transaction", ignore_status=True)
-add("POST /mine", "POST", "/mine", b"{}", ignore_status=True)
-add("POST /mine-engagement", "POST", "/mine-engagement", b"{}", ignore_status=True)
-add("POST /wallet/create", "POST", "/wallet/create", b"{}", ignore_status=True)
-add("POST /wallet/import", "POST", "/wallet/import", b"{}", ignore_status=True)
-add("POST /peers/broadcast", "POST", "/peers/broadcast", b"{}", ignore_status=True)
-add("POST /bridge/out", "POST", "/bridge/out", b"{}", ignore_status=True)
-add("POST /bridge/in", "POST", "/bridge/in", b"{}", ignore_status=True)
-add("GET /contract/wallet-registry-v1", "GET", "/contract/wallet-registry-v1", ignore_status=True)
-add("OPTIONS /info", "OPTIONS", "/info", ignore_status=True)
-# Native HTTP parser only accepts GET/POST/HEAD/PUT; OPTIONS is a documented gap.
+add("POST /transaction", "POST", "/transaction", b"{}")
+add("GET /transaction", "GET", "/transaction")
+add("POST /mine", "POST", "/mine", b"{}")
+add("POST /mine-engagement", "POST", "/mine-engagement", b"{}")
+add("POST /wallet/create", "POST", "/wallet/create", b"{}")
+add("POST /wallet/import", "POST", "/wallet/import", b"{}")
+add("POST /peers/broadcast", "POST", "/peers/broadcast", b"{}")
+add("POST /bridge/out", "POST", "/bridge/out", b"{}")
+add("POST /bridge/in", "POST", "/bridge/in", b"{}")
+add("GET /contract/wallet-registry-v1", "GET", "/contract/wallet-registry-v1")
+add("OPTIONS /info", "OPTIONS", "/info")
 add("POST /start-engagement", "POST", "/start-engagement", b'{"contentId":"c1","userId":"u1","action":"view"}', json_eq=True)
 add("POST /record-interaction/session-fixture", "POST", "/record-interaction/session-fixture", b'{"interactionType":"pause","data":{"at":1}}', json_eq=True)
-add("POST /end-engagement/missing", "POST", "/end-engagement/missing", ignore_status=True)
+add("POST /end-engagement/missing", "POST", "/end-engagement/missing")
 add("POST /peers/register", "POST", "/peers/register", b'{"peerUrl":"http://127.0.0.1:9"}', json_eq=True)
 
 # block hash field (before the rate-limit soak)
@@ -259,12 +271,25 @@ try:
     ve = json.loads(vb).get("error")
 except Exception:
     ge = ve = None
-rl_ok = ge == "Rate limit exceeded" and ve == "Rate limit exceeded"
-print("RATE 181+ go_status=%s vire_status=%s error_match=%s go_body=%r vire_body=%r" % (gs, vs, rl_ok, gb[:80], vb[:80]))
+rl_ok = ge == "Rate limit exceeded" and ve == "Rate limit exceeded" and gs == 429 and vs == 429
+try:
+    gj = json.loads(gb)
+    vj = json.loads(vb)
+    shape = isinstance(gj.get("retryAfterMs"), int) and isinstance(vj.get("retryAfterMs"), int)
+except Exception:
+    shape = False
+print("RATE 181+ go_status=%s vire_status=%s error_match=%s retryAfterMs_shape=%s go_ms=%s vire_ms=%s" % (
+    gs, vs, rl_ok, shape, json.loads(gb).get("retryAfterMs") if gb else None, json.loads(vb).get("retryAfterMs") if vb else None))
 print("hits_file", open("data/fcgbc-hits.txt").read().strip())
-rows.append(("RATE 180/60s", rl_ok, gs, vs, rl_ok, "native-status-gap" if gs != vs else "", gb[:80], vb[:80]))
+rows.append(("RATE 180/60s", rl_ok and shape, gs, vs, rl_ok, "" if shape else "retryAfterMs shape", gb[:80], vb[:80]))
 
-known_gap = {"OPTIONS /info"}
+# Negative: malformed method must not reach route (501, not 204/200).
+ns, nh, nb = fetch(vire, "FOO", "/info")
+neg = ns >= 400 and ns != 204
+print("NEG FOO /info vire_status=%s body=%r" % (ns, nb[:80]))
+rows.append(("NEG FOO /info", neg, 501, ns, True, "" if neg else "malformed method not fail-closed", b"", nb[:80]))
+
+known_gap = set()
 fail = [r for r in rows if not r[1] and r[0] not in known_gap]
 print("ROUTE_SUMMARY")
 for r in rows:

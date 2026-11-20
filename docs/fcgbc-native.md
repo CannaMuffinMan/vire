@@ -30,11 +30,17 @@ Already in `src/rt-crypto.vire` / `hash`. NIST vectors:
 
 Go default (no `Origin`, `NODE_ENV` not production): `Access-Control-Allow-Origin: *` plus the methods/headers strings from `fcgbc-go/server.go`. Native parked those on every `sendhttp` (`src/rt-net.vire` `txt_hdr2`). Host interpreter emits the same when `VIRE_FCGBC_HTTP=1`, and reflects listed origins.
 
-## HTTP status (native gap)
+## HTTP status
 
-Host `VireListen` with `VIRE_FCGBC_HTTP=1` maps the Go error strings to 204/400/404/429/503. Native `rt_net_sendhttp` still sends `HTTP/1.1 200` for a successful `route` return. The Linux harness treats body+CORS match on stub routes as proven **with a native-status gap**.
+Native `rt_net_statusof` is the PR #93 JSON `"status":N` scan (needles include 429). fcgbc Go bodies do not carry that field, so a small extra scan maps the same error strings host `FcgbcStatus` uses to 400/404/429/503. Empty `route` bodies (OPTIONS) become **204**. Overlap with #93: merge **#92 → #93 → #98**.
 
-Native request parsing only allows GET/POST/HEAD/PUT, so `OPTIONS` is **not proven** (Go 204, native 400). Rate limit 181st body `error=Rate limit exceeded` is proven; `retryAfterMs` is not byte-identical (native ticks are not Go wall ms). `GET /info` `port` is the bind port on Go and 3011 in the fixture guest; JSON compare ignores `port`.
+Parser allowlist is GET/POST/HEAD/PUT plus **OPTIONS** (`rt_net_optchk`). Any other method still goes to `cl_501`.
+
+## retryAfterMs
+
+Go: remaining milliseconds in the 60s IP window (`time.Until`). Native: no wall clock in the guest (`now` is reserved), so the JSON always uses integer `1`. Harness checks **field shape** (`error` string + `retryAfterMs` number), not the millisecond value.
+
+`GET /info` `port` is the bind port on Go and 3011 in the fixture guest; JSON compare ignores `port`.
 
 ## Prove
 

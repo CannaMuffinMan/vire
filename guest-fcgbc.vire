@@ -177,7 +177,10 @@ end
 define rateLimit
   ~ Count 180 then refuse. Native ticks are not millisecond wall time, so a
   ~ TickCount window cannot match Go on ELF; the 181st request in one process
-  ~ still matches the Go 60s test that never waits out the window.
+  ~ Count-only window. Go retryAfterMs is remaining wall ms in the 60s
+  ~ bucket (time.Until). Native guests have no wall clock (`now` is reserved),
+  ~ so this field is the integer 1: same JSON shape {error, retryAfterMs},
+  ~ not the same millisecond value.
   let hits be number with (readText with "data/fcgbc-hits.txt")
   let hits be hits + 1
   write with "data/fcgbc-hits.txt", (text with hits)
