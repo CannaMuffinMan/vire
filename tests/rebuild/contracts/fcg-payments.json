@@ -1,0 +1,38 @@
+{
+  "id": "fcg-payments",
+  "source": "in-tree api/fcgcpa.vire GET /payments and GET /mine 403 JSON. Payments stay off. Mining stays inside the app. Native HTTP status follows JSON status via rt_net_statusof (host VireListen.StatusOf). Reason phrases are not compared.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_payments",
+      "method": "GET",
+      "path": "/payments",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":403,\"error\":\"payments are off\"}"
+    },
+    {
+      "name": "get_mine",
+      "method": "GET",
+      "path": "/mine",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":403,\"error\":\"mining stays inside the app\"}"
+    }
+  ]
+}
