@@ -122,11 +122,11 @@ def http_req(method, path, body_send):
     lines = [
         "%s %s HTTP/1.1" % (method, path),
         "Host: 127.0.0.1",
-        "Connection: close",
     ]
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
+    lines.append("Connection: close")
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)
@@ -213,11 +213,11 @@ def http_req(port, method, path, body_send):
     lines = [
         "%s %s HTTP/1.1" % (method, path),
         "Host: 127.0.0.1",
-        "Connection: close",
     ]
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
+    lines.append("Connection: close")
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)
@@ -257,7 +257,7 @@ keys = ["content-type", "connection", "x-content-type-options", "cache-control"]
 mismatches = []
 
 read_cases = [c for c in doc["cases"] if not c.get("restore_chain") and (c.get("method") or "GET") == "GET"]
-write_cases = []
+write_cases = [c for c in doc["cases"] if (c.get("method") or "GET") == "POST"]
 
 restore(fix_src, fix_dst)
 for case in read_cases:
@@ -345,9 +345,8 @@ HPORT="${ids##* }"
 echo "host_listen 127.0.0.1:$HPORT"
 
 install_fixtures
-diff_contracts "$GPORT" GET
-echo "native GET /chain contract ok"
-echo "native POST /block skipped: native listen segfaults if route reads the POST body (rt-net body handle). Host POST is required below."
+diff_contracts "$GPORT"
+echo "native GET /chain and POST /block contract ok"
 install_fixtures
 diff_contracts "$HPORT"
 echo "host contract ok"
@@ -355,5 +354,5 @@ pair_host_native "$HPORT" "$GPORT"
 stop_guest "$GPID"
 stop_guest "$HPID"
 install_fixtures
-echo "PASS_AFTER at $AFTER_SHA native ELF matches host GET /chain; host POST /block matches recorded contract"
+echo "PASS_AFTER at $AFTER_SHA native ELF matches host GET /chain and POST /block vs recorded contract"
 echo "rebuild chain diff ok"

@@ -41,7 +41,10 @@ end
 
 define emitLinuxStart with image, fixes, labels
   pin with labels, "linux_start", image
-  let image be emitHex with image, "31ed4c8b24244c8d6c24084883e4f0"
+  ~ envp = argv + argc + 1: lea r8, [r13 + r12*8 + 8] needs REX.X so index 100 is r12, not riz.
+  let image be emitHex with image, "31ed4c8b24244c8d6c24084f8d44e5084c8905"
+  let image be emitRel with image, fixes, "envp_ptr"
+  let image be emitHex with image, "4883e4f0"
   let image be emitLeaRdi with image, fixes, "cmdline_buf"
   let image be emitHex with image, "4989fe4531ff"
   pin with labels, "ls_arg", image
@@ -111,6 +114,7 @@ define emitLinuxNetThunks with image, fixes, labels
   let image be emitIatThunk with image, fixes, labels, "thunk_ss", "stub_ss"
   let image be emitIatThunk with image, fixes, labels, "thunk_gn", "stub_gn"
   let image be emitIatThunk with image, fixes, labels, "thunk_cn", "stub_cn"
+  let image be emitIatThunk with image, fixes, labels, "thunk_ev", "stub_ev"
   return image
 end
 
@@ -618,5 +622,46 @@ define emitLinuxNetStubs with image, fixes, labels
   let image be emitSys with image, 42
   let image be emitSysNeg1 with image
   let image be emitHex with image, "c3"
+
+  ~ GetEnvironmentVariableA: scan envp saved at process start. rcx=name, rdx=buf, r8=size.
+  pin with labels, "stub_ev", image
+  let image be emitHex with image, "554889e54883ec3048894df8488955f04c8945e8488b05"
+  let image be emitRel with image, fixes, "envp_ptr"
+  let image be emitHex with image, "4885c00f84"
+  let image be emitRel with image, fixes, "ev_miss"
+  let image be emitHex with image, "488945e0"
+  pin with labels, "ev_walk", image
+  let image be emitHex with image, "488b45e0488b304885f60f84"
+  let image be emitRel with image, fixes, "ev_miss"
+  let image be emitHex with image, "488b7df8"
+  pin with labels, "ev_cmp", image
+  let image be emitHex with image, "0fb60f0fb61684c90f84"
+  let image be emitRel with image, fixes, "ev_eq"
+  let image be emitHex with image, "38d10f85"
+  let image be emitRel with image, fixes, "ev_next"
+  let image be emitHex with image, "48ffc748ffc6e9"
+  let image be emitRel with image, fixes, "ev_cmp"
+  pin with labels, "ev_eq", image
+  let image be emitHex with image, "80fa3d0f85"
+  let image be emitRel with image, fixes, "ev_next"
+  let image be emitHex with image, "48ffc6488b7df0488b4de84885c90f84"
+  let image be emitRel with image, fixes, "ev_miss"
+  let image be emitHex with image, "31c0"
+  pin with labels, "ev_copy", image
+  let image be emitHex with image, "4885c90f84"
+  let image be emitRel with image, fixes, "ev_done"
+  let image be emitHex with image, "0fb616881784d20f84"
+  let image be emitRel with image, fixes, "ev_nul"
+  let image be emitHex with image, "48ffc648ffc7ffc048ffc9e9"
+  let image be emitRel with image, fixes, "ev_copy"
+  pin with labels, "ev_nul", image
+  let image be emitHex with image, "c9c3"
+  pin with labels, "ev_done", image
+  let image be emitHex with image, "c60700c9c3"
+  pin with labels, "ev_next", image
+  let image be emitHex with image, "488345e008e9"
+  let image be emitRel with image, fixes, "ev_walk"
+  pin with labels, "ev_miss", image
+  let image be emitHex with image, "31c0c9c3"
   return image
 end

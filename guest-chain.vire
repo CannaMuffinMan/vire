@@ -1,6 +1,7 @@
 ~ Native FCG GET /chain + POST /block against committed genesis fixtures.
 ~ Proof = hash of "[1," + json(previous) + "," + json(text) + "]"
-~ Native listen+parse and json-of-list/map currently crash or corrupt (not used).
+~ POST body is a bounded leaf heap text (rt-net). Do not parse the body as JSON here;
+~ shape checks use string find on the raw request text.
 ~ Fixtures: data/rebuild/chain copied to data/chain by tools/rebuild-chain-diff.sh.
 
 define textOk with value
