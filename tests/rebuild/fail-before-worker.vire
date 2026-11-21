@@ -1,0 +1,6 @@
+~ FAIL_BEFORE worker: missing payments refusal and wrong default lines.
+
+define main
+  say "worker running"
+  halt with 0
+end

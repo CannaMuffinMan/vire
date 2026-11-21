@@ -1,4 +1,4 @@
-~ Host vs gen1 PE: loopback Postgres v3. Placeholders filled by prove scripts.
+~ Host vs native: loopback Postgres v3. Placeholders filled by prove scripts.
 
 define fail with why
   say "FAIL " + why
@@ -16,9 +16,20 @@ define cell0 with got
   return row at 0
 end
 
+define dec0 with got
+  if (length with (got at "decoded")) < 1
+    return none
+  end
+  let row be (got at "decoded") at 0
+  if (length with row) < 1
+    return none
+  end
+  return row at 0
+end
+
 define main
   say "pg pin 5b10ea5fa5eea46859f17a52b36037d9d088c01d"
-  say "pg residual no TLS; auth trust/cleartext; SCRAM residual under 5M cap"
+  say "pg residual no TLS (TLS lane); SCRAM-SHA-256 via native hash"
   try
     connect with "8.8.8.8", 5432
     fail with "non-loopback missed"
@@ -48,6 +59,9 @@ define main
   if (cell0 with one) != "1"
     fail with ("select1 got " + (cell0 with one))
   end
+  if (dec0 with one) != 1
+    fail with "select1 typed"
+  end
   say "select1 1"
   let cre be pg_query with conn, "CREATE TEMP TABLE t(n int)"
   if (cre at "ok") == false
@@ -72,12 +86,12 @@ define main
     fail with "bad sql missed"
   end
   say "bad-sql " + (bad at "why")
-  let u be pg_query with conn, "CREATE TEMP TABLE u(n text)"
+  let u be pg_query with conn, "CREATE TEMP TABLE u(n text, k int)"
   if (u at "ok") == false
     fail with (u at "why")
   end
   let hostile be "1); DROP TABLE u; --"
-  let bound be pg_exec_param with conn, "INSERT INTO u(n) VALUES ($1)", hostile
+  let bound be pg_exec_param with conn, "INSERT INTO u(n, k) VALUES ($1, $2)", [hostile, 9]
   if (bound at "ok") == false
     fail with (bound at "why")
   end
@@ -98,6 +112,55 @@ define main
     fail with ("count " + (cell0 with live))
   end
   say "injection-blocked table-live"
+  let tx be pg_begin with conn
+  if (tx at "ok") == false
+    fail with (tx at "why")
+  end
+  let txins be pg_exec_param with conn, "INSERT INTO u(n, k) VALUES ($1, $2)", ["tx", 1]
+  if (txins at "ok") == false
+    fail with (txins at "why")
+  end
+  let rb be pg_rollback with conn
+  if (rb at "ok") == false
+    fail with (rb at "why")
+  end
+  let after be pg_query with conn, "SELECT count(*) FROM u"
+  if (cell0 with after) != "1"
+    fail with "rollback missed"
+  end
+  say "rollback 1"
+  let tx2 be pg_begin with conn
+  if (tx2 at "ok") == false
+    fail with (tx2 at "why")
+  end
+  let txins2 be pg_exec_param with conn, "INSERT INTO u(n, k) VALUES ($1, $2)", ["ok", 2]
+  if (txins2 at "ok") == false
+    fail with (txins2 at "why")
+  end
+  let cm be pg_commit with conn
+  if (cm at "ok") == false
+    fail with (cm at "why")
+  end
+  let after2 be pg_query with conn, "SELECT count(*) FROM u"
+  if (cell0 with after2) != "2"
+    fail with "commit missed"
+  end
+  say "commit 2"
+  let typed be pg_query with conn, "SELECT 1::int4, true, null::text"
+  if (typed at "ok") == false
+    fail with (typed at "why")
+  end
+  let drow be (typed at "decoded") at 0
+  if (drow at 0) != 1
+    fail with "typed int"
+  end
+  if (drow at 1) != true
+    fail with "typed bool"
+  end
+  if (drow at 2) != none
+    fail with "typed null"
+  end
+  say "typed int-bool-null"
   pg_close with conn
   say "PG PROVE pass"
 end

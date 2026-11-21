@@ -1,0 +1,9 @@
+~ FAIL_BEFORE for rpc portal unauth goldens (a58999b1 had /api/health only).
+
+define route with method, path, body
+  return "{\"wrong\":true}"
+end
+
+define main
+  listen with 18080
+end

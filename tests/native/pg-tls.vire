@@ -1,0 +1,52 @@
+~ Host vs native: loopback Postgres over TLS (sslmode verify-full).
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define cell0 with got
+  if (length with (got at "rows")) < 1
+    return ""
+  end
+  let row be (got at "rows") at 0
+  if (length with row) < 1
+    return ""
+  end
+  return row at 0
+end
+
+define main
+  say "pg tls residual no SCRAM-SHA-256-PLUS channel binding"
+  try
+    connect with "8.8.8.8", 5432
+    fail with "non-loopback missed"
+  miss problem
+    say "non-loopback refused"
+  end
+  let port be PORT_PLACEHOLDER
+  let user be "PGUSER_PLACEHOLDER"
+  let db be "PGDB_PLACEHOLDER"
+  let secret be "PGSECRET_PLACEHOLDER"
+  let ca be "data/pg-ca.pem"
+  let opened be pg_open_ssl with "127.0.0.1", port, user, db, secret, "verify-full", "localhost", ca
+  if (opened at "ok") == false
+    fail with (opened at "why")
+  end
+  let conn be opened at "conn"
+  say "auth " + (conn at "auth")
+  let one be pg_query with conn, "SELECT 1"
+  if (one at "ok") == false
+    fail with (one at "why")
+  end
+  if (cell0 with one) != "1"
+    fail with ("select1 got " + (cell0 with one))
+  end
+  say "select1 1"
+  let nowq be pg_query with conn, "SELECT 42"
+  if (cell0 with nowq) != "42"
+    fail with ("paramless got " + (cell0 with nowq))
+  end
+  say "paramless 42"
+  say "PG TLS PROVE pass"
+end

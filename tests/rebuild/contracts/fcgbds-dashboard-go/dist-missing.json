@@ -1,0 +1,64 @@
+{
+  "id": "fcgbds-dashboard-go/dist-missing",
+  "source": "GET / and export pages with Dist empty: 503 dist_missing. Does not serve HTML.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_root",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}\n"
+    },
+    {
+      "name": "get_defense_reports",
+      "method": "GET",
+      "path": "/defense-reports",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}\n"
+    },
+    {
+      "name": "get_insane_counter",
+      "method": "GET",
+      "path": "/insane-counter",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}\n"
+    },
+    {
+      "name": "get_owner",
+      "method": "GET",
+      "path": "/owner",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}\n"
+    }
+  ]
+}

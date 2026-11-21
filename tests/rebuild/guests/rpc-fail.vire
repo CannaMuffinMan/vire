@@ -1,0 +1,14 @@
+~ FAIL_BEFORE for rpc-portal-go GET /api/health.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/api/health"
+      return "{\"ok\":false}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

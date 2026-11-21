@@ -1,0 +1,10 @@
+define main
+  try
+    resolve with "bad name!"
+    say "invalid-missed"
+  miss problem
+    say problem
+  end
+  let xs be resolve with "ok.test"
+  say (xs at 0)
+end

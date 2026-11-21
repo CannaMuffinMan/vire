@@ -1,0 +1,38 @@
+{
+  "id": "edge-go/maintenance",
+  "source": "edge-go maintenance-on JSON for non-health paths. Go maintenanceJSON plus Vire status:503. Bypass SHA-256/CIDR blocked. Retry-After not on native listen.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_healthz_during_maintenance",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "ok"
+    },
+    {
+      "name": "get_other_maintenance",
+      "method": "GET",
+      "path": "/nope",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"code\":\"maintenance_mode\",\"error\":\"maintenance\",\"message\":\"Forever Couch Gang is down for maintenance. Please try again soon.\",\"status\":503}"
+    }
+  ]
+}

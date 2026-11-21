@@ -1,0 +1,17 @@
+~ Isolated listen + parse of POST JSON. GET of empty body must not crash.
+
+define route with method, path, body
+  if path == "/p"
+    try
+      let v be parse with body
+      return json with v
+    miss problem
+      return "{\"ok\":false,\"status\":400,\"error\":\"bad\"}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404}"
+end
+
+define main
+  listen with 0
+end

@@ -57,25 +57,75 @@ define applyPackedFixes with fixes, base, raw, names
 end
 
 define netNames
-  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdrs", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "rt_save_frame", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "hu_fold", "hu_frame"]
+  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdrs", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "rt_save_frame", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "hu_fold", "hu_frame", "rt_net_statusof", "rt_net_ctype", "txt_hdrs_plain", "mktext_cap", "cl_needcl", "cl_411", "cl_401", "cl_tokengate", "txt_err401", "txt_err411", "txt_xfctoken", "txt_healthp", "txt_fcgenv", "envp_ptr", "iat_ev", "token_env", "token_left", "token_right", "cl_bodyleaf", "cl_emptybody"]
 end
 
-~ Prebuilt json encode/parse (rt-net-json-blob) holds the value in GPRs/rbp
-~ across helper calls. Helpers (buf_*, push, map_put, to_text) are parked;
-~ regenerating the blob is the remaining fix for those internal roots.
+define netNamesR3 
+  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "hu_fold", "hu_frame", "rt_net_statusof", "rt_net_ctype", "mktext_cap", "cl_needcl", "cl_411", "cl_401", "cl_tokengate", "cl_bodyleaf", "cl_emptybody", "dns_skip", "dns_sk_loop", "dns_sk_ptr", "dns_sk_j2", "dns_sk_nul", "dns_sk_ok", "dns_sk_bad", "dns_hostok", "dns_hk_lp", "dns_hk_ch", "dns_hk_dot", "dns_hk_end", "dns_hk_no", "dns_fmta", "dns_fa_oct", "dns_fa_num", "dns_fa_h", "dns_fa_hs", "dns_fa_t0", "dns_fa_t", "dns_fa_ts", "dns_fa_tw", "dns_fa_o", "dns_fa_done", "dns_build", "dns_b_lab", "dns_b_flush", "dns_b_cp", "dns_b_copied", "dns_b_tail", "dns_b_cp2", "dns_b_endlab", "dns_b_bad", "dns_parse", "dns_p_an", "dns_p_next", "dns_p_yes", "dns_p_no", "dns_udp", "dns_u_recv", "dns_u_cs", "dns_u_no", "dns_ns", "dns_ns_cf", "dns_ns_scan", "dns_ns_sp", "dns_ns_pr", "dns_ns_have", "dns_ns_etc", "dns_ns_win", "rt_resolve", "dns_r_id", "dns_r_ok", "dns_r_name", "dns_r_fail", "rt_connect", "conn_recheck", "conn_close", "conn_notloop", "conn_dns", "conn_host", "conn_port", "conn_addr", "conn_priv", "conn_fail", "rt_send", "send_fail", "send_bad", "send_closed", "rt_recv", "recv_cap", "recv_fail", "recv_bad", "recv_closed", "rt_close", "close_bad", "rt_net_statusof_blob", "rt_net_has", "land_has_i", "land_has_j", "land_has_next", "land_has_yes", "land_has_no", "land_has_done", "land_st_sub", "land_st_auth", "land_st_307", "land_st_405", "land_st_502", "land_st_blob", "rt_net_ctype_land", "land_ct_ws", "land_ct_sk", "land_ct_plain2", "land_ct_obj", "land_ct_paychk", "land_ct_html", "land_ct_locm", "land_ct_locp", "land_ct_locs", "land_ct_auth", "land_ct_payh", "land_ct_keep", "pr_back", "rt_net_find", "hf_i", "hf_j", "hf_next", "hf_yes", "hf_no", "rt_net_jsonfield", "jf_scan", "jf_end", "jf_miss", "jf_bad", "rt_net_addfield", "af_keep", "af_bad", "rt_net_guestextra", "ge_skip1", "ge_skip2", "ge_skip3", "ge_skip4", "ge_bad", "rt_net_afterroute", "ar_fail", "ar_send", "rt_net_applyextra", "ae_cp", "ae_end", "ae_done", "rt_net_ci1", "rt_net_reqfield", "rf_skipl", "rf_hdr0", "rf_line", "rf_n", "rf_colon", "rf_sp", "rf_sk", "rf_val", "rf_ve", "rf_take", "rf_nl", "rf_skip", "rf_none", "rt_net_onehead", "oh_keep", "rt_net_headapp", "ha_p", "ha_pv", "ha_v", "ha_pc", "ha_c", "ha_done", "rt_net_extraapp", "ea_p", "ea_pv", "ea_v", "ea_pc", "ea_c", "ea_done", "rt_net_reqhead", "rh_cpy", "rh_cdone", "rh_host", "rh_auth", "rh_done", "rh_empty", "rt_net_pushroute", "pr_body_ok", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "txt_hdrs", "txt_hdrs_plain", "txt_err411", "txt_err401", "txt_fcgenv", "token_env", "iat_ev", "txt_healthp", "txt_xfctoken", "token_left", "token_right", "rt_save_frame", "iat_cn", "linux_flag", "dns_path_fix", "iat_cf", "iat_rf", "iat_ch", "dns_path_resolv", "msg_dnsname", "msg_resolve", "tcp_socks", "msg_conn_host", "msg_conn_port", "msg_conn_addr", "msg_conn_priv", "msg_conn_fail", "msg_send_bad", "msg_conn_closed", "msg_recv_bad", "txt_held", "txt_suboff", "txt_authreq", "txt_st307", "txt_st405", "txt_st502", "txt_hdrs_html", "txt_hdrs_locm", "txt_hdrs_locp", "txt_hdrs_locs", "txt_hdrs_auth", "txt_hdrs_pay", "park_full", "txt_crlf", "extra_hold", "txt_k_loc", "txt_hn_loc", "txt_k_set", "txt_hn_set", "txt_k_www", "txt_hn_www", "txt_k_cc", "txt_hn_cc", "guest_extra", "txt_err500", "head_out", "head_hold", "txt_nm_cookie", "txt_hn_cookie", "txt_nm_host", "txt_hn_host", "txt_nm_authz", "txt_hn_authz"]
+end
 
-define emitNetRuntime with image, fixes, labels, has_route, need_net
+
+
+
+define netNamesR4 
+  return ["rt_net_init", "net_init_done", "net_init_fail", "rt_net_mktext", "mktext_oom", "rt_net_sendall", "send_loop", "send_done", "rt_net_sendhttp", "sh_errph", "sh_ph", "rt_net_hdrend", "hdrend_loop", "hdrend_hit", "hdrend_none", "rt_net_hdrunsafe", "hu_loop", "hu_next", "hu_lf", "hu_cr", "hu_ok", "hu_bad", "rt_net_pathok", "po_loop", "po_next", "po_ok", "po_bad", "rt_net_prefixci", "px_loop", "px_d", "px_c", "px_colon", "px_no", "rt_net_clval", "cv_colon", "cv_after", "cv_sp", "cv_sk", "cv_num", "cv_d", "cv_end", "cv_bad", "rt_net_client", "cl_hdr", "cl_rl", "cl_rl_end", "cl_sp1", "cl_gotm", "cl_sp2", "cl_gotp", "cl_mok", "cl_verok", "cl_hd", "cl_hline", "cl_notecl", "cl_hdnext", "cl_readcl", "cl_hddone", "cl_body", "cl_more", "cl_gotbody", "cl_nobody", "cl_bodytxt", "cl_400", "cl_408", "cl_413", "cl_431", "cl_501", "rt_listen", "listen_port_ok", "listen_loop", "listen_bad_port", "listen_fail", "rt_json_skip", "js_loop", "js_adv", "js_done", "rt_json_kw", "kw_bad", "rt_json_enc", "je_null", "je_bool", "je_false", "je_boolw", "je_int", "je_str", "je_ch", "je_escq", "je_escb", "je_escn", "je_escr", "je_esct", "je_escc", "je_hx1", "je_hx2", "je_strend", "je_list", "je_li", "je_lit", "je_le", "je_map", "je_mi", "je_mit", "je_me", "je_badkey", "je_deep", "rt_json", "rt_json_val", "jv_num", "jv_nd", "jv_nl", "jv_nend", "jv_npos", "jv_nbad", "jv_null", "jv_true", "jv_false", "jv_str", "jv_sc", "jv_sx", "jv_sn", "jv_sr", "jv_st", "jv_sxx", "jv_sp", "jv_se", "jv_arr", "jv_ai", "jv_ac", "jv_ae", "jv_obj", "jv_oi", "jv_oc", "jv_oe", "jv_bad", "rt_parse", "jp_bad", "hu_fold", "hu_frame", "rt_net_statusof", "rt_net_ctype", "mktext_cap", "cl_needcl", "cl_411", "cl_401", "cl_tokengate", "cl_bodyleaf", "cl_emptybody", "dns_skip", "dns_sk_loop", "dns_sk_ptr", "dns_sk_j2", "dns_sk_nul", "dns_sk_ok", "dns_sk_bad", "dns_hostok", "dns_hk_lp", "dns_hk_ch", "dns_hk_dot", "dns_hk_end", "dns_hk_no", "dns_fmta", "dns_fa_oct", "dns_fa_num", "dns_fa_h", "dns_fa_hs", "dns_fa_t0", "dns_fa_t", "dns_fa_ts", "dns_fa_tw", "dns_fa_o", "dns_fa_done", "dns_build", "dns_b_lab", "dns_b_flush", "dns_b_cp", "dns_b_copied", "dns_b_tail", "dns_b_cp2", "dns_b_endlab", "dns_b_bad", "dns_parse", "dns_p_an", "dns_p_next", "dns_p_yes", "dns_p_no", "dns_udp", "dns_u_recv", "dns_u_cs", "dns_u_no", "dns_ns", "dns_ns_cf", "dns_ns_scan", "dns_ns_sp", "dns_ns_pr", "dns_ns_have", "dns_ns_etc", "dns_ns_win", "rt_resolve", "dns_r_id", "dns_r_ok", "dns_r_name", "dns_r_fail", "rt_connect", "conn_recheck", "conn_close", "conn_notloop", "conn_dns", "conn_host", "conn_port", "conn_addr", "conn_priv", "conn_fail", "rt_send", "send_fail", "send_bad", "send_closed", "rt_recv", "recv_cap", "recv_fail", "recv_bad", "recv_closed", "rt_close", "close_bad", "rt_net_statusof_blob", "rt_net_has", "land_has_i", "land_has_j", "land_has_next", "land_has_yes", "land_has_no", "land_has_done", "land_st_sub", "land_st_auth", "land_st_307", "land_st_405", "land_st_502", "land_st_blob", "rt_net_ctype_land", "land_ct_ws", "land_ct_sk", "land_ct_plain2", "land_ct_obj", "land_ct_paychk", "land_ct_html", "land_ct_locm", "land_ct_locp", "land_ct_locs", "land_ct_auth", "land_ct_payh", "land_ct_keep", "pr_back", "rt_net_find", "hf_i", "hf_j", "hf_next", "hf_yes", "hf_no", "rt_net_jsonfield", "jf_scan", "jf_end", "jf_miss", "jf_bad", "rt_net_addfield", "af_keep", "af_bad", "rt_net_guestextra", "ge_skip1", "ge_skip2", "ge_skip3", "ge_skip4", "ge_bad", "rt_net_afterroute", "ar_fail", "ar_send", "rt_net_applyextra", "ae_cp", "ae_end", "ae_done", "rt_net_ci1", "rt_net_reqfield", "rf_skipl", "rf_hdr0", "rf_line", "rf_n", "rf_colon", "rf_sp", "rf_sk", "rf_val", "rf_ve", "rf_take", "rf_nl", "rf_skip", "rf_none", "rt_net_onehead", "oh_keep", "rt_net_headapp", "ha_p", "ha_pv", "ha_v", "ha_pc", "ha_c", "ha_done", "rt_net_extraapp", "ea_p", "ea_pv", "ea_v", "ea_pc", "ea_c", "ea_done", "rt_net_reqhead", "rh_cpy", "rh_cdone", "rh_host", "rh_auth", "rh_done", "rh_empty", "rt_net_pushroute", "pr_body_ok", "ws2_ready", "rt_alloc", "iat_wsa", "msg_net", "rt_fail", "rt_memcpy", "msg_oom", "iat_sd", "rt_buf_new", "txt_http11", "rt_buf_text", "rt_int_text", "txt_sp_ok", "txt_sp_err", "txt_hdr2", "rt_buf_finish", "iat_ss", "iat_gt", "iat_rv", "txt_GET", "rt_texteq", "txt_POST", "txt_HEAD", "txt_PUT", "txt_http11v", "txt_http10v", "txt_empty", "txt_clen", "txt_te", "txt_host", "fn_route", "rt_restore_frame", "rt_to_text", "txt_err400", "txt_err408", "txt_err413", "txt_err431", "txt_err501", "iat_sk", "iat_bd", "iat_ln", "iat_gn", "txt_listen", "rt_text_cat", "rt_say", "iat_ac", "iat_cs", "msg_port", "rt_memeq", "msg_json", "txt_null", "txt_true", "txt_false", "rt_buf_byte", "rt_push_none", "rt_push_bool", "rt_list_new", "rt_push", "rt_map_new", "rt_map_put", "txt_hdrs", "txt_hdrs_plain", "txt_err411", "txt_err401", "txt_fcgenv", "token_env", "iat_ev", "txt_healthp", "txt_xfctoken", "token_left", "token_right", "rt_save_frame", "iat_cn", "linux_flag", "dns_path_fix", "iat_cf", "iat_rf", "iat_ch", "dns_path_resolv", "msg_dnsname", "msg_resolve", "tcp_socks", "msg_conn_host", "msg_conn_port", "msg_conn_addr", "msg_conn_priv", "msg_conn_fail", "msg_send_bad", "msg_conn_closed", "msg_recv_bad", "txt_held", "txt_suboff", "txt_authreq", "txt_st307", "txt_st405", "txt_st502", "txt_hdrs_html", "txt_hdrs_locm", "txt_hdrs_locp", "txt_hdrs_locs", "txt_hdrs_auth", "txt_hdrs_pay", "park_full", "txt_crlf", "extra_hold", "txt_k_loc", "txt_hn_loc", "txt_k_set", "txt_hn_set", "txt_k_www", "txt_hn_www", "txt_k_cc", "txt_hn_cc", "guest_extra", "txt_err500", "head_out", "head_hold", "txt_nm_cookie", "txt_hn_cookie", "txt_nm_host", "txt_hn_host", "txt_nm_authz", "txt_hn_authz"]
+end
+
+
+
+
+~ Prebuilt json encode/parse (rt-net-json-blob). Cursor is {ptr, end}.
+~ rt_buf_finish returns the text object in rax. Encode keeps the buffer in
+~ rax across helper calls; parse walks [ptr] against end. The same bytes
+~ live in rt-net-blob at +0xd5e when the guest also calls listen.
+~ rt_net_statusof (appended to rt-net-blob) maps JSON "status":N the same way
+~ host VireListen.StatusOf does. Route replies call it before sendhttp.
+~ rt_net_ctype picks txt_hdrs (JSON), txt_hdrs_plain, or landing HTML/auth/redirect
+~ prefixes (leading `{` / `[` / `<` after whitespace), matching host SendApi.
+~ JSON Content-Type is application/json with no charset (Go writeJSON).
+~ text/plain keeps charset=utf-8 (cpa-go health).
+~ Request body is a heap text: length at [0], bytes at [8], capped by
+~ Content-Length and HttpWire.MaxRequestBody (1000000). POST/PUT without
+~ Content-Length is 411. Oversize is 413. Headers are scanned to the
+~ terminator including the last line (any order, case-insensitive names).
+~ Duplicate Content-Length is 400. GET/HEAD without a body get a leaf
+~ empty heap text so `length`/`parse` of `body` cannot walk a leftover
+~ GPR. POST/PUT still require Content-Length. Native FCG_API_TOKEN uses iat_ev (GetEnvironmentVariableA
+~ / ELF envp scan) and constant-time header compare before fn_route.
+
+define emitNetRuntime with image, fixes, labels, has_route, need_net, route_nparams
   let base be length with image
-  let names be netNames
   if need_net
-    let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
-    applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
-    applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
-    return (emitTcpClient with image, fixes, labels)
+    if route_nparams == 4
+      let names be netNamesR4
+      let image be emitHex with image, (read with "data/src/rt-net-r4-blob.txt")
+      applyPackedPins with labels, base, (read with "data/src/rt-net-r4-pins.txt"), names
+      applyPackedFixes with fixes, base, (read with "data/src/rt-net-r4-fixes.txt"), names
+      return image
+    end
+    let names be netNamesR3
+    let image be emitHex with image, (read with "data/src/rt-net-r3-blob.txt")
+    applyPackedPins with labels, base, (read with "data/src/rt-net-r3-pins.txt"), names
+    applyPackedFixes with fixes, base, (read with "data/src/rt-net-r3-fixes.txt"), names
+    return image
   end
+  let names be netNames
   let image be emitHex with image, (read with "data/src/rt-net-json-blob.txt")
   applyPackedPins with labels, base, (read with "data/src/rt-net-json-pins.txt"), names
   applyPackedFixes with fixes, base, (read with "data/src/rt-net-json-fixes.txt"), names
+  return image
+end
+
+define parkDns with image, labels
+  parkMsg with image, labels, "msg_resolve", "could not resolve"
+  parkMsg with image, labels, "msg_dnsname", "that name is not valid"
+  parkMsg with image, labels, "dns_loop_ip", "127.0.0.1"
+  pin with labels, "dns_path_fix", image
+  emitStr with image, "data/vire-dns"
+  pin with labels, "dns_path_resolv", image
+  emitStr with image, "/etc/resolv.conf"
+  pin with labels, "dns_path_hosts", image
+  emitStr with image, "/etc/hosts"
   return image
 end
 
@@ -84,8 +134,70 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
   parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
   parkMsg with image, labels, "txt_sp_err", " Error\r\n"
-  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json; charset=utf-8\r\nContent-Length: "
-  parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
+  ~ JSON listen replies match Go writeJSON: Content-Type application/json, no charset.
+  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_plain", "Content-Type: text/plain; charset=utf-8\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_html", "Content-Type: text/html; charset=utf-8\r\nX-Payments-Enabled: off\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_auth", "Content-Type: text/plain; charset=utf-8\r\nWWW-Authenticate: Basic realm=\"Protected\"\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_pay", "Content-Type: application/json\r\nX-Payments-Enabled: off\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locp", "Content-Type: application/json\r\nLocation: /partners\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locs", "Content-Type: application/json\r\nLocation: /sop\r\nContent-Length: "
+  parkMsg with image, labels, "txt_hdrs_locm", "Content-Type: application/json\r\nLocation: /sop/access?next=/sop/media-lab\r\nContent-Length: "
+  parkMsg with image, labels, "txt_held", "{\"reason\":\"data_held\"}"
+  parkMsg with image, labels, "txt_suboff", "{\"enabled\":false}"
+  parkMsg with image, labels, "txt_authreq", "Authentication required."
+  parkMsg with image, labels, "txt_st307", "\"status\":307"
+  parkMsg with image, labels, "txt_st405", "\"status\":405"
+  parkMsg with image, labels, "txt_st502", "\"status\":502"
+  parkMsg with image, labels, "txt_locp", "\"location\":\"/partners\""
+  parkMsg with image, labels, "txt_locs", "\"location\":\"/sop\"}"
+  parkMsg with image, labels, "txt_locm", "\"location\":\"/sop/access?next=/sop/media-lab\""
+  parkMsg with image, labels, "txt_adsense", "\"adsenseClientId\""
+  pin with labels, "txt_hdr2", image
+  let hdr2 be "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n"
+  let image be emitU64 with image, (length with hdr2)
+  let image be emitStr with image, hdr2
+  let z be 0
+  while z < 512
+    let image be emitU8 with image, 0
+    let z be z + 1
+  end
+  parkMsg with image, labels, "txt_crlf", "\r\n"
+  parkMsg with image, labels, "txt_err500", "{\"error\":\"route failed\"}"
+  parkMsg with image, labels, "txt_k_loc", "\"location\":\""
+  parkMsg with image, labels, "txt_k_set", "\"set-cookie\":\""
+  parkMsg with image, labels, "txt_k_www", "\"www-authenticate\":\""
+  parkMsg with image, labels, "txt_k_cc", "\"cache-control\":\""
+  parkMsg with image, labels, "txt_hn_loc", "Location: "
+  parkMsg with image, labels, "txt_hn_set", "Set-Cookie: "
+  parkMsg with image, labels, "txt_hn_www", "WWW-Authenticate: "
+  parkMsg with image, labels, "txt_hn_cc", "Cache-Control: "
+  parkMsg with image, labels, "txt_hn_cookie", "Cookie: "
+  parkMsg with image, labels, "txt_hn_host", "Host: "
+  parkMsg with image, labels, "txt_hn_authz", "Authorization: "
+  parkMsg with image, labels, "txt_nm_cookie", "cookie"
+  parkMsg with image, labels, "txt_nm_host", "host"
+  parkMsg with image, labels, "txt_nm_authz", "authorization"
+  pin with labels, "guest_extra", image
+  emitU64 with image, 0
+  pin with labels, "head_hold", image
+  let z2 be 0
+  while z2 < 4104
+    let image be emitU8 with image, 0
+    let z2 be z2 + 1
+  end
+  pin with labels, "head_out", image
+  let z3 be 0
+  while z3 < 1032
+    let image be emitU8 with image, 0
+    let z3 be z3 + 1
+  end
+  pin with labels, "extra_hold", image
+  let z4 be 0
+  while z4 < 1032
+    let image be emitU8 with image, 0
+    let z4 be z4 + 1
+  end
   parkMsg with image, labels, "txt_GET", "GET"
   parkMsg with image, labels, "txt_POST", "POST"
   parkMsg with image, labels, "txt_HEAD", "HEAD"
@@ -105,6 +217,32 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_err413", "{\"error\":\"body too large\"}"
   parkMsg with image, labels, "txt_err431", "{\"error\":\"headers too large\"}"
   parkMsg with image, labels, "txt_err501", "{\"error\":\"not implemented\"}"
+  parkMsg with image, labels, "txt_err401", "{\"error\":\"unauthorized\"}"
+  parkMsg with image, labels, "txt_err411", "{\"error\":\"content length required\"}"
+  parkMsg with image, labels, "txt_xfctoken", "x-fcg-token"
+  parkMsg with image, labels, "txt_healthp", "/health"
+  parkMsg with image, labels, "txt_fcgenv", "FCG_API_TOKEN"
+  let image be emitU8 with image, 0
+  pin with labels, "envp_ptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "token_env", image
+  let z be 0
+  while z < 256
+    let image be emitU8 with image, 0
+    let z be z + 1
+  end
+  pin with labels, "token_left", image
+  let z be 0
+  while z < 256
+    let image be emitU8 with image, 0
+    let z be z + 1
+  end
+  pin with labels, "token_right", image
+  let z be 0
+  while z < 256
+    let image be emitU8 with image, 0
+    let z be z + 1
+  end
   parkMsg with image, labels, "msg_net", "network setup failed"
   parkMsg with image, labels, "msg_port", "port must be from 1024 to 65535"
   parkMsg with image, labels, "msg_need_route", "listen needs define route with method, path, body"
@@ -114,6 +252,7 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_conn_port", "connect needs a port from 1 to 65535"
   parkMsg with image, labels, "msg_conn_host", "connect needs a host and a port"
   parkMsg with image, labels, "msg_conn_fail", "could not connect"
+  let image be parkDns with image, labels
   parkMsg with image, labels, "msg_send_bad", "send needs a connection and text"
   parkMsg with image, labels, "msg_recv_bad", "recv needs a connection and a size"
   parkMsg with image, labels, "msg_conn_closed", "that connection is closed"
@@ -124,6 +263,17 @@ define parkNet with image, labels
   return image
 end
 
+~ Landing-go extras: 503 data_held / subscription, 401 auth text, 307 location,
+~ HTML Content-Type, WWW-Authenticate, X-Payments-Enabled. Same needles as host.
+define emitLandingHttp with image, fixes, labels, base, route_nparams
+  ~ Packed into rt-net-r3/r4 blobs so compile-native ELF stays under the compiler list cap.
+  ~ Unsigned sub of needle_len vs haystack (hf_no) so {"status":307} does not
+  ~ walk txt_k_www. GET/HEAD empty body is txt_empty (pr_body_ok) so
+  ~ listen+proxy_reply does not SEGV. emitTcpClient in the same blobs uses 4102
+  ~ (SO_RCVTIMEO) and iat_ss.
+  return image
+end
+
 define emitIat with image, fixes, name
   let image be emitList with image, [255, 21]
   let image be emitRel with image, fixes, name
@@ -131,170 +281,5 @@ define emitIat with image, fixes, name
 end
 
 define emitTcpClient with image, fixes, labels
-  ~ Guest connect/send/recv/close. Loopback 127.0.0.1 only. No TLS. Check
-  ~ the IPv4 literal before socket+connect. Recv cap 1000000.
-  ~ WSAStartup via rt_net_init (same as listen). Send via rt_net_sendall.
-  ~ Host still applies 5s send/recv timeouts; native send uses rt_net_sendall.
-  pin with labels, "rt_connect", image
-  emitPro with image
-  emitPop2 with image
-  emitList with image, [72, 137, 85, 248, 76, 137, 77, 232, 72, 131, 248, 2, 15, 133]
-  emitRel with image, fixes, "conn_host"
-  emitList with image, [73, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "conn_host"
-  emitList with image, [77, 133, 201, 15, 142]
-  emitRel with image, fixes, "conn_port"
-  emitList with image, [73, 129, 249]
-  emitU32 with image, 65535
-  emitJcc with image, fixes, 135, "conn_port"
-  emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 131, 249, 9, 15, 133]
-  emitRel with image, fixes, "conn_notloop"
-  emitList with image, [129, 122, 8, 49, 50, 55, 46]
-  emitJcc with image, fixes, 133, "conn_notloop"
-  emitList with image, [129, 122, 12, 48, 46, 48, 46]
-  emitJcc with image, fixes, 133, "conn_notloop"
-  emitList with image, [128, 122, 16, 49, 15, 133]
-  emitRel with image, fixes, "conn_notloop"
-  emitCallTo with image, fixes, "rt_net_init"
-  emitList with image, [185]
-  emitU32 with image, 2
-  emitList with image, [186]
-  emitU32 with image, 1
-  emitList with image, [65, 184]
-  emitU32 with image, 6
-  let image be emitIat with image, fixes, "iat_sk"
-  emitList with image, [72, 131, 248, 255, 15, 132]
-  emitRel with image, fixes, "conn_fail"
-  ~ Same sockaddr layout as rt_listen (rbp-48). htons via xchg al,ah.
-  emitList with image, [72, 137, 69, 240, 72, 199, 69, 208, 0, 0, 0, 0]
-  emitList with image, [72, 199, 69, 216, 0, 0, 0, 0, 198, 69, 208, 2]
-  emitList with image, [139, 69, 232, 102, 134, 224, 102, 137, 69, 210]
-  emitList with image, [198, 69, 212, 127, 198, 69, 213, 0, 198, 69, 214, 0, 198, 69, 215, 1]
-  emitList with image, [72, 139, 77, 240, 72, 141, 85, 208, 65, 184]
-  emitU32 with image, 16
-  let image be emitIat with image, fixes, "iat_cn"
-  emitList with image, [133, 192, 15, 133]
-  emitRel with image, fixes, "conn_close"
-  emitList with image, [72, 141, 13]
-  emitRel with image, fixes, "tcp_socks"
-  emitList with image, [72, 139, 85, 240, 72, 137, 17, 186]
-  emitU32 with image, 1
-  emitPushTag with image, 1
-  emitEpi with image
-  pin with labels, "conn_close", image
-  emitList with image, [72, 139, 77, 240]
-  let image be emitIat with image, fixes, "iat_cs"
-  emitJmpTo with image, fixes, "conn_fail"
-  pin with labels, "conn_notloop", image
-  emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 133, 201, 15, 132]
-  emitRel with image, fixes, "conn_addr"
-  emitList with image, [15, 182, 66, 8, 131, 248, 48, 15, 130]
-  emitRel with image, fixes, "conn_addr"
-  emitList with image, [131, 248, 57, 15, 135]
-  emitRel with image, fixes, "conn_addr"
-  emitJmpTo with image, fixes, "conn_priv"
-  pin with labels, "conn_host", image
-  emitFail with image, fixes, "msg_conn_host"
-  pin with labels, "conn_port", image
-  emitFail with image, fixes, "msg_conn_port"
-  pin with labels, "conn_addr", image
-  emitFail with image, fixes, "msg_conn_addr"
-  pin with labels, "conn_priv", image
-  emitFail with image, fixes, "msg_conn_priv"
-  pin with labels, "conn_fail", image
-  emitFail with image, fixes, "msg_conn_fail"
-
-  pin with labels, "rt_send", image
-  emitPro with image
-  emitPop2 with image
-  emitList with image, [72, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "send_bad"
-  emitList with image, [73, 131, 248, 2, 15, 133]
-  emitRel with image, fixes, "send_bad"
-  emitList with image, [72, 131, 250, 1, 15, 133]
-  emitRel with image, fixes, "send_closed"
-  emitList with image, [76, 137, 77, 240]
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "tcp_socks"
-  emitList with image, [72, 133, 201, 15, 132]
-  emitRel with image, fixes, "send_closed"
-  emitList with image, [72, 131, 249, 255, 15, 132]
-  emitRel with image, fixes, "send_closed"
-  emitList with image, [72, 139, 85, 240, 76, 139, 2, 72, 141, 82, 8]
-  emitCallTo with image, fixes, "rt_net_sendall"
-  emitList with image, [133, 192, 15, 136]
-  emitRel with image, fixes, "send_fail"
-  emitList with image, [72, 139, 85, 240, 72, 139, 18]
-  emitPushTag with image, 1
-  emitEpi with image
-  pin with labels, "send_fail", image
-  emitFail with image, fixes, "msg_conn_fail"
-  pin with labels, "send_bad", image
-  emitFail with image, fixes, "msg_send_bad"
-  pin with labels, "send_closed", image
-  emitFail with image, fixes, "msg_conn_closed"
-
-  pin with labels, "rt_recv", image
-  emitPro with image
-  emitPop2 with image
-  emitList with image, [72, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "recv_bad"
-  emitList with image, [73, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "recv_bad"
-  emitList with image, [72, 131, 250, 1, 15, 133]
-  emitRel with image, fixes, "recv_closed"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "tcp_socks"
-  emitList with image, [72, 133, 201, 15, 132]
-  emitRel with image, fixes, "recv_closed"
-  emitList with image, [72, 131, 249, 255, 15, 132]
-  emitRel with image, fixes, "recv_closed"
-  emitList with image, [72, 137, 77, 248, 77, 133, 201, 15, 136]
-  emitRel with image, fixes, "recv_bad"
-  emitList with image, [73, 129, 249]
-  emitU32 with image, 1000000
-  emitJcc with image, fixes, 134, "recv_cap"
-  emitList with image, [73, 199, 193]
-  emitU32 with image, 1000000
-  pin with labels, "recv_cap", image
-  emitList with image, [76, 137, 77, 232, 139, 77, 232, 72, 131, 193, 16, 15, 130]
-  emitRel with image, fixes, "recv_bad"
-  emitCallTo with image, fixes, "rt_alloc"
-  emitLeaf with image
-  emitList with image, [72, 137, 69, 224, 72, 139, 77, 248, 72, 141, 80, 8, 139, 69, 232, 76, 99, 192, 69, 49, 201]
-  let image be emitIat with image, fixes, "iat_rv"
-  emitList with image, [133, 192, 15, 136]
-  emitRel with image, fixes, "recv_fail"
-  emitList with image, [72, 139, 85, 224, 72, 99, 200, 72, 137, 10, 198, 68, 10, 8, 0]
-  emitPushTag with image, 2
-  emitEpi with image
-  pin with labels, "recv_fail", image
-  emitFail with image, fixes, "msg_conn_fail"
-  pin with labels, "recv_bad", image
-  emitFail with image, fixes, "msg_recv_bad"
-  pin with labels, "recv_closed", image
-  emitFail with image, fixes, "msg_conn_closed"
-
-  pin with labels, "rt_close", image
-  emitPro with image
-  emitPop1 with image
-  emitList with image, [72, 131, 248, 1, 15, 133]
-  emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 131, 250, 1, 15, 133]
-  emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 139, 13]
-  emitRel with image, fixes, "tcp_socks"
-  emitList with image, [72, 133, 201, 15, 132]
-  emitRel with image, fixes, "close_bad"
-  emitList with image, [72, 141, 21]
-  emitRel with image, fixes, "tcp_socks"
-  emitList with image, [72, 199, 2, 0, 0, 0, 0]
-  let image be emitIat with image, fixes, "iat_cs"
-  emitCallTo with image, fixes, "rt_push_none"
-  emitEpi with image
-  pin with labels, "close_bad", image
-  emitFail with image, fixes, "msg_conn_closed"
   return image
 end
-
-

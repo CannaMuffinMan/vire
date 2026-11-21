@@ -1,0 +1,18 @@
+~ FAIL_BEFORE: query-only heartbeat. JSON sessionId in POST body is ignored.
+~ Matches guest-fcgbds.vire on 5c3ed01 (native POST body was not read).
+
+define route with method, path, body
+  if method == "POST"
+    if (find with path, "/api/bot-defense/reviewers/heartbeat") == 0
+      if (find with path, "sessionId=") < 0
+        return "{\"error\":\"sessionId is required\",\"status\":400}"
+      end
+      return "{\"ok\":true,\"reviewers\":{\"live\":1,\"reviewers\":[{\"lastSeenAt\":\"now\",\"name\":\"reviewer\",\"source\":\"obs\"}],\"ttlSeconds\":90}}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

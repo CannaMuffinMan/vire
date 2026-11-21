@@ -1,0 +1,14 @@
+~ rpc-portal-go GET /api/health golden {ok:true} (derived from source, not live).
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/api/health"
+      return "{\"ok\":true}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

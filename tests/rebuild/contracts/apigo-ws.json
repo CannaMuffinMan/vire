@@ -1,0 +1,39 @@
+{
+  "source": "Derived. api-go is not in the vire tree. Go reverse-proxy of Upgrade lives in CannaMuffinMan/fcgcpa-prod api-go/internal/httpx/server.go (hop-by-hop headers kept when Upgrade is websocket) and proxy_passthrough_test.go (GET /ws/kick with RFC 6455 handshake headers). Frame close codes, 64KiB cap, mask/RSV fail-closed are native RFC 6455 from PR #94 src/rt-ws.vire, not a recorded Go golden.",
+  "missing_in_vire": [
+    "docs/REBUILD-MY-STACK.md is on the rebuild-stack branches, not this native-ws HEAD",
+    "api-go source tree",
+    "api-go WS frame goldens (Go tests only assert Upgrade header reach Node; they do not record 101 accept, echo, or close codes)"
+  ],
+  "not_merged": "PR #107 HTTP reverse-proxy primitive was not merged: it strips Upgrade on HTTP and cannot hijack RFC 6455. This lane terminates WS on the listen socket like native ELF.",
+  "bind": "127.0.0.1",
+  "handshake": {
+    "method": "GET",
+    "paths": ["/ws/kick", "/ws/chat", "/ws/live", "/chat", "/live", "/"],
+    "request_headers": [
+      "Upgrade: websocket",
+      "Connection: Upgrade",
+      "Sec-WebSocket-Key: <24-char standard base64>",
+      "Sec-WebSocket-Version: 13"
+    ],
+    "status": 101,
+    "response_headers": [
+      "Upgrade: websocket",
+      "Connection: Upgrade",
+      "Sec-WebSocket-Accept: base64(SHA1(key + 258EAFA5-E914-47DA-95CA-C5AB0DC85B11))"
+    ]
+  },
+  "frames": {
+    "client_mask_required": true,
+    "payload_cap": 65536,
+    "echo_text_and_binary": true,
+    "ping_to_pong": true,
+    "close_echo": true,
+    "close_1002_protocol": ["unmasked", "rsv", "fragmented_control"],
+    "close_1009_too_big": ["64bit_nonminimal_or_over_65536", "payload_over_65536"]
+  },
+  "http": {
+    "GET /health": { "status": 200, "body_contains": "ok" },
+    "GET /healthz": { "status": 200, "body": "{\"live\":true,\"status\":\"ok\"}" }
+  }
+}

@@ -1,5 +1,15 @@
 # Changelog
 
+## Native Postgres TLS (this branch)
+
+- `pg_open_ssl` sends SSLRequest, refuses `'N'` for `require`/`verify-full`, then `tls_wrap` (cert check on; hostname for verify-full). SCRAM-SHA-256 and simple query over TLS. Test CA generated at prove time. Channel binding SCRAM-SHA-256-PLUS is residual.
+- Guest `tls_wrap` wraps an existing loopback TCP handle. Windows PE Schannel IAT (`secur32`/`crypt32`) is emitted, not a fail-closed stub.
+
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Test certs at test time.
+- `tls_listen`: TLS 1.2+ termination on the HTTP listener (rank 11). Host `SslStream`; Linux ELF `SSL_accept` wrapping `rt_listen`. Loopback tests, fail-closed handshake/plaintext/downgrade. Windows PE still fail-closed. Contract `tests/rebuild/contracts/health.json`.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.
@@ -18,6 +28,7 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - Close-out. `PHASE0-DONE.md` maps each Phase 0 done-criterion to a test or CI job. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
 
 - Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Findings in `PHASE0-FUZZ.md`.
+- Fuzz campaign (`FUZZ-CAMPAIGN.md`): grammar-aware frontend, builtins, GC/list-cap, path bind, Unicorn + Windows PE jobs. Nightly stays off the PR `check.yml` path. Caps unchanged.
 
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
 

@@ -21,6 +21,13 @@ public class NativeNetTests
         Assert.Contains("hu_fold", net);
         Assert.Contains("hu_frame", net);
         Assert.Contains("rt_net_hdrunsafe", net);
+        Assert.Contains("txt_hdrs_plain", net);
+        Assert.Contains("txt_hdrs_html", net);
+        Assert.Contains("rt_net_ctype", net);
+        Assert.Contains("rt_net_statusof", net);
+        Assert.Contains("emitLandingHttp", net);
+        Assert.Contains("txt_st502", net);
+        Assert.Contains("ss_timeval", File.ReadAllText(Path.Combine(root, "src", "rt-linux.vire")));
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
         Assert.True(blob.Length % 2 == 0);
         Assert.Equal("e9", blob.Substring(0x62d * 2, 2));
@@ -31,9 +38,18 @@ public class NativeNetTests
         Assert.DoesNotContain("LoadLibraryA", net);
         string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
         Assert.Contains("use \"src/rt-net.vire\"", native);
+        Assert.Contains("use \"src/rt-ws.vire\"", native);
         Assert.Contains("nm == \"json\"", native);
         Assert.Contains("nm == \"listen\"", native);
+        Assert.Contains("nm == \"ws_listen\"", native);
+        string ws = File.ReadAllText(Path.Combine(root, "src", "rt-ws.vire"));
+        Assert.Equal(ws, File.ReadAllText(Path.Combine(root, "data", "src", "rt-ws.vire")));
+        Assert.Contains("emitWsRuntime", ws);
+        Assert.Contains("rt_sha1", ws);
+        Assert.Contains("258EAFA5-E914-47DA-95CA-C5AB0DC85B11", ws);
         Assert.Contains("nm == \"connect\"", native);
+        Assert.Contains("nm == \"resolve\"", native);
+        Assert.Contains("rt_resolve", File.ReadAllText(Path.Combine(root, "src", "rt-dns.vire")));
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("iat_cn", pe);
@@ -44,6 +60,8 @@ public class NativeNetTests
         string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
         Assert.Contains("path == \"/health\"", guest);
         Assert.Contains("path == \"/api/health\"", guest);
+        Assert.Contains("path == \"/info\"", guest);
+        Assert.Contains("path == \"/connect\"", guest);
         Assert.Contains("service", guest);
         Assert.Contains("fcgcpa", guest);
         Assert.Contains("payments", guest);
@@ -75,6 +93,12 @@ public class NativeNetTests
                 Assert.Equal((byte)'F', pe[3]);
                 byte[] okCrlfElf = new byte[] { 5, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x4F, 0x4B, 0x0D, 0x0A, 0 };
                 Assert.True(IndexOf(pe, okCrlfElf) >= 0, "parked txt_sp_ok must be CR LF");
+                byte[] jsonCt = Encoding.ASCII.GetBytes("Content-Type: application/json\r\n");
+                byte[] jsonCtCharset = Encoding.ASCII.GetBytes("Content-Type: application/json; charset=utf-8");
+                Assert.True(IndexOf(pe, jsonCt) >= 0, "parked JSON Content-Type must match Go writeJSON (no charset)");
+                Assert.True(IndexOf(pe, jsonCtCharset) < 0, "parked JSON Content-Type must not add charset=utf-8");
+                byte[] plainCt = Encoding.ASCII.GetBytes("Content-Type: text/plain; charset=utf-8\r\n");
+                Assert.True(IndexOf(pe, plainCt) >= 0, "parked text/plain Content-Type keeps charset=utf-8");
                 return;
             }
             string ascii = Encoding.ASCII.GetString(pe);
@@ -85,6 +109,9 @@ public class NativeNetTests
             Assert.True(IndexOf(pe, okCrlf) >= 0, "parked txt_sp_ok must be CR LF");
             Assert.True(IndexOf(pe, okUs) < 0, "parked txt_sp_ok must not use 0x1F");
             Assert.Contains("\r\nConnection: close\r\n", ascii);
+            Assert.Contains("Content-Type: application/json\r\n", ascii);
+            Assert.DoesNotContain("Content-Type: application/json; charset=utf-8", ascii);
+            Assert.Contains("Content-Type: text/plain; charset=utf-8\r\n", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);

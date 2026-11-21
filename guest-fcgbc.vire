@@ -1,0 +1,370 @@
+~ Native/host port of fcgbc-go read routes and 503 stubs.
+~ Fixture chain only (no prod data, no keys). Wallet create/import stay refused.
+
+define jsonNL with text
+  return text + "\n"
+end
+
+define notFound
+  return jsonNL with "{\"error\":\"Not found\"}"
+end
+
+define refused with msg
+  return jsonNL with ("{\"error\":\"" + msg + "\"}")
+end
+
+define prefixAfter with path, pre
+  let npre be length with pre
+  let n be length with path
+  if n < npre
+    return none
+  end
+  if (slice with path, 0, npre) != pre
+    return none
+  end
+  return slice with path, npre, n
+end
+
+define parseJSInt with s
+  let n be length with s
+  let i be 0
+  while i < n
+    let ch be s at i
+    if ch != " "
+      if ch != "\t"
+        stop
+      end
+    end
+    let i be i + 1
+  end
+  if i >= n
+    return none
+  end
+  let sign be 1
+  let ch be s at i
+  if ch == "+"
+    let i be i + 1
+  end
+  if ch == "-"
+    let sign be 0 - 1
+    let i be i + 1
+  end
+  if i >= n
+    return none
+  end
+  let fromi be i
+  let digits be "0123456789"
+  while i < n
+    if (find with digits, (s at i)) < 0
+      stop
+    end
+    let i be i + 1
+  end
+  if i == fromi
+    return none
+  end
+  let raw be slice with s, fromi, i
+  let v be number with raw
+  return v * sign
+end
+
+define txHashInput
+  return "alice|bob|10|transfer|{\"memo\":\"fixture\"}|1700000000000"
+end
+
+define fixtureTxJson
+  let h be hash with (txHashInput)
+  return "[{\"fromAddress\":\"alice\",\"toAddress\":\"bob\",\"amount\":10,\"action\":\"transfer\",\"data\":{\"memo\":\"fixture\"},\"timestamp\":1700000000000,\"hash\":\"" + h + "\",\"signature\":null}]"
+end
+
+define block1Proof
+  return "{\"action\":\"like\",\"engagement\":1,\"timestamp\":1700000100000,\"userId\":\"bob\"}"
+end
+
+define block1Preimage
+  return "1|1700000001000|" + (fixtureTxJson) + "|genesis-fixture|bob|" + (block1Proof) + "|0"
+end
+
+define block1Hash
+  return hash with (block1Preimage)
+end
+
+define genesisJson
+  return "{\"index\":0,\"timestamp\":1700000000000,\"transactions\":[],\"previousHash\":\"0\",\"miner\":\"genesis\",\"porProof\":{\"action\":\"genesis\",\"engagement\":0,\"timestamp\":1700000000000,\"userId\":\"genesis\"},\"nonce\":0,\"hash\":\"genesis-fixture\"}"
+end
+
+define block1Json
+  return "{\"index\":1,\"timestamp\":1700000001000,\"transactions\":" + (fixtureTxJson) + ",\"previousHash\":\"genesis-fixture\",\"miner\":\"bob\",\"porProof\":" + (block1Proof) + ",\"nonce\":0,\"hash\":\"" + (block1Hash) + "\"}"
+end
+
+define bobScore
+  return 1000
+end
+
+define couchTier with score
+  if score >= 100000
+    return ["Legend", 100]
+  end
+  if score >= 10000
+    return ["Elite", 10]
+  end
+  if score >= 1000
+    return ["Veteran", 5]
+  end
+  if score >= 100
+    return ["Regular", 2]
+  end
+  return ["Newcomer", 1]
+end
+
+define nextTier with name
+  if name == "Newcomer"
+    return "100"
+  end
+  if name == "Regular"
+    return "1000"
+  end
+  if name == "Veteran"
+    return "10000"
+  end
+  if name == "Elite"
+    return "100000"
+  end
+  return none
+end
+
+define couchJson with addr, score
+  let t be couchTier with score
+  let name be t at 0
+  let mult be t at 1
+  let nxt be nextTier with name
+  let eff be "{\"efficiency\":" + (text with mult) + ",\"tier\":\"" + name + "\""
+  if nxt == none
+    let eff be eff + ",\"nextTierThreshold\":null}"
+  else
+    let eff be eff + ",\"nextTierThreshold\":" + nxt + "}"
+  end
+  return "{\"address\":\"" + addr + "\",\"tier\":{\"tier\":\"" + name + "\",\"multiplier\":" + (text with mult) + "},\"efficiency\":" + eff + "}"
+end
+
+define readText with path
+  return read with path
+end
+
+define peersArray
+  let raw be readText with "data/fcgbc-peers.txt"
+  if raw == ""
+    return "[]"
+  end
+  return "[\"" + raw + "\"]"
+end
+
+define fieldStr with body, fname
+  let needle be "\"" + fname + "\":\""
+  let pos be find with body, needle
+  if pos < 0
+    return none
+  end
+  let fromp be pos + (length with needle)
+  let rest be slice with body, fromp, (length with body)
+  let endat be find with rest, "\""
+  if endat < 0
+    return none
+  end
+  return slice with rest, 0, endat
+end
+
+define rateLimit
+  ~ Count 180 then refuse. Native ticks are not millisecond wall time, so a
+  ~ TickCount window cannot match Go on ELF; the 181st request in one process
+  ~ Count-only window. Go retryAfterMs is remaining wall ms in the 60s
+  ~ bucket (time.Until). Native guests have no wall clock (`now` is reserved),
+  ~ so this field is the integer 1: same JSON shape {error, retryAfterMs},
+  ~ not the same millisecond value.
+  let hits be number with (readText with "data/fcgbc-hits.txt")
+  let hits be hits + 1
+  write with "data/fcgbc-hits.txt", (text with hits)
+  if hits > 180
+    return "{\"error\":\"Rate limit exceeded\",\"retryAfterMs\":1}"
+  end
+  return none
+end
+
+define peersJson
+  return jsonNL with ("{\"peers\":" + (peersArray) + ",\"nodeId\":\"fcgc-node-fixture\"}")
+end
+
+define infoJson
+  return jsonNL with ("{\"nodeId\":\"fcgc-node-fixture\",\"port\":3011,\"blockchainLength\":2,\"pendingTransactions\":0,\"peers\":" + (peersArray) + ",\"miningStats\":{\"averageEngagement\":0,\"sessionsCompleted\":0,\"totalMined\":0},\"walletCount\":0}")
+end
+
+define handleRefused with method, want, msg
+  if method != want
+    return notFound
+  end
+  return refused with msg
+end
+
+define route with method, path, body
+  let limited be rateLimit
+  if limited != none
+    return limited
+  end
+  if method == "OPTIONS"
+    return ""
+  end
+  if path == "/pending-transactions"
+    if method != "GET"
+      return notFound
+    end
+    return jsonNL with "[]"
+  end
+  if path == "/peers"
+    if method != "GET"
+      return notFound
+    end
+    return peersJson
+  end
+  if path == "/info"
+    if method != "GET"
+      return notFound
+    end
+    return infoJson
+  end
+  if path == "/blockchain"
+    if method != "GET"
+      return notFound
+    end
+    let h be block1Hash
+    let chain be "[" + (genesisJson) + "," + (block1Json) + "]"
+    return jsonNL with ("{\"chain\":" + chain + ",\"length\":2,\"isValid\":true}")
+  end
+  let blk be prefixAfter with path, "/block/"
+  if blk != none
+    if method != "GET"
+      return notFound
+    end
+    let idx be parseJSInt with blk
+    if idx == none
+      return jsonNL with "{\"error\":\"Block not found\"}"
+    end
+    if idx < 0
+      return jsonNL with "{\"error\":\"Block not found\"}"
+    end
+    if idx == 0
+      return jsonNL with (genesisJson)
+    end
+    if idx == 1
+      return jsonNL with (block1Json)
+    end
+    return jsonNL with "{\"error\":\"Block not found\"}"
+  end
+  if path == "/transaction"
+    return handleRefused with method, "POST", "refused: behavior is not proven to match the Node service"
+  end
+  if path == "/mine"
+    return handleRefused with method, "POST", "mining disabled: chain rules are not executed"
+  end
+  if path == "/mine-engagement"
+    return handleRefused with method, "POST", "mining disabled: chain rules are not executed"
+  end
+  if path == "/wallet/create"
+    return handleRefused with method, "POST", "wallet key operations refused"
+  end
+  if path == "/wallet/import"
+    return handleRefused with method, "POST", "wallet key operations refused"
+  end
+  if path == "/peers/broadcast"
+    return handleRefused with method, "POST", "peer broadcast refused"
+  end
+  if path == "/bridge/out"
+    return handleRefused with method, "POST", "refused: behavior is not proven to match the Node service"
+  end
+  if path == "/bridge/in"
+    return handleRefused with method, "POST", "refused: behavior is not proven to match the Node service"
+  end
+  let bal be prefixAfter with path, "/wallet/balance/"
+  if bal != none
+    if method != "GET"
+      return notFound
+    end
+    let amt be 0
+    if bal == "bob"
+      let amt be 10
+    end
+    if bal == "alice"
+      let amt be 0 - 10
+    end
+    return "{\"address\":\"" + bal + "\",\"balance\":" + (text with amt) + "}"
+  end
+  let cred be prefixAfter with path, "/wallet/couchcred/"
+  if cred != none
+    if method != "GET"
+      return notFound
+    end
+    let score be 0
+    if cred == "bob"
+      let score be bobScore
+    end
+    return couchJson with cred, score
+  end
+  if path == "/start-engagement"
+    if method != "POST"
+      return notFound
+    end
+    if (length with body) < 2
+      return jsonNL with "{\"error\":\"invalid json\"}"
+    end
+    write with "data/fcgbc-session.txt", "session-fixture"
+    return jsonNL with "{\"sessionId\":\"session-fixture\"}"
+  end
+  let rec be prefixAfter with path, "/record-interaction/"
+  if rec != none
+    if method != "POST"
+      return notFound
+    end
+    if (length with body) < 2
+      return jsonNL with "{\"error\":\"invalid json\"}"
+    end
+    let sess be readText with "data/fcgbc-session.txt"
+    if sess == rec
+      return jsonNL with "{\"success\":true}"
+    end
+    return jsonNL with "{\"success\":false}"
+  end
+  let endp be prefixAfter with path, "/end-engagement/"
+  if endp != none
+    if method != "POST"
+      return notFound
+    end
+    let sess be readText with "data/fcgbc-session.txt"
+    if sess != endp
+      return jsonNL with "{\"error\":\"Session not found\"}"
+    end
+    write with "data/fcgbc-session.txt", ""
+    return jsonNL with "{\"id\":\"" + endp + "\",\"contentId\":\"c1\",\"userId\":\"u1\",\"action\":\"view\",\"startTime\":1700000100000,\"endTime\":1700000100000,\"duration\":0,\"interactions\":[]}"
+  end
+  if path == "/peers/register"
+    if method != "POST"
+      return notFound
+    end
+    let url be fieldStr with body, "peerUrl"
+    if url == none
+      return jsonNL with "{\"error\":\"invalid json\"}"
+    end
+    write with "data/fcgbc-peers.txt", url
+    return jsonNL with ("{\"message\":\"Peer registered\",\"peers\":[\"" + url + "\"]}")
+  end
+  let con be prefixAfter with path, "/contract/"
+  if con != none
+    return jsonNL with "{\"error\":\"contract routes are not implemented by api/src/blockchain/node.js\"}"
+  end
+  return notFound
+end
+
+define main
+  write with "data/fcgbc-hits.txt", "0"
+  write with "data/fcgbc-session.txt", ""
+  write with "data/fcgbc-peers.txt", ""
+  listen with 0
+end

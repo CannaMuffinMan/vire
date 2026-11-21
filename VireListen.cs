@@ -2,17 +2,23 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 
 static class VireListen
 {
-    public delegate object RouteCall(string method, string path, string body, int line, out int maxOutput);
+    public delegate object RouteCall(string method, string path, string body, string head, int line, out int maxOutput);
 
     const int ListenSlotsMax = 64;
     static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
 
     public static void WithCancel(int port, int line, string root, RouteCall route, Func<object, string> show, Action<int> setPort)
+    {
+        WithCancel(port, line, root, route, show, setPort, null);
+    }
+
+    public static void WithCancel(int port, int line, string root, RouteCall route, Func<object, string> show, Action<int> setPort, X509Certificate2 tlsCert)
     {
         using (CancellationTokenSource cts = new CancellationTokenSource())
         {
@@ -22,12 +28,17 @@ static class VireListen
                 cts.Cancel();
             };
             Console.CancelKeyPress += onCancel;
-            try { Run(port, line, cts.Token, root, route, show, setPort); }
+            try { Run(port, line, cts.Token, root, route, show, setPort, tlsCert); }
             finally { Console.CancelKeyPress -= onCancel; }
         }
     }
 
     public static void Run(int port, int line, CancellationToken stop, string root, RouteCall route, Func<object, string> show, Action<int> setPort)
+    {
+        Run(port, line, stop, root, route, show, setPort, null);
+    }
+
+    public static void Run(int port, int line, CancellationToken stop, string root, RouteCall route, Func<object, string> show, Action<int> setPort, X509Certificate2 tlsCert)
     {
         string envPort = Environment.GetEnvironmentVariable("PORT");
         if (!string.IsNullOrWhiteSpace(envPort)) port = Machine.RequirePort(envPort.Trim(), line);
@@ -83,7 +94,7 @@ static class VireListen
                 ThreadPool.QueueUserWorkItem(delegate (object state)
                 {
                     TcpClient held = (TcpClient)state;
-                    try { AnswerApi(held, line, token, publish, stop, root, route, show); }
+                    try { AnswerApi(held, line, token, publish, stop, root, route, show, tlsCert); }
                     catch (IOException)
                     {
                         Console.Error.WriteLine("vire: internal error (IOException)");
@@ -133,7 +144,7 @@ static class VireListen
         return HttpWire.HeaderEnd(buffer, got);
     }
 
-    static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
+    static bool ReadTimed(Stream stream, byte[] buffer, ref int got, int want, DateTime deadline)
     {
         while (got < want)
         {
@@ -149,7 +160,7 @@ static class VireListen
         return true;
     }
 
-    static bool ReadOnce(NetworkStream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
+    static bool ReadOnce(Stream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
     {
         if (got >= maxGot) return false;
         int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
@@ -163,9 +174,14 @@ static class VireListen
         return true;
     }
 
-    static void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show)
+    static void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show, X509Certificate2 tlsCert)
     {
-        NetworkStream stream = client.GetStream();
+        Stream stream = client.GetStream();
+        if (tlsCert != null)
+        {
+            try { stream = VireTls.WrapServer(stream, tlsCert, line); }
+            catch (VireError) { return; }
+        }
         DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
         byte[] buffer = new byte[HttpWire.MaxHeaderBlock + HttpWire.MaxRequestBody + 16];
         int got = 0;
@@ -193,6 +209,11 @@ static class VireListen
         if (headers.Status != 0)
         {
             SendParseFail(stream, headers.Status, headers);
+            return;
+        }
+        if (VireWs.IsUpgradeGet(headers))
+        {
+            VireWs.Answer(stream, headers);
             return;
         }
         int bodyAt = headers.BodyAt;
@@ -245,7 +266,7 @@ static class VireListen
         {
             if (ListenHooks.RouteException != null && path == "/boom")
                 throw ListenHooks.RouteException;
-            result = route(method, path, body, line, out maxOutput);
+            result = route(method, path, body, HttpWire.AllowlistedRequestHead(head), line, out maxOutput);
         }
         catch (VireError err)
         {
@@ -281,8 +302,108 @@ static class VireListen
         if (text == null) text = show(result);
         if (text == null) text = "null";
         if (text.Length > maxOutput) text = "{\"error\":\"response too large\"}";
-        int code = StatusOf(text, 200);
-        SendApi(stream, code, text, null);
+        bool fcgbc = FcgbcHttp();
+        int code = fcgbc ? FcgbcStatus(method, text) : StatusOf(text, 200);
+        bool refused;
+        string extra = ExtraHeadersOf(text, out refused);
+        if (refused)
+        {
+            SendApi(stream, 500, "{\"error\":\"route failed\"}", "");
+            return;
+        }
+        if (fcgbc) extra = extra + FcgbcCors(head);
+        SendApi(stream, code, text, extra);
+    }
+
+    static bool FcgbcHttp()
+    {
+        string v = Environment.GetEnvironmentVariable("VIRE_FCGBC_HTTP");
+        return v == "1";
+    }
+
+    static int FcgbcStatus(string method, string text)
+    {
+        if (method == "OPTIONS") return 204;
+        if (text == null) return 200;
+        if (text.IndexOf("Rate limit exceeded", StringComparison.Ordinal) >= 0) return 429;
+        if (text.IndexOf("mining disabled: chain rules are not executed", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("wallet key operations refused", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("peer broadcast refused", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("refused: behavior is not proven to match the Node service", StringComparison.Ordinal) >= 0) return 503;
+        if (text.IndexOf("invalid json", StringComparison.Ordinal) >= 0) return 400;
+        if (text.IndexOf("Block not found", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("Session not found", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("contract routes are not implemented", StringComparison.Ordinal) >= 0) return 404;
+        if (text.IndexOf("\"error\":\"Not found\"", StringComparison.Ordinal) >= 0) return 404;
+        return StatusOf(text, 200);
+    }
+
+    static string HeaderLine(string head, string name)
+    {
+        if (head == null) return "";
+        string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            int colon = line.IndexOf(':');
+            if (colon <= 0) continue;
+            string key = line.Substring(0, colon).Trim(' ', '\t');
+            if (string.Equals(key, name, StringComparison.OrdinalIgnoreCase))
+                return line.Substring(colon + 1).Trim(' ', '\t');
+        }
+        return "";
+    }
+
+    static bool FcgbcLocalOrigin(string origin)
+    {
+        if (origin.StartsWith("https://", StringComparison.Ordinal)) origin = origin.Substring(8);
+        else if (origin.StartsWith("http://", StringComparison.Ordinal)) origin = origin.Substring(7);
+        else return false;
+        if (origin.IndexOf('/') >= 0) return false;
+        int colon = origin.LastIndexOf(':');
+        string host = origin;
+        if (colon > 0) host = origin.Substring(0, colon);
+        return host == "localhost" || host == "127.0.0.1";
+    }
+
+    static string FcgbcCors(string head)
+    {
+        string methods = "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n";
+        string headers = "Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, x-fcgbc-admin-secret\r\n";
+        bool prod = string.Equals(Environment.GetEnvironmentVariable("NODE_ENV"), "production", StringComparison.OrdinalIgnoreCase);
+        string origin = HeaderLine(head, "Origin");
+        string allow = "";
+        if (origin == "")
+        {
+            if (!prod) allow = "Access-Control-Allow-Origin: *\r\n";
+        }
+        else
+        {
+            bool listed = origin == "https://admin.forevercouchgang.space"
+                || origin == "https://rpc.forevercouchgang.space"
+                || origin == "https://forevercouchgang.space"
+                || origin == "https://www.forevercouchgang.space"
+                || origin == "https://app.forevercouchgang.space"
+                || origin == "https://dev.forevercouchgang.space"
+                || origin == "http://localhost:3000"
+                || origin == "http://localhost:3001"
+                || origin == "http://localhost:3002"
+                || origin == "http://localhost:3003"
+                || origin == "http://localhost:5173";
+            string extra = Environment.GetEnvironmentVariable("FCGBC_CORS_ORIGINS");
+            if (string.IsNullOrEmpty(extra)) extra = Environment.GetEnvironmentVariable("CORS_ORIGINS");
+            if (!listed && !string.IsNullOrEmpty(extra))
+            {
+                string[] parts = extra.Split(',');
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (parts[i].Trim() == origin) listed = true;
+                }
+            }
+            if (listed || (!prod && FcgbcLocalOrigin(origin)))
+                allow = "Access-Control-Allow-Origin: " + origin + "\r\nVary: Origin\r\n";
+        }
+        return allow + methods + headers;
     }
 
     static bool IsRequestBudget(VireError err)
@@ -293,16 +414,63 @@ static class VireListen
             || msg.IndexOf("while ran too long", StringComparison.Ordinal) >= 0;
     }
 
+    static string ContentTypeOf(string text)
+    {
+        if (text == null) return "application/json";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '{' || c == '[') return "application/json";
+            if (c == '<') return "text/html; charset=utf-8";
+            return "text/plain; charset=utf-8";
+        }
+        return "text/plain; charset=utf-8";
+    }
+
     static int StatusOf(string text, int fallback)
     {
         if (text == null) return fallback;
-        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400 };
+        if (text.IndexOf("\"reason\":\"data_held\"", StringComparison.Ordinal) >= 0) return 503;
+        if (text == "{\"enabled\":false}") return 503;
+        if (text == "Authentication required.") return 401;
+        int[] codes = { 507, 503, 502, 500, 431, 413, 411, 408, 405, 404, 403, 401, 400, 307 };
         for (int i = 0; i < codes.Length; i++)
         {
             string needle = "\"status\":" + codes[i];
             if (text.IndexOf(needle, StringComparison.Ordinal) >= 0) return codes[i];
         }
         return fallback;
+    }
+
+    static string ExtraHeadersOf(string text, out bool refused)
+    {
+        refused = false;
+        if (text == null) return "";
+        string extra = HttpWire.AllowlistedReplyHeaders(text, out refused);
+        if (refused) return "";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '<') extra += "X-Payments-Enabled: off\r\n";
+            break;
+        }
+        if (text == "Authentication required.")
+            extra += "WWW-Authenticate: Basic realm=\"Protected\"\r\n";
+        if (text.IndexOf("\"adsenseClientId\"", StringComparison.Ordinal) >= 0)
+            extra += "X-Payments-Enabled: off\r\n";
+        return extra;
     }
 
     static string ReasonOf(int code)
@@ -320,12 +488,13 @@ static class VireListen
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";
+        if (code == 502) return "Bad Gateway";
         if (code == 503) return "Service Unavailable";
         if (code == 507) return "Insufficient Storage";
         return "OK";
     }
 
-    static void SendParseFail(NetworkStream stream, int status, HttpWire.Result parsed)
+    static void SendParseFail(Stream stream, int status, HttpWire.Result parsed)
     {
         if (status == 404)
             SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
@@ -333,7 +502,7 @@ static class VireListen
             SendApi(stream, status, parsed != null && parsed.ErrorJson != null ? parsed.ErrorJson : "{\"error\":\"bad request\"}", null);
     }
 
-    static void SendApi(NetworkStream stream, int code, string body, string extra)
+    static void SendApi(Stream stream, int code, string body, string extra)
     {
         byte[] data = Encoding.UTF8.GetBytes(body ?? "");
         string extraSafe = HeaderField(extra);
@@ -344,7 +513,7 @@ static class VireListen
             data = Encoding.UTF8.GetBytes("{\"error\":\"route failed\"}");
         }
         string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
-            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Type: " + ContentTypeOf(body) + "\r\n"
             + "Content-Length: " + data.Length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"
@@ -356,7 +525,7 @@ static class VireListen
         if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static bool TrySite(NetworkStream stream, string method, string url, string head, int line, string root)
+    static bool TrySite(Stream stream, string method, string url, string head, int line, string root)
     {
         string site = Path.Combine(root, "site");
         if (!Directory.Exists(site)) return false;
@@ -504,7 +673,7 @@ static class VireListen
         return 206;
     }
 
-    static void SendSiteEmpty(NetworkStream stream, int code, string type, string body)
+    static void SendSiteEmpty(Stream stream, int code, string type, string body)
     {
         byte[] data = Encoding.UTF8.GetBytes(body ?? "");
         string head = SiteHead(code, type, data.Length, "", false);
@@ -513,7 +682,7 @@ static class VireListen
         if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static void SendSiteRangeFail(NetworkStream stream, string type, long total)
+    static void SendSiteRangeFail(Stream stream, string type, long total)
     {
         string extra = "Content-Range: bytes */" + total + "\r\n";
         string head = SiteHead(416, type, 0, extra, true);
@@ -521,7 +690,7 @@ static class VireListen
         stream.Write(prefix, 0, prefix.Length);
     }
 
-    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, long writeCount, bool partial, long total, bool video)
+    static void SendSiteFile(Stream stream, int code, string type, Stream file, long start, long count, long writeCount, bool partial, long total, bool video)
     {
         string extra = "";
         if (partial) extra += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";

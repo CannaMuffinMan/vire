@@ -1,0 +1,10 @@
+~ Fail-before: block hash is not SHA-256 of the Go preimage.
+define route with method, path, body
+  if path == "/block/1"
+    return "{\"index\":1,\"hash\":\"deadbeef\"}\n"
+  end
+  return "{\"error\":\"Not found\"}\n"
+end
+define main
+  listen with 0
+end
