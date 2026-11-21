@@ -11,10 +11,12 @@ export VIRE_HEADLESS=1
 unset VIRE_BUDGET || true
 
 AFTER_SHA="$(git rev-parse HEAD)"
-BASE_SHA="$(git rev-parse cursor/rebuild-go-sidecar-health-758b 2>/dev/null || git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+BASE_SHA="$(git rev-parse df58afd1d401c67bf8b086f447399162b3cc8b78 2>/dev/null || git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
 CONTRACT="$ROOT/tests/rebuild/contracts/fcg-chain.json"
 FAIL_SRC="$ROOT/tests/rebuild/fail-before-chain.vire"
+FAIL_REMAINDER_SRC="$ROOT/tests/rebuild/fail-before-chain-remainder.vire"
 GOOD_SRC="$ROOT/guest-chain.vire"
+REMAINDER_PY="$ROOT/tools/rebuild-chain-remainder.py"
 VIRE_DLL="$ROOT/bin/Release/net10.0/vire.dll"
 FIX_SRC="$ROOT/data/rebuild/chain"
 FIX_DST="$ROOT/data/chain"
@@ -28,10 +30,12 @@ dotnet build vire.csproj -c Release --nologo
 mkdir -p data
 
 install_fixtures() {
+  rm -rf "$FIX_DST"
   mkdir -p "$FIX_DST"
   cp "$FIX_SRC/head.json" "$FIX_DST/head.json"
   cp "$FIX_SRC/000001.json" "$FIX_DST/000001.json"
   cp "$FIX_SRC/blocks.json" "$FIX_DST/blocks.json"
+  rm -f "$ROOT/data/chain.json"
 }
 
 hex_to_bin() {
@@ -325,6 +329,28 @@ if [[ "$FCODE" -ne 2 ]]; then
 fi
 echo "FAIL_BEFORE at $BASE_SHA contract mismatch as required"
 
+echo "FAIL_BEFORE remainder vs snapshot guest (no rotate/507/tamper/migrate)"
+compile_listen_guest "$FAIL_REMAINDER_SRC" "rebuild-chain-fail-rem"
+ids="$(run_cmd rebuild-chain-fail-rem "./data/rebuild-chain-fail-rem.elf")"
+RPID="${ids%% *}"
+RPORT="${ids##* }"
+echo "fail_before_remainder_listen 127.0.0.1:$RPORT"
+set +e
+python3 "$REMAINDER_PY" run "$RPORT" "$FIX_SRC" "$FIX_DST" fail-before
+RCODE=$?
+set -e
+stop_guest "$RPID"
+install_fixtures
+if [[ "$RCODE" -eq 0 ]]; then
+  echo "FAIL_BEFORE remainder expected mismatch, got match"
+  exit 1
+fi
+if [[ "$RCODE" -ne 2 ]]; then
+  echo "FAIL_BEFORE remainder harness error $RCODE"
+  exit 1
+fi
+echo "FAIL_BEFORE remainder at $BASE_SHA mismatch as required"
+
 echo "PASS_AFTER compile guest-chain.vire"
 compile_listen_guest "$GOOD_SRC" "rebuild-chain"
 ids="$(run_cmd rebuild-chain "./data/rebuild-chain.elf")"
@@ -345,8 +371,25 @@ install_fixtures
 diff_contracts "$HPORT"
 echo "host contract ok"
 pair_host_native "$HPORT" "$GPORT"
+install_fixtures
+python3 "$REMAINDER_PY" run "$GPORT" "$FIX_SRC" "$FIX_DST" pass-after
+echo "native remainder contract ok"
+install_fixtures
+python3 "$REMAINDER_PY" run "$HPORT" "$FIX_SRC" "$FIX_DST" pass-after
+echo "host remainder contract ok"
 stop_guest "$GPID"
 stop_guest "$HPID"
 install_fixtures
-echo "PASS_AFTER at $AFTER_SHA native ELF matches host GET /chain and POST /block vs recorded contract"
+ids="$(run_cmd rebuild-chain "./data/rebuild-chain.elf")"
+GPID="${ids%% *}"
+GPORT="${ids##* }"
+ids="$(run_cmd rebuild-chain-host dotnet exec "$VIRE_DLL" "$ROOT/rebuild-chain-run.vire")"
+HPID="${ids%% *}"
+HPORT="${ids##* }"
+echo "pair_remainder native 127.0.0.1:$GPORT host 127.0.0.1:$HPORT"
+python3 "$REMAINDER_PY" pair "$HPORT" "$GPORT" "$FIX_SRC" "$FIX_DST"
+stop_guest "$GPID"
+stop_guest "$HPID"
+install_fixtures
+echo "PASS_AFTER at $AFTER_SHA native ELF matches host GET /chain and POST /block vs recorded contract including rotate/507/tamper/migrate/previousHash/concurrent"
 echo "rebuild chain diff ok"

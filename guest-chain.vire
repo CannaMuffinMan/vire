@@ -1,8 +1,83 @@
-~ Native FCG GET /chain + POST /block against committed genesis fixtures.
-~ Proof = hash of "[1," + json(previous) + "," + json(text) + "]"
-~ POST body is a bounded leaf heap text (rt-net). Do not parse the body as JSON here;
-~ shape checks use string find on the raw request text.
-~ Fixtures: data/rebuild/chain copied to data/chain by tools/rebuild-chain-diff.sh.
+~ Native FCG GET /chain + POST /block. Same rules as api/fcgcpa.vire.
+~ Native listen+parse segfaults; this guest does not call parse.
+~ Proof = hash of "[" + text(index) + "," + json(previous) + "," + json(text) + "]"
+~ Segment rotate at 512 KB, 507 at segment 64, 503 on tamper,
+~ data/chain.json migrate, previousHash / hash aliases.
+~ Writes stay under data/ (openat O_NOFOLLOW on Linux).
+
+define pad6 with n
+  let s be text with n
+  while (length with s) < 6
+    let s be "0" + s
+  end
+  return s
+end
+
+define segmentPath with n
+  return "data/chain/" + (pad6 with n) + ".json"
+end
+
+define makeProof with index, previous, text
+  return hash with ("[" + (text with index) + ",\"" + previous + "\",\"" + text + "\"]")
+end
+
+define fileHere with path
+  try
+    let _ be read with path
+    return true
+  miss problem
+    return false
+  end
+end
+
+define takeQuoted with raw, key
+  let needle be "\"" + key + "\":\""
+  let pos be find with raw, needle
+  if pos < 0
+    return ""
+  end
+  let rest be slice with raw, (pos + (length with needle)), (length with raw)
+  let cut be find with rest, "\""
+  if cut < 0
+    return ""
+  end
+  return slice with rest, 0, cut
+end
+
+define takeInt with raw, key
+  let needle be "\"" + key + "\":"
+  let pos be find with raw, needle
+  if pos < 0
+    return 0 - 1
+  end
+  let rest be slice with raw, (pos + (length with needle)), (length with raw)
+  let i be 0
+  let sign be 1
+  if (length with rest) > 0
+    if (slice with rest, 0, 1) == "-"
+      let sign be 0 - 1
+      let i be 1
+    end
+  end
+  let n be 0
+  let got be 0
+  while i < (length with rest)
+    let ch be slice with rest, i, (i + 1)
+    if (find with "0123456789", ch) < 0
+      stop
+    end
+    let n be (n * 10) + (number with ch)
+    let got be 1
+    let i be i + 1
+  end
+  if got == 0
+    return 0 - 1
+  end
+  if sign < 0
+    return 0 - n
+  end
+  return n
+end
 
 define textOk with value
   try
@@ -10,8 +85,16 @@ define textOk with value
     if n > 4096
       return false
     end
-    let quoted be json with value
-    if (length with quoted) < 2
+    if (find with value, "\t") >= 0
+      return false
+    end
+    if (find with value, "\r") >= 0
+      return false
+    end
+    if (find with value, "\"") >= 0
+      return false
+    end
+    if (find with value, "\\") >= 0
       return false
     end
     return true
@@ -49,60 +132,293 @@ define takeText with body
   return slice with inner, 0, cut
 end
 
-define takeHeadProof
-  let headRaw be read with "data/chain/head.json"
-  let hat be find with headRaw, "\"proof\":\""
-  if hat < 0
-    return ""
+define takeQuotedPrefer with body, first, second
+  let a be takeQuoted with body, first
+  if a != ""
+    return a
   end
-  let hrest be slice with headRaw, (hat + 9), (length with headRaw)
-  let hcut be find with hrest, "\""
-  if hcut < 0
-    return ""
-  end
-  return slice with hrest, 0, hcut
+  return takeQuoted with body, second
 end
 
-define takeQuoted with body, key
-  let needle be "\"" + key + "\":\""
-  let pos be find with body, needle
-  if pos < 0
-    return ""
-  end
-  let rest be slice with body, (pos + (length with needle)), (length with body)
-  let cut be find with rest, "\""
-  if cut < 0
-    return ""
-  end
-  return slice with rest, 0, cut
+define blockJson with index, previous, proof, text
+  let a be "{\"index\":" + (text with index)
+  let b be a + ",\"previous\":\""
+  let c be b + previous
+  let d be c + "\",\"proof\":\""
+  let e be d + proof
+  let f be e + "\",\"text\":\""
+  return f + text + "\"}"
 end
 
-define makeDumped with previous, blockText
-  return "[1," + (json with previous) + "," + (json with blockText) + "]"
+define wrapSeg with link, inner
+  let a be "{\"link\":\"" + link
+  let b be a + "\",\"blocks\":["
+  return b + inner + "]}"
 end
 
-define writeAccept with previous, proof, blockText
-  let part be "{\"index\":1,\"previous\":" + (json with previous)
-  let part2 be part + ",\"proof\":"
-  let part3 be part2 + (json with proof)
-  let part4 be part3 + ",\"text\":"
-  let stored0 be part4 + (json with blockText)
-  let stored be stored0 + "}"
-  let genesis be read with "data/chain/blocks.json"
-  let innerChain be slice with genesis, 1, ((length with genesis) - 1)
-  let grown be "[" + innerChain
-  let grown2 be grown + ","
-  let grown3 be grown2 + stored
-  let grown4 be grown3 + "]"
-  write with "data/chain/blocks.json", grown4
-  let headOut be "{\"segment\":1,\"index\":1,\"proof\":" + (json with proof)
-  let headOut2 be headOut + "}"
-  write with "data/chain/head.json", headOut2
-  let reply be "{\"ok\":true,\"accepted\":true,\"index\":1,\"proof\":" + (json with proof)
-  return reply + "}"
+define extractBlocksInner with raw
+  let mark be find with raw, "\"blocks\":["
+  if mark < 0
+    return ""
+  end
+  let start be mark + 10
+  if (length with raw) < 2
+    return ""
+  end
+  let stopAt be (length with raw) - 2
+  if stopAt < start
+    return ""
+  end
+  return slice with raw, start, stopAt
+end
+
+define verifyBlocksInner with inner, startPrevious, startIndex
+  let previous be startPrevious
+  let want be startIndex
+  let lastProof be startPrevious
+  let lastIndex be startIndex + (0 - 1)
+  let nblocks be 0
+  let i be 0
+  let ninner be length with inner
+  while i < ninner
+    let lim be i + 4500
+    if lim > ninner
+      let lim be ninner
+    end
+    let window be slice with inner, i, lim
+    if (begins with window, ",")
+      let i be i + 1
+    else
+      let idx be takeInt with window, "index"
+      let prev be takeQuoted with window, "previous"
+      let proof be takeQuoted with window, "proof"
+      let txt be takeQuoted with window, "text"
+      if idx != want
+        let bad be []
+        push with bad, 0
+        return bad
+      end
+      if prev != previous
+        let bad be []
+        push with bad, 0
+        return bad
+      end
+      if not (textOk with txt)
+        let bad be []
+        push with bad, 0
+        return bad
+      end
+      let wantProof be makeProof with want, prev, txt
+      if proof != wantProof
+        let bad be []
+        push with bad, 0
+        return bad
+      end
+      let previous be proof
+      let lastProof be proof
+      let lastIndex be want
+      let want be want + 1
+      let nblocks be nblocks + 1
+      let close be find with window, "}"
+      if close < 0
+        let bad be []
+        push with bad, 0
+        return bad
+      end
+      let i be i + close + 1
+    end
+  end
+  let good be []
+  push with good, 1
+  push with good, lastProof
+  push with good, lastIndex
+  push with good, nblocks
+  return good
+end
+
+define verifyChain
+  try
+    let headRaw be read with "data/chain/head.json"
+    let lastSeg be takeInt with headRaw, "segment"
+    let headIndex be takeInt with headRaw, "index"
+    let headProof be takeQuoted with headRaw, "proof"
+    if lastSeg < 1
+      return false
+    end
+    let n be 1
+    let previous be "0"
+    let want be 0
+    let lastProof be "0"
+    let lastIndex be 0 - 1
+    while n <= lastSeg
+      let raw be read with (segmentPath with n)
+      if (length with raw) > 1000000
+        return false
+      end
+      let link be takeQuoted with raw, "link"
+      if link != previous
+        return false
+      end
+      let inner be extractBlocksInner with raw
+      let chk be verifyBlocksInner with inner, previous, want
+      if (chk at 0) == 0
+        return false
+      end
+      if (chk at 3) > 0
+        let previous be chk at 1
+        let want be (chk at 2) + 1
+        let lastProof be chk at 1
+        let lastIndex be chk at 2
+      end
+      let n be n + 1
+    end
+    if headIndex != lastIndex
+      return false
+    end
+    if headProof != lastProof
+      return false
+    end
+    return true
+  miss problem
+    return false
+  end
+end
+
+define writeHead with segment, index, proof
+  let a be "{\"segment\":" + (text with segment)
+  let b be a + ",\"index\":"
+  let c be b + (text with index)
+  let d be c + ",\"proof\":"
+  write with "data/chain/head.json", (d + "\"" + proof + "\"}")
+end
+
+define writeGenesis
+  let previous be "0"
+  let text be ""
+  let proof be makeProof with 0, previous, text
+  let blk be blockJson with 0, previous, proof, text
+  write with (segmentPath with 1), (wrapSeg with "0", blk)
+  writeHead with 1, 0, proof
+end
+
+define dumpAllBlocks
+  try
+    let headRaw be read with "data/chain/head.json"
+    let lastSeg be takeInt with headRaw, "segment"
+    let out be "["
+    let n be 1
+    let first be 1
+    while n <= lastSeg
+      let raw be read with (segmentPath with n)
+      let inner be extractBlocksInner with raw
+      if (length with inner) > 0
+        if first == 0
+          let out be out + ","
+        end
+        let out be out + inner
+        let first be 0
+      end
+      let n be n + 1
+    end
+    return out + "]"
+  miss problem
+    return none
+  end
+end
+
+define loadBlocks
+  if not verifyChain
+    return none
+  end
+  return dumpAllBlocks
+end
+
+define migrateOld
+  try
+    let old be read with "data/chain.json"
+    let i be 0
+    let mapped be ""
+    let n be 0
+    let previous be "0"
+    let lastProof be "0"
+    let lastIndex be 0
+    while i < (length with old)
+      let rest be slice with old, i, (length with old)
+      let brace be find with rest, "{"
+      if brace < 0
+        stop
+      end
+      let one be slice with rest, brace, (length with rest)
+      let close be find with one, "}"
+      if close < 0
+        return false
+      end
+      let one be slice with one, 0, (close + 1)
+      let text be ""
+      if (find with one, "\"text\":\"") >= 0
+        let text be takeQuoted with one, "text"
+      end
+      let prev be "0"
+      if (find with one, "\"previous\":\"") >= 0
+        let prev be takeQuoted with one, "previous"
+      end
+      if (find with one, "\"previousHash\":\"") >= 0
+        let prev be takeQuoted with one, "previousHash"
+      end
+      let index be n
+      if (find with one, "\"index\":") >= 0
+        let index be takeInt with one, "index"
+      end
+      if not (textOk with text)
+        return false
+      end
+      if index != n
+        return false
+      end
+      if prev != previous
+        return false
+      end
+      let proof be makeProof with index, prev, text
+      let blk be blockJson with index, prev, proof, text
+      if n > 0
+        let mapped be mapped + ","
+      end
+      let mapped be mapped + blk
+      let previous be proof
+      let lastProof be proof
+      let lastIndex be index
+      let n be n + 1
+      let i be i + brace
+      let i be i + close
+      let i be i + 1
+    end
+    if n < 1
+      return false
+    end
+    write with (segmentPath with 1), (wrapSeg with "0", mapped)
+    writeHead with 1, lastIndex, lastProof
+    write with "data/chain.json", ""
+    return true
+  miss problem
+    return false
+  end
+end
+
+define bootChain
+  if fileHere with "data/chain/head.json"
+    return verifyChain
+  end
+  if fileHere with "data/chain.json"
+    return migrateOld
+  end
+  writeGenesis
+  return true
 end
 
 define appendBlock with body
+  if not verifyChain
+    return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
+  end
   let shape be rejectShape with body
   if shape == "bad"
     return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
@@ -113,39 +429,70 @@ define appendBlock with body
   if shape == "notext"
     return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
   end
-  let blockText be takeText with body
-  if not (textOk with blockText)
+  let text be takeText with body
+  if not (textOk with text)
     return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
   end
-  let previous be takeHeadProof
-  if previous == ""
-    return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
-  end
-  let dumped be makeDumped with previous, blockText
-  let proof be hash with dumped
-  let given be takeQuoted with body, "proof"
-  if given != ""
-    if given != proof
-      return "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
-    end
-  end
-  let givenPrev be takeQuoted with body, "previous"
+  let headRaw be read with "data/chain/head.json"
+  let index be (takeInt with headRaw, "index") + 1
+  let previous be takeQuoted with headRaw, "proof"
+  let proof be makeProof with index, previous, text
+  let givenPrev be takeQuotedPrefer with body, "previous", "previousHash"
   if givenPrev != ""
     if givenPrev != previous
       return "{\"ok\":false,\"status\":400,\"error\":\"previous does not match\"}"
     end
   end
-  return writeAccept with previous, proof, blockText
+  let givenProof be takeQuotedPrefer with body, "proof", "hash"
+  if givenProof != ""
+    if givenProof != proof
+      return "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
+    end
+  end
+  let extra be blockJson with index, previous, proof, text
+  let segNo be takeInt with headRaw, "segment"
+  let raw be read with (segmentPath with segNo)
+  if ((length with raw) + (length with extra) + 2) > 524288
+    if segNo >= 64
+      return "{\"ok\":false,\"status\":507,\"error\":\"chain full\"}"
+    end
+    let segNo be segNo + 1
+    write with (segmentPath with segNo), (wrapSeg with previous, extra)
+  else
+    let link be takeQuoted with raw, "link"
+    let inner be extractBlocksInner with raw
+    let grown be inner
+    if (length with inner) > 0
+      let grown be inner + "," + extra
+    end
+    if (length with inner) < 1
+      let grown be extra
+    end
+    write with (segmentPath with segNo), (wrapSeg with link, grown)
+  end
+  writeHead with segNo, index, proof
+  let reply be "{\"ok\":true,\"accepted\":true,\"index\":" + (text with index)
+  return reply + ",\"proof\":\"" + proof + "\"}"
 end
 
 define route with method, path, body
   if path == "/chain"
+    if not (fileHere with "data/chain/head.json")
+      bootChain
+    end
+  end
+  if path == "/block"
+    if not (fileHere with "data/chain/head.json")
+      bootChain
+    end
+  end
+  if path == "/chain"
     if method == "GET"
-      try
-        return read with "data/chain/blocks.json"
-      miss problem
+      let dumped be loadBlocks
+      if dumped == none
         return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
       end
+      return dumped
     end
   end
   if path == "/block"
