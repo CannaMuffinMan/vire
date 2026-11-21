@@ -292,11 +292,11 @@ run_slice() {
 
   echo "=== slice $id PASS_AFTER ==="
   compile_listen_guest "$good_src" "unauth-good-$id"
-  ids="$(run_cmd "unauth-good-$id" "./data/unauth-good-${id}.elf")"
+  ids="$(run_cmd "unauth-good-$id" "./data/unauth-good-${id}.elf" 0)"
   local gpid="${ids%% *}"
   local gport="${ids##* }"
   echo "native_listen 127.0.0.1:$gport"
-  ids="$(run_cmd "unauth-host-$id" dotnet exec "$VIRE_DLL" "data/unauth-good-${id}.vire")"
+  ids="$(run_cmd "unauth-host-$id" dotnet exec "$VIRE_DLL" "data/unauth-good-${id}.vire" 0)"
   local hpid="${ids%% *}"
   local hport="${ids##* }"
   echo "host_listen 127.0.0.1:$hport"
