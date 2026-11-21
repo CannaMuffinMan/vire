@@ -93,14 +93,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net, route_npar
       let image be emitHex with image, (read with "data/src/rt-net-r4-blob.txt")
       applyPackedPins with labels, base, (read with "data/src/rt-net-r4-pins.txt"), names
       applyPackedFixes with fixes, base, (read with "data/src/rt-net-r4-fixes.txt"), names
-      return emitLandingHttp with image, fixes, labels, base
-    end
-    if route_nparams == 3
-      let names be netNamesR3
-      let image be emitHex with image, (read with "data/src/rt-net-r3-blob.txt")
-      applyPackedPins with labels, base, (read with "data/src/rt-net-r3-pins.txt"), names
-      applyPackedFixes with fixes, base, (read with "data/src/rt-net-r3-fixes.txt"), names
-      return emitLandingHttp with image, fixes, labels, base
+      return image
     end
     let names be netNames
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
@@ -147,13 +140,60 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_suboff", "{\"enabled\":false}"
   parkMsg with image, labels, "txt_authreq", "Authentication required."
   parkMsg with image, labels, "txt_st307", "\"status\":307"
+  parkMsg with image, labels, "txt_st405", "\"status\":405"
   parkMsg with image, labels, "txt_st502", "\"status\":502"
   parkMsg with image, labels, "txt_st101", "\"status\":101"
   parkMsg with image, labels, "txt_locp", "\"location\":\"/partners\""
   parkMsg with image, labels, "txt_locs", "\"location\":\"/sop\"}"
   parkMsg with image, labels, "txt_locm", "\"location\":\"/sop/access?next=/sop/media-lab\""
   parkMsg with image, labels, "txt_adsense", "\"adsenseClientId\""
-  parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
+  pin with labels, "txt_hdr2", image
+  let hdr2 be "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n"
+  let image be emitU64 with image, (length with hdr2)
+  let image be emitStr with image, hdr2
+  let zhdr be 0
+  while zhdr < 512
+    let image be emitU8 with image, 0
+    let zhdr be zhdr + 1
+  end
+  parkMsg with image, labels, "txt_crlf", "\r\n"
+  parkMsg with image, labels, "txt_err500", "{\"error\":\"route failed\"}"
+  parkMsg with image, labels, "txt_k_loc", "\"location\":\""
+  parkMsg with image, labels, "txt_k_set", "\"set-cookie\":\""
+  parkMsg with image, labels, "txt_k_www", "\"www-authenticate\":\""
+  parkMsg with image, labels, "txt_k_cc", "\"cache-control\":\""
+  parkMsg with image, labels, "txt_hn_loc", "Location: "
+  parkMsg with image, labels, "txt_hn_set", "Set-Cookie: "
+  parkMsg with image, labels, "txt_hn_www", "WWW-Authenticate: "
+  parkMsg with image, labels, "txt_hn_cc", "Cache-Control: "
+  parkMsg with image, labels, "txt_hn_cookie", "Cookie: "
+  parkMsg with image, labels, "txt_hn_host", "Host: "
+  parkMsg with image, labels, "txt_hn_authz", "Authorization: "
+  parkMsg with image, labels, "txt_nm_cookie", "cookie"
+  parkMsg with image, labels, "txt_nm_host", "host"
+  parkMsg with image, labels, "txt_nm_authz", "authorization"
+  pin with labels, "guest_extra", image
+  emitU64 with image, 0
+  pin with labels, "head_hold", image
+  let z2 be 0
+  while z2 < 4104
+    let image be emitU8 with image, 0
+    let z2 be z2 + 1
+  end
+  pin with labels, "head_out", image
+  let z3 be 0
+  while z3 < 1032
+    let image be emitU8 with image, 0
+    let z3 be z3 + 1
+  end
+  pin with labels, "extra_hold", image
+  let z4 be 0
+  while z4 < 1032
+    let image be emitU8 with image, 0
+    let z4 be z4 + 1
+  end
+  pin with labels, "park_full", image
+  emitU64 with image, 0
   parkMsg with image, labels, "txt_GET", "GET"
   parkMsg with image, labels, "txt_POST", "POST"
   parkMsg with image, labels, "txt_HEAD", "HEAD"
