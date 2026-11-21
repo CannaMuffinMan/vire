@@ -1,0 +1,33 @@
+{
+  "service": "vire-listen-ws-loopback",
+  "notes": "Browser Upgrade to Vire listen is spliced onto proxy_reply's loopback RFC 6455 tunnel. Host VireListen and native ELF must match the recorded transcript. Loopback only.",
+  "bind": "127.0.0.1",
+  "rfc_key": "dGhlIHNhbXBsZSBub25jZQ==",
+  "rfc_accept": "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+  "cases": [
+    {
+      "name": "listen-ws-echo",
+      "path": "/ws/echo",
+      "status": 101,
+      "response_headers": [
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+      ],
+      "client_frames_hex": "8182000000006869888000000000",
+      "tunnel_hex": "810268698800"
+    },
+    {
+      "name": "listen-ws-bad-upgrade",
+      "note": "Upgrade: h2c is rejected",
+      "status": 400,
+      "body": "{\"error\":\"bad request\"}"
+    },
+    {
+      "name": "listen-ws-refuse",
+      "path": "/ws/refuse",
+      "status": 403,
+      "body": "{\"error\":\"forbidden\",\"status\":403}"
+    }
+  ]
+}

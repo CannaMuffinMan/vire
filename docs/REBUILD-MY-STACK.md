@@ -75,8 +75,8 @@ A slice is proven when:
 
 Flag, do not paper over:
 
-- TLS (no native TLS server)
-- WebSocket (guest emit exists only as `tests/native/fixtures/gc-tagged-walk/rt-ws.vire`, not in production `compile-native.vire`)
+- Public TLS / DNS (loopback `tls_listen` and listen WS hijack are this lane)
+- Chat/live *product* routes (primitive only; api-go is not in this repo)
 - unread production Node/Go services
 - nondeterministic bodies (timestamps, ids)
 - auth tokens (`FCG_API_TOKEN` must never be printed; `/health` stays unauthenticated)
@@ -108,13 +108,13 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
 | HTTP/1.1 client (loopback) | **Present** PE + ELF | `src/http-client.vire` via `connect`/`send`/`recv`; 5s socket timeouts |
-| Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}`; RFC 6455 upgrade tunnel |
+| Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}`; RFC 6455 upgrade tunnel; listen hijack |
 | Files `data/` / `site/` | **Present** | `rt_read` / `rt_write`; Linux `openat` + `O_NOFOLLOW` |
 | SHA-256 `hash` | **Present** | `crypto-prove.vire`, million-hash |
 | PostgreSQL v3 loopback | **Present, no TLS** | `src/rt-pg.vire`, `tools/pg-prove-linux.sh` |
 | Redis loopback | **Present, no TLS** | `src/rt-redis.vire` |
-| WebSocket listen | **Not in production compiler** | fixture only |
-| TLS server or client | **Missing** | no `tls`/`ssl` in runtime |
+| WebSocket listen | **Present** loopback hijack | `VireListen.TryWsHijack` + native `land_ws_send`; `tools/rebuild-listen-ws-diff.sh` |
+| TLS server or client | **Present** ELF + host | `tls_listen` / `tls_connect`; wss via `tools/rebuild-listen-wss-diff.sh`. PE TLS still fail-closed |
 | DNS | **Missing** | connect is numeric / loopback |
 | Public bind | Host only with `VIRE_BIND=public` and a 16+ char token; native guests print `127.0.0.1` | `GUIDE.md`, `txt_listen` |
 
@@ -143,8 +143,8 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
 | 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
-| 10 | WebSocket chat / live | WS, maybe TLS | Proxy can tunnel RFC 6455 to loopback; native listen terminate is a separate lane | Chat/live service routes still not ported |
-| 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
+| 10 | WebSocket chat / live | WS, maybe TLS | Listen hijack: client Upgrade -> `proxy_reply` loopback tunnel (host+ELF transcripts). wss on `tls_listen` (ELF). Chat/live *service routes* still not ported |
+| 11 | Loopback TLS terminator | `tls_listen` | **Present** host SslStream + ELF OpenSSL (PR #120). Public/edge TLS still out of guest. PE fail-closed |
 | 12 | Skinned browser, Proof of Rot miner, shop, OAuth clients | unknown | none | Blocked on missing source (PR39) |
 
 ### Rank 3 sidecar goldens (this PR)
@@ -186,7 +186,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
-- TLS, WebSocket, DNS, public bind
+- Public bind / DNS. Loopback WS hijack and loopback `tls_listen` / wss are in this lane; chat/live *product* routes are not.
 - Go microservices
 - Payments on, mining network, testnet
 - Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and the body/token blob. `compile-native.vire` was not edited. Blob+pins+fixes for `rt_net_statusof` remain from prior lanes.
@@ -199,6 +199,9 @@ bash tools/rebuild-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
 bash tools/rebuild-landing-diff.sh
 bash tools/rebuild-proxy-diff.sh
+bash tools/rebuild-proxy-ws-diff.sh
+bash tools/rebuild-listen-ws-diff.sh
+bash tools/rebuild-listen-wss-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 

@@ -170,6 +170,11 @@ define http_ws_intent with method, extra
     end
     let i be i + 1
   end
+  if (http_trim with upgrade) != ""
+    if not (http_has_token with upgrade, "websocket")
+      return -1
+    end
+  end
   let wantWs be false
   if http_has_token with upgrade, "websocket"
     let wantWs be true
