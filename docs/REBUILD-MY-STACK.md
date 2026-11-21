@@ -135,6 +135,19 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 - **Platforms:** ELF (proven here). PE uses the same blob; `GetEnvironmentVariableA` is on the net kernel32 IAT. CouchStation must re-run the PE commands below.
 - **Residual:** token compare pads 256-byte buffers and XOR-folds (constant-time on the padded copy, not on header parsing). Env token length &lt; 16 means the gate is off (same as host). Arena 32MB / list 100000 / steps 5M unchanged. Header names are scanned in any order; the last header before `\\r\\n\\r\\n` is included.
 
+### Rank 4 remainder (this PR)
+
+Recorded in `tests/rebuild/contracts/fcg-chain-remainder.json` (from in-tree `api/fcgcpa.vire`, not prod):
+
+- Segment rotate when `len(raw)+len(extra)+2 > 524288` → new `000002.json`, no file over 512 KB
+- Segment 64 already at the cap → HTTP **507** `chain full` (checked before rotate so native bump-allocation is not still holding a 512 KB segment)
+- Tamper of stored block `text` so it no longer matches `proof` → HTTP **503** `chain invalid` on GET `/chain` and POST `/block`
+- Old `data/chain.json` with `previousHash` and no `head.json` → migrate into `data/chain/` (native overwrites `chain.json` with empty text; host `erase`)
+- POST `previousHash` / `hash` aliases beyond `previous` / `proof` (400 when they disagree; 200 when `previousHash` matches the tip)
+- Eight concurrent POSTs → indexes 1..8 consecutive (host `ChainRouteLock`; native listen is single-threaded)
+
+Isolated harness: `tools/rebuild-chain-limits-diff.sh` (FAIL_BEFORE `5c3ed01abe2a12a34fca74b915d5e39a9f05fde3` snapshot guest vs PASS_AFTER `guest-chain.vire`). Nothing else in that remainder contract is Blocked.
+
 ### Rank 4 remainder security property (tamper → 503)
 
 - **Property:** after a stored segment under `data/chain/` is mutated so a block `text` no longer matches `proof`, native `GET /chain` and `POST /block` return HTTP 503 `{"ok":false,"status":503,"error":"chain invalid"}`. Isolated reproducer: `tools/rebuild-chain-tamper.sh` (fail-before snapshot guest vs pass-after `guest-chain.vire`).
@@ -185,7 +198,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
 | 3d | `api-go` `GET /healthz` | HTTP, JSON | Present | **This PR.** `{"status":"ok","live":true}`. Not `api-go` `/api/health`. |
 | 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | **Done (this PR).** GET 403 bodies match `api/fcgcpa.vire`; payments stay off. |
-| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST + rotate/507/503/migrate/aliases/concurrent on native ELF | **Done (this PR remainder).** Host vs native vs `tests/rebuild/contracts/fcg-chain.json` and `fcg-chain-remainder.json`. PE rotate/507 unproven. |
+| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST on PR #112 (`5c3ed01a`); rotate@512KiB, 507 full, 503 tamper, `data/chain.json` migrate, `previousHash`/`hash` aliases, concurrent indexes | **This PR remainder.** Host vs native ELF `tools/rebuild-chain-limits-diff.sh` vs `fcg-chain-remainder.json` (+ alias cases in `fcg-chain.json`). FAIL_BEFORE `5c3ed01abe2a12a34fca74b915d5e39a9f05fde3`. PE: `tools/rebuild-chain-limits-windows.ps1` (CouchStation; unproven here). |
 | 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
 | 6 | `landing-go` unauth fixtures (healthz, JSON APIs, 307s, held-503, fixture HTML) | HTTP, JSON, text/html, Location / WWW-Authenticate | Present on this PR (Linux ELF harness) | **This PR.** Rank 6 static HTML is in-tree strings. Host vs native `tools/rebuild-landing-diff.sh`. |
 | 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | **This PR.** Fixture secret; `ct_eq` MAC. Native listen can see Cookie / emit Set-Cookie (`rebuild-header-diff.sh`). Full landing-sop guest vs host is a follow-on if HMAC listen+`proxy_reply` still faults. |
@@ -236,12 +249,12 @@ Recorded in `tests/rebuild/contracts/`:
 - Old `data/chain.json` with `previousHash` and no `head.json` → migrate into `data/chain/`
 - Eight concurrent POSTs → indexes 1..8 consecutive on host lock and on native single-thread listen
 
-Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `tools/rebuild-chain-diff.sh`, `tools/rebuild-chain-tamper.sh`, `tools/rebuild-landing-diff.sh`. Windows PE steps (CouchStation only): `tools/rebuild-fcgcpa-windows.ps1` — this Linux lane does not claim PE proof.
+Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `tools/rebuild-chain-diff.sh`, `tools/rebuild-chain-tamper.sh`, `tools/rebuild-chain-limits-diff.sh`, `tools/rebuild-landing-diff.sh`. Windows PE steps (CouchStation only): `tools/rebuild-fcgcpa-windows.ps1`, `tools/rebuild-chain-limits-windows.ps1` — this Linux lane does not claim PE proof.
 
 ### What this PR does not prove
 
 - Byte-identical Node handler vs Vire (private repo unread)
-- Native POST `/block` body read is proven (bounded leaf heap text). Chain rotate/507/503/migrate is in this integration.
+- Native POST `/block` body read is proven (bounded leaf heap text). Chain rotate/507/503/migrate/aliases/concurrent is proven on Linux ELF by `tools/rebuild-chain-limits-diff.sh` in this PR (stacked on #112).
 - Native `erase` of `data/chain.json` after migrate (guest writes empty text; host `api/fcgcpa.vire` unlinks)
 - Remaining sidecar routes beyond the five GET goldens plus unauth rpc-portal-go / edge-go / dev-portal-go / fcgbds-dashboard-go JSON (JWT, reverse-proxy, static files, holdings outbound still blocked)
 - Native listen does not emit Go extra security headers (`X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) or per-route Cache-Control / charset=utf-8; contracts match the native header set (`application/json` without charset, `nosniff`, `no-store`)
@@ -265,6 +278,7 @@ bash tools/rebuild-health-diff.sh
 bash tools/rebuild-sidecar-diff.sh
 bash tools/rebuild-unauth-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
+bash tools/rebuild-chain-limits-diff.sh
 bash tools/rebuild-landing-diff.sh
 bash tools/rebuild-proxy-diff.sh
 bash tools/rebuild-proxy-ws-diff.sh
@@ -275,7 +289,7 @@ bash tools/rebuild-header-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
-Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. Header allowlist PE: `tools/rebuild-headers-windows.ps1`. This Linux lane does not replace that proof.
+Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 4 remainder PE: `tools/rebuild-chain-limits-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. Header allowlist PE: `tools/rebuild-headers-windows.ps1`. This Linux lane does not replace that proof.
 
 ## Rank 9 Redis TLS (`rediss://`)
 
