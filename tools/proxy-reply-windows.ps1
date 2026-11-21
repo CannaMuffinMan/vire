@@ -71,15 +71,28 @@ $upThread.IsBackground = $true
 $upThread.Start()
 
 function Get-ListenPort([System.Diagnostics.Process]$proc) {
-    $deadline = (Get-Date).AddSeconds(12)
-    $buf = ""
-    while ((Get-Date) -lt $deadline) {
-        $line = $proc.StandardOutput.ReadLine()
-        if ($null -eq $line) { break }
-        $buf += $line
+    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    $buf = New-Object System.Text.StringBuilder
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ($proc.HasExited) {
+            $tail = $proc.StandardOutput.ReadToEnd()
+            if ($tail) { [void]$buf.Append($tail) }
+            $err = ""
+            try { if ($proc.StandardError) { $err = $proc.StandardError.ReadToEnd() } } catch { }
+            throw ("no listen port (exited $($proc.ExitCode)): $buf $err")
+        }
+        $ms = [int]($deadline - [DateTime]::UtcNow).TotalMilliseconds
+        if ($ms -lt 1) { break }
+        $task = $proc.StandardOutput.ReadLineAsync()
+        if (-not $task.Wait($ms)) { break }
+        $line = $task.Result
+        if ($null -eq $line) { Start-Sleep -Milliseconds 50; continue }
+        [void]$buf.AppendLine($line)
         if ($line -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
     }
-    throw "no listen port: $buf"
+    $err = ""
+    try { if ($proc.StandardError -and -not $proc.StandardError.EndOfStream) { $err = $proc.StandardError.ReadToEnd() } } catch { }
+    throw "no listen port: $buf $err"
 }
 
 function Get-Proxy([int]$Port) {
@@ -104,6 +117,7 @@ $psiH.FileName = "dotnet"
 $psiH.Arguments = "exec `"$VireDll`" data/native-proxy-reply/proxy-reply.vire $upPort"
 $psiH.WorkingDirectory = $Root
 $psiH.RedirectStandardOutput = $true
+$psiH.RedirectStandardError = $true
 $psiH.UseShellExecute = $false
 $hostProc = [System.Diagnostics.Process]::Start($psiH)
 $hport = Get-ListenPort $hostProc

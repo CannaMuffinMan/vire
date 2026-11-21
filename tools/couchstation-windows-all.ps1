@@ -169,6 +169,8 @@ Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-wind
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
+Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
 Run-Proof "redis-tls-prove-windows" { Run-Script "tools/redis-tls-prove-windows.ps1" }
 Run-Proof "aes-gcm-windows" { Run-Script "tools/aes-gcm-windows.ps1" }
 Run-Proof "rebuild-headers-windows" { Run-Script "tools/rebuild-headers-windows.ps1" }

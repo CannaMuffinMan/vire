@@ -73,6 +73,30 @@ public class NativeNetTests
     }
 
     [Fact]
+    public void DnsResolveGuestCompilesWithRtResolveLabel()
+    {
+        string root = DualMode.FindRoot();
+        string work = Path.Combine(root, "data", "native-dns", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            File.Copy(Path.Combine(root, "tests", "native", "dns-resolve.vire"), Path.Combine(work, "dns-resolve.vire"));
+            string srcRel = ("data/native-dns/" + Path.GetFileName(work) + "/dns-resolve.vire").Replace('\\', '/');
+            string hexRel = ("data/native-dns/" + Path.GetFileName(work) + "/dns-resolve.hex").Replace('\\', '/');
+            DualMode.Proc compiled = DualMode.RunVire(root, new string[] { "compile-native.vire", srcRel, hexRel }, root);
+            string text = DualMode.Norm(compiled.Out + " " + compiled.Err);
+            Assert.True(compiled.Code == 0, text);
+            Assert.Contains("compiled", text);
+            Assert.DoesNotContain("map has no key rt_resolve", text);
+            Assert.True(File.Exists(Path.Combine(root, hexRel.Replace('/', Path.DirectorySeparatorChar))));
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void HostCompileOfHealthGuestImportsWs2AllowlistOnly()
     {
         string root = DualMode.FindRoot();

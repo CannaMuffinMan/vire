@@ -131,7 +131,7 @@ public static class VirePgRedisTlsFix {
             req.CertificateExtensions.Add(san.Build());
             X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(7));
             File.WriteAllBytes(pfxPath, cert.Export(X509ContentType.Pfx, password));
-            File.WriteAllText(cerPath, "-----BEGIN CERTIFICATE-----`n" + Convert.ToBase64String(cert.RawData, Base64FormattingOptions.InsertLineBreaks) + "`n-----END CERTIFICATE-----`n");
+            File.WriteAllText(cerPath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(cert.RawData, Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n");
             return new X509Certificate2(File.ReadAllBytes(pfxPath), password, X509KeyStorageFlags.Exportable);
         }
     }

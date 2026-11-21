@@ -44,8 +44,8 @@ public static class VireTlsCert {
             san.AddIpAddress(IPAddress.Loopback);
             req.CertificateExtensions.Add(san.Build());
             using (X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1))) {
-                File.WriteAllText(certPath, cert.ExportCertificatePem());
-                File.WriteAllText(keyPath, rsa.ExportRSAPrivateKeyPem());
+                File.WriteAllText(certPath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(cert.Export(X509ContentType.Cert), Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n");
+                File.WriteAllText(keyPath, "-----BEGIN RSA PRIVATE KEY-----\n" + Convert.ToBase64String(rsa.ExportRSAPrivateKey(), Base64FormattingOptions.InsertLineBreaks) + "\n-----END RSA PRIVATE KEY-----\n");
             }
         }
     }

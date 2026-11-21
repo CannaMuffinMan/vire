@@ -45,6 +45,7 @@ static class VireWs
             + accept + "\r\n\r\n";
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
+        try { stream.Flush(); } catch (IOException) { }
         Echo(stream);
     }
 
@@ -174,6 +175,7 @@ static class VireWs
         }
         stream.Write(hdr, 0, hdr.Length);
         if (payload.Length > 0) stream.Write(payload, 0, payload.Length);
+        try { stream.Flush(); } catch (IOException) { }
     }
 
     static void WriteClose(Stream stream, int code)

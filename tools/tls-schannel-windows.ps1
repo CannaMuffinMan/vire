@@ -80,7 +80,7 @@ public static class VireSchanFix {
             req.CertificateExtensions.Add(san.Build());
             using (X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1))) {
                 File.WriteAllBytes(pfxPath, cert.Export(X509ContentType.Pfx, password));
-                File.WriteAllText(cerPath, cert.ExportCertificatePem());
+                File.WriteAllText(cerPath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(cert.Export(X509ContentType.Cert), Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n");
             }
         }
     }
@@ -108,7 +108,7 @@ public static class VireSchanFix {
         }
     }
 }
-"@
+"@ -ReferencedAssemblies "System.Net.Http"
 $pfx = Join-Path $Data "tls-health.pfx"
 $cer = Join-Path $Data "tls-health-cert.pem"
 [VireSchanFix]::WritePfx($pfx, $cer, "")

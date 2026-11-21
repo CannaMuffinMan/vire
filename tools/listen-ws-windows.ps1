@@ -103,7 +103,10 @@ public static class VireListenWsFix {
                     if (line.StartsWith("Sec-WebSocket-Key:", StringComparison.OrdinalIgnoreCase))
                         key = line.Substring(18).Trim();
                 }
-                byte[] acc = SHA1.HashData(Encoding.ASCII.GetBytes(key + Guid));
+                byte[] acc;
+                using (SHA1 sha = SHA1.Create()) {
+                    acc = sha.ComputeHash(Encoding.ASCII.GetBytes(key + Guid));
+                }
                 string accept = Convert.ToBase64String(acc);
                 byte[] ok = Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
                 s.Write(ok, 0, ok.Length);

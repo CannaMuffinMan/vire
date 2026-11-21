@@ -68,6 +68,7 @@ static class VireListen
         }
         setPort(actual);
         Console.WriteLine("listening on " + (publish ? "0.0.0.0:" : "127.0.0.1:") + actual);
+        Console.Out.Flush();
         try
         {
             while (!stop.IsCancellationRequested)
@@ -86,7 +87,12 @@ static class VireListen
                 catch (SocketException) { continue; }
                 if (!ListenSlots.Wait(0))
                 {
-                    try { SendApi(client.GetStream(), 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n"); }
+                    try
+                    {
+                        client.NoDelay = true;
+                        SendApi(client.GetStream(), 503, "{\"error\":\"busy\"}", "Retry-After: 1\r\n");
+                        try { client.Client.Shutdown(SocketShutdown.Send); } catch (Exception) { }
+                    }
                     catch (Exception) { }
                     try { client.Close(); } catch (Exception) { }
                     continue;
@@ -94,17 +100,20 @@ static class VireListen
                 ThreadPool.QueueUserWorkItem(delegate (object state)
                 {
                     TcpClient held = (TcpClient)state;
-                    try { AnswerApi(held, line, token, publish, stop, root, route, show, tlsCert); }
-                    catch (IOException)
+                    try
                     {
-                        Console.Error.WriteLine("vire: internal error (IOException)");
+                        held.NoDelay = true;
+                        AnswerApi(held, line, token, publish, stop, root, route, show, tlsCert);
                     }
+                    catch (IOException) { }
+                    catch (SocketException) { }
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("vire: internal error (" + ex.GetType().Name + ")");
                     }
                     finally
                     {
+                        try { held.Client.Shutdown(SocketShutdown.Send); } catch (Exception) { }
                         try { held.Close(); } catch (Exception) { }
                         ListenSlots.Release();
                     }
@@ -532,6 +541,7 @@ static class VireListen
         byte[] prefix = Encoding.ASCII.GetBytes(head);
         stream.Write(prefix, 0, prefix.Length);
         if (data.Length > 0) stream.Write(data, 0, data.Length);
+        try { stream.Flush(); } catch (IOException) { }
     }
 
     static bool TrySite(Stream stream, string method, string url, string head, int line, string root)

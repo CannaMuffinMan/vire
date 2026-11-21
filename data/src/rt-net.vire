@@ -84,7 +84,10 @@ end
 define emitNetRuntime with image, fixes, labels, has_route, need_net, route_nparams
   let base be length with image
   if need_net
-    if route_nparams == 4
+    ~ r4 packed blob parks rt_resolve (and connect). 3-param listen stays on
+    ~ the smaller blob plus emitTcpClient/emitLandingHttp. resolve-only guests
+    ~ have route_nparams 0; without r4, finish dies: map has no key rt_resolve.
+    if (route_nparams == 4) or (route_nparams == 0)
       let names be netNamesR4
       let image be emitHex with image, (read with "data/src/rt-net-r4-blob.txt")
       applyPackedPins with labels, base, (read with "data/src/rt-net-r4-pins.txt"), names

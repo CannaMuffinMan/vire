@@ -83,19 +83,19 @@ Copy-Item (Join-Path $Root "data/rebuild/chain/000001.json") (Join-Path $Data "c
 $hp = Start-Process -FilePath $healthExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput (Join-Path $Data "rebuild-health-pe.out") -PassThru
 Start-Sleep -Milliseconds 400
 $hout = Get-Content -Raw (Join-Path $Data "rebuild-health-pe.out")
-if ($hout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $hp.Id -Force; throw "health PE did not listen" }
+if ($hout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -ErrorAction SilentlyContinue -Id $hp.Id -Force; throw "health PE did not listen" }
 $hport = [int]$Matches[1]
 try {
     Assert-Case (Read-Http $hport "GET" "/payments" $null) 403 '{"ok":false,"status":403,"error":"payments are off"}' "get_payments"
     Assert-Case (Read-Http $hport "GET" "/mine" $null) 403 '{"ok":false,"status":403,"error":"mining stays inside the app"}' "get_mine"
 } finally {
-    Stop-Process -Id $hp.Id -Force
+    Stop-Process -ErrorAction SilentlyContinue -Id $hp.Id -Force
 }
 
 $cp = Start-Process -FilePath $chainExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput (Join-Path $Data "rebuild-chain-pe.out") -PassThru
 Start-Sleep -Milliseconds 400
 $cout = Get-Content -Raw (Join-Path $Data "rebuild-chain-pe.out")
-if ($cout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $cp.Id -Force; throw "chain PE did not listen" }
+if ($cout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -ErrorAction SilentlyContinue -Id $cp.Id -Force; throw "chain PE did not listen" }
 $cport = [int]$Matches[1]
 try {
     Assert-Case (Read-Http $cport "GET" "/chain" $null) 200 '[{"index":0,"previous":"0","proof":"a9df21e6e7672bdb9cea28047aa39ba0fa96d54ae0791a9bab30078f5a2d4fad","text":""}]' "get_chain_genesis"
@@ -117,7 +117,7 @@ try {
     Assert-Case (Read-Http $cport "POST" "/block" '{"text":"more"}') 503 '{"ok":false,"status":503,"error":"chain invalid"}' "post_block_tamper_503"
     Write-Host "PE remainder rotate/507/migrate/concurrent: run Linux tools/rebuild-chain-diff.sh; this script does not fill 512 KB segments."
 } finally {
-    Stop-Process -Id $cp.Id -Force
+    Stop-Process -ErrorAction SilentlyContinue -Id $cp.Id -Force
 }
 
 Write-Host "CouchStation PE: unauth sidecar guests (rpc-portal-go, edge-go, dev-portal-go, fcgbds-dashboard-go)"
@@ -127,12 +127,12 @@ function Assert-GuestGet([string]$Src, [string]$Stem, [string]$Path, [int]$WantS
     $p = Start-Process -FilePath $exe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput $out -PassThru
     Start-Sleep -Milliseconds 400
     $text = Get-Content -Raw $out
-    if ($text -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $p.Id -Force; throw "$Stem PE did not listen" }
+    if ($text -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -ErrorAction SilentlyContinue -Id $p.Id -Force; throw "$Stem PE did not listen" }
     $port = [int]$Matches[1]
     try {
         Assert-Case (Read-Http $port "GET" $Path $null) $WantStatus $WantBody $Name
     } finally {
-        Stop-Process -Id $p.Id -Force
+        Stop-Process -ErrorAction SilentlyContinue -Id $p.Id -Force
     }
 }
 $guestDir = Join-Path $Root "tests/rebuild/guests"
@@ -147,7 +147,7 @@ $landingExe = Compile-Guest (Join-Path $Root "tests/rebuild/guests/landing-go.vi
 $lp = Start-Process -FilePath $landingExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput (Join-Path $Data "rebuild-landing-pe.out") -PassThru
 Start-Sleep -Milliseconds 400
 $lout = Get-Content -Raw (Join-Path $Data "rebuild-landing-pe.out")
-if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $lp.Id -Force; throw "landing PE did not listen" }
+if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -ErrorAction SilentlyContinue -Id $lp.Id -Force; throw "landing PE did not listen" }
 $lport = [int]$Matches[1]
 try {
     Assert-Case (Read-Http $lport "GET" "/healthz" $null) 200 'ok' "get_healthz"
@@ -157,7 +157,7 @@ try {
     Assert-Case (Read-Http $lport "GET" "/partnership" $null) 307 '{"status":307,"location":"/partners"}' "get_partnership"
     Assert-Case (Read-Http $lport "GET" "/partners" $null) 503 '{"reason":"data_held"}' "get_partners_held"
 } finally {
-    Stop-Process -Id $lp.Id -Force
+    Stop-Process -ErrorAction SilentlyContinue -Id $lp.Id -Force
 }
 
 Write-Host "Windows PE rebuild fcgcpa + unauth sidecar + landing-go steps completed on this CouchStation. Linux is not PE proof."
