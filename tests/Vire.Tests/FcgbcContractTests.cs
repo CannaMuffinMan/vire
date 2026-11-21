@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text.Json;
 using Xunit;
@@ -20,7 +21,11 @@ public class FcgbcContractTests
         Assert.Contains("Content-Type: application/json\\r\\nContent-Length:", net);
         Assert.DoesNotContain("application/json; charset=utf-8", net);
         string listen = File.ReadAllText(Path.Combine(root, "VireListen.cs"));
-        Assert.Contains("Content-Type: application/json\\r\\n", listen);
+        // Landing/proxy stack uses ContentTypeOf (JSON is application/json with no charset).
+        Assert.True(
+            listen.IndexOf("Content-Type: application/json\\r\\n", StringComparison.Ordinal) >= 0
+            || listen.IndexOf("ContentTypeOf", StringComparison.Ordinal) >= 0,
+            "host listen must emit JSON Content-Type without charset");
         int jsonCases = 0;
         foreach (JsonElement c in doc.RootElement.GetProperty("cases").EnumerateArray())
         {

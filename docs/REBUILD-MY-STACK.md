@@ -83,6 +83,13 @@ Flag, do not paper over:
 
 HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, same needles as `VireListen.StatusOf`). Reason phrases stay `OK` vs `Error` on native (host uses `Not Found` / `Forbidden`). Contracts compare numeric status, not the reason phrase.
 
+### Rank 6a SOP HMAC cookie + 6b-r loopback proxy routes (this PR)
+
+- **Property:** `sop_issue` / `sop_verify` HMAC-SHA256 over `v1.<exp>`; `ct_eq` on the 32-byte MAC; missing, tampered, and expired cookies deny. Cookie name `fcg_sop_authenticated`. Secret is a harness-generated hex fixture, never a production env value.
+- **Proxy routes:** landing-go `/api/upstream/*` and `/api/gateway-down` (502); dev-portal-go goldens (`dist_missing`, `not_configured`) plus `/fcg-api/` prefix strip; edge-go `/healthz` plus loopback proxy when the process host-arg is `www` or `dev`, else 404.
+- **Regression:** `tests/rebuild/guests/landing-sop.vire`, `dev-portal-go.vire`, `edge-go.vire` + `tools/rebuild-sop-proxy-diff.sh`.
+- **Residual:** Cookie request header is not a listen `route` argument (CLI `header` mode parses it). No TLS, DNS, public bind, railway.internal, Shopify/media-lab, or real `FCG_AUTH_COOKIE_SECRET`. After merging native HMAC into `rt-more.vire`, **listen + `proxy_reply` segfaults** on Linux ELF (connect/`proxy` from `main` still matches). Proxy route proof is host listen vs native `proxy` CLI. Cookie listen host-vs-native still matches.
+
 ### Rank 6b reverse-proxy primitive (this PR)
 
 - **Property:** guests may `use "src/http-client.vire"` and call `http` / `proxy` / `proxy_reply`. Outbound is `connect` to `127.0.0.1` only (same private-network refuse as TCP client). GET/POST with Content-Length. Response parse is fail-closed on CL+TE, duplicate CL, Transfer-Encoding/chunked, oversize (>1_000_000 or header block >16_384), and timeout. `proxy` strips hop-by-hop headers, sets `X-Forwarded-For/Host/Proto`, rewrites `Location` with a prefix, and returns 502 `{"error":"bad gateway"}` on upstream failure. Native connect sets 5s `SO_RCVTIMEO`/`SO_SNDTIMEO` (PE DWORD; ELF stub maps to `timeval`). Listen JSON `"status":502` maps to HTTP 502 (`StatusOf` + `rt_net_statusof` wrapper).
@@ -109,6 +116,8 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
 | HTTP/1.1 client (loopback) | **Present** PE + ELF | `src/http-client.vire` via `connect`/`send`/`recv`; 5s socket timeouts |
 | Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}` |
+| HMAC-SHA256 / Cookie / JWT HS256 | **Present** | `hmac` builtin + `src/rt-crypto.vire` (PR #105). SOP gate in `src/sop-cookie.vire` |
+| SOP HMAC cookie gate | **Present** (fixture secret) | issue/verify, `ct_eq` MAC, missing/tamper/expired deny |
 | Files `data/` / `site/` | **Present** | `rt_read` / `rt_write`; Linux `openat` + `O_NOFOLLOW` |
 | SHA-256 `hash` | **Present** | `crypto-prove.vire`, million-hash |
 | PostgreSQL v3 loopback | **Present, no TLS** | `src/rt-pg.vire`, `tools/pg-prove-linux.sh` |
@@ -137,11 +146,12 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST on native (bounded body, Content-Length required) | **Done (this PR).** Native `rt-net` request body is a leaf heap text capped at 1_000_000, fail-closed 411/413/400. Host vs native `/block` vs `tests/rebuild/contracts/fcg-chain.json`. |
 | 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
 | 6 | `landing-go` unauth fixtures (healthz, JSON APIs, 307s, held-503, fixture HTML) | HTTP, JSON, text/html, Location / WWW-Authenticate | Present on this PR (Linux ELF harness) | **This PR.** Rank 6 static HTML is in-tree strings. Host vs native `tools/rebuild-landing-diff.sh`. |
-| 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | Missing | **Blocked.** No stubs. |
-| 6b | reverse-proxy primitive (shared by landing-go / dev-portal-go / edge-go / api-go) | outbound HTTP/1.1, hop-by-hop strip, X-Forwarded-*, Location prefix, 502 | **This PR.** Primitive only; those services' routes are not ported. |
+| 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | **This PR.** Fixture secret; `ct_eq` MAC; missing/tamper/expired deny. Listen does not forward `Cookie` (POST body / CLI header). |
+| 6b | reverse-proxy primitive (shared by landing-go / dev-portal-go / edge-go / api-go) | outbound HTTP/1.1, hop-by-hop strip, X-Forwarded-*, Location prefix, 502 | Primitive in PR #107. |
+| 6b-r | landing-go / dev-portal-go / edge-go **loopback** proxy routes | `proxy_reply` to `127.0.0.1` | **This PR.** `LANDING_API_UPSTREAM` as `/api/upstream/*`; `/fcg-api/` strip; edge Host via process args (`www`/`dev`/`unknown`). |
 | 6c | `landing-go` Shopify / media-lab APIs | held 503 in Go; out of scope here | — | **Blocked.** No stubs. |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
-| 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
+| 8 | Rest of Go `api-go` / `cpa-go` | JWT session cookies, TLS proxy, remaining routes | Health GETs only | Remaining routes **Blocked** (no TLS/DNS/public upstream stubs). Dev-portal JWT `Set-Cookie` session not ported. |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
 | 10 | WebSocket chat / live | WS, maybe TLS | Fixture only | Blocked |
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
@@ -182,7 +192,8 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Native POST `/block` body read is proven on this branch (bounded leaf heap text). Remaining chain rotate/507/503/migrate is not.
 - Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
 - Remaining sidecar routes beyond the five GET goldens
-- `landing-go` SOP HMAC cookies, Shopify/media-lab (blocked; no stubs). Reverse-proxy **primitive** is in `src/http-client.vire`; landing-go `LANDING_UPSTREAM` routes are not ported here.
+- `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Residual: listen `route` still sees `method, path, body` only (no Cookie header); HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
+- Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
@@ -199,6 +210,7 @@ bash tools/rebuild-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
 bash tools/rebuild-landing-diff.sh
 bash tools/rebuild-proxy-diff.sh
+bash tools/rebuild-sop-proxy-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 

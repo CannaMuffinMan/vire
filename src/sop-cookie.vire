@@ -1,0 +1,119 @@
+~ landing-go SOP HMAC cookie gate (fixture secret only).
+~ Cookie value: v1.<unixExp>.<hmac_sha256_hex(secret, "v1.<unixExp>")>
+~ Name: fcg_sop_authenticated. MAC compare is ct_eq on the 32-byte digest.
+~ Tamper, expired, and missing cookies deny. Residual: listen does not
+~ forward the Cookie request header, so HTTP verify uses POST body.
+use "rt-crypto.vire"
+
+define sop_cookie_name
+  return "fcg_sop_authenticated"
+end
+
+define sop_mac with secret, payload
+  let ab be ascii_bytes with payload
+  if (ab at 0) != "ok"
+    return none
+  end
+  return hmac_sha256 with secret, (ab at 1)
+end
+
+define sop_issue with secret, exp
+  if secret == none
+    return ["deny", "missing"]
+  end
+  let n be length with secret
+  if n == 0
+    return ["deny", "missing"]
+  end
+  let payload be "v1." + (text with exp)
+  let mac be sop_mac with secret, payload
+  if mac == none
+    return ["deny", "tamper"]
+  end
+  return ["ok", payload + "." + (hex with mac)]
+end
+
+define sop_split with cookie
+  if cookie == none
+    return none
+  end
+  if cookie == ""
+    return none
+  end
+  let n be length with cookie
+  if n < 5
+    return none
+  end
+  if (slice with cookie, 0, 3) != "v1."
+    return none
+  end
+  let i be 3
+  while i < n
+    if (cookie at i) == "."
+      stop
+    end
+    let i be i + 1
+  end
+  if i >= n
+    return none
+  end
+  if i == 3
+    return none
+  end
+  let expText be slice with cookie, 3, i
+  let macHex be slice with cookie, (i + 1), n
+  return [expText, macHex]
+end
+
+define sop_verify with secret, cookie, clock
+  if cookie == none
+    return ["deny", "missing"]
+  end
+  if cookie == ""
+    return ["deny", "missing"]
+  end
+  if cookie == "-"
+    return ["deny", "missing"]
+  end
+  if secret == none
+    return ["deny", "missing"]
+  end
+  let parts be sop_split with cookie
+  if parts == none
+    return ["deny", "tamper"]
+  end
+  let expText be parts at 0
+  let macHex be parts at 1
+  let payload be "v1." + expText
+  let want be sop_mac with secret, payload
+  let got be hex_to_bytes with macHex
+  if want == none
+    return ["deny", "tamper"]
+  end
+  if (got at 0) != "ok"
+    return ["deny", "tamper"]
+  end
+  if not (ct_eq with want, (got at 1))
+    return ["deny", "tamper"]
+  end
+  let exp be number with expText
+  if exp <= clock
+    return ["deny", "expired"]
+  end
+  return ["ok", exp]
+end
+
+define sop_from_header with header
+  let pairs be cookie_parse with header
+  let i be 0
+  let n be length with pairs
+  let name be sop_cookie_name
+  while i < n
+    let p be pairs at i
+    if (p at 0) == name
+      return p at 1
+    end
+    let i be i + 1
+  end
+  return ""
+end

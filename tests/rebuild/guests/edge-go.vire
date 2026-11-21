@@ -1,0 +1,35 @@
+~ edge-go loopback port: /healthz local; other paths proxy to 127.0.0.1.
+~ railway.internal and public Host maps stay blocked (no TLS/DNS). Fixture host is args[1]:
+~ "www" and "dev" proxy; anything else 404 (unknown Host).
+use "http-client.vire"
+
+define route with method, path, body
+  let port be number with (args at 0)
+  let host be args at 1
+  if path == "/healthz"
+    return "ok"
+  end
+  if host == "www"
+    if path == "/echo"
+      return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "Host: www.fixture.test\r\n", "prefix": ""}
+    end
+  end
+  if host == "dev"
+    if path == "/echo"
+      return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "Host: dev.fixture.test\r\n", "prefix": ""}
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  let port be number with (args at 0)
+  let host be args at 1
+  if host == "proxy-echo"
+    let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "Host: www.fixture.test\r\n", "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  listen with 0
+end
