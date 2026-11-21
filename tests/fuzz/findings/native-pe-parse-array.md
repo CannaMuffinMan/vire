@@ -13,4 +13,4 @@ Observed: `UC_ERR_WRITE_UNMAPPED` at `5368745172`, `EXIT None`. Host interpreter
 
 The campaign `grammar-builtins.vire` seed hits this after printing split/at/cat/text/has, then faults on `parse`/`json`.
 
-Not fixed in this PR (harness-only). Caps unchanged.
+Fixed on native-compiler: parse cursor is `{ptr, end}` (not length-as-pointer), skip reloads the cursor from `[rbp-8]`, and cmp/movzx walk the text pointer. Caps unchanged.

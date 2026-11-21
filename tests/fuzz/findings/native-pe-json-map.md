@@ -11,4 +11,4 @@ python3 tools/native-pe-emu.py /tmp/json-map.hex
 
 Observed: `UC_ERR_READ_UNMAPPED` at `0x140000010` range (emu: `5368724496`), `EXIT None`, empty stdout. Host interpreter of the same guest prints `{"a": 2}`.
 
-Not fixed in this PR (harness-only). Caps unchanged.
+Fixed on native-compiler: `rt_buf_finish` / `rt_int_text` now return the text object in rax, and the JSON blob reloads the encode buffer in rcx before writing `:`. Caps unchanged.
