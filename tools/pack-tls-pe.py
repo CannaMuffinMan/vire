@@ -231,23 +231,25 @@ def run():
         if n not in names:
             names.append(n)
     idx = {n: i for i, n in enumerate(names)}
-    pins = []
-    for n, off in a.labels.items():
-        pins.append(u32(off) + bytes(4) + bytes((idx[n] & 255, (idx[n] >> 8) & 255)))
-        # 12-byte records like net: off u32, pad 4, id u16
-    # parseU32 + parseU16 at +8; 12 bytes. pad 4 zeros.
+    # Hex records are 12 chars: u32 off + u16 name id (see applyPackedPins).
     pin_raw = b"".join(
-        u32(off) + b"\x00\x00\x00\x00" + bytes((idx[n] & 255, idx[n] >> 8 & 255))
+        u32(off) + bytes((idx[n] & 255, (idx[n] >> 8) & 255))
         for n, off in a.labels.items()
     )
     fix_raw = b"".join(
-        u32(at) + b"\x00\x00\x00\x00" + bytes((idx[n] & 255, idx[n] >> 8 & 255))
+        u32(at) + bytes((idx[n] & 255, (idx[n] >> 8) & 255))
         for at, n in a.fixes
     )
-    (ROOT / "src" / "rt-tls-pe-blob.txt").write_text(blob)
-    (ROOT / "src" / "rt-tls-pe-pins.txt").write_text(pin_raw.hex())
-    (ROOT / "src" / "rt-tls-pe-fixes.txt").write_text(fix_raw.hex())
+    for dest in (ROOT / "src", ROOT / "data" / "src"):
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "rt-tls-pe-blob.txt").write_text(blob)
+        (dest / "rt-tls-pe-pins.txt").write_text(pin_raw.hex())
+        (dest / "rt-tls-pe-fixes.txt").write_text(fix_raw.hex())
     (ROOT / "src" / "rt-tls-pe-names.txt").write_text("\n".join(names) + "\n")
+    quoted = ", ".join('"' + n + '"' for n in names)
+    print("define tlsPeNames")
+    print("  return [" + quoted + "]")
+    print("end")
     print("blob_bytes", len(a.image), "pins", len(a.labels), "fixes", len(a.fixes), "names", len(names))
 
 
