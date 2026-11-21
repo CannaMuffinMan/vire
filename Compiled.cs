@@ -599,7 +599,12 @@ sealed class CompiledMachine
             if (args.Count != 1) throw new VireError("hex takes 1 values, got " + args.Count, line, col);
             return Program.HexBytes(args[0], line, col);
         }
-        if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
+        if (name == "hash")
+        {
+            string raw = args[0] as string;
+            if (raw == null) return VireSeal.HashText(Show(args[0]));
+            return VireSeal.HashGuest(raw);
+        }
         if (name == "chr")
         {
             if (args.Count != 1) throw new VireError("chr takes 1 values, got " + args.Count, line, col);
@@ -1009,6 +1014,14 @@ sealed class CompiledMachine
             if (ca == null) throw new VireError("tls_connect needs a host, a port, a name, and a ca file", line, col);
             if (ca.Length > 0) ca = Safe(ca, line, col);
             return VireTls.Connect(args[0] as string, args[1], args[2] as string, ca, tcp, root, line, col);
+        }
+        if (name == "tls_wrap")
+        {
+            if (args.Count != 4) throw new VireError("tls_wrap takes 4 values, got " + args.Count, line, col);
+            string wrapCa = args[2] as string;
+            if (wrapCa == null) throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, col);
+            if (wrapCa.Length > 0) wrapCa = Safe(wrapCa, line, col);
+            return VireTls.Wrap(args[0], args[1] as string, wrapCa, args[3], tcp, line, col);
         }
         if (name == "tls_listen")
         {

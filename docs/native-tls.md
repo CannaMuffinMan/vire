@@ -19,12 +19,13 @@ Linux has no SChannel. The kernel does not perform the handshake.
 | Minimum version | `OpenSSL_version_num() >= 0x30000000` (3.0.0). Below that, `tls_connect` fail-closes. Loading `libssl.so.3` already requires the OPENSSL_3.0 ELF version. |
 | Not used for non-TLS | If a program never calls `tls_*`, the image has no INTERP and no DT_NEEDED. |
 
-Windows native PE: SChannel via a fixed `secur32.dll` + `crypt32.dll` IAT (`AcquireCredentialsHandleA`, `InitializeSecurityContextA` / `AcceptSecurityContext`, `EncryptMessage` / `DecryptMessage`). TLS 1.2|1.3 only (`SP_PROT_TLS1_2_* | SP_PROT_TLS1_3_*`). Client verification is on (`SCH_CRED_AUTO_CRED_VALIDATION`, `pszTargetName` = `name`). No `SCH_CRED_NO_SERVERNAME_CHECK`, no `SCH_CRED_MANUAL_CRED_VALIDATION`, no `SCH_CRED_IGNORE_NO_REVOCATION_CHECK`. Empty `ca` uses the system store; a non-empty `ca` is a sandboxed PEM loaded into an in-memory root store. Server cert is a sandboxed PFX (`tls_listen` cert path); `key` is the PFX password (empty allowed). Host `SslStream` still runs on both OS. Windows PE execute proof: `tools/tls-schannel-windows.ps1` (PENDING unless CouchStation ran it).
+Windows native PE: `openTlsPeImage` SChannel via a fixed `secur32.dll` + `crypt32.dll` IAT (`AcquireCredentialsHandleA`, `InitializeSecurityContextA` / `AcceptSecurityContext`, `EncryptMessage` / `DecryptMessage`). TLS 1.2|1.3 only (`SP_PROT_TLS1_2_* | SP_PROT_TLS1_3_*`). Client verification is on (`SCH_CRED_AUTO_CRED_VALIDATION`, `pszTargetName` = `name`). No `SCH_CRED_NO_SERVERNAME_CHECK`, no `SCH_CRED_MANUAL_CRED_VALIDATION`, no `SCH_CRED_IGNORE_NO_REVOCATION_CHECK`. Empty `ca` uses the system store; a non-empty `ca` is a sandboxed PEM loaded into an in-memory root store. Server cert is a sandboxed PFX (`tls_listen` cert path); `key` is the PFX password (empty allowed). Host `SslStream` still runs on both OS. Windows PE execute proofs: `tools/tls-schannel-windows.ps1` and `tools/pg-redis-tls-windows.ps1` (PENDING unless CouchStation ran them).
 
 ## Guest API
 
 ```
 tls_connect with host, port, name, ca
+tls_wrap with handle, name, ca, checkHost
 tls_send with handle, text
 tls_recv with handle, size
 tls_close with handle
@@ -32,6 +33,7 @@ tls_listen with port, cert, key   ~ host SslStream; Linux ELF PEM; Windows PE sa
 ```
 
 - `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate.
+- `tls_wrap` runs the same handshake on an existing TCP handle (`checkHost` 1 = verify-full hostname, 0 = require: encrypt + chain, no hostname). Used after Postgres SSLRequest `'S'`.
 - `ca` empty (`""`) uses the system trust store (`SSL_CTX_set_default_verify_paths` / OS roots). A non-empty `ca` must pass the same **data/ / site/** sandbox as `read` (`rt_check_path` on ELF, `SafePath` on the host). Traversal and paths outside that gate fail closed. OpenSSL never sees a path that skipped the gate.
 - Validation is on. There is no skip-verify flag.
 - Recv cap 1_000_000 bytes, same as TCP.
@@ -62,6 +64,7 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 - Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping; `tls_listen` `/health`; negatives fail-closed).
 - Windows host: `tools/tls-server-windows.ps1` (SslStream `/health`).
 - Windows PE SChannel: `tools/tls-schannel-windows.ps1` (PENDING CouchStation).
+- Windows PE Postgres/Redis TLS: `tools/pg-redis-tls-windows.ps1` (PENDING CouchStation; loopback test servers only).
 
 ## Shared files
 

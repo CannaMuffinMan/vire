@@ -15,7 +15,7 @@ $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $PinSha"
 Write-Output "pass_after_sha $AfterSha"
 Write-Output "pg_pin $PinSha"
-Write-Output "pg_residual no TLS; SCRAM-SHA-256 not used (5M cap); auth trust"
+Write-Output "pg_residual no TLS (TLS lane); native recv timeout is host 5s / SO_RCVTIMEO follow-up"
 Write-VireHostInfo
 
 function Ensure-PinCommit {
@@ -213,11 +213,20 @@ if (Test-Path $PgData) {
 }
 $initdb = Join-Path $PgBin "initdb.exe"
 $createdb = Join-Path $PgBin "createdb.exe"
+$psql = Join-Path $PgBin "psql.exe"
+$alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$buf = New-Object byte[] 20
+$rng.GetBytes($buf)
+$chars = New-Object char[] 20
+for ($i = 0; $i -lt 20; $i++) { $chars[$i] = $alphabet[$buf[$i] % $alphabet.Length] }
+$PgSecret = -join $chars
+Write-Output "pg_secret_len $($PgSecret.Length)"
 $env:PGPASSWORD = "ThrowawayVireCi1"
 & $initdb -D $PgData -U $PgUser --auth=trust --auth-local=trust --no-sync --locale=C --encoding=UTF8
 if ($LASTEXITCODE -ne 0) { throw "initdb exit $LASTEXITCODE" }
 $conf = Join-Path $PgData "postgresql.conf"
-Add-Content -Path $conf -Value "`nlisten_addresses = '127.0.0.1'`nport = $PgPort`nunix_socket_directories = ''`npassword_encryption = scram-sha-256`n"
+Add-Content -Path $conf -Value "`nlisten_addresses = '127.0.0.1'`nport = $PgPort`nunix_socket_directories = ''`npassword_encryption = scram-sha-256`nscram_iterations = 32`n"
 $hba = Join-Path $PgData "pg_hba.conf"
 Set-Content -Path $hba -Value @"
 local   all             all                                     trust
@@ -236,7 +245,24 @@ $proofError = $null
 try {
     & $createdb -h 127.0.0.1 -p $PgPort -U $PgUser $PgDb
     if ($LASTEXITCODE -ne 0) { throw "createdb exit $LASTEXITCODE" }
-    Write-Output "pg_ready 16 loopback trust"
+    & $psql -h 127.0.0.1 -p $PgPort -U $PgUser -d $PgDb -v ON_ERROR_STOP=1 -c "ALTER USER $PgUser PASSWORD '$PgSecret';"
+    if ($LASTEXITCODE -ne 0) { throw "ALTER USER exit $LASTEXITCODE" }
+    Set-Content -Path $hba -Value @"
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 reject
+host    all             all             0.0.0.0/0               reject
+"@
+    & $pgctl -D $PgData reload
+    Write-Output "pg_ready loopback scram-sha-256"
+
+    Write-Output "pg_decode_start"
+    $decodeOut = & dotnet exec $VireDll "pg-decode-prove.vire"
+    $decodeCode = $LASTEXITCODE
+    Write-Output $decodeOut
+    Write-Output "pg_decode_exit $decodeCode"
+    if ($decodeCode -ne 0) { throw "pg-decode-prove exit $decodeCode" }
+    if ("$decodeOut" -notmatch "PG DECODE PROVE pass") { throw "decode prove missing pass line" }
 
     $lib = [System.IO.File]::ReadAllText((Join-Path $Root "src/rt-pg.vire"))
     $guest = [System.IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-client.vire"))
@@ -244,7 +270,7 @@ try {
     $guest = $guest -replace "PORT_PLACEHOLDER", "$PgPort"
     $guest = $guest -replace "PGUSER_PLACEHOLDER", $PgUser
     $guest = $guest -replace "PGDB_PLACEHOLDER", $PgDb
-    $guest = $guest -replace "PGSECRET_PLACEHOLDER", ""
+    $guest = $guest -replace "PGSECRET_PLACEHOLDER", $PgSecret
     $combined = $lib + "`n" + $guest
     $guestPath = Join-Path $Data "pg-client.vire"
     $utf8 = New-Object System.Text.UTF8Encoding $false
@@ -267,7 +293,11 @@ try {
         "select1 1",
         "roundtrip 7",
         "bad-sql ",
+        "auth scram-sha-256",
         "injection-blocked table-live",
+        "rollback 1",
+        "commit 2",
+        "typed int-bool-null",
         "PG PROVE pass"
     )) {
         if (-not $hostText.Contains($n)) { throw "host missing $n" }

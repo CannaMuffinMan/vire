@@ -15,6 +15,9 @@ publish/
 *.dll
 *.pdb
 *.hex
+pg-tls-run.vire
+pg-tls-neg-run.vire
+pg-tls-verify-run.vire
 
 # secrets, keys, wallets
 .env

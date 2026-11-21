@@ -2,10 +2,11 @@ use "src/rt-tls-pe.vire"
 
 ~ Native TLS: Linux OpenSSL 3 via PT_INTERP/libssl.so.3. Windows PE SChannel
 ~ (secur32/crypt32 IAT). Guest APIs:
-~ tls_connect host port name ca; tls_listen port cert key; tls_send/recv/close.
+~ tls_connect host port name ca; tls_wrap handle name ca checkHost;
+~ tls_listen port cert key; tls_send/recv/close.
 ~ Cert validation on. TLS 1.2 minimum, TLS 1.3 max. No insecure flags.
-~ tls_listen loads PEM cert/key under data/ or site/, then reuses rt_listen
-~ with SSL_accept on the loopback HTTP path. Windows PE tls_listen fail-closed.
+~ ELF tls_listen: PEM cert/key under data/ or site/, then rt_listen + SSL_accept.
+~ PE tls_listen: sandboxed PFX + SChannel AcceptSecurityContext.
 
 define tlsSymNames
   return ["TLS_client_method", "TLS_server_method", "SSL_CTX_new", "SSL_CTX_free", "SSL_CTX_set_verify", "SSL_CTX_ctrl", "SSL_CTX_load_verify_locations", "SSL_CTX_set_default_verify_paths", "SSL_CTX_use_certificate_file", "SSL_CTX_use_PrivateKey_file", "SSL_CTX_check_private_key", "SSL_new", "SSL_free", "SSL_set_fd", "SSL_connect", "SSL_accept", "SSL_read", "SSL_write", "SSL_shutdown", "SSL_get_verify_result", "SSL_set1_host", "SSL_CTX_set_options", "OpenSSL_version_num"]
@@ -261,11 +262,38 @@ define emitTlsWrapAccept with image, fixes, labels
 end
 
 define emitTlsGuest with image, fixes, labels
+  pin with labels, "rt_tls_wrap", image
+  emitPro with image
+  emitPop2 with image
+  ~ rax/rdx = ca, r8/r9 = checkHost
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 249, 1, 15, 135]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 13]
+  emitRel with image, fixes, "tls_checkhost"
+  emitList with image, [72, 137, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitPop2 with image
+  ~ rax/rdx = handle, r8/r9 = name
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 13]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [72, 137, 85, 224]
+  emitJmpTo with image, fixes, "tls_hs_start"
+
   pin with labels, "rt_tls_connect", image
   emitPro with image
   emitPop2 with image
   ~ rax/rdx = name, r8/r9 = ca
-  emitList with image, [72, 137, 85, 208, 76, 137, 13]
+  emitList with image, [72, 137, 21]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [76, 137, 13]
   emitRel with image, fixes, "tls_captr"
   emitList with image, [72, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_conn_bad"
@@ -277,6 +305,9 @@ define emitTlsGuest with image, fixes, labels
   emitRel with image, fixes, "tls_conn_bad"
   emitList with image, [73, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_checkhost"
+  emitU32 with image, 1
   emitList with image, [72, 139, 85, 240]
   emitPushTag with image, 2
   emitList with image, [72, 139, 85, 232]
@@ -284,6 +315,7 @@ define emitTlsGuest with image, fixes, labels
   emitCallTo with image, fixes, "rt_connect"
   emitPop1 with image
   emitList with image, [72, 137, 85, 224]
+  pin with labels, "tls_hs_start", image
   ~ TLS_client_method()
   emitList with image, [49, 201]
   let image be emitIat with image, fixes, "iat_tcm"
@@ -359,10 +391,17 @@ define emitTlsGuest with image, fixes, labels
   emitList with image, [139, 21]
   emitRel with image, fixes, "tcp_socks"
   let image be emitIat with image, fixes, "iat_setfd"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_checkhost"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_skip_host"
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "tls_ssl"
-  emitList with image, [72, 139, 85, 208, 72, 141, 82, 8]
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [72, 141, 82, 8]
   let image be emitIat with image, fixes, "iat_sethost"
+  pin with labels, "tls_skip_host", image
   emitList with image, [72, 139, 13]
   emitRel with image, fixes, "tls_ssl"
   let image be emitIat with image, fixes, "iat_sslcon"
@@ -378,6 +417,8 @@ define emitTlsGuest with image, fixes, labels
   emitEpi with image
   pin with labels, "tls_conn_bad", image
   emitFail with image, fixes, "msg_tls_args"
+  pin with labels, "tls_wrap_bad", image
+  emitFail with image, fixes, "msg_tls_wrap"
   pin with labels, "tls_hs_fail", image
   emitFail with image, fixes, "msg_tls_hs"
   pin with labels, "tls_ver_fail", image
@@ -543,25 +584,6 @@ define emitTlsGuest with image, fixes, labels
   return image
 end
 
-define emitTlsPeRefuse with image, fixes, labels
-  pin with labels, "rt_tls_connect", image
-  emitPro with image
-  emitFail with image, fixes, "msg_tls_pe"
-  pin with labels, "rt_tls_send", image
-  emitPro with image
-  emitFail with image, fixes, "msg_tls_pe"
-  pin with labels, "rt_tls_recv", image
-  emitPro with image
-  emitFail with image, fixes, "msg_tls_pe"
-  pin with labels, "rt_tls_close", image
-  emitPro with image
-  emitFail with image, fixes, "msg_tls_pe"
-  pin with labels, "rt_tls_listen", image
-  emitPro with image
-  emitFail with image, fixes, "msg_tls_pe"
-  return image
-end
-
 define emitTlsRuntime with image, fixes, labels, elf
   if elf
     let image be emitTlsGuest with image, fixes, labels
@@ -572,6 +594,7 @@ end
 
 define parkTls with image, labels
   parkMsg with image, labels, "msg_tls_args", "tls_connect needs a host, a port, a name, and a ca file"
+  parkMsg with image, labels, "msg_tls_wrap", "tls_wrap needs a connection, a name, a ca file, and a host check"
   parkMsg with image, labels, "msg_tls_hs", "tls handshake failed"
   parkMsg with image, labels, "msg_tls_send", "tls_send needs a connection and text"
   parkMsg with image, labels, "msg_tls_recv", "tls_recv needs a connection and a size"
@@ -589,6 +612,8 @@ define parkTls with image, labels
   pin with labels, "tls_fd", image
   let image be emitU64 with image, 0
   pin with labels, "tls_captr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_checkhost", image
   let image be emitU64 with image, 0
   pin with labels, "tls_got_head", image
   let image be emitU64 with image, 0
