@@ -1,5 +1,7 @@
 # fcgbds-dashboard-go blocked (no stubs)
 
+TODO(VIRE-FINISH-NOW): prove remaining dashboard-go routes/headers listed below on host and native without raising caps.
+
 - static HTML and 307 `/obs` when Dist is set
 - optional Upstream HTTP (main leaves nil; no live fetch)
 - `X-FCGBDS-Fallback` / `X-FCGBDS-Wall` headers
