@@ -1,0 +1,9 @@
+~ FAIL_BEFORE for edge unauth goldens (route absent at a58999b1).
+
+define route with method, path, body
+  return "{\"wrong\":true}"
+end
+
+define main
+  listen with 18080
+end

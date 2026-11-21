@@ -1,0 +1,17 @@
+~ dev-portal-go unauth fail-closed routes (derived from source, not live).
+~ Missing dist is checked before the page cookie gate, so GET / is 503 dist_missing
+~ with no cookie. Cookie/JWT session and /fcg-api/ proxy are blocked (no stubs).
+
+define route with method, path, body
+  if path == "/"
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  if path == "/login"
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  return "{\"reason\":\"dist_missing\",\"status\":503}"
+end
+
+define main
+  listen with 18080
+end

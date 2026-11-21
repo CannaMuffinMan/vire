@@ -1,0 +1,9 @@
+~ FAIL_BEFORE for dashboard unauth goldens.
+
+define route with method, path, body
+  return "{\"wrong\":true}"
+end
+
+define main
+  listen with 18080
+end

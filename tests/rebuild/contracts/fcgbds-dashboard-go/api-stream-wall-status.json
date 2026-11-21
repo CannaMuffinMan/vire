@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-stream-wall-status",
+  "source": "GET /api/stream-wall/status locked stream. Struct field order. Native Cache-Control remains no-store (Go sets public max-age=3).",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_stream_status",
+      "method": "GET",
+      "path": "/api/stream-wall/status",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}\n"
+    }
+  ]
+}

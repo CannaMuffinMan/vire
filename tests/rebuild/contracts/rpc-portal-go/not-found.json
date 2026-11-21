@@ -1,0 +1,25 @@
+{
+  "id": "rpc-portal-go/not-found",
+  "source": "rpc-portal-go unknown path. Go /api/* uses stdlib 404 page; Vire JSON 404 with status field (same mapping as prior rebuild 404).",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_unknown",
+      "method": "GET",
+      "path": "/api/nope",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+    }
+  ]
+}

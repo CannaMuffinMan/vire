@@ -1,0 +1,44 @@
+~ rpc-portal-go unauth JSON (derived from source, not live).
+~ GET /api/health already in PR #100. This guest adds capabilities, rpc-off,
+~ payments-off transfer, dist_missing, 404/405. JWT/vault/holdings/static files blocked.
+~ Extra Go security headers (X-Frame-Options, Referrer-Policy, Permissions-Policy)
+~ are not on native listen; nosniff + Cache-Control no-store are.
+~ Non-200 replies include JSON "status":N so host StatusOf / native rt_net_statusof match HTTP.
+
+define route with method, path, body
+  if path == "/api/health"
+    if method == "GET"
+      return "{\"ok\":true}"
+    end
+    return "{\"error\":\"method not allowed\",\"status\":405}"
+  end
+  if path == "/api/capabilities"
+    if method == "GET"
+      return "{\"node\":false}"
+    end
+    return "{\"error\":\"method not allowed\",\"status\":405}"
+  end
+  if path == "/api/rpc"
+    if method == "GET"
+      return "{\"enabled\":false,\"status\":503}"
+    end
+    return "{\"error\":\"method not allowed\",\"status\":405}"
+  end
+  if path == "/api/transfer"
+    if method == "POST"
+      return "{\"code\":\"value_transfer_disabled\",\"error\":\"$FCGC is not offered to the public. User-to-user transfer is disabled.\",\"status\":403}"
+    end
+    return "{\"error\":\"method not allowed\",\"status\":405}"
+  end
+  if path == "/"
+    if method == "GET"
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+    return "{\"error\":\"method not allowed\",\"status\":405}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end
