@@ -19,12 +19,13 @@ Linux has no SChannel. The kernel does not perform the handshake.
 | Minimum version | `OpenSSL_version_num() >= 0x30000000` (3.0.0). Below that, `tls_connect` fail-closes. Loading `libssl.so.3` already requires the OPENSSL_3.0 ELF version. |
 | Not used for non-TLS | If a program never calls `tls_*`, the image has no INTERP and no DT_NEEDED. |
 
-Windows native PE: APIs exist; the PE path fail-closes until SChannel is proven. Host `SslStream` runs on both OS.
+Windows native PE: `openPeTlsImage` imports `secur32.dll` (`AcquireCredentialsHandleA`, `InitializeSecurityContextA`, `EncryptMessage`, `DecryptMessage`, …) and `crypt32.dll` (`CertOpenStore`). Host `SslStream` runs on both OS. Prove the PE handshake on a Windows box (`tools/pg-tls-prove-windows.ps1`).
 
 ## Guest API
 
 ```
 tls_connect with host, port, name, ca
+tls_wrap with handle, name, ca, checkHost
 tls_send with handle, text
 tls_recv with handle, size
 tls_close with handle
@@ -32,6 +33,7 @@ tls_listen with port, cert, key   ~ native ELF fail-closed; host interpreter onl
 ```
 
 - `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate.
+- `tls_wrap` runs the same handshake on an existing TCP handle (`checkHost` 1 = verify-full hostname, 0 = require: encrypt + chain, no hostname). Used after Postgres SSLRequest `'S'`.
 - `ca` empty (`""`) uses the system trust store (`SSL_CTX_set_default_verify_paths` / OS roots). A non-empty `ca` must pass the same **data/ / site/** sandbox as `read` (`rt_check_path` on ELF, `SafePath` on the host). Traversal and paths outside that gate fail closed. OpenSSL never sees a path that skipped the gate.
 - Validation is on. There is no skip-verify flag.
 - Recv cap 1_000_000 bytes, same as TCP.

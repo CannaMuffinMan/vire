@@ -1,0 +1,22 @@
+~ Negative SSLRequest: server says N, or S then not TLS.
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define main
+  let nport be NPORT_PLACEHOLDER
+  let sport be SPORT_PLACEHOLDER
+  let n be pg_open_ssl with "127.0.0.1", nport, "vire", "vire", "x", "require", "localhost", "data/pg-ca.pem"
+  if (n at "ok") == true
+    fail with "require accepted plaintext N"
+  end
+  say "ssl-refused " + (n at "why")
+  let s be pg_open_ssl with "127.0.0.1", sport, "vire", "vire", "x", "require", "localhost", "data/pg-ca.pem"
+  if (s at "ok") == true
+    fail with "downgrade S then plaintext missed"
+  end
+  say "downgrade " + (s at "why")
+  say "PG TLS NEG pass"
+end

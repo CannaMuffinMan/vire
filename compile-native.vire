@@ -693,6 +693,10 @@ define noteNeed with state, nm
     put true into state at "needNet"
     put true into state at "needTls"
   end
+  if nm == "tls_wrap"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
   if nm == "tls_listen"
     put true into state at "needNet"
     put true into state at "needTls"
@@ -1289,6 +1293,9 @@ define builtinArity with nm
   if nm == "tls_connect"
     return 4
   end
+  if nm == "tls_wrap"
+    return 4
+  end
   return -1
 end
 
@@ -1878,7 +1885,7 @@ define main
     end
   end
   if hits at "tls"
-    let opened be openNetImage
+    let opened be openPeTlsImage
     if wantElf
       let opened be openElfTlsImage
     end
