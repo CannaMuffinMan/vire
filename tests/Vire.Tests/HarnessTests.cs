@@ -135,6 +135,8 @@ public class HarnessTests
         Assert.Contains("native-pg-tls-windows", yml);
         Assert.Contains("native-redis-tls-windows", yml);
         Assert.Contains("redis-tls-prove-windows.ps1", yml);
+        Assert.Contains("pg-redis-tls-windows.ps1", yml);
+        Assert.Contains("native-pg-redis-tls-windows", yml);
         Assert.Contains("native-selfhost-handoff.ps1", yml);
         Assert.Contains("native-selfhost-windows", yml);
         Assert.DoesNotContain("continue-on-error: true", yml);

@@ -50,6 +50,12 @@ public class RedisTests
         Assert.Contains("plaintext downgrade", neg);
         string rebuild = File.ReadAllText(Path.Combine(root, "docs", "REBUILD-MY-STACK.md"));
         Assert.Contains("rediss://", rebuild);
-        Assert.Contains("What this PR does not prove", rebuild);
+        Assert.Contains("pg-redis-tls-windows.ps1", rebuild);
+        string ps = File.ReadAllText(Path.Combine(root, "tools", "pg-redis-tls-windows.ps1"));
+        Assert.Contains("1328b737d5d121cf5f898cb13e86a26d9f5f772f", ps);
+        Assert.Contains("rt_tls_wrap", ps);
+        Assert.Contains("127.0.0.1", ps);
+        Assert.Contains("VIRE_BUDGET", ps);
+        Assert.DoesNotContain("Set-MpPreference", ps);
     }
 }
