@@ -1,0 +1,41 @@
+{
+  "service": "vire-proxy-ws-loopback",
+  "notes": "RFC 6455 upgrade through src/http-client.vire proxy. Loopback fixture only. Hop-by-hop strip remains for non-upgrade HTTP.",
+  "bind": "127.0.0.1",
+  "rfc_key": "dGhlIHNhbXBsZSBub25jZQ==",
+  "rfc_accept": "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+  "cases": [
+    {
+      "name": "proxy-ws",
+      "request": {
+        "method": "GET",
+        "path": "/ws/echo",
+        "headers": [
+          "Upgrade: websocket",
+          "Connection: Upgrade",
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+          "Sec-WebSocket-Version: 13"
+        ],
+        "client_frames_hex": "8182000000006869888000000000"
+      },
+      "status": 101,
+      "response_headers": [
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+      ],
+      "tunnel_hex": "810268698800"
+    },
+    {
+      "name": "proxy-ws-bad",
+      "note": "Connection does not include Upgrade token",
+      "status": 400,
+      "body": "{\"error\":\"bad request\"}"
+    },
+    {
+      "name": "proxy-ws-refuse",
+      "status": 403,
+      "body": "forbidden"
+    }
+  ]
+}

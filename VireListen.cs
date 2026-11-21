@@ -282,7 +282,7 @@ static class VireListen
         if (text == null) text = "null";
         if (text.Length > maxOutput) text = "{\"error\":\"response too large\"}";
         int code = StatusOf(text, 200);
-        SendApi(stream, code, text, null);
+        SendApi(stream, code, text, ExtraHeadersOf(text));
     }
 
     static bool IsRequestBudget(VireError err)
@@ -293,16 +293,67 @@ static class VireListen
             || msg.IndexOf("while ran too long", StringComparison.Ordinal) >= 0;
     }
 
+    static string ContentTypeOf(string text)
+    {
+        if (text == null) return "application/json";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '{' || c == '[') return "application/json";
+            if (c == '<') return "text/html; charset=utf-8";
+            return "text/plain; charset=utf-8";
+        }
+        return "text/plain; charset=utf-8";
+    }
+
     static int StatusOf(string text, int fallback)
     {
         if (text == null) return fallback;
-        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400 };
+        if (text.IndexOf("\"reason\":\"data_held\"", StringComparison.Ordinal) >= 0) return 503;
+        if (text == "{\"enabled\":false}") return 503;
+        if (text == "Authentication required.") return 401;
+        int[] codes = { 507, 503, 502, 500, 431, 413, 411, 408, 404, 403, 401, 400, 307 };
         for (int i = 0; i < codes.Length; i++)
         {
             string needle = "\"status\":" + codes[i];
             if (text.IndexOf(needle, StringComparison.Ordinal) >= 0) return codes[i];
         }
         return fallback;
+    }
+
+    static string ExtraHeadersOf(string text)
+    {
+        if (text == null) return "";
+        string extra = "";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '<') extra += "X-Payments-Enabled: off\r\n";
+            break;
+        }
+        if (text.IndexOf("\"location\":\"/sop/access?next=/sop/media-lab\"", StringComparison.Ordinal) >= 0)
+            extra += "Location: /sop/access?next=/sop/media-lab\r\n";
+        else if (text.IndexOf("\"location\":\"/partners\"", StringComparison.Ordinal) >= 0)
+            extra += "Location: /partners\r\n";
+        else if (text.IndexOf("\"location\":\"/sop\"}", StringComparison.Ordinal) >= 0)
+            extra += "Location: /sop\r\n";
+        if (text == "Authentication required.")
+            extra += "WWW-Authenticate: Basic realm=\"Protected\"\r\n";
+        if (text.IndexOf("\"adsenseClientId\"", StringComparison.Ordinal) >= 0)
+            extra += "X-Payments-Enabled: off\r\n";
+        return extra;
     }
 
     static string ReasonOf(int code)
@@ -320,6 +371,7 @@ static class VireListen
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";
+        if (code == 502) return "Bad Gateway";
         if (code == 503) return "Service Unavailable";
         if (code == 507) return "Insufficient Storage";
         return "OK";
@@ -344,7 +396,7 @@ static class VireListen
             data = Encoding.UTF8.GetBytes("{\"error\":\"route failed\"}");
         }
         string head = "HTTP/1.1 " + code + " " + ReasonOf(code) + "\r\n"
-            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Type: " + ContentTypeOf(body) + "\r\n"
             + "Content-Length: " + data.Length + "\r\n"
             + "Connection: close\r\n"
             + "X-Content-Type-Options: nosniff\r\n"

@@ -1,0 +1,28 @@
+{
+  "id": "healthz",
+  "source": "landing-go GET /healthz golden ok, derived from source, not live.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control",
+    "location",
+    "www-authenticate",
+    "x-payments-enabled"
+  ],
+  "cases": [
+    {
+      "name": "get_healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "ok"
+    }
+  ]
+}

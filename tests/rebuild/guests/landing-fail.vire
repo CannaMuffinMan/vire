@@ -1,0 +1,9 @@
+~ FAIL_BEFORE for landing-go: routes absent.
+
+define route with method, path, body
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

@@ -1,0 +1,25 @@
+{
+  "id": "cpa-health",
+  "source": "cpa-go GET /health golden ok newline, text/plain, derived from source, not live.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_health",
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "ok\n"
+    }
+  ]
+}

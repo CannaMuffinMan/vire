@@ -1,0 +1,151 @@
+~ Native outbound HTTP/1.1 + reverse-proxy primitive (loopback only).
+~ Harness copies src/http-client.vire beside this file as http-client.vire.
+use "http-client.vire"
+
+define ws_hex with raw
+  if raw == none
+    return ""
+  end
+  let tab be ""
+  let n be 0
+  while n < 256
+    let tab be tab + (chr with n)
+    let n be n + 1
+  end
+  let digits be "0123456789abcdef"
+  let out be ""
+  let i be 0
+  let m be length with raw
+  while i < m
+    let v be find with tab, (raw at i)
+    let hi be idiv with v, 16
+    let lo be v % 16
+    let out be out + (digits at hi) + (digits at lo)
+    let i be i + 1
+  end
+  return out
+end
+
+define route with method, path, body
+  let port be number with (args at 0)
+  if path == "/proxy"
+    return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/proxy"}
+  end
+  if path == "/proxy-loc"
+    return proxy_reply with {"method": "GET", "port": port, "path": "/redir", "body": "", "head": "", "prefix": "/app"}
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  let port be number with (args at 0)
+  let mode be args at 1
+  if mode == "client-get"
+    let got be http with {"method": "GET", "port": port, "path": "/echo?x=1", "body": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "client-post"
+    let got be http with {"method": "POST", "port": port, "path": "/echo", "body": "hi-body"}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "client-chunk"
+    let got be http with {"method": "GET", "port": port, "path": "/chunk", "body": ""}
+    if got at "ok"
+      say "chunk-missed"
+    end
+    say (got at "error")
+    halt with 0
+  end
+  if mode == "client-clte"
+    let got be http with {"method": "GET", "port": port, "path": "/clte", "body": ""}
+    if got at "ok"
+      say "clte-missed"
+    end
+    say (got at "error")
+    halt with 0
+  end
+  if mode == "client-dupcl"
+    let got be http with {"method": "GET", "port": port, "path": "/dupcl", "body": ""}
+    if got at "ok"
+      say "dupcl-missed"
+    end
+    say (got at "error")
+    halt with 0
+  end
+  if mode == "client-oversize"
+    let got be http with {"method": "GET", "port": port, "path": "/oversize", "body": ""}
+    if got at "ok"
+      say "oversize-missed"
+    end
+    say (got at "error")
+    halt with 0
+  end
+  if mode == "client-timeout"
+    let got be http with {"method": "GET", "port": port, "path": "/hang", "body": ""}
+    if got at "ok"
+      say "timeout-missed"
+    end
+    say "timeout"
+    halt with 0
+  end
+  if mode == "proxy-get"
+    let got be proxy with {"method": "GET", "port": port, "path": "/echo?x=1", "body": "", "head": "Host: example.test\r\nX-Keep: yes\r\nConnection: keep-alive\r\n", "prefix": "/app"}
+    say (got at "status")
+    say (got at "body")
+    say (got at "headers")
+    halt with 0
+  end
+  if mode == "proxy-post"
+    let got be proxy with {"method": "POST", "port": port, "path": "/echo", "body": "from-proxy", "head": "Host: example.test\r\n", "prefix": "/app"}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "proxy-loc"
+    let got be proxy with {"method": "GET", "port": port, "path": "/redir", "body": "", "head": "", "prefix": "/app"}
+    say (got at "status")
+    say (got at "location")
+    halt with 0
+  end
+  if mode == "proxy-fail"
+    let got be proxy with {"method": "GET", "port": 9, "path": "/", "body": "", "head": "", "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "proxy-smuggle"
+    let got be proxy with {"method": "POST", "port": port, "path": "/", "body": "x", "head": "Content-Length: 1\r\nTransfer-Encoding: chunked\r\n", "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "proxy-ws"
+    let frame be (chr with 129) + (chr with 130) + (chr with 0) + (chr with 0) + (chr with 0) + (chr with 0) + "hi" + (chr with 136) + (chr with 128) + (chr with 0) + (chr with 0) + (chr with 0) + (chr with 0)
+    let head be "Host: example.test\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+    let got be proxy with {"method": "GET", "port": port, "path": "/ws/echo", "body": frame, "head": head, "prefix": ""}
+    say (got at "status")
+    say (got at "error")
+    say (got at "headers")
+    say (ws_hex with (got at "body"))
+    halt with 0
+  end
+  if mode == "proxy-ws-bad"
+    let head be "Upgrade: websocket\r\nConnection: close\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+    let got be proxy with {"method": "GET", "port": port, "path": "/ws/echo", "body": "", "head": head, "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "proxy-ws-refuse"
+    let head be "Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+    let got be proxy with {"method": "GET", "port": port, "path": "/ws/refuse", "body": "", "head": head, "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  listen with 0
+end
