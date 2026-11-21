@@ -1,0 +1,14 @@
+~ fcgbc-go GET /pending-transactions golden [] (derived from source, not live).
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/pending-transactions"
+      return "[]"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

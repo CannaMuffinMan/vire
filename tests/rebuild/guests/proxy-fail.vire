@@ -1,0 +1,5 @@
+~ FAIL_BEFORE: no outbound HTTP / reverse-proxy helper.
+define main
+  say "200"
+  say "not proxied"
+end

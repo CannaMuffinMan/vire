@@ -2777,6 +2777,7 @@ define emitMore with image, fixes, labels
   pin with labels, "hash_bad", image
   emitFail with image, fixes, "msg_hash"
   emitSha with image, fixes, labels
+  emitHmac with image, fixes, labels
   pin with labels, "rt_idiv", image
   emitPro with image
   emitPop2 with image
@@ -3030,6 +3031,243 @@ define emitSha with image, fixes, labels
   return image
 end
 
+~ HMAC-SHA256 and byte digest reuse rt_sha256 (FIPS 180-4). Win64 rcx/rdx/r8.
+define emitHmac with image, fixes, labels
+  pin with labels, "rt_hmac_flat", image
+  emitPro with image
+  emitList with image, [72, 137, 85, 248, 72, 137, 77, 240, 72, 131, 249, 4, 15, 132]
+  emitRel with image, fixes, "hmac_flat_list"
+  emitList with image, [72, 131, 249, 6, 15, 132]
+  emitRel with image, fixes, "hmac_flat_bytes"
+  emitList with image, [72, 131, 249, 2, 15, 132]
+  emitRel with image, fixes, "hmac_flat_text"
+  emitFail with image, fixes, "msg_digest"
+  pin with labels, "hmac_flat_text", image
+  emitList with image, [72, 139, 10]
+  emitJmpTo with image, fixes, "hmac_flat_copytxt"
+  pin with labels, "hmac_flat_bytes", image
+  emitList with image, [72, 139, 10]
+  emitJmpTo with image, fixes, "hmac_flat_n"
+  pin with labels, "hmac_flat_list", image
+  emitList with image, [72, 139, 10]
+  pin with labels, "hmac_flat_n", image
+  emitList with image, [72, 137, 77, 232, 72, 129, 249]
+  emitU32 with image, 100000
+  emitJcc with image, fixes, 135, "hmac_flat_oom"
+  emitParkSlot with image, fixes, 248
+  emitList with image, [72, 139, 77, 232, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 224, 72, 139, 77, 232, 72, 137, 8, 72, 131, 125, 240, 2, 15, 132]
+  emitRel with image, fixes, "hmac_flat_fromtxt"
+  emitList with image, [72, 131, 125, 240, 6, 15, 132]
+  emitRel with image, fixes, "hmac_flat_fromb"
+  emitList with image, [72, 139, 85, 248, 76, 139, 66, 16, 77, 49, 219]
+  pin with labels, "hmac_flat_loop", image
+  emitList with image, [76, 59, 93, 232, 15, 131]
+  emitRel with image, fixes, "hmac_flat_done"
+  emitList with image, [76, 137, 216, 72, 193, 224, 4, 76, 1, 192, 72, 131, 56, 1, 15, 133]
+  emitRel with image, fixes, "hmac_flat_bad"
+  emitList with image, [72, 139, 80, 8, 72, 139, 69, 224, 66, 136, 84, 24, 8]
+  emitList with image, [73, 255, 195, 233]
+  emitRel with image, fixes, "hmac_flat_loop"
+  pin with labels, "hmac_flat_fromtxt", image
+  emitList with image, [72, 139, 85, 248, 72, 141, 82, 8, 72, 139, 77, 224, 72, 141, 73, 8, 76, 139, 69, 232]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitJmpTo with image, fixes, "hmac_flat_done"
+  pin with labels, "hmac_flat_fromb", image
+  emitList with image, [72, 139, 85, 248, 72, 139, 82, 16, 72, 139, 77, 224, 72, 141, 73, 8, 76, 139, 69, 232]
+  emitCallTo with image, fixes, "rt_memcpy"
+  pin with labels, "hmac_flat_done", image
+  emitList with image, [72, 139, 69, 224]
+  emitEpi with image
+  pin with labels, "hmac_flat_copytxt", image
+  emitList with image, [72, 139, 10, 72, 137, 77, 232]
+  emitJmpTo with image, fixes, "hmac_flat_n"
+  pin with labels, "hmac_flat_bad", image
+  emitFail with image, fixes, "msg_digest"
+  pin with labels, "hmac_flat_oom", image
+  emitFail with image, fixes, "msg_oom"
+
+  pin with labels, "rt_hmac_unhex", image
+  emitList with image, [49, 192]
+  pin with labels, "hmac_unhex_loop", image
+  emitList with image, [61, 32, 0, 0, 0, 15, 131]
+  emitRel with image, fixes, "hmac_unhex_done"
+  emitList with image, [68, 15, 182, 4, 65, 68, 15, 182, 76, 65, 1, 65, 128, 232, 48, 65, 128, 248, 9, 15, 134]
+  emitRel with image, fixes, "hmac_unhex_hi"
+  emitList with image, [65, 128, 232, 39]
+  pin with labels, "hmac_unhex_hi", image
+  emitList with image, [65, 128, 233, 48, 65, 128, 249, 9, 15, 134]
+  emitRel with image, fixes, "hmac_unhex_lo"
+  emitList with image, [65, 128, 233, 39]
+  pin with labels, "hmac_unhex_lo", image
+  emitList with image, [65, 192, 224, 4, 69, 8, 200, 68, 136, 2, 72, 255, 194, 72, 255, 192, 233]
+  emitRel with image, fixes, "hmac_unhex_loop"
+  pin with labels, "hmac_unhex_done", image
+  emitList with image, [195]
+
+  pin with labels, "rt_hmac_pack", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 185]
+  emitU32 with image, 24
+  emitCallTo with image, fixes, "rt_alloc"
+  emitKindHdr with image
+  emitList with image, [72, 137, 69, 240, 72, 199, 0, 32, 0, 0, 0, 72, 199, 64, 8, 32, 0, 0, 0]
+  emitParkSlot with image, fixes, 240
+  emitParkSlot with image, fixes, 248
+  emitList with image, [185]
+  emitU32 with image, 512
+  emitCallTo with image, fixes, "rt_alloc"
+  emitKindPairs with image
+  emitUnparkSlot with image, 248
+  emitUnparkSlot with image, 240
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 240, 72, 137, 65, 16, 77, 49, 219]
+  pin with labels, "hmac_pack_loop", image
+  emitList with image, [73, 131, 251, 32, 15, 131]
+  emitRel with image, fixes, "hmac_pack_done"
+  emitList with image, [76, 137, 216, 72, 193, 224, 4, 72, 3, 69, 232, 72, 199, 0, 1, 0, 0, 0]
+  emitList with image, [72, 139, 85, 248, 70, 15, 182, 4, 26, 76, 137, 64, 8, 73, 255, 195, 233]
+  emitRel with image, fixes, "hmac_pack_loop"
+  pin with labels, "hmac_pack_done", image
+  emitList with image, [72, 139, 85, 240]
+  emitPushTag with image, 4
+  emitEpi with image
+
+  pin with labels, "rt_digest", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 137, 193, 232]
+  emitRel with image, fixes, "rt_hmac_flat"
+  emitList with image, [72, 137, 69, 248]
+  emitParkSlot with image, fixes, 248
+  emitList with image, [185]
+  emitU32 with image, 81
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 240, 72, 139, 85, 248, 72, 141, 74, 8, 72, 139, 18, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitList with image, [72, 139, 77, 240, 72, 131, 193, 8, 72, 141, 85, 184]
+  emitCallTo with image, fixes, "rt_hmac_unhex"
+  emitList with image, [72, 141, 77, 184]
+  emitCallTo with image, fixes, "rt_hmac_pack"
+  emitEpi with image
+
+  pin with labels, "rt_hmac", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [76, 137, 69, 200, 76, 137, 77, 192, 72, 137, 193, 232]
+  emitRel with image, fixes, "rt_hmac_flat"
+  emitList with image, [72, 137, 69, 248]
+  emitList with image, [72, 139, 77, 200, 72, 139, 85, 192, 232]
+  emitRel with image, fixes, "rt_hmac_flat"
+  emitList with image, [72, 137, 69, 240]
+  emitParkSlot with image, fixes, 248
+  emitParkSlot with image, fixes, 240
+  emitList with image, [185]
+  emitU32 with image, 192
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 240
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 232, 72, 137, 193, 186]
+  emitU32 with image, 192
+  emitCallTo with image, fixes, "rt_bzero"
+  emitList with image, [72, 139, 85, 248, 72, 139, 2, 72, 131, 248, 64, 15, 142]
+  emitRel with image, fixes, "hmac_keyfit"
+  emitParkSlot with image, fixes, 248
+  emitParkSlot with image, fixes, 240
+  emitParkSlot with image, fixes, 232
+  emitList with image, [185]
+  emitU32 with image, 81
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 232
+  emitUnparkSlot with image, 240
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 224, 72, 139, 85, 248, 72, 141, 74, 8, 72, 139, 18, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitList with image, [72, 139, 77, 224, 72, 131, 193, 8, 72, 139, 85, 232]
+  emitCallTo with image, fixes, "rt_hmac_unhex"
+  emitJmpTo with image, fixes, "hmac_xor"
+  pin with labels, "hmac_keyfit", image
+  emitList with image, [72, 139, 85, 248, 76, 139, 2, 72, 141, 82, 8, 72, 139, 77, 232]
+  emitCallTo with image, fixes, "rt_memcpy"
+  pin with labels, "hmac_xor", image
+  emitList with image, [49, 192]
+  pin with labels, "hmac_xor_loop", image
+  emitList with image, [61, 64, 0, 0, 0, 15, 131]
+  emitRel with image, fixes, "hmac_inner"
+  emitList with image, [72, 139, 85, 232, 68, 15, 182, 4, 2, 69, 137, 193, 65, 128, 240, 54, 65, 128, 241, 92]
+  emitList with image, [68, 136, 68, 2, 64, 68, 136, 140, 2, 128, 0, 0, 0, 72, 255, 192, 233]
+  emitRel with image, fixes, "hmac_xor_loop"
+  pin with labels, "hmac_inner", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 2, 72, 131, 192, 64, 72, 137, 69, 216]
+  emitParkSlot with image, fixes, 248
+  emitParkSlot with image, fixes, 240
+  emitParkSlot with image, fixes, 232
+  emitList with image, [72, 139, 77, 216, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 232
+  emitUnparkSlot with image, 240
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 208, 72, 137, 193, 72, 139, 85, 232, 72, 141, 82, 64, 65, 184, 64, 0, 0, 0]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 77, 208, 72, 131, 193, 64, 72, 139, 85, 240, 76, 139, 2, 72, 141, 82, 8]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 216
+  emitParkSlot with image, fixes, 208
+  emitList with image, [185]
+  emitU32 with image, 81
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 208
+  emitUnparkSlot with image, 216
+  emitUnparkSlot with image, 232
+  emitList with image, [72, 137, 69, 224, 72, 139, 77, 208, 72, 139, 85, 216, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 224
+  emitList with image, [185]
+  emitU32 with image, 32
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 224
+  emitUnparkSlot with image, 232
+  emitList with image, [72, 137, 69, 184, 72, 139, 77, 224, 72, 131, 193, 8, 72, 137, 194]
+  emitCallTo with image, fixes, "rt_hmac_unhex"
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 184
+  emitList with image, [185]
+  emitU32 with image, 96
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 184
+  emitUnparkSlot with image, 232
+  emitList with image, [72, 137, 69, 200, 72, 137, 193, 72, 139, 85, 232, 72, 141, 146, 128, 0, 0, 0, 65, 184, 64, 0, 0, 0]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 77, 200, 72, 131, 193, 64, 72, 139, 85, 184, 65, 184, 32, 0, 0, 0]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitParkSlot with image, fixes, 200
+  emitList with image, [185]
+  emitU32 with image, 81
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 200
+  emitList with image, [72, 137, 69, 224, 185, 96, 0, 0, 0, 72, 137, 202, 72, 139, 77, 200, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitList with image, [72, 139, 77, 224, 72, 131, 193, 8, 72, 139, 85, 184]
+  emitCallTo with image, fixes, "rt_hmac_unhex"
+  emitList with image, [72, 139, 77, 184]
+  emitCallTo with image, fixes, "rt_hmac_pack"
+  emitEpi with image
+  return image
+end
+
 define parkMsg with image, labels, name, raw
   pin with labels, name, image
   let image be emitU64 with image, (length with raw)
@@ -3068,6 +3306,8 @@ define parkMore with image, labels
   parkMsg with image, labels, "msg_replace", "replace needs three texts"
   parkMsg with image, labels, "msg_lower", "lower needs text"
   parkMsg with image, labels, "msg_hash", "hash needs text"
+  parkMsg with image, labels, "msg_digest", "digest needs a list of whole numbers"
+  parkMsg with image, labels, "msg_hmac", "hmac needs two lists of whole numbers"
   parkMsg with image, labels, "msg_hex", "hex needs a list of whole numbers"
   parkMsg with image, labels, "msg_join", "join needs a list of text"
   parkMsg with image, labels, "msg_begins", "begins needs two texts"
