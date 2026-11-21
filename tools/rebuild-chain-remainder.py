@@ -188,6 +188,44 @@ def run_remainder(port, fix_src, fix_dst, mode):
         check_headers(hd2, "get_chain_tamper_503", mismatches)
     print("case tamper POST status %s body %s" % (st, body))
 
+    # previousHash / hash aliases (recorded in fcg-chain.json; beyond previous/proof).
+    restore_genesis(fix_src, fix_dst)
+    genesis = "a9df21e6e7672bdb9cea28047aa39ba0fa96d54ae0791a9bab30078f5a2d4fad"
+    st, hd, body = http_req(port, "POST", "/block", '{"text":"x","previousHash":"not-the-tip"}')
+    want_prev = '{"ok":false,"status":400,"error":"previous does not match"}'
+    if mode == "fail-before":
+        if st == 400 and body == want_prev:
+            mismatches.append("FAIL_BEFORE previousHash mismatch unexpectedly 400")
+    else:
+        if st != 400 or body != want_prev:
+            mismatches.append("post_block_previousHash_mismatch got %s %s" % (st, body))
+        check_headers(hd, "post_block_previousHash_mismatch", mismatches)
+    print("case previousHash mismatch status %s body %s" % (st, body))
+    restore_genesis(fix_src, fix_dst)
+    st, hd, body = http_req(port, "POST", "/block", '{"text":"x","hash":"deadbeef"}')
+    want_hash = '{"ok":false,"status":400,"error":"proof does not match"}'
+    if mode == "fail-before":
+        if st == 400 and body == want_hash:
+            mismatches.append("FAIL_BEFORE hash alias mismatch unexpectedly 400")
+    else:
+        if st != 400 or body != want_hash:
+            mismatches.append("post_block_hash_alias_mismatch got %s %s" % (st, body))
+        check_headers(hd, "post_block_hash_alias_mismatch", mismatches)
+    print("case hash alias mismatch status %s body %s" % (st, body))
+    restore_genesis(fix_src, fix_dst)
+    st, hd, body = http_req(
+        port,
+        "POST",
+        "/block",
+        '{"text":"fixture-one","previousHash":"%s"}' % genesis,
+    )
+    want_ok = '{"ok":true,"accepted":true,"index":1,"proof":"52d7f3a9d3dfa0458a20ff820cab94c1df2acea128dacd450a6e45456c27f561"}'
+    if mode != "fail-before":
+        if st != 200 or body != want_ok:
+            mismatches.append("post_block_previousHash_ok got %s %s" % (st, body))
+        check_headers(hd, "post_block_previousHash_ok", mismatches)
+    print("case previousHash ok status %s body %s" % (st, body))
+
     # 507 before rotate so native arena is not still holding a 512 KB segment.
     if mode != "fail-before":
         restore_genesis(fix_src, fix_dst)

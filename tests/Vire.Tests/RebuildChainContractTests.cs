@@ -66,6 +66,8 @@ public class RebuildChainContractTests
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-tamper.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-remainder.py")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-limits-diff.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-limits-windows.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgcpa-windows.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "fail-before-chain-remainder.vire")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "fcg-chain-remainder.json")));
