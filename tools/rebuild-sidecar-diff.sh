@@ -33,10 +33,7 @@ text = Path(sys.argv[1]).read_text()
 text = text.replace("listen with 18080", "listen with 0")
 Path(sys.argv[2]).write_text(text)
 PY
-  cp "$ROOT/src/http-client.vire" "$ROOT/data/http-client.vire"
-  cp "$ROOT/src/dist-static.vire" "$ROOT/data/dist-static.vire"
-  cp "$ROOT/src/portal-jwt.vire" "$ROOT/data/portal-jwt.vire"
-  cp "$ROOT/src/sop-cookie.vire" "$ROOT/data/sop-cookie.vire" 2>/dev/null || true
+  cp "$ROOT/src/"*.vire "$ROOT/data/"
   rm -f "data/${stem}.hex" "data/${stem}.elf"
   dotnet exec "$VIRE_DLL" --compiler compile-native.vire "data/${stem}.vire" "data/${stem}.hex"
   hex_to_bin "data/${stem}.hex" "data/${stem}.elf"
