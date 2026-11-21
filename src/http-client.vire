@@ -1,0 +1,444 @@
+~ Loopback HTTP/1.1 client and reverse-proxy helper.
+~ Outbound connect is 127.0.0.1 only (native/host connect). No TLS, no DNS.
+~ Fail-closed: CL+TE, duplicate Content-Length, chunked upstream, oversize, timeout.
+
+define http_gateway
+  return {"ok": false, "status": 502, "headers": "", "body": "{\"error\":\"bad gateway\"}", "error": "bad gateway"}
+end
+
+define http_trim with raw
+  if raw == none
+    return ""
+  end
+  let tab be chr with 9
+  let n be length with raw
+  let i be 0
+  while i < n
+    let ch be raw at i
+    if ch == " "
+      let i be i + 1
+    end
+    if ch == tab
+      let i be i + 1
+    end
+    if ch != " "
+      if ch != tab
+        stop
+      end
+    end
+  end
+  let j be n
+  while j > i
+    let ch be raw at (j - 1)
+    if ch == " "
+      let j be j - 1
+    end
+    if ch == tab
+      let j be j - 1
+    end
+    if ch != " "
+      if ch != tab
+        stop
+      end
+    end
+  end
+  return slice with raw, i, j
+end
+
+define http_hop with name
+  if name == "connection"
+    return true
+  end
+  if name == "keep-alive"
+    return true
+  end
+  if name == "te"
+    return true
+  end
+  if name == "trailer"
+    return true
+  end
+  if name == "transfer-encoding"
+    return true
+  end
+  if name == "upgrade"
+    return true
+  end
+  if begins with name, "proxy-"
+    return true
+  end
+  return false
+end
+
+define http_cl_digits with raw
+  let t be http_trim with raw
+  let n be length with t
+  if n == 0
+    return -2
+  end
+  if t at 0 == "0"
+    if n > 1
+      return -2
+    end
+  end
+  let acc be 0
+  let i be 0
+  while i < n
+    let ch be t at i
+    if (find with "0123456789", ch) < 0
+      return -2
+    end
+    let acc be (acc * 10) + (number with ch)
+    if acc > 1000000
+      return -3
+    end
+    let i be i + 1
+  end
+  return acc
+end
+
+define http_scan with head
+  let lines be split with head, "\r\n"
+  let i be 1
+  let n be length with lines
+  let sawCl be false
+  let cl be -1
+  let te be false
+  let host be ""
+  while i < n
+    let line be lines at i
+    if line != ""
+      if begins with line, " "
+        return {"bad": true, "why": "fold"}
+      end
+      if begins with line, "	"
+        return {"bad": true, "why": "fold"}
+      end
+      let colon be find with line, ":"
+      if colon <= 0
+        return {"bad": true, "why": "colon"}
+      end
+      let name be lower with (http_trim with (slice with line, 0, colon))
+      if name == ""
+        return {"bad": true, "why": "name"}
+      end
+      let value be slice with line, (colon + 1), (length with line)
+      if name == "transfer-encoding"
+        let te be true
+      end
+      if name == "content-length"
+        let parsed be http_cl_digits with value
+        if parsed < 0
+          return {"bad": true, "why": "cl", "cl": parsed}
+        end
+        if sawCl
+          return {"bad": true, "why": "dup-cl"}
+        end
+        let sawCl be true
+        let cl be parsed
+      end
+      if name == "host"
+        let host be http_trim with value
+      end
+    end
+    let i be i + 1
+  end
+  if te
+    if sawCl
+      return {"bad": true, "why": "cl-te"}
+    end
+    return {"bad": true, "why": "te", "te": true}
+  end
+  return {"bad": false, "cl": cl, "host": host, "te": false}
+end
+
+define http_strip_hops with head
+  let lines be split with head, "\r\n"
+  let i be 1
+  let n be length with lines
+  let out be ""
+  while i < n
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon > 0
+        let name be lower with (http_trim with (slice with line, 0, colon))
+        if not (http_hop with name)
+          if name != "host"
+            if name != "content-length"
+              let out be out + line + "\r\n"
+            end
+          end
+        end
+      end
+    end
+    let i be i + 1
+  end
+  return out
+end
+
+define http_rewrite_loc with loc, prefix
+  if loc == none
+    return ""
+  end
+  if prefix == none
+    return loc
+  end
+  if prefix == ""
+    return loc
+  end
+  let path be loc
+  if begins with loc, "http://"
+    let rest be slice with loc, 7, (length with loc)
+    let slash be find with rest, "/"
+    if slash < 0
+      let path be "/"
+    end
+    if slash >= 0
+      let path be slice with rest, slash, (length with rest)
+    end
+  end
+  if begins with path, prefix
+    return path
+  end
+  if begins with path, "/"
+    if ends with prefix, "/"
+      return prefix + (slice with path, 1, (length with path))
+    end
+    return prefix + path
+  end
+  return loc
+end
+
+define http_recv_all with h
+  let got be ""
+  let nrecv be 0
+  while nrecv < 256
+    let chunk be recv with h, 4096
+    if chunk == ""
+      stop
+    end
+    let got be got + chunk
+    if (length with got) > 1016384
+      return {"bad": true, "why": "oversize", "raw": got}
+    end
+    let nrecv be nrecv + 1
+  end
+  return {"bad": false, "raw": got}
+end
+
+define http_parse_resp with raw
+  let endAt be find with raw, "\r\n\r\n"
+  if endAt < 0
+    if (length with raw) >= 16384
+      return {"bad": true, "why": "headers"}
+    end
+    return {"bad": true, "why": "timeout"}
+  end
+  if endAt > 16384
+    return {"bad": true, "why": "headers"}
+  end
+  let head be slice with raw, 0, endAt
+  let cr be find with head, "\r\n"
+  if cr <= 0
+    return {"bad": true, "why": "status"}
+  end
+  let line be slice with head, 0, cr
+  let bits be split with line, " "
+  if (length with bits) < 2
+    return {"bad": true, "why": "status"}
+  end
+  let ver be bits at 0
+  if ver != "HTTP/1.1"
+    if ver != "HTTP/1.0"
+      return {"bad": true, "why": "status"}
+    end
+  end
+  let codeText be bits at 1
+  if (length with codeText) != 3
+    return {"bad": true, "why": "status"}
+  end
+  let status be number with codeText
+  let scanned be http_scan with head
+  if scanned at "bad"
+    return {"bad": true, "why": scanned at "why"}
+  end
+  if scanned at "te"
+    return {"bad": true, "why": "te"}
+  end
+  let cl be scanned at "cl"
+  let bodyAt be endAt + 4
+  let have be (length with raw) - bodyAt
+  if have < 0
+    let have be 0
+  end
+  if cl < 0
+    let body be slice with raw, bodyAt, (length with raw)
+    if (length with body) > 1000000
+      return {"bad": true, "why": "oversize"}
+    end
+    return {"bad": false, "status": status, "headers": head, "body": body}
+  end
+  if cl > 1000000
+    return {"bad": true, "why": "oversize"}
+  end
+  if have < cl
+    return {"bad": true, "why": "timeout"}
+  end
+  let body be slice with raw, bodyAt, (bodyAt + cl)
+  return {"bad": false, "status": status, "headers": head, "body": body}
+end
+
+define http with spec
+  let method be spec at "method"
+  let port be spec at "port"
+  let path be spec at "path"
+  let body be ""
+  if has with spec, "body"
+    let body be spec at "body"
+  end
+  if body == none
+    let body be ""
+  end
+  let extra be ""
+  if has with spec, "head"
+    let extra be spec at "head"
+  end
+  if extra == none
+    let extra be ""
+  end
+  if method != "GET"
+    if method != "POST"
+      return {"ok": false, "status": 400, "headers": "", "body": "{\"error\":\"bad request\"}", "error": "method"}
+    end
+  end
+  if path == ""
+    let path be "/"
+  end
+  if extra != ""
+    let scanned be http_scan with ("x\r\n" + extra)
+    if scanned at "bad"
+      return {"ok": false, "status": 400, "headers": "", "body": "{\"error\":\"bad request\"}", "error": scanned at "why"}
+    end
+  end
+  let req be method + " " + path + " HTTP/1.1\r\n"
+  let req be req + "Host: 127.0.0.1:" + (text with port) + "\r\n"
+  let req be req + "Connection: close\r\n"
+  if extra != ""
+    let req be req + (http_strip_hops with ("x\r\n" + extra))
+  end
+  let req be req + "Content-Length: " + (text with (length with body)) + "\r\n\r\n"
+  if body != ""
+    let req be req + body
+  end
+  let opened be 0
+  let h be 0
+  try
+    let h be connect with "127.0.0.1", port
+    let opened be 1
+    send with h, req
+    let packed be http_recv_all with h
+    close with h
+    let opened be 0
+    if packed at "bad"
+      return {"ok": false, "status": 0, "headers": "", "body": "", "error": packed at "why"}
+    end
+    let parsed be http_parse_resp with (packed at "raw")
+    if parsed at "bad"
+      return {"ok": false, "status": 0, "headers": "", "body": "", "error": parsed at "why"}
+    end
+    return {"ok": true, "status": parsed at "status", "headers": parsed at "headers", "body": parsed at "body", "error": ""}
+  miss problem
+    if opened == 1
+      try
+        close with h
+      miss closed
+        let opened be 0
+      end
+    end
+    return {"ok": false, "status": 0, "headers": "", "body": "", "error": problem}
+  end
+end
+
+define proxy with spec
+  let extra be ""
+  if has with spec, "head"
+    let extra be spec at "head"
+  end
+  if extra == none
+    let extra be ""
+  end
+  if extra != ""
+    let scanned be http_scan with ("x\r\n" + extra)
+    if scanned at "bad"
+      return http_gateway
+    end
+  end
+  let got be http with spec
+  if not (got at "ok")
+    return http_gateway
+  end
+  let prefix be ""
+  if has with spec, "prefix"
+    let prefix be spec at "prefix"
+  end
+  if prefix == none
+    let prefix be ""
+  end
+  let headers be got at "headers"
+  let loc be ""
+  let lines be split with headers, "\r\n"
+  let i be 1
+  let n be length with lines
+  let fwd be ""
+  while i < n
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon > 0
+        let name be lower with (http_trim with (slice with line, 0, colon))
+        let value be http_trim with (slice with line, (colon + 1), (length with line))
+        if name == "location"
+          let loc be http_rewrite_loc with value, prefix
+          let fwd be fwd + "Location: " + loc + "\r\n"
+        end
+        if not (http_hop with name)
+          if name != "location"
+            if name != "content-length"
+              let fwd be fwd + line + "\r\n"
+            end
+          end
+        end
+      end
+    end
+    let i be i + 1
+  end
+  let xf be extra
+  if xf == ""
+    let xf be "x\r\n"
+  end
+  if xf != ""
+    if not (begins with xf, "x")
+      let xf be "x\r\n" + xf
+    end
+  end
+  let inbound be http_scan with xf
+  let xfhost be "127.0.0.1"
+  if not (inbound at "bad")
+    if (inbound at "host") != ""
+      let xfhost be inbound at "host"
+    end
+  end
+  let fwd be fwd + "X-Forwarded-For: 127.0.0.1\r\n"
+  let fwd be fwd + "X-Forwarded-Host: " + xfhost + "\r\n"
+  let fwd be fwd + "X-Forwarded-Proto: http\r\n"
+  return {"ok": true, "status": got at "status", "headers": fwd, "body": got at "body", "location": loc, "error": ""}
+end
+
+define proxy_reply with spec
+  let got be proxy with spec
+  if not (got at "ok")
+    return "{\"error\":\"bad gateway\",\"status\":502}"
+  end
+  return got at "body"
+end

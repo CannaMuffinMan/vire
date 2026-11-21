@@ -596,20 +596,46 @@ define emitLinuxNetStubs with image, fixes, labels
   let image be emitHex with image, "31c0c3"
 
   pin with labels, "stub_ss", image
-  let image be emitHex with image, "554889e589cf89d64489c04c89cb"
-  ~ Win SOL_SOCKET 0xFFFF -> 1, SO_REUSEADDR 4 -> 2
-  let image be emitHex with image, "81faffff000075"
-  let image be emitU8 with image, 5
+  ~ Win64 setsockopt -> Linux. SOL_SOCKET 0xFFFF->1, SO_REUSEADDR 4->2,
+  ~ SO_RCVTIMEO 0x1006->20, SO_SNDTIMEO 0x1005->21. DWORD ms -> timeval.
+  let image be emitHex with image, "554889e54883ec2089cf89d64489c04c89cb81faffff00000f85"
+  let image be emitRel with image, fixes, "ss_level"
   let image be emitHex with image, "be"
   let image be emitU32 with image, 1
-  let image be emitHex with image, "83f80475"
-  let image be emitU8 with image, 5
-  let image be emitHex with image, "b8"
+  pin with labels, "ss_level", image
+  let image be emitHex with image, "83f8040f85"
+  let image be emitRel with image, fixes, "ss_notreuse"
+  let image be emitHex with image, "ba"
   let image be emitU32 with image, 2
-  let image be emitHex with image, "89c28b45304989c24189c0"
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "ss_generic"
+  pin with labels, "ss_notreuse", image
+  let image be emitHex with image, "3d061000000f85"
+  let image be emitRel with image, fixes, "ss_notrcv"
+  let image be emitHex with image, "41b9"
+  let image be emitU32 with image, 20
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "ss_timeval"
+  pin with labels, "ss_notrcv", image
+  let image be emitHex with image, "3d051000000f85"
+  let image be emitRel with image, fixes, "ss_win"
+  let image be emitHex with image, "41b9"
+  let image be emitU32 with image, 21
+  pin with labels, "ss_timeval", image
+  let image be emitHex with image, "8b0331d2b9"
+  let image be emitU32 with image, 1000
+  let image be emitHex with image, "f7f148c745f0000000008945f069d2e803000048c745f8000000008955f8488d5df04489ca4989da41b8"
+  let image be emitU32 with image, 16
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "ss_sys"
+  pin with labels, "ss_win", image
+  let image be emitHex with image, "89c2"
+  pin with labels, "ss_generic", image
+  let image be emitHex with image, "4989da8b45304989c0"
+  pin with labels, "ss_sys", image
   let image be emitSys with image, 54
   let image be emitSysNeg1 with image
-  let image be emitHex with image, "5dc3"
+  let image be emitHex with image, "c9c3"
 
   pin with labels, "stub_gn", image
   let image be emitHex with image, "89cf4889d64c89c2"
