@@ -19,7 +19,7 @@ Linux has no SChannel. The kernel does not perform the handshake.
 | Minimum version | `OpenSSL_version_num() >= 0x30000000` (3.0.0). Below that, `tls_connect` fail-closes. Loading `libssl.so.3` already requires the OPENSSL_3.0 ELF version. |
 | Not used for non-TLS | If a program never calls `tls_*`, the image has no INTERP and no DT_NEEDED. |
 
-Windows native PE: APIs exist; the PE path fail-closes until SChannel is proven. Host `SslStream` runs on both OS.
+Windows native PE: SChannel via a fixed `secur32.dll` + `crypt32.dll` IAT (`AcquireCredentialsHandleA`, `InitializeSecurityContextA` / `AcceptSecurityContext`, `EncryptMessage` / `DecryptMessage`). TLS 1.2|1.3 only (`SP_PROT_TLS1_2_* | SP_PROT_TLS1_3_*`). Client verification is on (`SCH_CRED_AUTO_CRED_VALIDATION`, `pszTargetName` = `name`). No `SCH_CRED_NO_SERVERNAME_CHECK`, no `SCH_CRED_MANUAL_CRED_VALIDATION`, no `SCH_CRED_IGNORE_NO_REVOCATION_CHECK`. Empty `ca` uses the system store; a non-empty `ca` is a sandboxed PEM loaded into an in-memory root store. Server cert is a sandboxed PFX (`tls_listen` cert path); `key` is the PFX password (empty allowed). Host `SslStream` still runs on both OS. Windows PE execute proof: `tools/tls-schannel-windows.ps1` (PENDING unless CouchStation ran it).
 
 ## Guest API
 
@@ -28,7 +28,7 @@ tls_connect with host, port, name, ca
 tls_send with handle, text
 tls_recv with handle, size
 tls_close with handle
-tls_listen with port, cert, key   ~ host SslStream; Linux ELF OpenSSL server; Windows PE fail-closed
+tls_listen with port, cert, key   ~ host SslStream; Linux ELF PEM; Windows PE sandboxed PFX + password
 ```
 
 - `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate.
@@ -40,11 +40,11 @@ tls_listen with port, cert, key   ~ host SslStream; Linux ELF OpenSSL server; Wi
 
 | Rule | Status |
 |---|---|
-| Certificate validation on by default | Host: `SslClientAuthenticationOptions` with custom root or system roots. Native ELF: `SSL_CTX_set_verify(SSL_VERIFY_PEER)`, `SSL_set1_host`, `SSL_get_verify_result == 0`. |
+| Certificate validation on by default | Host: `SslClientAuthenticationOptions` with custom root or system roots. Native ELF: `SSL_CTX_set_verify(SSL_VERIFY_PEER)`, `SSL_set1_host`, `SSL_get_verify_result == 0`. Native PE: SChannel auto validation + `pszTargetName`. |
 | No protocol downgrade | Host: `Tls12 \| Tls13`. Native: min TLS1.2 / max TLS1.3 via `SSL_CTX_ctrl`. |
 | No insecure flags by default | No skip-verify, no `SSL_VERIFY_NONE`. |
 | Path sandbox | CA/cert/key files: `data/` or `site/` only. Empty CA = system store, not an arbitrary libc `open`. |
-| TLS server | Host: `Tls12 \| Tls13`, `RequireEncryption`, Linux `CipherSuitesPolicy` AEAD suites. ELF: `TLS_server_method`, min TLS 1.2 / max TLS 1.3, `SSL_OP_NO_COMPRESSION \| SSL_OP_NO_TLSv1 \| SSL_OP_NO_TLSv1_1`. Handshake / plaintext / truncated ClientHello fail closed (no HTTP). Tests bind `127.0.0.1` only. |
+| TLS server | Host: `Tls12 \| Tls13`, `RequireEncryption`, Linux `CipherSuitesPolicy` AEAD suites. ELF: `TLS_server_method`, min TLS 1.2 / max TLS 1.3, `SSL_OP_NO_COMPRESSION \| SSL_OP_NO_TLSv1 \| SSL_OP_NO_TLSv1_1`. PE: SChannel inbound cred + PFX, same protocol bits. Handshake / plaintext / truncated ClientHello fail closed (no HTTP). Tests bind `127.0.0.1` only. |
 | Caps | Arena 32MB, list 100000, steps 5M unchanged. Native `connect` still refuses non-loopback. |
 | Dynamic ELF only for TLS guests | TCP/hello/selfhost images stay static. |
 
@@ -61,6 +61,7 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 - Host TLS server: `tests/Vire.Tests/TlsServerTests.cs` (`GET /health` vs `tests/rebuild/contracts/health.json`; plaintext, TLS 1.0, truncated handshake, bad cert path).
 - Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping; `tls_listen` `/health`; negatives fail-closed).
 - Windows host: `tools/tls-server-windows.ps1` (SslStream `/health`).
+- Windows PE SChannel: `tools/tls-schannel-windows.ps1` (PENDING CouchStation).
 
 ## Shared files
 

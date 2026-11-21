@@ -1,5 +1,7 @@
-~ Native TLS: Linux OpenSSL 3 via PT_INTERP/libssl.so.3. Windows PE fail-closed
-~ (SChannel IAT is reserved; handshake proven on Linux ELF). Guest APIs:
+use "src/rt-tls-pe.vire"
+
+~ Native TLS: Linux OpenSSL 3 via PT_INTERP/libssl.so.3. Windows PE SChannel
+~ (secur32/crypt32 IAT). Guest APIs:
 ~ tls_connect host port name ca; tls_listen port cert key; tls_send/recv/close.
 ~ Cert validation on. TLS 1.2 minimum, TLS 1.3 max. No insecure flags.
 ~ tls_listen loads PEM cert/key under data/ or site/, then reuses rt_listen
@@ -565,7 +567,7 @@ define emitTlsRuntime with image, fixes, labels, elf
     let image be emitTlsGuest with image, fixes, labels
     return image
   end
-  return (emitTlsPeRefuse with image, fixes, labels)
+  return (emitTlsPeGuest with image, fixes, labels)
 end
 
 define parkTls with image, labels
@@ -577,6 +579,8 @@ define parkTls with image, labels
   parkMsg with image, labels, "msg_tls_cert", "could not load that tls certificate"
   parkMsg with image, labels, "msg_tls_pe", "native tls on windows pe uses Schannel; prove that handshake on a Windows box"
   parkMsg with image, labels, "msg_tls_ver", "openssl must be 3.0 or newer"
+  pin with labels, "txt_unisp", image
+  let image be emitStr with image, "Microsoft Unified Security Protocol Provider"
   let image be alignTo with image, 8
   pin with labels, "tls_ctx", image
   let image be emitU64 with image, 0
@@ -595,6 +599,165 @@ define parkTls with image, labels
   while i < (length with names)
     pin with labels, (names at i), image
     let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "tls_cred", image
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ctxt", image
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  pin with labels, "tls_sch", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_sch4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_sch8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_sch16", image
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  pin with labels, "tls_sch56", image
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  pin with labels, "tls_sch72", image
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  pin with labels, "tls_attr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_expiry", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_store", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_cert", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_pacred", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_keyptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_nameptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_fileptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_filesz", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_dersz", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_blob", image
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  pin with labels, "tls_blob8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_status", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_first", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_hs_len", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ready", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_server", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_raw_saved", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_proto", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_cflags", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ac_raw", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_rv_raw", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_sd_raw", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_cs_raw", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_plain_len", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_plain_off", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_inbuf", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_inbuf4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_inbuf8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_outbuf", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_outbuf4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_outbuf8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_indesc", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_indesc4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_indesc8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_outdesc", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_outdesc4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_outdesc8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_sizes", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_sizes4", image
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  let image be emitU32 with image, 0
+  pin with labels, "tls_desc", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_desc4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_desc8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_bufs", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs4", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs8", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_bufs16", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs20", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs24", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_bufs32", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs36", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs40", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_bufs48", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs52", image
+  let image be emitU32 with image, 0
+  pin with labels, "tls_bufs56", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_pw", image
+  let i be 0
+  while i < 520
+    let image be emitU8 with image, 0
+    let i be i + 1
+  end
+  let image be alignTo with image, 8
+  pin with labels, "tls_iobuf", image
+  let i be 0
+  while i < 18432
+    let image be emitU8 with image, 0
+    let i be i + 1
+  end
+  pin with labels, "tls_plain", image
+  let i be 0
+  while i < 18432
+    let image be emitU8 with image, 0
     let i be i + 1
   end
   return image

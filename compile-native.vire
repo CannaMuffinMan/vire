@@ -1878,7 +1878,7 @@ define main
     end
   end
   if hits at "tls"
-    let opened be openNetImage
+    let opened be openTlsPeImage
     if wantElf
       let opened be openElfTlsImage
     end

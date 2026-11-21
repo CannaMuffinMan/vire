@@ -13,8 +13,8 @@ Proven side-by-side: host interpreter vs native Linux ELF (Windows PE where a `t
 | 7 | Health contract | `guest-health.vire` `GET /health` | same guest | prior | prior |
 | 8 | Redis | loopback RESP | `rt-redis` | `tools/redis-prove-windows.ps1` | prior |
 | 9 | Postgres client | trust/cleartext | `rt-pg` | `tools/pg-prove-windows.ps1` | prior (#95) |
-| 10 | TLS client | `SslStream` `tls_connect` | OpenSSL 3 `libssl.so.3` | host SslStream; PE fail-closed | PR #99 |
-| 11 | **TLS server / HTTPS listener** | `tls_listen` + `SslStream` on `VireListen` | OpenSSL `TLS_server_method` + `SSL_accept` wrapping `rt_listen` | `tools/tls-server-windows.ps1` | **this lane** |
+| 10 | TLS client | `SslStream` `tls_connect` | OpenSSL 3 `libssl.so.3` | PE SChannel (`tools/tls-schannel-windows.ps1`, PENDING CouchStation) | this lane |
+| 11 | **TLS server / HTTPS listener** | `tls_listen` + `SslStream` on `VireListen` | OpenSSL `TLS_server_method` + `SSL_accept` wrapping `rt_listen` | PE SChannel PFX `tls_listen`; host `tools/tls-server-windows.ps1` | **this lane** |
 | 12 | Edge / public TLS | Railway / reverse proxy | not in-guest | n/a | out of scope (Go sidecars never terminate TLS) |
 
 ## Rank 11 contract
@@ -23,4 +23,4 @@ Proven side-by-side: host interpreter vs native Linux ELF (Windows PE where a `t
 
 Host and native ELF must both serve that JSON over **HTTPS** on `127.0.0.1` with a test-generated self-signed cert under `data/` (never committed). Handshake failure, plaintext on the TLS port, TLS 1.0/1.1, and truncated ClientHello **fail closed** (no HTTP response). Missing or traversal cert/key paths fail closed through the data/site gate.
 
-Native Windows PE `tls_listen` remains fail-closed until SChannel is proven. Linux ELF is the native proof.
+Native Windows PE uses SChannel (IAT allowlist). Linux ELF remains the native proof on this VM. PE execute proof is `tools/tls-schannel-windows.ps1` on CouchStation.

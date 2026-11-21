@@ -61,6 +61,21 @@ public class TlsTests
         Assert.Contains("SSL_VERIFY", File.ReadAllText(Path.Combine(root, "docs", "native-tls.md")));
         Assert.DoesNotContain("SSL_VERIFY_NONE", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.DoesNotContain("native tls_listen is fail-closed", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
+        string peTls = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire"));
+        string peImg = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
+        Assert.Contains("AcquireCredentialsHandleA", peImg);
+        Assert.Contains("InitializeSecurityContextA", peImg);
+        Assert.Contains("AcceptSecurityContext", peImg);
+        Assert.Contains("EncryptMessage", peImg);
+        Assert.Contains("iat_ach", peTls);
+        Assert.Contains("iat_isc", peTls);
+        Assert.Contains("iat_asc", peTls);
+        Assert.Contains("iat_enc", peTls);
+        Assert.DoesNotContain("SCH_CRED_NO_SERVERNAME_CHECK", peTls);
+        Assert.DoesNotContain("SCH_CRED_MANUAL_CRED_VALIDATION", peTls);
+        Assert.DoesNotContain("SCH_CRED_IGNORE_NO_REVOCATION_CHECK", peTls);
+        Assert.Contains("openTlsPeImage", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("openTlsPeImage", native);
     }
 
     [Fact]
