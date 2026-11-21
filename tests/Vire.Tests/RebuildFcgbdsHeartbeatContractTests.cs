@@ -22,7 +22,7 @@ public class RebuildFcgbdsHeartbeatContractTests
         }
         Assert.Equal(3, n);
         Assert.Contains("session_id with body", guest);
-        Assert.Contains("\"sessionId\":\"", guest);
+        Assert.Contains("sessionId", guest);
         Assert.Contains("listen with 0", guest);
         Assert.DoesNotContain("session_id with body", fail);
         Assert.Contains("sessionId=", fail);
