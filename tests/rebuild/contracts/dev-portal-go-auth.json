@@ -1,0 +1,28 @@
+{
+  "id": "dev-portal-go-auth",
+  "source": "fcgcpa-prod PR #147 dev-portal-go: page-gate 307, JWT session, 405, dist. HTTPS API target blocked. Listen does not forward Cookie; cookie is a process arg.",
+  "headers_that_matter": ["content-type", "connection", "x-content-type-options", "cache-control"],
+  "cases": [
+    {
+      "name": "dist_missing",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    },
+    {
+      "name": "session_login_redirect",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 307,
+      "body": "{\"status\":307}"
+    },
+    {
+      "name": "login_static_missing",
+      "method": "GET",
+      "path": "/login",
+      "status": 503,
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    }
+  ]
+}

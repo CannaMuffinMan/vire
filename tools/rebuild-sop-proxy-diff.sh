@@ -40,6 +40,8 @@ echo "FAIL_BEFORE at $BEFORE_SHA (sop-fail.vire)"
 cp "$ROOT/src/http-client.vire" "$STAGE/http-client.vire"
 cp "$ROOT/src/rt-crypto.vire" "$STAGE/rt-crypto.vire"
 cp "$ROOT/src/sop-cookie.vire" "$STAGE/sop-cookie.vire"
+cp "$ROOT/src/dist-static.vire" "$STAGE/dist-static.vire"
+cp "$ROOT/src/portal-jwt.vire" "$STAGE/portal-jwt.vire"
 cp "$ROOT/tests/rebuild/guests/landing-sop.vire" "$STAGE/landing-sop.vire"
 cp "$ROOT/tests/rebuild/guests/landing-proxy.vire" "$STAGE/landing-proxy.vire"
 cp "$ROOT/tests/rebuild/guests/dev-portal-go.vire" "$STAGE/dev-portal-go.vire"
@@ -355,7 +357,7 @@ def get(port, path):
     return st, body
 cases = [
     ("/", 503, '{"reason":"dist_missing","status":503}'),
-    ("/api/auth/session", 503, '{"ok":false,"error":"not_configured","status":503}'),
+    ("/api/auth/session", 307, '{"status":307}'),
 ]
 for path, st, body in cases:
     hs, hb = get(sys.argv[1], path)
@@ -363,6 +365,34 @@ for path, st, body in cases:
     if hs != st or ns != st or hb != body or nb != body:
         raise SystemExit(f"portal {path} {hs}/{hb!r} {ns}/{nb!r}")
 print("portal goldens host-vs-native match")
+PY
+stop_guest "$HOST_PID"
+stop_guest "$NAT_PID"
+read HOST_PID HOST_PORT < <(run_listen portal-auth-host dotnet exec "$VIRE_DLL" "$STAGE/dev-portal-go.vire" "$UP_PORT" listen "-" 0 "-" "-" "1")
+read NAT_PID NAT_PORT < <(run_listen portal-auth-nat "$STAGE/dev-portal-go.elf" "$UP_PORT" listen "-" 0 "-" "-" "1")
+python3 - "$HOST_PORT" "$NAT_PORT" <<'PY'
+import socket, sys
+def get(port, path):
+    req = f"GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n".encode()
+    s = socket.create_connection(("127.0.0.1", int(port)), 3)
+    s.sendall(req); s.settimeout(3)
+    data = b""
+    while True:
+        try:
+            c = s.recv(4096)
+        except socket.timeout:
+            break
+        if not c:
+            break
+        data += c
+    s.close()
+    raw = data.decode()
+    return int(raw.split(" ")[1]), raw.split("\r\n\r\n", 1)[1]
+hs, hb = get(sys.argv[1], "/api/auth/session")
+ns, nb = get(sys.argv[2], "/api/auth/session")
+if hs != 503 or ns != 503 or hb != '{"ok":false,"error":"not_configured","status":503}' or nb != hb:
+    raise SystemExit(f"portal gated session {hs}/{hb!r} {ns}/{nb!r}")
+print("portal session not_configured with page cookie match")
 PY
 stop_guest "$HOST_PID"
 stop_guest "$NAT_PID"

@@ -22,17 +22,17 @@
       "body": "{\"reason\":\"dist_missing\",\"status\":503}"
     },
     {
-      "name": "session_not_configured",
+      "name": "session_login_redirect",
       "method": "GET",
       "path": "/api/auth/session",
-      "status": 503,
+      "status": 307,
       "headers": {
         "content-type": "application/json",
         "connection": "close",
         "x-content-type-options": "nosniff",
         "cache-control": "no-store"
       },
-      "body": "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
+      "body": "{\"status\":307}"
     },
     {
       "name": "fcg_api_proxy",
