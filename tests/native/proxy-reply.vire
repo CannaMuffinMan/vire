@@ -1,0 +1,15 @@
+~ Isolated listen + proxy_reply. Packed ELF used to SEGV (rdx=1 GET nobody)
+~ and return empty HTTP; host returned the upstream body.
+use "http-client.vire"
+
+define route with method, path, body
+  let port be number with (args at 0)
+  if path == "/proxy"
+    return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/proxy"}
+  end
+  return "{\"ok\":false,\"status\":404}"
+end
+
+define main
+  listen with 0
+end
