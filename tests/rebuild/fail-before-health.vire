@@ -1,0 +1,15 @@
+~ Intentionally wrong health guest for FAIL_BEFORE of tools/rebuild-health-diff.sh.
+~ Missing /api/health and a truncated /health body. Not a product server.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

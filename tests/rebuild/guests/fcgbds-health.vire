@@ -1,0 +1,16 @@
+~ fcgbds-go GET /health golden fields only (derived from source, not live).
+~ Go also emits ts=now(); this guest has no clock, so ts is omitted.
+~ Field match: ok, service, dbConfigured, paymentsEnabled.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true,\"service\":\"fcgbds-core\",\"dbConfigured\":false,\"paymentsEnabled\":false}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

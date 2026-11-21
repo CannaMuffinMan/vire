@@ -21,6 +21,8 @@ public class NativeNetTests
         Assert.Contains("hu_fold", net);
         Assert.Contains("hu_frame", net);
         Assert.Contains("rt_net_hdrunsafe", net);
+        Assert.Contains("txt_hdrs_plain", net);
+        Assert.Contains("rt_net_ctype", net);
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
         Assert.True(blob.Length % 2 == 0);
         Assert.Equal("e9", blob.Substring(0x62d * 2, 2));
@@ -44,6 +46,8 @@ public class NativeNetTests
         string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
         Assert.Contains("path == \"/health\"", guest);
         Assert.Contains("path == \"/api/health\"", guest);
+        Assert.Contains("path == \"/info\"", guest);
+        Assert.Contains("path == \"/connect\"", guest);
         Assert.Contains("service", guest);
         Assert.Contains("fcgcpa", guest);
         Assert.Contains("payments", guest);
@@ -75,6 +79,10 @@ public class NativeNetTests
                 Assert.Equal((byte)'F', pe[3]);
                 byte[] okCrlfElf = new byte[] { 5, 0, 0, 0, 0, 0, 0, 0, 0x20, 0x4F, 0x4B, 0x0D, 0x0A, 0 };
                 Assert.True(IndexOf(pe, okCrlfElf) >= 0, "parked txt_sp_ok must be CR LF");
+                byte[] jsonCt = Encoding.ASCII.GetBytes("Content-Type: application/json\r\n");
+                byte[] jsonCtCharset = Encoding.ASCII.GetBytes("Content-Type: application/json; charset=utf-8");
+                Assert.True(IndexOf(pe, jsonCt) >= 0, "parked JSON Content-Type must match Go writeJSON (no charset)");
+                Assert.True(IndexOf(pe, jsonCtCharset) < 0, "parked JSON Content-Type must not add charset=utf-8");
                 return;
             }
             string ascii = Encoding.ASCII.GetString(pe);
@@ -85,6 +93,8 @@ public class NativeNetTests
             Assert.True(IndexOf(pe, okCrlf) >= 0, "parked txt_sp_ok must be CR LF");
             Assert.True(IndexOf(pe, okUs) < 0, "parked txt_sp_ok must not use 0x1F");
             Assert.Contains("\r\nConnection: close\r\n", ascii);
+            Assert.Contains("Content-Type: application/json\r\n", ascii);
+            Assert.DoesNotContain("Content-Type: application/json; charset=utf-8", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);
