@@ -116,6 +116,19 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net, route_npar
   return image
 end
 
+define parkDns with image, labels
+  parkMsg with image, labels, "msg_resolve", "could not resolve"
+  parkMsg with image, labels, "msg_dnsname", "that name is not valid"
+  parkMsg with image, labels, "dns_loop_ip", "127.0.0.1"
+  pin with labels, "dns_path_fix", image
+  emitStr with image, "data/vire-dns"
+  pin with labels, "dns_path_resolv", image
+  emitStr with image, "/etc/resolv.conf"
+  pin with labels, "dns_path_hosts", image
+  emitStr with image, "/etc/hosts"
+  return image
+end
+
 define parkNet with image, labels
   parkMsg with image, labels, "txt_listen", "listening on 127.0.0.1:"
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
@@ -219,6 +232,9 @@ end
 
 ~ Landing-go extras: 503 data_held / subscription, 401 auth text, 307 location,
 ~ HTML Content-Type, WWW-Authenticate, X-Payments-Enabled. Same needles as host.
+~ Unsigned sub of needle_len vs haystack (hf_no) so {"status":307} does not
+~ walk txt_k_www. GET/HEAD empty body is txt_empty (pr_body_ok) so
+~ listen+proxy_reply does not SEGV. Packed r3/r4 blobs keep compiler list cap.
 define emitLandingHttp with image, fixes, labels, base
   put (labels at "rt_net_statusof") into labels at "rt_net_statusof_blob"
   pin with labels, "rt_net_has", image
