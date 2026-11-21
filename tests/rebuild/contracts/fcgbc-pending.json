@@ -1,0 +1,25 @@
+{
+  "id": "fcgbc-pending",
+  "source": "fcgbc-go GET /pending-transactions golden [] derived from source, not live.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_pending_transactions",
+      "method": "GET",
+      "path": "/pending-transactions",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "[]"
+    }
+  ]
+}

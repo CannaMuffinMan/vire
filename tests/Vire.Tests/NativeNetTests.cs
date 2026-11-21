@@ -21,6 +21,8 @@ public class NativeNetTests
         Assert.Contains("hu_fold", net);
         Assert.Contains("hu_frame", net);
         Assert.Contains("rt_net_hdrunsafe", net);
+        Assert.Contains("txt_hdrs_plain", net);
+        Assert.Contains("rt_net_ctype", net);
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
         Assert.True(blob.Length % 2 == 0);
         Assert.Equal("e9", blob.Substring(0x62d * 2, 2));
@@ -88,6 +90,8 @@ public class NativeNetTests
                 byte[] jsonCtCharset = Encoding.ASCII.GetBytes("Content-Type: application/json; charset=utf-8");
                 Assert.True(IndexOf(pe, jsonCt) >= 0, "parked JSON Content-Type must match Go writeJSON (no charset)");
                 Assert.True(IndexOf(pe, jsonCtCharset) < 0, "parked JSON Content-Type must not add charset=utf-8");
+                byte[] plainCt = Encoding.ASCII.GetBytes("Content-Type: text/plain; charset=utf-8\r\n");
+                Assert.True(IndexOf(pe, plainCt) >= 0, "parked text/plain Content-Type keeps charset=utf-8");
                 return;
             }
             string ascii = Encoding.ASCII.GetString(pe);
@@ -100,6 +104,7 @@ public class NativeNetTests
             Assert.Contains("\r\nConnection: close\r\n", ascii);
             Assert.Contains("Content-Type: application/json\r\n", ascii);
             Assert.DoesNotContain("Content-Type: application/json; charset=utf-8", ascii);
+            Assert.Contains("Content-Type: text/plain; charset=utf-8\r\n", ascii);
             Assert.Contains("WSAStartup", imports);
             Assert.Contains("GetTickCount", imports);
             Assert.DoesNotContain("LoadLibraryA", imports);

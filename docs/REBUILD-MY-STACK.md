@@ -87,6 +87,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | --- | --- | --- |
 | HTTP listen (loopback) | **Present** PE + ELF | `src/rt-net.vire`, `tools/native-net-windows.ps1`, `tools/native-elf-tcp.sh` |
 | HTTP status from JSON `"status"` | **Present** | `rt_net_statusof`; harness `GET /nope` → 404 |
+| Content-Type JSON vs text/plain | **Present** | `rt_net_ctype` + host `ContentTypeOf`; `GET /health` `ok\\n` is text/plain |
 | JSON encode/parse | **Present** | `rt_json` / `rt_parse`, `json-prove.vire` |
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
@@ -108,20 +109,36 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | Rank | Service / slice | Needs | Native today | Port now? |
 | --- | --- | --- | --- | --- |
 | 1 | `GET /health` and `GET /api/health` JSON | HTTP, JSON | Both present | **Done (PR #92 + this lane).** |
-| 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | **This PR.** Same listen guest, extra contracts |
-| 3 | `fcgbds-go` `GET /health` | HTTP, JSON | Present | **Next native proof.** Golden fields `ok`, `service: fcgbds-core`, `paymentsEnabled: false`. `ts` is now() — compare JSON fields, not exact bytes. Keep separate from Node/`api/fcgcpa.vire` health. |
-| 3b | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | After unauth Go health GETs, or in parallel on the same guest |
+| 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | Done (PR #93). |
+| 3 | `fcgbds-go` `GET /health` | HTTP, JSON | Present | **This PR.** Field match; `ts` omitted (no guest clock). |
+| 3a | `fcgbc-go` `GET /pending-transactions` | HTTP, JSON | Present | **This PR.** Body `[]`. |
+| 3b | `cpa-go` `GET /health` | HTTP, text/plain | Present | **This PR.** `ok\\n` + native/host text/plain Content-Type. |
+| 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
+| 3d | `api-go` `GET /healthz` | HTTP, JSON | Present | **This PR.** `{"status":"ok","live":true}`. Not `api-go` `/api/health`. |
+| 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | Next in-tree JSON after sidecar goldens |
 | 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | All present on native | After 3. Needs chain fixtures, not prod data |
 | 5 | Host `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen`; native guest has no token gate | Human review: port header check or keep host |
 | 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
-| 8 | Go `api-go`, `cpa-go` | unknown until source | unknown | Blocked; unread |
+| 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
 | 10 | WebSocket chat / live | WS, maybe TLS | Fixture only | Blocked |
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
 | 12 | Skinned browser, Proof of Rot miner, shop, OAuth clients | unknown | none | Blocked on missing source (PR39) |
 
-### Rank 1–2 contracts (proven on Linux ELF in this lane)
+### Rank 3 sidecar goldens (this PR)
+
+Minimal fixtures only (derived from source, not live). No auth, internal hostnames, env lists, or maintenance-bypass.
+
+- `fcgbds-go GET /health` → 200 JSON; fields `ok=true`, `service=fcgbds-core`, `dbConfigured=false`, `paymentsEnabled=false`. Go also sends `ts=now()`; this guest omits `ts`.
+- `fcgbc-go GET /pending-transactions` → 200, body `[]`
+- `cpa-go GET /health` → 200, `Content-Type: text/plain; charset=utf-8`, body `ok\n`
+- `rpc-portal-go GET /api/health` → 200, `{"ok":true}`
+- `api-go GET /healthz` → 200, `{"status":"ok","live":true}` (Go listen is `API_GO_ADDR`; guest still loopback `listen`)
+
+Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs native per slice).
+
+### Rank 1–2 contracts (proven on Linux ELF in prior lanes)
 
 Recorded in `tests/rebuild/contracts/`:
 
@@ -135,7 +152,9 @@ Recorded in `tests/rebuild/contracts/`:
 
 - Byte-identical Node handler vs Vire (private repo unread)
 - Remaining `api/fcgcpa.vire` routes (`/payments`, `/mine`, `/chain`, `/block`)
-- Go sidecars (`fcgbds-go` `/health`, `fcgbc-go` `/pending-transactions`, `cpa-go` `/health` text/plain, `rpc-portal-go` `/api/health`, `api-go` `/healthz`). Those contracts are not this PR. `api-go` `/api/health` is not the Node/`fcgcpa` health body.
+- Remaining sidecar routes beyond these five GET goldens
+- `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
+- Guest clock / RFC3339 `ts` on `fcgbds-go` health
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
@@ -145,6 +164,7 @@ Recorded in `tests/rebuild/contracts/`:
 
 ```text
 bash tools/rebuild-health-diff.sh
+bash tools/rebuild-sidecar-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
