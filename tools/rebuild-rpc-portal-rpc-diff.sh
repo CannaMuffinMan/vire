@@ -29,15 +29,16 @@ if ! git cat-file -e "${BEFORE_SHA}:tests/rebuild/guests/rpc-portal-go.vire"; th
   echo "missing fail-before blob at $BEFORE_SHA"
   exit 1
 fi
-old="$(git show "${BEFORE_SHA}:tests/rebuild/guests/rpc-portal-go.vire")"
-if echo "$old" | grep -q 'return "{\"enabled\":false,\"status\":503}"'; then
-  echo "FAIL_BEFORE guest already had status field"
-  exit 1
-fi
-if ! echo "$old" | grep -q 'return "{\"enabled\":false}"'; then
-  echo "FAIL_BEFORE guest missing enabled:false body"
-  exit 1
-fi
+python3 - "$BEFORE_SHA" <<'PY'
+import subprocess, sys
+sha = sys.argv[1]
+old = subprocess.check_output(["git", "show", f"{sha}:tests/rebuild/guests/rpc-portal-go.vire"], text=True)
+if '{"enabled":false,"status":503}' in old:
+    raise SystemExit("FAIL_BEFORE guest already had status field")
+if 'return "{\\"enabled\\":false}"' not in old:
+    raise SystemExit("FAIL_BEFORE guest missing enabled:false body")
+print("fail_before_guest_body_ok")
+PY
 echo "FAIL_BEFORE at $BEFORE_SHA rpc-portal /api/rpc body {\"enabled\":false} (no status field)"
 
 dotnet build vire.csproj -c Release --nologo
@@ -107,7 +108,7 @@ stop_guest() {
 
 git show "${BEFORE_SHA}:tests/rebuild/guests/rpc-portal-go.vire" > data/rpc-portal-rpc-fail.vire
 compile_listen_guest data/rpc-portal-rpc-fail.vire rpc-rpc-fail
-ids="$(run_cmd rpc-rpc-fail ./data/rpc-rpc-fail.elf)"
+ids="$(run_cmd rpc-rpc-fail ./data/rpc-rpc-fail.elf 0)"
 fpid="${ids%% *}"
 fport="${ids##* }"
 set +e

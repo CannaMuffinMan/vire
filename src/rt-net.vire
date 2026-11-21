@@ -148,7 +148,7 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_locm", "\"location\":\"/sop/access?next=/sop/media-lab\""
   parkMsg with image, labels, "txt_adsense", "\"adsenseClientId\""
   pin with labels, "txt_hdr2", image
-  let hdr2 be "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n"
+  let hdr2 be "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
   let image be emitU64 with image, (length with hdr2)
   let image be emitStr with image, hdr2
   let zhdr be 0
