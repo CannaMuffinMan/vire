@@ -91,11 +91,3 @@ define dist_path with root, url
   end
   return root + "/" + rel
 end
-
-define dist_known with root, url
-  let p be dist_path with root, url
-  if p == none
-    return none
-  end
-  return p
-end
