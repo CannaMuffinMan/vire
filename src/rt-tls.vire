@@ -1,0 +1,601 @@
+~ Native TLS: Linux OpenSSL 3 via PT_INTERP/libssl.so.3. Windows PE fail-closed
+~ (SChannel IAT is reserved; handshake proven on Linux ELF). Guest APIs:
+~ tls_connect host port name ca; tls_listen port cert key; tls_send/recv/close.
+~ Cert validation on. TLS 1.2 minimum, TLS 1.3 max. No insecure flags.
+~ tls_listen loads PEM cert/key under data/ or site/, then reuses rt_listen
+~ with SSL_accept on the loopback HTTP path. Windows PE tls_listen fail-closed.
+
+define tlsSymNames
+  return ["TLS_client_method", "TLS_server_method", "SSL_CTX_new", "SSL_CTX_free", "SSL_CTX_set_verify", "SSL_CTX_ctrl", "SSL_CTX_load_verify_locations", "SSL_CTX_set_default_verify_paths", "SSL_CTX_use_certificate_file", "SSL_CTX_use_PrivateKey_file", "SSL_CTX_check_private_key", "SSL_new", "SSL_free", "SSL_set_fd", "SSL_connect", "SSL_accept", "SSL_read", "SSL_write", "SSL_shutdown", "SSL_get_verify_result", "SSL_set1_host", "SSL_CTX_set_options", "OpenSSL_version_num"]
+end
+
+define tlsIatNames
+  return ["iat_tcm", "iat_tsm", "iat_ctxnew", "iat_ctxfree", "iat_setver", "iat_ctrl", "iat_loadca", "iat_defca", "iat_usecert", "iat_usekey", "iat_chkkey", "iat_sslnew", "iat_sslfree", "iat_setfd", "iat_sslcon", "iat_sslacc", "iat_sslrd", "iat_sslwr", "iat_sslshut", "iat_vfyres", "iat_sethost", "iat_setopt", "iat_vernum"]
+end
+
+define tlsStubNames
+  return ["stub_tcm", "stub_tsm", "stub_ctxnew", "stub_ctxfree", "stub_setver", "stub_ctrl", "stub_loadca", "stub_defca", "stub_usecert", "stub_usekey", "stub_chkkey", "stub_sslnew", "stub_sslfree", "stub_setfd", "stub_sslcon", "stub_sslacc", "stub_sslrd", "stub_sslwr", "stub_sslshut", "stub_vfyres", "stub_sethost", "stub_setopt", "stub_vernum"]
+end
+
+define tlsThunkNames
+  return ["thunk_tcm", "thunk_tsm", "thunk_ctxnew", "thunk_ctxfree", "thunk_setver", "thunk_ctrl", "thunk_loadca", "thunk_defca", "thunk_usecert", "thunk_usekey", "thunk_chkkey", "thunk_sslnew", "thunk_sslfree", "thunk_setfd", "thunk_sslcon", "thunk_sslacc", "thunk_sslrd", "thunk_sslwr", "thunk_sslshut", "thunk_vfyres", "thunk_sethost", "thunk_setopt", "thunk_vernum"]
+end
+
+define tlsPltNames
+  return ["plt_tcm", "plt_tsm", "plt_ctxnew", "plt_ctxfree", "plt_setver", "plt_ctrl", "plt_loadca", "plt_defca", "plt_usecert", "plt_usekey", "plt_chkkey", "plt_sslnew", "plt_sslfree", "plt_setfd", "plt_sslcon", "plt_sslacc", "plt_sslrd", "plt_sslwr", "plt_sslshut", "plt_vfyres", "plt_sethost", "plt_setopt", "plt_vernum"]
+end
+
+define tlsGotNames
+  return ["got_tcm", "got_tsm", "got_ctxnew", "got_ctxfree", "got_setver", "got_ctrl", "got_loadca", "got_defca", "got_usecert", "got_usekey", "got_chkkey", "got_sslnew", "got_sslfree", "got_setfd", "got_sslcon", "got_sslacc", "got_sslrd", "got_sslwr", "got_sslshut", "got_vfyres", "got_sethost", "got_setopt", "got_vernum"]
+end
+
+define tlsHashBuckets
+  return [0, 0, 0, 8, 20, 18, 0, 0, 0, 11, 0, 0, 6, 0, 19, 0, 0, 0, 0, 22, 21, 13, 0, 12, 0, 5, 0, 0, 0, 23, 0, 0]
+end
+
+define tlsHashChains
+  return [0, 0, 1, 0, 0, 0, 0, 0, 7, 4, 0, 0, 3, 9, 0, 2, 15, 16, 10, 0, 14, 17, 0, 0]
+end
+
+define emitTlsPltAndMeta with image, fixes, labels
+  pin with labels, "tls_dynstr", image
+  let image be emitU8 with image, 0
+  pin with labels, "tls_needed", image
+  let image be emitStr with image, "libssl.so.3"
+  pin with labels, "tls_needed2", image
+  let image be emitStr with image, "libcrypto.so.3"
+  let names be tlsSymNames
+  let i be 0
+  while i < (length with names)
+    pin with labels, ("dynstr_" + (text with i)), image
+    let image be emitStr with image, (names at i)
+    let i be i + 1
+  end
+  let image be alignTo with image, 8
+  pin with labels, "tls_dynsym", image
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let i be 0
+  while i < (length with names)
+    pin with labels, ("dynsym_" + (text with i)), image
+    let image be emitU32 with image, 0
+    let image be emitU8 with image, 18
+    let image be emitU8 with image, 0
+    let image be emitU8 with image, 0
+    let image be emitU8 with image, 0
+    let image be emitU64 with image, 0
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be alignTo with image, 8
+  pin with labels, "tls_hash", image
+  let image be emitU32 with image, 32
+  let image be emitU32 with image, 24
+  let b be tlsHashBuckets
+  let i be 0
+  while i < 32
+    let image be emitU32 with image, (b at i)
+    let i be i + 1
+  end
+  let c be tlsHashChains
+  let i be 0
+  while i < 24
+    let image be emitU32 with image, (c at i)
+    let i be i + 1
+  end
+  let image be alignTo with image, 8
+  pin with labels, "tls_rela", image
+  let i be 0
+  while i < (length with names)
+    pin with labels, ("rela_" + (text with i)), image
+    let image be emitU64 with image, 0
+    let image be emitU64 with image, 0
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be alignTo with image, 8
+  pin with labels, "tls_dynamic", image
+  let i be 0
+  while i < 24
+    let image be emitU64 with image, 0
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  let image be alignTo with image, 16
+  pin with labels, "tls_plt0", image
+  let image be emitList with image, [255, 53, 0, 0, 0, 0, 255, 37, 0, 0, 0, 0, 15, 31, 64, 0]
+  let i be 0
+  let plts be tlsPltNames
+  while i < (length with plts)
+    pin with labels, (plts at i), image
+    let image be emitList with image, [255, 37, 0, 0, 0, 0, 104, 0, 0, 0, 0, 233, 0, 0, 0, 0]
+    let i be i + 1
+  end
+  return image
+end
+
+define emitTlsSysvStub with image, fixes, labels, stub, plt
+  ~ Align SysV calls: OpenSSL uses movaps on the frame. and rsp,-16
+  ~ then call with rsp%16==0.
+  pin with labels, stub, image
+  let image be emitHex with image, "554889e54883e4f04889cf4889d64c89c24989c9e8"
+  let image be emitRel with image, fixes, plt
+  let image be emitHex with image, "c9c3"
+  return image
+end
+
+define emitTlsSslStubs with image, fixes, labels
+  let stubs be tlsStubNames
+  let plts be tlsPltNames
+  let i be 0
+  while i < (length with stubs)
+    let image be emitTlsSysvStub with image, fixes, labels, (stubs at i), (plts at i)
+    let i be i + 1
+  end
+  let thunks be tlsThunkNames
+  let i be 0
+  while i < (length with thunks)
+    let image be emitIatThunk with image, fixes, labels, (thunks at i), (stubs at i)
+    let i be i + 1
+  end
+  return image
+end
+
+define emitTlsIoStubs with image, fixes, labels
+  pin with labels, "stub_ac_tls", image
+  let image be emitHex with image, "89cf4889d64489c2"
+  let image be emitSys with image, 43
+  let image be emitSysNeg1 with image
+  let image be emitHex with image, "488905"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_ctx"
+  let image be emitHex with image, "4885c00f84"
+  let image be emitRel with image, fixes, "ac_tls_raw"
+  let image be emitHex with image, "4889c1ff15"
+  let image be emitRel with image, fixes, "iat_sslnew"
+  let image be emitHex with image, "4885c00f84"
+  let image be emitRel with image, fixes, "ac_tls_fail"
+  let image be emitHex with image, "488905"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4889c18b15"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_setfd"
+  let image be emitHex with image, "488b0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_sslacc"
+  let image be emitHex with image, "83f8010f85"
+  let image be emitRel with image, fixes, "ac_tls_fail"
+  pin with labels, "ac_tls_raw", image
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "c3"
+  pin with labels, "ac_tls_fail", image
+  let image be emitHex with image, "488b0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4885c974"
+  let image be emitU8 with image, 24
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_sslfree"
+  let image be emitHex with image, "488d0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "48c70100000000"
+  let image be emitHex with image, "488b3d"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitSys with image, 3
+  let image be emitHex with image, "48c7c0ffffffffc3"
+
+  pin with labels, "stub_rv_tls", image
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4885c074"
+  let image be emitU8 with image, 9
+  let image be emitHex with image, "4889c1ff25"
+  let image be emitRel with image, fixes, "iat_sslrd"
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "stub_rv"
+
+  pin with labels, "stub_sd_tls", image
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4885c074"
+  let image be emitU8 with image, 9
+  let image be emitHex with image, "4889c1ff25"
+  let image be emitRel with image, fixes, "iat_sslwr"
+  let image be emitHex with image, "e9"
+  let image be emitRel with image, fixes, "stub_sd"
+
+  pin with labels, "stub_cs_tls", image
+  let image be emitHex with image, "505351488b05"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4885c074"
+  let image be emitU8 with image, 36
+  let image be emitHex with image, "4889c1ff15"
+  let image be emitRel with image, fixes, "iat_sslshut"
+  let image be emitHex with image, "488b0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_sslfree"
+  let image be emitHex with image, "488d0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "48c701000000005b595889cf"
+  let image be emitSys with image, 3
+  let image be emitHex with image, "31c0c3"
+  return image
+end
+
+define emitTlsWrapAccept with image, fixes, labels
+  ~ After a successful accept fd in rax: if tls_ctx, SSL_new/set_fd/accept.
+  pin with labels, "tls_after_accept", image
+  let image be emitHex with image, "488905"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_ctx"
+  let image be emitHex with image, "4885c074"
+  let image be emitU8 with image, 70
+  let image be emitHex with image, "4889c1ff15"
+  let image be emitRel with image, fixes, "iat_sslnew"
+  let image be emitHex with image, "4885c074"
+  let image be emitU8 with image, 56
+  let image be emitHex with image, "488905"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "4889c18b15"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_setfd"
+  let image be emitHex with image, "488b0d"
+  let image be emitRel with image, fixes, "tls_ssl"
+  let image be emitHex with image, "ff15"
+  let image be emitRel with image, fixes, "iat_sslacc"
+  let image be emitHex with image, "83f80175"
+  let image be emitU8 with image, 14
+  let image be emitHex with image, "488b05"
+  let image be emitRel with image, fixes, "tls_fd"
+  let image be emitHex with image, "c348c7c0ffffffffc3"
+  return image
+end
+
+define emitTlsGuest with image, fixes, labels
+  pin with labels, "rt_tls_connect", image
+  emitPro with image
+  emitPop2 with image
+  ~ rax/rdx = name, r8/r9 = ca
+  emitList with image, [72, 137, 85, 208, 76, 137, 13]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitPop2 with image
+  ~ rax/rdx = host, r8/r9 = port
+  emitList with image, [72, 137, 85, 240, 76, 137, 77, 232, 72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [72, 139, 85, 240]
+  emitPushTag with image, 2
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 1
+  emitCallTo with image, fixes, "rt_connect"
+  emitPop1 with image
+  emitList with image, [72, 137, 85, 224]
+  ~ TLS_client_method()
+  emitList with image, [49, 201]
+  let image be emitIat with image, fixes, "iat_tcm"
+  emitList with image, [72, 137, 193, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  let image be emitIat with image, fixes, "iat_ctxnew"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [49, 201]
+  let image be emitIat with image, fixes, "iat_vernum"
+  emitList with image, [72, 61]
+  emitU32 with image, 805306368
+  emitList with image, [15, 130]
+  emitRel with image, fixes, "tls_ver_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 123
+  emitList with image, [65, 184]
+  emitU32 with image, 771
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_ctrl"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 124
+  emitList with image, [65, 184]
+  emitU32 with image, 772
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_ctrl"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 192]
+  let image be emitIat with image, fixes, "iat_setver"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [72, 139, 2, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_defca"
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [72, 137, 209]
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [72, 131, 194, 8, 69, 49, 192, 72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  let image be emitIat with image, fixes, "iat_loadca"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitJmpTo with image, fixes, "tls_ca_ok"
+  pin with labels, "tls_defca", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  let image be emitIat with image, fixes, "iat_defca"
+  pin with labels, "tls_ca_ok", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  let image be emitIat with image, fixes, "iat_sslnew"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [139, 21]
+  emitRel with image, fixes, "tcp_socks"
+  let image be emitIat with image, fixes, "iat_setfd"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 139, 85, 208, 72, 141, 82, 8]
+  let image be emitIat with image, fixes, "iat_sethost"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  let image be emitIat with image, fixes, "iat_sslcon"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  let image be emitIat with image, fixes, "iat_vfyres"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "tls_conn_bad", image
+  emitFail with image, fixes, "msg_tls_args"
+  pin with labels, "tls_hs_fail", image
+  emitFail with image, fixes, "msg_tls_hs"
+  pin with labels, "tls_ver_fail", image
+  emitFail with image, fixes, "msg_tls_ver"
+
+  pin with labels, "rt_tls_send", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [77, 139, 1, 73, 141, 81, 8]
+  let image be emitIat with image, fixes, "iat_sslwr"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 99, 208]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "tls_send_bad", image
+  emitFail with image, fixes, "msg_tls_send"
+
+  pin with labels, "rt_tls_recv", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [77, 133, 201, 15, 136]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [73, 129, 249]
+  emitU32 with image, 1000000
+  emitJcc with image, fixes, 134, "tls_recv_cap"
+  emitList with image, [73, 199, 193]
+  emitU32 with image, 1000000
+  pin with labels, "tls_recv_cap", image
+  emitList with image, [76, 137, 77, 232, 139, 77, 232, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 141, 80, 8, 139, 69, 232, 76, 99, 192]
+  let image be emitIat with image, fixes, "iat_sslrd"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 139, 85, 224, 72, 99, 200, 72, 137, 10, 198, 68, 10, 8, 0]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_recv_bad", image
+  emitFail with image, fixes, "msg_tls_recv"
+
+  pin with labels, "rt_tls_close", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 137, 85, 240, 72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tls_cls"
+  let image be emitIat with image, fixes, "iat_sslshut"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  let image be emitIat with image, fixes, "iat_sslfree"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 199, 1, 0, 0, 0, 0]
+  pin with labels, "tls_cls", image
+  emitList with image, [72, 139, 85, 240]
+  emitPushTag with image, 1
+  emitCallTo with image, fixes, "rt_close"
+  emitEpi with image
+
+  pin with labels, "rt_tls_listen", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 137, 85, 208, 76, 137, 77, 216, 72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitList with image, [72, 137, 85, 224]
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 77, 208]
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 77, 216]
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [49, 201]
+  let image be emitIat with image, fixes, "iat_tsm"
+  emitList with image, [72, 137, 193, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  let image be emitIat with image, fixes, "iat_ctxnew"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [49, 201]
+  let image be emitIat with image, fixes, "iat_vernum"
+  emitList with image, [72, 61]
+  emitU32 with image, 805306368
+  emitList with image, [15, 130]
+  emitRel with image, fixes, "tls_ver_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 123
+  emitList with image, [65, 184]
+  emitU32 with image, 771
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_ctrl"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 124
+  emitList with image, [65, 184]
+  emitU32 with image, 772
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_ctrl"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [186]
+  emitU32 with image, 335675392
+  let image be emitIat with image, fixes, "iat_setopt"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [72, 139, 85, 208, 72, 131, 194, 8, 65, 184]
+  emitU32 with image, 1
+  let image be emitIat with image, fixes, "iat_usecert"
+  emitList with image, [131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_cert_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  emitList with image, [72, 139, 85, 216, 72, 131, 194, 8, 65, 184]
+  emitU32 with image, 1
+  let image be emitIat with image, fixes, "iat_usekey"
+  emitList with image, [131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_cert_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ctx"
+  let image be emitIat with image, fixes, "iat_chkkey"
+  emitList with image, [131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_cert_fail"
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 1
+  emitList with image, [201]
+  emitJmpTo with image, fixes, "rt_listen"
+  pin with labels, "tls_listen_args", image
+  emitFail with image, fixes, "msg_tls_listen"
+  pin with labels, "tls_cert_fail", image
+  emitFail with image, fixes, "msg_tls_cert"
+  return image
+end
+
+define emitTlsPeRefuse with image, fixes, labels
+  pin with labels, "rt_tls_connect", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_pe"
+  pin with labels, "rt_tls_send", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_pe"
+  pin with labels, "rt_tls_recv", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_pe"
+  pin with labels, "rt_tls_close", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_pe"
+  pin with labels, "rt_tls_listen", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_pe"
+  return image
+end
+
+define emitTlsRuntime with image, fixes, labels, elf
+  if elf
+    let image be emitTlsGuest with image, fixes, labels
+    return image
+  end
+  return (emitTlsPeRefuse with image, fixes, labels)
+end
+
+define parkTls with image, labels
+  parkMsg with image, labels, "msg_tls_args", "tls_connect needs a host, a port, a name, and a ca file"
+  parkMsg with image, labels, "msg_tls_hs", "tls handshake failed"
+  parkMsg with image, labels, "msg_tls_send", "tls_send needs a connection and text"
+  parkMsg with image, labels, "msg_tls_recv", "tls_recv needs a connection and a size"
+  parkMsg with image, labels, "msg_tls_listen", "tls_listen needs a certificate file and a key file"
+  parkMsg with image, labels, "msg_tls_cert", "could not load that tls certificate"
+  parkMsg with image, labels, "msg_tls_pe", "native tls on windows pe uses Schannel; prove that handshake on a Windows box"
+  parkMsg with image, labels, "msg_tls_ver", "openssl must be 3.0 or newer"
+  let image be alignTo with image, 8
+  pin with labels, "tls_ctx", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_ssl", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_fd", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_captr", image
+  let image be emitU64 with image, 0
+  pin with labels, "tls_got_head", image
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let image be emitU64 with image, 0
+  let names be tlsGotNames
+  let i be 0
+  while i < (length with names)
+    pin with labels, (names at i), image
+    let image be emitU64 with image, 0
+    let i be i + 1
+  end
+  return image
+end
