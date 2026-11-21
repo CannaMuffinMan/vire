@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-challenge",
+  "source": "fcgbds-dashboard-go /api/challenge with Upstream nil. Map keys sorted by encoding/json.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_challenge",
+      "method": "GET",
+      "path": "/api/challenge",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"caption\":\"Visitor check is unavailable. You were not blocked.\",\"unavailable\":true}\n"
+    }
+  ]
+}

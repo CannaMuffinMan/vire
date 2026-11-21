@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# FAIL_BEFORE at native-compiler: host hello hex is PE (MZ), not an ELF that prints hello.
+# FAIL_BEFORE: pinned pre-ELF SHA (PR #71 / first parent of #78). Hello hex is PE (MZ).
+# Do not use origin/native-compiler or merge-base: after #78 that tip already emits ELF.
 # PASS_AFTER: host-compiled ELF prints "hello from stage" and exits 0 on this Linux.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -8,10 +9,18 @@ export PATH="${HOME}/.dotnet:${PATH:-}"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export VIRE_HEADLESS=1
 unset VIRE_BUDGET || true
-BASE_SHA="${NATIVE_ELF_BASE_SHA:-$(git merge-base HEAD origin/native-compiler 2>/dev/null || git rev-parse HEAD^)}"
+# 03836f78 = Merge PR #71; compile-native.vire is PE-only (no buildElf).
+BASE_SHA="${NATIVE_ELF_BASE_SHA:-03836f787aa7dff609bbde8e700d464423b2a784}"
 AFTER_SHA="$(git rev-parse HEAD)"
 echo "fail_before_sha $BASE_SHA"
 echo "pass_after_sha $AFTER_SHA"
+if ! git cat-file -t "$BASE_SHA" >/dev/null 2>&1; then
+  git fetch origin "$BASE_SHA"
+fi
+if git show "$BASE_SHA:compile-native.vire" | grep -q buildElf; then
+  echo "FAIL_BEFORE pin $BASE_SHA already has ELF backend (need a pre-ELF SHA)" >&2
+  exit 1
+fi
 
 hex_to_bin() {
   python3 - "$1" "$2" <<'PY'

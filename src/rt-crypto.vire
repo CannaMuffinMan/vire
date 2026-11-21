@@ -859,23 +859,7 @@ define cryptoPad with buf
 end
 
 define sha256_bytes with buf
-  let ks be cryptoK
-  let state be cryptoIv
-  let padded be cryptoPad with buf
-  let i be 0
-  let n be length with padded
-  while i < n
-    let block be slice with padded, i, (i + 64)
-    let state be cryptoCompress with state, block, ks
-    let i be i + 64
-  end
-  let out be []
-  let j be 0
-  while j < 8
-    let out be cryptoStoreWord with out, (state at j)
-    let j be j + 1
-  end
-  return out
+  return digest with buf
 end
 
 define sha256_hex with buf
@@ -1214,28 +1198,7 @@ define cat_bytes with a, b
 end
 
 define hmac_sha256 with key, msg
-  let k be copy_bytes with key
-  if (length with k) > 64
-    let k be sha256_bytes with k
-  end
-  while (length with k) < 64
-    push with k, 0
-  end
-  let ip be []
-  let op be []
-  let i be 0
-  while i < 64
-    let b be k at i
-    let x be cryptoXor16 with b, 54
-    push with ip, x
-    let y be cryptoXor16 with b, 92
-    push with op, y
-    let i be i + 1
-  end
-  let cat be cat_bytes with ip, msg
-  let inner be sha256_bytes with cat
-  let cat be cat_bytes with op, inner
-  return sha256_bytes with cat
+  return hmac with key, msg
 end
 
 define hmac_sha256_hex with key, msg
@@ -1947,4 +1910,399 @@ define jwt_hs256_verify with token, secret, clock
     end
   end
   return ["ok", pt at 1]
+end
+
+define cookie_is_ows with ch
+  if ch == " "
+    return true
+  end
+  if ch == "\t"
+    return true
+  end
+  return false
+end
+
+define cookie_skip_ows with text, i
+  let n be length with text
+  while i < n
+    if not (cookie_is_ows with (text at i))
+      stop
+    end
+    let i be i + 1
+  end
+  return i
+end
+
+define cookie_has_inject with text
+  let n be length with text
+  let i be 0
+  while i < n
+    let ch be text at i
+    if ch == "\r"
+      return true
+    end
+    if ch == "\n"
+      return true
+    end
+    if ch == ";"
+      return true
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define cookie_strip_prefix with header
+  let n be length with header
+  if n < 7
+    return header
+  end
+  let p be lower with (slice with header, 0, 7)
+  if p != "cookie:"
+    return header
+  end
+  return slice with header, 7, n
+end
+
+define cookie_line_end with ch
+  if ch == "\r"
+    return true
+  end
+  if ch == "\n"
+    return true
+  end
+  return false
+end
+
+define cookie_parse with header
+  let text be cookie_strip_prefix with header
+  let n be length with text
+  let i be cookie_skip_ows with text, 0
+  let out be []
+  let seen be {}
+  while i < n
+    let i be cookie_skip_ows with text, i
+    if i >= n
+      stop
+    end
+    if cookie_line_end with (text at i)
+      stop
+    end
+    if (text at i) == ";"
+      let i be i + 1
+    end
+    if i >= n
+      stop
+    end
+    let i be cookie_skip_ows with text, i
+    if i >= n
+      stop
+    end
+    if cookie_line_end with (text at i)
+      stop
+    end
+    let start be i
+    while i < n
+      let ch be text at i
+      if ch == "="
+        stop
+      end
+      if ch == ";"
+        stop
+      end
+      if cookie_line_end with ch
+        stop
+      end
+      let i be i + 1
+    end
+    let name be slice with text, start, i
+    let name be slice with name, 0, (length with name)
+    let j be (length with name) - 1
+    while j >= 0
+      if not (cookie_is_ows with (name at j))
+        stop
+      end
+      let j be j - 1
+    end
+    let name be slice with name, 0, (j + 1)
+    if i < n
+      if (text at i) == "="
+        let i be i + 1
+      end
+    end
+    let vs be i
+    while i < n
+      if (text at i) == ";"
+        stop
+      end
+      if cookie_line_end with (text at i)
+        stop
+      end
+      let i be i + 1
+    end
+    let val be slice with text, vs, i
+    let val be slice with val, (cookie_skip_ows with val, 0), (length with val)
+    let k be (length with val) - 1
+    while k >= 0
+      if not (cookie_is_ows with (val at k))
+        stop
+      end
+      let k be k - 1
+    end
+    let val be slice with val, 0, (k + 1)
+    if (length with name) > 0
+      if not (has with seen, name)
+        put 1 into seen at name
+        push with out, [name, val]
+      end
+    end
+    if i < n
+      if (text at i) == ";"
+        let i be i + 1
+      end
+    end
+  end
+  return out
+end
+
+define cookie_set with name, value, path, httponly, secure, samesite, max_age
+  if cookie_has_inject with name
+    return ["bad", "injected name"]
+  end
+  if cookie_has_inject with value
+    return ["bad", "injected value"]
+  end
+  if (length with name) == 0
+    return ["bad", "empty name"]
+  end
+  let out be name + "=" + value
+  if path != none
+    if cookie_has_inject with path
+      return ["bad", "injected path"]
+    end
+    let out be out + "; Path=" + path
+  end
+  if httponly
+    let out be out + "; HttpOnly"
+  end
+  if secure
+    let out be out + "; Secure"
+  end
+  if samesite != none
+    if cookie_has_inject with samesite
+      return ["bad", "injected samesite"]
+    end
+    let out be out + "; SameSite=" + samesite
+  end
+  if max_age != none
+    let out be out + "; Max-Age=" + (text with max_age)
+  end
+  return ["ok", out]
+end
+
+~ PBKDF2-HMAC-SHA256 (RFC 8018) on builtin hmac. FCG password KDF for
+~ cpa-go / api-go / dev-portal-go login after HMAC/JWT/cookie primitives.
+~ Comparison walks every DK byte (not a CPU timing barrier).
+
+define xor8_bit with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  return r
+end
+
+define make_xor_tab
+  let tab be []
+  let a be 0
+  while a < 256
+    let b be 0
+    while b < 256
+      push with tab, (xor8_bit with a, b)
+      let b be b + 1
+    end
+    let a be a + 1
+  end
+  return tab
+end
+
+define xor8 with tab, a, b
+  return tab at ((shl8 with a) + b)
+end
+
+define xor32_into with tab, dst, src
+  put (xor8 with tab, (dst at 0), (src at 0)) into dst at 0
+  put (xor8 with tab, (dst at 1), (src at 1)) into dst at 1
+  put (xor8 with tab, (dst at 2), (src at 2)) into dst at 2
+  put (xor8 with tab, (dst at 3), (src at 3)) into dst at 3
+  put (xor8 with tab, (dst at 4), (src at 4)) into dst at 4
+  put (xor8 with tab, (dst at 5), (src at 5)) into dst at 5
+  put (xor8 with tab, (dst at 6), (src at 6)) into dst at 6
+  put (xor8 with tab, (dst at 7), (src at 7)) into dst at 7
+  put (xor8 with tab, (dst at 8), (src at 8)) into dst at 8
+  put (xor8 with tab, (dst at 9), (src at 9)) into dst at 9
+  put (xor8 with tab, (dst at 10), (src at 10)) into dst at 10
+  put (xor8 with tab, (dst at 11), (src at 11)) into dst at 11
+  put (xor8 with tab, (dst at 12), (src at 12)) into dst at 12
+  put (xor8 with tab, (dst at 13), (src at 13)) into dst at 13
+  put (xor8 with tab, (dst at 14), (src at 14)) into dst at 14
+  put (xor8 with tab, (dst at 15), (src at 15)) into dst at 15
+  put (xor8 with tab, (dst at 16), (src at 16)) into dst at 16
+  put (xor8 with tab, (dst at 17), (src at 17)) into dst at 17
+  put (xor8 with tab, (dst at 18), (src at 18)) into dst at 18
+  put (xor8 with tab, (dst at 19), (src at 19)) into dst at 19
+  put (xor8 with tab, (dst at 20), (src at 20)) into dst at 20
+  put (xor8 with tab, (dst at 21), (src at 21)) into dst at 21
+  put (xor8 with tab, (dst at 22), (src at 22)) into dst at 22
+  put (xor8 with tab, (dst at 23), (src at 23)) into dst at 23
+  put (xor8 with tab, (dst at 24), (src at 24)) into dst at 24
+  put (xor8 with tab, (dst at 25), (src at 25)) into dst at 25
+  put (xor8 with tab, (dst at 26), (src at 26)) into dst at 26
+  put (xor8 with tab, (dst at 27), (src at 27)) into dst at 27
+  put (xor8 with tab, (dst at 28), (src at 28)) into dst at 28
+  put (xor8 with tab, (dst at 29), (src at 29)) into dst at 29
+  put (xor8 with tab, (dst at 30), (src at 30)) into dst at 30
+  put (xor8 with tab, (dst at 31), (src at 31)) into dst at 31
+end
+
+define pbkdf2_be32 with n
+  let b3 be n % 256
+  let n be idiv with n, 256
+  let b2 be n % 256
+  let n be idiv with n, 256
+  let b1 be n % 256
+  let n be idiv with n, 256
+  let b0 be n % 256
+  return [b0, b1, b2, b3]
+end
+
+define pbkdf2_block with tab, pw, salt, rounds, idx
+  let msg be cat_bytes with salt, (pbkdf2_be32 with idx)
+  let u be hmac with pw, msg
+  let t be copy_bytes with u
+  let j be 1
+  while j < rounds
+    let u be hmac with pw, u
+    xor32_into with tab, t, u
+    let j be j + 1
+  end
+  return t
+end
+
+define pbkdf2_sha256_tab with tab, pw, salt, rounds, dklen
+  if rounds < 1
+    return ["bad", "pbkdf2 rounds"]
+  end
+  if dklen < 1
+    return ["bad", "pbkdf2 dklen"]
+  end
+  if dklen > 1024
+    return ["bad", "pbkdf2 dklen"]
+  end
+  let out be []
+  let block be 1
+  while (length with out) < dklen
+    let t be pbkdf2_block with tab, pw, salt, rounds, block
+    let i be 0
+    let n be length with t
+    while i < n
+      if (length with out) < dklen
+        push with out, (t at i)
+      end
+      let i be i + 1
+    end
+    let block be block + 1
+  end
+  return ["ok", out]
+end
+
+define pbkdf2_sha256 with pw, salt, rounds, dklen
+  return pbkdf2_sha256_tab with (make_xor_tab), pw, salt, rounds, dklen
+end
+
+define pbkdf2_sha256_hex_tab with tab, pw, salt, rounds, dklen
+  let got be pbkdf2_sha256_tab with tab, pw, salt, rounds, dklen
+  if (got at 0) != "ok"
+    return got
+  end
+  return ["ok", (hex with (got at 1))]
+end
+
+define pbkdf2_sha256_verify_tab with tab, pw, salt, rounds, want
+  let got be pbkdf2_sha256_tab with tab, pw, salt, rounds, (length with want)
+  if (got at 0) != "ok"
+    return false
+  end
+  return ct_eq with (got at 1), want
+end
+
+~ FCG login DK: 32-byte PBKDF2-HMAC-SHA256. RFC 7914 c=80000 fits the 5M step
+~ cap after unrolling the 32-byte XOR (the 1M while-pass cap is unchanged).
+define fcg_password_dk_tab with tab, pw, salt, rounds
+  return pbkdf2_sha256_tab with tab, pw, salt, rounds, 32
+end
+
+define fcg_password_verify_tab with tab, pw, salt, rounds, want
+  return pbkdf2_sha256_verify_tab with tab, pw, salt, rounds, want
 end

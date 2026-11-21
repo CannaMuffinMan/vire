@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/not-found",
+  "source": "Unknown /api/* is 404 error not_found. Vire adds status:404.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_unknown",
+      "method": "GET",
+      "path": "/api/nope",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"not_found\",\"status\":404}\n"
+    }
+  ]
+}

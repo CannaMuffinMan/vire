@@ -1,0 +1,481 @@
+~ UDP DNS stub (A/AAAA). Connected datagrams use the existing ws2 allowlist
+~ (socket, bind, connect, send, recv, closesocket, GetTickCount). Linux reads
+~ /etc/hosts and /etc/resolv.conf with open(2). Every packet byte is checked
+~ against the received length before it is read. Compressed-name hops cap 16.
+
+define emitDnsSkip with image, fixes, labels
+  pin with labels, "dns_skip", image
+  emitPro with image
+  let image be emitList with image, [83, 65, 84, 65, 85, 65, 86, 72, 137, 77, 248, 137, 85, 240, 68, 137, 69, 232, 139, 93, 232, 69, 49, 228, 69, 49, 237, 69, 49, 246, 69, 49, 210]
+  pin with labels, "dns_sk_loop", image
+  let image be emitList with image, [133, 219, 15, 136]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [59, 93, 240, 15, 131]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [72, 139, 77, 248, 15, 182, 4, 25, 255, 195, 132, 192, 15, 132]
+  let image be emitRel with image, fixes, "dns_sk_nul"
+  let image be emitList with image, [137, 193, 129, 225]
+  let image be emitU32 with image, 192
+  let image be emitList with image, [129, 249]
+  let image be emitU32 with image, 192
+  let image be emitList with image, [15, 132]
+  let image be emitRel with image, fixes, "dns_sk_ptr"
+  let image be emitList with image, [133, 201, 15, 133]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [60, 63, 15, 135]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [68, 1, 208, 61]
+  let image be emitU32 with image, 255
+  let image be emitList with image, [15, 135]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [15, 182, 192, 1, 195, 15, 130]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [59, 93, 240, 15, 135]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitJmpTo with image, fixes, "dns_sk_loop"
+  pin with labels, "dns_sk_ptr", image
+  let image be emitList with image, [59, 93, 240, 15, 131]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [68, 15, 182, 4, 25, 255, 195, 37, 63, 0, 0, 0, 193, 224, 8, 68, 9, 192, 65, 255, 196, 65, 131, 252, 16, 15, 143]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [133, 192, 15, 136]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [59, 69, 240, 15, 131]
+  let image be emitRel with image, fixes, "dns_sk_bad"
+  let image be emitList with image, [69, 133, 237, 15, 133]
+  let image be emitRel with image, fixes, "dns_sk_j2"
+  let image be emitList with image, [65, 137, 222, 65, 189, 1, 0, 0, 0]
+  pin with labels, "dns_sk_j2", image
+  let image be emitList with image, [137, 195]
+  let image be emitJmpTo with image, fixes, "dns_sk_loop"
+  pin with labels, "dns_sk_nul", image
+  let image be emitList with image, [69, 133, 237, 15, 132]
+  let image be emitRel with image, fixes, "dns_sk_ok"
+  let image be emitList with image, [68, 137, 243]
+  pin with labels, "dns_sk_ok", image
+  let image be emitList with image, [137, 216, 65, 94, 65, 93, 65, 92, 91]
+  emitEpi with image
+  pin with labels, "dns_sk_bad", image
+  let image be emitList with image, [184, 255, 255, 255, 255, 65, 94, 65, 93, 65, 92, 91]
+  emitEpi with image
+  return image
+end
+
+define emitDnsHostOk with image, fixes, labels
+  pin with labels, "dns_hostok", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 139, 1, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [72, 137, 193, 72, 129, 249]
+  emitU32 with image, 255
+  emitJcc with image, fixes, 135, "dns_hk_no"
+  emitList with image, [72, 139, 85, 248, 15, 182, 66, 8, 60, 46, 15, 132]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [15, 182, 68, 10, 7, 60, 46, 15, 132]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [49, 192, 49, 219]
+  pin with labels, "dns_hk_lp", image
+  emitList with image, [72, 57, 200, 15, 132]
+  emitRel with image, fixes, "dns_hk_end"
+  emitList with image, [72, 139, 85, 248, 68, 15, 182, 68, 2, 8, 65, 128, 248, 46, 15, 132]
+  emitRel with image, fixes, "dns_hk_dot"
+  emitList with image, [69, 137, 193, 65, 131, 233, 48, 65, 128, 249, 9, 15, 134]
+  emitRel with image, fixes, "dns_hk_ch"
+  emitList with image, [69, 137, 193, 65, 131, 233, 65, 65, 128, 249, 25, 15, 134]
+  emitRel with image, fixes, "dns_hk_ch"
+  emitList with image, [69, 137, 193, 65, 131, 233, 97, 65, 128, 249, 25, 15, 134]
+  emitRel with image, fixes, "dns_hk_ch"
+  emitList with image, [65, 128, 248, 45, 15, 133]
+  emitRel with image, fixes, "dns_hk_no"
+  pin with labels, "dns_hk_ch", image
+  emitList with image, [255, 195, 131, 251, 63, 15, 143]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [72, 255, 192]
+  emitJmpTo with image, fixes, "dns_hk_lp"
+  pin with labels, "dns_hk_dot", image
+  emitList with image, [133, 219, 15, 132]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [49, 219, 72, 255, 192]
+  emitJmpTo with image, fixes, "dns_hk_lp"
+  pin with labels, "dns_hk_end", image
+  emitList with image, [133, 219, 15, 132]
+  emitRel with image, fixes, "dns_hk_no"
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "dns_hk_no", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitDnsFmtA with image, fixes, labels
+  pin with labels, "dns_fmta", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 185, 32, 0, 0, 0]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232, 72, 199, 69, 224, 0, 0, 0, 0, 49, 219]
+  pin with labels, "dns_fa_oct", image
+  emitList with image, [131, 251, 4, 15, 132]
+  emitRel with image, fixes, "dns_fa_done"
+  emitList with image, [133, 219, 15, 132]
+  emitRel with image, fixes, "dns_fa_num"
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 224, 198, 68, 8, 8, 46, 72, 255, 69, 224]
+  pin with labels, "dns_fa_num", image
+  emitList with image, [72, 139, 77, 248, 15, 182, 4, 25, 49, 201, 49, 210]
+  pin with labels, "dns_fa_h", image
+  emitList with image, [61, 100, 0, 0, 0, 15, 130]
+  emitRel with image, fixes, "dns_fa_hs"
+  emitList with image, [45, 100, 0, 0, 0, 255, 193, 233]
+  emitRel with image, fixes, "dns_fa_h"
+  pin with labels, "dns_fa_hs", image
+  emitList with image, [137, 77, 208, 137, 69, 216, 133, 201, 15, 132]
+  emitRel with image, fixes, "dns_fa_t0"
+  emitList with image, [137, 200, 4, 48, 72, 139, 77, 232, 72, 139, 85, 224, 136, 68, 10, 8, 72, 255, 69, 224]
+  pin with labels, "dns_fa_t0", image
+  emitList with image, [139, 69, 216, 49, 201]
+  pin with labels, "dns_fa_t", image
+  emitList with image, [61, 10, 0, 0, 0, 15, 130]
+  emitRel with image, fixes, "dns_fa_ts"
+  emitList with image, [45, 10, 0, 0, 0, 255, 193, 233]
+  emitRel with image, fixes, "dns_fa_t"
+  pin with labels, "dns_fa_ts", image
+  emitList with image, [137, 69, 216, 133, 201, 15, 133]
+  emitRel with image, fixes, "dns_fa_tw"
+  emitList with image, [131, 125, 208, 0, 15, 132]
+  emitRel with image, fixes, "dns_fa_o"
+  pin with labels, "dns_fa_tw", image
+  emitList with image, [137, 200, 4, 48, 72, 139, 77, 232, 72, 139, 85, 224, 136, 68, 10, 8, 72, 255, 69, 224]
+  pin with labels, "dns_fa_o", image
+  emitList with image, [139, 69, 216, 4, 48, 72, 139, 77, 232, 72, 139, 85, 224, 136, 68, 10, 8, 72, 255, 69, 224, 255, 195]
+  emitJmpTo with image, fixes, "dns_fa_oct"
+  pin with labels, "dns_fa_done", image
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 224, 72, 137, 8, 198, 68, 8, 8, 0, 72, 137, 194]
+  emitEpi with image
+  return image
+end
+
+define emitDnsBuild with image, fixes, labels
+  ~ rcx=host text, edx=id, r8d=qtype, r9=dest. eax=len or 0.
+  pin with labels, "dns_build", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 137, 85, 240, 68, 137, 69, 232, 76, 137, 77, 224, 72, 139, 1, 72, 137, 69, 216]
+  emitList with image, [72, 139, 69, 224, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_b_bad"
+  emitList with image, [139, 85, 240, 136, 112, 0, 136, 80, 1, 198, 64, 2, 1, 198, 64, 3, 0, 198, 64, 4, 0, 198, 64, 5, 1, 198, 64, 6, 0, 198, 64, 7, 0, 198, 64, 8, 0, 198, 64, 9, 0, 198, 64, 10, 0, 198, 64, 11, 0]
+  emitList with image, [72, 199, 69, 208, 12, 0, 0, 0, 72, 199, 69, 200, 0, 0, 0, 0, 72, 199, 69, 192, 0, 0, 0, 0]
+  pin with labels, "dns_b_lab", image
+  emitList with image, [72, 139, 69, 192, 72, 59, 69, 216, 15, 131]
+  emitRel with image, fixes, "dns_b_tail"
+  emitList with image, [72, 139, 85, 248, 72, 3, 85, 192, 15, 182, 66, 8, 60, 46, 15, 132]
+  emitRel with image, fixes, "dns_b_flush"
+  emitList with image, [72, 255, 69, 192]
+  emitJmpTo with image, fixes, "dns_b_lab"
+  pin with labels, "dns_b_flush", image
+  emitList with image, [72, 139, 69, 192, 72, 43, 69, 200, 72, 137, 69, 184, 72, 131, 248, 1, 15, 130]
+  emitRel with image, fixes, "dns_b_bad"
+  emitList with image, [72, 131, 248, 63, 15, 143]
+  emitRel with image, fixes, "dns_b_bad"
+  emitList with image, [72, 139, 77, 208, 72, 3, 77, 184, 72, 131, 193, 5, 72, 129, 249]
+  emitU32 with image, 512
+  emitJcc with image, fixes, 135, "dns_b_bad"
+  emitList with image, [72, 139, 69, 224, 72, 3, 69, 208, 72, 139, 77, 184, 136, 8, 72, 255, 69, 208, 72, 139, 85, 248, 72, 131, 194, 8, 72, 3, 85, 200, 72, 139, 117, 224, 72, 3, 117, 208, 72, 139, 77, 184]
+  pin with labels, "dns_b_cp", image
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "dns_b_copied"
+  emitList with image, [138, 2, 136, 6, 72, 255, 194, 72, 255, 198, 72, 255, 201, 117, 241]
+  pin with labels, "dns_b_copied", image
+  emitList with image, [72, 139, 69, 184, 72, 1, 69, 208, 72, 139, 69, 192, 72, 255, 192, 72, 137, 69, 200, 72, 137, 69, 192]
+  emitJmpTo with image, fixes, "dns_b_lab"
+  pin with labels, "dns_b_tail", image
+  emitList with image, [72, 139, 69, 216, 72, 43, 69, 200, 72, 137, 69, 184, 72, 131, 248, 1, 15, 130]
+  emitRel with image, fixes, "dns_b_bad"
+  emitList with image, [72, 131, 248, 63, 15, 143]
+  emitRel with image, fixes, "dns_b_bad"
+  emitList with image, [72, 139, 77, 208, 72, 3, 77, 184, 72, 131, 193, 5, 72, 129, 249]
+  emitU32 with image, 512
+  emitJcc with image, fixes, 135, "dns_b_bad"
+  emitList with image, [72, 139, 69, 224, 72, 3, 69, 208, 72, 139, 77, 184, 136, 8, 72, 255, 69, 208, 72, 139, 85, 248, 72, 131, 194, 8, 72, 3, 85, 200, 72, 139, 117, 224, 72, 3, 117, 208, 72, 139, 77, 184]
+  pin with labels, "dns_b_cp2", image
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "dns_b_endlab"
+  emitList with image, [138, 2, 136, 6, 72, 255, 194, 72, 255, 198, 72, 255, 201, 117, 241]
+  pin with labels, "dns_b_endlab", image
+  emitList with image, [72, 139, 69, 184, 72, 1, 69, 208, 72, 139, 69, 224, 72, 3, 69, 208, 198, 0, 0, 72, 255, 69, 208, 139, 69, 232, 193, 232, 8, 72, 139, 77, 224, 72, 3, 77, 208, 136, 1, 72, 255, 69, 208, 139, 69, 232, 72, 139, 77, 224, 72, 3, 77, 208, 136, 1, 72, 255, 69, 208, 72, 139, 77, 224, 72, 3, 77, 208, 198, 1, 0, 72, 255, 69, 208, 72, 139, 77, 224, 72, 3, 77, 208, 198, 1, 1, 72, 255, 69, 208, 72, 139, 69, 208, 201, 195]
+  pin with labels, "dns_b_bad", image
+  emitList with image, [49, 192, 201, 195]
+  return image
+end
+
+define emitDnsParse with image, fixes, labels
+  pin with labels, "dns_parse", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 137, 85, 240, 68, 137, 69, 232, 68, 137, 77, 224, 131, 125, 240, 12, 15, 130]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [129, 125, 240]
+  emitU32 with image, 512
+  emitJcc with image, fixes, 135, "dns_p_no"
+  emitList with image, [72, 139, 77, 248, 15, 182, 1, 193, 224, 8, 15, 182, 81, 1, 9, 208, 59, 69, 232, 15, 133]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [15, 182, 65, 2, 193, 224, 8, 15, 182, 81, 3, 9, 208, 137, 194, 129, 226, 0, 128, 0, 0, 15, 132]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [137, 194, 129, 226, 0, 120, 0, 0, 15, 133]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [131, 224, 15, 15, 133]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [15, 182, 65, 4, 193, 224, 8, 15, 182, 81, 5, 9, 208, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [15, 182, 65, 6, 193, 224, 8, 15, 182, 81, 7, 9, 208, 131, 248, 0, 15, 132]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [131, 248, 32, 15, 143]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [137, 69, 216, 72, 139, 77, 248, 139, 85, 240, 65, 184, 12, 0, 0, 0]
+  emitCallTo with image, fixes, "dns_skip"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [131, 192, 4, 15, 136]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [59, 69, 240, 15, 135]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [137, 69, 208, 49, 219]
+  pin with labels, "dns_p_an", image
+  emitList with image, [59, 93, 216, 15, 132]
+  emitRel with image, fixes, "dns_p_yes"
+  emitList with image, [72, 139, 77, 248, 139, 85, 240, 68, 139, 69, 208]
+  emitCallTo with image, fixes, "dns_skip"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [137, 69, 208, 139, 77, 208, 141, 81, 10, 59, 85, 240, 15, 135]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [72, 139, 85, 248, 15, 182, 4, 10, 193, 224, 8, 15, 182, 116, 10, 1, 9, 240, 137, 69, 200, 15, 182, 68, 10, 8, 193, 224, 8, 15, 182, 116, 10, 9, 9, 240, 137, 69, 192, 131, 125, 192, 0, 15, 136]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [139, 77, 208, 131, 193, 10, 3, 77, 192, 59, 77, 240, 15, 135]
+  emitRel with image, fixes, "dns_p_no"
+  emitList with image, [139, 69, 200, 59, 69, 224, 15, 133]
+  emitRel with image, fixes, "dns_p_next"
+  emitList with image, [131, 125, 224, 1, 15, 133]
+  emitRel with image, fixes, "dns_p_next"
+  emitList with image, [131, 125, 192, 4, 15, 133]
+  emitRel with image, fixes, "dns_p_next"
+  emitList with image, [139, 77, 208, 131, 193, 10, 72, 139, 85, 248, 72, 1, 202]
+  emitList with image, [72, 137, 209, 186, 4, 0, 0, 0]
+  emitCallTo with image, fixes, "dns_fmta"
+  emitList with image, [73, 199, 69, 0]
+  emitU32 with image, 2
+  emitList with image, [73, 137, 85, 8, 73, 131, 197, 16]
+  emitCallTo with image, fixes, "rt_push"
+  pin with labels, "dns_p_next", image
+  emitList with image, [139, 69, 208, 131, 192, 10, 3, 69, 192, 137, 69, 208, 255, 195]
+  emitJmpTo with image, fixes, "dns_p_an"
+  pin with labels, "dns_p_yes", image
+  emitList with image, [184, 1, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "dns_p_no", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitDnsUdp with image, fixes, labels
+  pin with labels, "dns_udp", image
+  emitPro with image
+  emitList with image, [72, 129, 236, 0, 1, 0, 0, 72, 137, 77, 248, 137, 85, 240, 76, 137, 69, 232, 68, 137, 77, 224, 139, 69, 48, 137, 69, 216]
+  emitCallTo with image, fixes, "rt_net_init"
+  emitList with image, [185, 2, 0, 0, 0, 186, 2, 0, 0, 0, 65, 184, 17, 0, 0, 0]
+  emitIat with image, fixes, "iat_sk"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "dns_u_no"
+  emitList with image, [72, 137, 69, 208, 72, 199, 69, 176, 0, 0, 0, 0, 72, 199, 69, 184, 0, 0, 0, 0, 198, 69, 176, 2, 198, 69, 178, 0, 198, 69, 179, 0, 198, 69, 180, 0, 198, 69, 181, 0, 198, 69, 182, 0, 198, 69, 183, 0, 72, 139, 77, 208, 72, 141, 85, 176, 65, 184, 16, 0, 0, 0]
+  emitIat with image, fixes, "iat_bd"
+  emitList with image, [72, 199, 69, 176, 0, 0, 0, 0, 72, 199, 69, 184, 0, 0, 0, 0, 198, 69, 176, 2, 139, 69, 216, 102, 134, 224, 102, 137, 69, 178, 139, 69, 224, 137, 69, 180, 72, 139, 77, 208, 72, 141, 85, 176, 65, 184, 16, 0, 0, 0]
+  emitIat with image, fixes, "iat_cn"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "dns_u_cs"
+  emitList with image, [199, 69, 160, 184, 11, 0, 0, 72, 139, 77, 208, 186]
+  emitU32 with image, 65535
+  emitList with image, [65, 184]
+  emitU32 with image, 4102
+  emitList with image, [76, 141, 77, 160, 72, 199, 68, 36, 32, 4, 0, 0, 0]
+  emitIat with image, fixes, "iat_ss"
+  emitList with image, [72, 139, 77, 208, 72, 139, 85, 248, 68, 139, 69, 240, 69, 49, 201]
+  emitIat with image, fixes, "iat_sd"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "dns_u_cs"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "linux_flag"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_u_recv"
+  emitList with image, [139, 69, 208, 137, 69, 144, 199, 69, 148, 1, 0, 0, 0, 72, 141, 125, 144, 190, 1, 0, 0, 0, 186]
+  emitU32 with image, 3000
+  emitSys with image, 7
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "dns_u_cs"
+  pin with labels, "dns_u_recv", image
+  emitList with image, [72, 139, 77, 208, 72, 139, 85, 232, 65, 184, 0, 2, 0, 0, 69, 49, 201]
+  emitIat with image, fixes, "iat_rv"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "dns_u_cs"
+  emitList with image, [137, 69, 200, 72, 139, 77, 208]
+  emitIat with image, fixes, "iat_cs"
+  emitList with image, [139, 69, 200, 201, 195]
+  pin with labels, "dns_u_cs", image
+  emitList with image, [72, 139, 77, 208]
+  emitIat with image, fixes, "iat_cs"
+  pin with labels, "dns_u_no", image
+  emitList with image, [49, 192, 201, 195]
+  return image
+end
+
+define emitDnsNs with image, fixes, labels
+  ~ eax=ipv4 (LE 127.0.0.1), edx=port. Prefers data/vire-dns "127.0.0.1 PORT".
+  pin with labels, "dns_ns", image
+  emitPro with image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "linux_flag"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_ns_cf"
+  emitList with image, [72, 141, 61]
+  emitRel with image, fixes, "dns_path_fix"
+  emitList with image, [49, 246, 186]
+  emitU32 with image, 655360
+  emitSys with image, 2
+  emitList with image, [72, 133, 192, 15, 136]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [80, 72, 137, 199, 72, 141, 117, 128, 186, 64, 0, 0, 0]
+  emitSys with image, 0
+  emitList with image, [90, 80, 72, 137, 199]
+  emitSys with image, 3
+  emitList with image, [88, 137, 69, 240, 139, 85, 240, 133, 210, 15, 132]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [198, 68, 21, 128, 0, 49, 219, 49, 201]
+  emitJmpTo with image, fixes, "dns_ns_scan"
+  pin with labels, "dns_ns_cf", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "dns_path_fix"
+  emitList with image, [186]
+  emitU32 with image, 2147483648
+  emitList with image, [65, 184, 1, 0, 0, 0, 69, 49, 201, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40, 128, 0, 32, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
+  emitIat with image, fixes, "iat_cf"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [72, 137, 69, 248, 72, 141, 85, 128, 72, 139, 77, 248, 65, 184, 64, 0, 0, 0, 76, 141, 77, 240, 72, 199, 68, 36, 32, 0, 0, 0, 0]
+  emitIat with image, fixes, "iat_rf"
+  emitList with image, [80, 72, 139, 77, 248]
+  emitIat with image, fixes, "iat_ch"
+  emitList with image, [88, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [139, 85, 240, 133, 210, 15, 132]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [198, 68, 21, 128, 0, 49, 219, 49, 201]
+  pin with labels, "dns_ns_scan", image
+  emitList with image, [59, 218, 15, 131]
+  emitRel with image, fixes, "dns_ns_have"
+  emitList with image, [15, 182, 68, 29, 128, 60, 32, 15, 132]
+  emitRel with image, fixes, "dns_ns_sp"
+  emitList with image, [60, 9, 15, 132]
+  emitRel with image, fixes, "dns_ns_sp"
+  emitList with image, [255, 195]
+  emitJmpTo with image, fixes, "dns_ns_scan"
+  pin with labels, "dns_ns_sp", image
+  emitList with image, [255, 195, 49, 201]
+  pin with labels, "dns_ns_pr", image
+  emitList with image, [59, 218, 15, 131]
+  emitRel with image, fixes, "dns_ns_have"
+  emitList with image, [15, 182, 68, 29, 128, 60, 48, 15, 130]
+  emitRel with image, fixes, "dns_ns_have"
+  emitList with image, [60, 57, 15, 135]
+  emitRel with image, fixes, "dns_ns_have"
+  emitList with image, [107, 201, 10, 15, 182, 68, 29, 128, 44, 48, 1, 193, 255, 195]
+  emitJmpTo with image, fixes, "dns_ns_pr"
+  pin with labels, "dns_ns_have", image
+  emitList with image, [133, 201, 15, 132]
+  emitRel with image, fixes, "dns_ns_etc"
+  emitList with image, [129, 249]
+  emitU32 with image, 65535
+  emitJcc with image, fixes, 135, "dns_ns_etc"
+  emitList with image, [184, 127, 0, 0, 1, 137, 202, 201, 195]
+  pin with labels, "dns_ns_etc", image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "linux_flag"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_ns_win"
+  emitList with image, [72, 141, 61]
+  emitRel with image, fixes, "dns_path_resolv"
+  emitList with image, [49, 246, 186]
+  emitU32 with image, 655360
+  emitSys with image, 2
+  emitList with image, [72, 133, 192, 15, 136]
+  emitRel with image, fixes, "dns_ns_win"
+  emitList with image, [80, 72, 137, 199, 72, 141, 117, 128, 186, 64, 0, 0, 0]
+  emitSys with image, 0
+  emitList with image, [90, 80, 72, 137, 199]
+  emitSys with image, 3
+  emitList with image, [88, 184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 201, 195]
+  pin with labels, "dns_ns_win", image
+  emitList with image, [184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 201, 195]
+  return image
+end
+
+define emitDnsResolve with image, fixes, labels
+  pin with labels, "rt_resolve", image
+  emitPro with image
+  emitList with image, [72, 129, 236, 0, 4, 0, 0]
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "dns_r_name"
+  emitList with image, [72, 137, 85, 248, 72, 137, 209]
+  emitCallTo with image, fixes, "dns_hostok"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "dns_r_name"
+  emitCallTo with image, fixes, "rt_list_new"
+  emitCallTo with image, fixes, "dns_ns"
+  emitList with image, [137, 69, 240, 137, 85, 232]
+  emitIat with image, fixes, "iat_gt"
+  pin with labels, "dns_r_id", image
+  emitList with image, [13, 1, 0, 0, 0, 37, 255, 255, 0, 0, 137, 69, 224, 72, 139, 77, 248, 139, 85, 224, 65, 184, 1, 0, 0, 0, 76, 141, 141, 0, 254, 255, 255]
+  emitCallTo with image, fixes, "dns_build"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "dns_r_fail"
+  emitList with image, [137, 69, 216, 72, 141, 141, 0, 254, 255, 255, 139, 85, 216, 76, 141, 133, 0, 252, 255, 255, 68, 139, 77, 240, 139, 69, 232, 137, 68, 36, 32]
+  emitCallTo with image, fixes, "dns_udp"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "dns_r_fail"
+  emitList with image, [137, 69, 208, 72, 141, 141, 0, 252, 255, 255, 139, 85, 208, 68, 139, 69, 224, 65, 185, 1, 0, 0, 0]
+  emitCallTo with image, fixes, "dns_parse"
+  emitList with image, [73, 131, 237, 16, 73, 139, 85, 8, 72, 139, 2, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "dns_r_fail"
+  emitList with image, [73, 131, 197, 16]
+  pin with labels, "dns_r_ok", image
+  emitEpi with image
+  pin with labels, "dns_r_name", image
+  emitFail with image, fixes, "msg_dnsname"
+  pin with labels, "dns_r_fail", image
+  emitFail with image, fixes, "msg_resolve"
+  return image
+end
+
+define parkDns with image, labels
+  parkMsg with image, labels, "msg_resolve", "could not resolve"
+  parkMsg with image, labels, "msg_dnsname", "that name is not valid"
+  parkMsg with image, labels, "dns_loop_ip", "127.0.0.1"
+  pin with labels, "dns_path_fix", image
+  emitStr with image, "data/vire-dns"
+  pin with labels, "dns_path_resolv", image
+  emitStr with image, "/etc/resolv.conf"
+  pin with labels, "dns_path_hosts", image
+  emitStr with image, "/etc/hosts"
+  return image
+end
+
+define emitDnsRuntime with image, fixes, labels
+  let image be emitDnsSkip with image, fixes, labels
+  let image be emitDnsHostOk with image, fixes, labels
+  let image be emitDnsFmtA with image, fixes, labels
+  let image be emitDnsBuild with image, fixes, labels
+  let image be emitDnsParse with image, fixes, labels
+  let image be emitDnsUdp with image, fixes, labels
+  let image be emitDnsNs with image, fixes, labels
+  let image be emitDnsResolve with image, fixes, labels
+  return image
+end
+

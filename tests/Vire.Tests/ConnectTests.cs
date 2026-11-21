@@ -28,10 +28,10 @@ public class ConnectTests
     public void DualModeRefusesNonLiteralHostAndBadPort()
     {
         DualMode.DualRun host = DualMode.RunSource(
-            "define main\n  connect with \"localhost\", 8080\nend\n", null);
+            "define main\n  connect with \"not a host!\", 8080\nend\n", null);
         Assert.True(host.Matched, Diff(host));
         Assert.Equal(1, host.InterpCode);
-        Assert.Contains("not allowed", host.InterpErr);
+        Assert.Contains("not valid", host.InterpErr);
 
         DualMode.DualRun port = DualMode.RunSource(
             "define main\n  connect with \"127.0.0.1\", 0\nend\n", null);

@@ -1,0 +1,9 @@
+~ FAIL_BEFORE for portal JWT/static/405/307 lanes.
+
+define route with method, path, body
+  return "{\"ok\":true}"
+end
+
+define main
+  listen with 0
+end

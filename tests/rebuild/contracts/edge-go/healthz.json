@@ -1,0 +1,25 @@
+{
+  "id": "edge-go/healthz",
+  "source": "edge-go any method /healthz writes ok before Host routing. Derived from source, not live.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "ok"
+    }
+  ]
+}

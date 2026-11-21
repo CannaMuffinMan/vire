@@ -1,5 +1,6 @@
 ~ Guest RESP2 Redis client over loopback TCP from PR #64.
-~ Loopback 127.0.0.1 only. No TLS, no DNS, no RESP3, no pub/sub.
+~ rediss:// is TLS via tls_connect (verify-full: CA + hostname).
+~ Loopback 127.0.0.1 only. No DNS, no RESP3, no pub/sub, no skip-verify.
 ~ Caps stay inside host limits: bulk 65536, array 1024, depth 16,
 ~ frame 1000000 (recv cap), list 100000, steps 5M, arena 32MB.
 
@@ -235,11 +236,111 @@ define redis_open with port
   return connect with "127.0.0.1", port
 end
 
-define redis_read with h
+define redis_open_tls with port, name, ca
+  return tls_connect with "127.0.0.1", port, name, ca
+end
+
+define redis_scheme with url
+  if begins with url, "rediss://"
+    return "rediss"
+  end
+  if begins with url, "redis://"
+    return "redis"
+  end
+  return ""
+end
+
+define redis_url_rest with url
+  let s be redis_scheme with url
+  if s == "rediss"
+    return slice with url, 9, (length with url)
+  end
+  if s == "redis"
+    return slice with url, 8, (length with url)
+  end
+  return ""
+end
+
+define redis_url_password with url
+  let rest be redis_url_rest with url
+  let mark be find with rest, "@"
+  if mark < 0
+    return ""
+  end
+  let userinfo be slice with rest, 0, mark
+  if begins with userinfo, ":"
+    return slice with userinfo, 1, (length with userinfo)
+  end
+  let colon be find with userinfo, ":"
+  if colon < 0
+    return userinfo
+  end
+  return slice with userinfo, (colon + 1), (length with userinfo)
+end
+
+define redis_url_hostport with url
+  let rest be redis_url_rest with url
+  let mark be find with rest, "@"
+  let start be 0
+  if mark >= 0
+    let start be mark + 1
+  end
+  let slash be find with rest, "/"
+  let limit be length with rest
+  if slash >= start
+    let limit be slash
+  end
+  return slice with rest, start, limit
+end
+
+define redis_url_host with url
+  let hp be redis_url_hostport with url
+  let colon be find with hp, ":"
+  if colon < 0
+    return hp
+  end
+  return slice with hp, 0, colon
+end
+
+define redis_url_port with url
+  let hp be redis_url_hostport with url
+  let colon be find with hp, ":"
+  if colon < 0
+    return 6379
+  end
+  return number with (slice with hp, (colon + 1), (length with hp))
+end
+
+define redis_recv_chunk with h, tls
+  if tls == 1
+    return tls_recv with h, 4096
+  end
+  return recv with h, 4096
+end
+
+define redis_send_raw with h, tls, raw
+  if tls == 1
+    tls_send with h, raw
+    return none
+  end
+  send with h, raw
+  return none
+end
+
+define redis_close_mode with h, tls
+  if tls == 1
+    tls_close with h
+    return none
+  end
+  close with h
+  return none
+end
+
+define redis_read_mode with h, tls
   let buf be ""
   let turns be 0
   while turns < 64
-    let chunk be recv with h, 4096
+    let chunk be redis_recv_chunk with h, tls
     if (length with chunk) == 0
       return redis_bad with "truncated frame"
     end
@@ -259,9 +360,25 @@ define redis_read with h
   return redis_bad with "truncated frame"
 end
 
+define redis_read with h
+  return redis_read_mode with h, 0
+end
+
+define redis_read_tls with h
+  return redis_read_mode with h, 1
+end
+
+define redis_exec_mode with h, tls, parts
+  redis_send_raw with h, tls, (redis_encode with parts)
+  return redis_read_mode with h, tls
+end
+
 define redis_exec with h, parts
-  send with h, (redis_encode with parts)
-  return redis_read with h
+  return redis_exec_mode with h, 0, parts
+end
+
+define redis_exec_tls with h, parts
+  return redis_exec_mode with h, 1, parts
 end
 
 define redis_is_err with got
@@ -283,11 +400,27 @@ define redis_err_why with got
   return v at "s"
 end
 
-define redis_auth with h, password
+define redis_auth_mode with h, tls, password
   if password == ""
     return redis_ok with {"k": "+", "s": "OK"}
   end
-  let got be redis_exec with h, ["AUTH", password]
+  let got be redis_exec_mode with h, tls, ["AUTH", password]
+  if redis_is_err with got
+    return redis_bad with (redis_err_why with got)
+  end
+  return got
+end
+
+define redis_auth with h, password
+  return redis_auth_mode with h, 0, password
+end
+
+define redis_auth_tls with h, password
+  return redis_auth_mode with h, 1, password
+end
+
+define redis_cmd_mode with h, tls, parts
+  let got be redis_exec_mode with h, tls, parts
   if redis_is_err with got
     return redis_bad with (redis_err_why with got)
   end
@@ -295,27 +428,27 @@ define redis_auth with h, password
 end
 
 define redis_ping with h
-  let got be redis_exec with h, ["PING"]
-  if redis_is_err with got
-    return redis_bad with (redis_err_why with got)
-  end
-  return got
+  return redis_cmd_mode with h, 0, ["PING"]
+end
+
+define redis_ping_tls with h
+  return redis_cmd_mode with h, 1, ["PING"]
 end
 
 define redis_set with h, key, value
-  let got be redis_exec with h, ["SET", key, value]
-  if redis_is_err with got
-    return redis_bad with (redis_err_why with got)
-  end
-  return got
+  return redis_cmd_mode with h, 0, ["SET", key, value]
+end
+
+define redis_set_tls with h, key, value
+  return redis_cmd_mode with h, 1, ["SET", key, value]
 end
 
 define redis_get with h, key
-  let got be redis_exec with h, ["GET", key]
-  if redis_is_err with got
-    return redis_bad with (redis_err_why with got)
-  end
-  return got
+  return redis_cmd_mode with h, 0, ["GET", key]
+end
+
+define redis_get_tls with h, key
+  return redis_cmd_mode with h, 1, ["GET", key]
 end
 
 define redis_del with h, key
@@ -340,6 +473,32 @@ define redis_expire with h, key, sec
     return redis_bad with (redis_err_why with got)
   end
   return got
+end
+
+define redis_open_rediss with url, name, ca
+  let s be redis_scheme with url
+  if s != "rediss"
+    return redis_bad with "plaintext redis url"
+  end
+  let host be redis_url_host with url
+  if host != "127.0.0.1"
+    return redis_bad with "loopback only"
+  end
+  let port be redis_url_port with url
+  try
+    let h be redis_open_tls with port, name, ca
+  miss problem
+    return redis_bad with problem
+  end
+  let secret be redis_url_password with url
+  if secret != ""
+    let auth be redis_auth_tls with h, secret
+    if (auth at 0) != "ok"
+      redis_close_mode with h, 1
+      return auth
+    end
+  end
+  return redis_ok with h
 end
 
 define redis_show with v

@@ -45,15 +45,20 @@ if [[ "$HELLO" != "hello from stage" ]]; then
 fi
 echo "step_gen1_hello ok"
 
-rm -f data/gen2.hex
-./data/gen1.elf data/compile-native.vire data/gen2.hex
-H1="$(sha256sum data/gen1.hex | awk '{print $1}')"
-H2="$(sha256sum data/gen2.hex | awk '{print $1}')"
-echo "gen1_sha256 $H1"
-echo "gen2_sha256 $H2"
-if [[ "$H1" != "$H2" ]]; then
-  echo "gen1/gen2 SHA-256 differ"
-  exit 1
-fi
-echo "PASS_AFTER at $AFTER_SHA sha256(gen1)==sha256(gen2)"
+H1=""
+for round in 1 2 3; do
+  rm -f data/gen2.hex
+  ./data/gen1.elf data/compile-native.vire data/gen2.hex
+  H2="$(sha256sum data/gen2.hex | awk '{print $1}')"
+  if [[ -z "$H1" ]]; then
+    H1="$(sha256sum data/gen1.hex | awk '{print $1}')"
+    echo "gen1_sha256 $H1"
+  fi
+  echo "gen2_round${round}_sha256 $H2"
+  if [[ "$H1" != "$H2" ]]; then
+    echo "gen1/gen2 SHA-256 differ on round $round"
+    exit 1
+  fi
+done
+echo "PASS_AFTER at $AFTER_SHA sha256(gen1)==sha256(gen2) x3"
 echo "native elf selfhost ok"

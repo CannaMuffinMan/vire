@@ -1,0 +1,26 @@
+{
+  "id": "rpc-portal-go/method-not-allowed",
+  "source": "rpc-portal-go POST /api/health. Go 1.22 ServeMux 405 empty body; Vire JSON status:405 so HTTP 405 matches.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "post_api_health_405",
+      "method": "POST",
+      "path": "/api/health",
+      "status": 405,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"method not allowed\",\"status\":405}",
+      "request_body": ""
+    }
+  ]
+}

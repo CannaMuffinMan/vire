@@ -1,0 +1,20 @@
+use "src/rt-crypto.vire"
+
+define main
+  let tab be make_xor_tab
+  let p be ascii_bytes with "Password"
+  let s be ascii_bytes with "NaCl"
+  let got be pbkdf2_sha256_hex_tab with tab, (p at 1), (s at 1), 80000, 64
+  if (got at 0) != "ok"
+    say "RFC7914 11 c=80000 FAIL " + (got at 1)
+    halt with 1
+  end
+  let want be "4ddcd8f60b98be21830cee5ef22701f9641a4418d04c0414aeff08876b34ab56a1d425a1225833549adb841b51c9b3176a272bdebba1d078478f62b397f33c8d"
+  if (got at 1) == want
+    say "RFC7914 11 c=80000 PASS " + (got at 1)
+    say "PBKDF2 80k PROVE pass"
+    halt with 0
+  end
+  say "RFC7914 11 c=80000 FAIL got=" + (got at 1)
+  halt with 1
+end
