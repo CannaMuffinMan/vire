@@ -5,6 +5,7 @@
 ~ cap 8192 so a hostile server cannot burn the 5M step budget).
 ~ Channel binding SCRAM-SHA-256-PLUS is residual (tls-unique / server-end-point
 ~ export is not on the guest TLS API).
+~ TODO(VIRE-FINISH-NOW): guest SCRAM-SHA-256-PLUS using tls-unique / server-end-point.
 ~ Prove scripts set scram_iterations=32; default 4096 is the same
 ~ protocol and stays under the cap if the guest xor loop is later nativized.
 ~ Caps stay 32MB / 100000 / 5M. Recv cap 1000000. Message length fail-closed.
