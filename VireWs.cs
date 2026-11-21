@@ -7,7 +7,6 @@ using System.Text;
 static class VireWs
 {
     public const int PayloadCap = 65536;
-    public const int HeaderCap = 8192;
     const string Guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
     public static bool IsUpgradeGet(HttpWire.Result headers)

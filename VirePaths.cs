@@ -170,11 +170,6 @@ static class VirePaths
         return folder;
     }
 
-    public static string CombineUnder(string root, string rel, int line)
-    {
-        return CombineUnder(root, rel, line, 1);
-    }
-
     public static string CombineUnder(string root, string rel, int line, int column)
     {
         CheckName(rel, line, column);

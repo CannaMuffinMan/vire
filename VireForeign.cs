@@ -9,11 +9,6 @@ static class VireForeign
     const uint SearchFlags = 0x900;
     const int MaxForeignText = 4096;
 
-    public static int Call(string root, object dllValue, object exportValue, int line, int col)
-    {
-        return CallArgs(root, dllValue, exportValue, new int[0], line, col);
-    }
-
     public static int CallArgs(string root, object dll, object export, int[] args, int line, int col)
     {
         if (args == null || args.Length > 4)

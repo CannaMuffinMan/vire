@@ -12,6 +12,7 @@ static class VireApk
     const string DebugAlias = "androiddebugkey";
     const string DebugStorePass = "android";
 
+    // TODO(VIRE-FINISH-NOW): expose Pack as a guest builtin only if APK from .vire is still a product goal
     public static string Pack(string root, int line, int col)
     {
         string tools = FindBuildTools();
@@ -173,7 +174,6 @@ static class VireApk
                 if (versions.Length > 0) return versions[versions.Length - 1];
             }
         }
-        if (Directory.Exists(BuildTools)) return BuildTools;
         return BuildTools;
     }
 
