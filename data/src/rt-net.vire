@@ -38,7 +38,12 @@ define applyPackedPins with labels, base, raw, names
   while i + 11 < n
     let off be parseU32 with raw, i
     let id be parseU16 with raw, (i + 8)
-    put (base + off) into labels at (names at id)
+    let nm be names at id
+    ~ r4 parks a linux_flag cell; finish must use the image cell from parkRuntime
+    ~ (PE=0 / ELF=1). Pinning the blob cell makes PE resolve take the syscall path (AV).
+    if nm != "linux_flag"
+      put (base + off) into labels at nm
+    end
     let i be i + 12
   end
   return true
@@ -87,6 +92,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net, route_npar
     ~ r4 packed blob parks rt_resolve (and connect). 3-param listen stays on
     ~ the smaller blob plus emitTcpClient/emitLandingHttp. resolve-only guests
     ~ have route_nparams 0; without r4, finish dies: map has no key rt_resolve.
+    ~ Do not pin r4's linux_flag cell (applyPackedPins skips it).
     if (route_nparams == 4) or (route_nparams == 0)
       let names be netNamesR4
       let image be emitHex with image, (read with "data/src/rt-net-r4-blob.txt")

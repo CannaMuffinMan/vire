@@ -174,8 +174,11 @@ try {
 }
 Write-Output "step_gen1_host ok"
 
-$g1 = Join-Path $Root "g1.exe"
+$ProofOut = Join-Path ([IO.Path]::GetTempPath()) ("vire-proof-" + [IO.Path]::GetRandomFileName())
+New-Item -ItemType Directory -Force -Path $ProofOut | Out-Null
+$g1 = Join-Path $ProofOut "g1.exe"
 Copy-Item $gen1Exe $g1 -Force
+Write-Output "g1_copy $g1"
 $gen1HelloHex = Join-Path $Data "gen1-hello.hex"
 $gen1HelloExe = Join-Path $Data "gen1-hello.exe"
 if (Test-Path $gen1HelloHex) { Remove-Item -Force $gen1HelloHex }

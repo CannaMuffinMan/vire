@@ -3,6 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_HEADLESS = "1"
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
@@ -70,31 +71,6 @@ $upThread = New-Object System.Threading.Thread ([System.Threading.ThreadStart]{
 $upThread.IsBackground = $true
 $upThread.Start()
 
-function Get-ListenPort([System.Diagnostics.Process]$proc) {
-    $deadline = [DateTime]::UtcNow.AddSeconds(12)
-    $buf = New-Object System.Text.StringBuilder
-    while ([DateTime]::UtcNow -lt $deadline) {
-        if ($proc.HasExited) {
-            $tail = $proc.StandardOutput.ReadToEnd()
-            if ($tail) { [void]$buf.Append($tail) }
-            $err = ""
-            try { if ($proc.StandardError) { $err = $proc.StandardError.ReadToEnd() } } catch { }
-            throw ("no listen port (exited $($proc.ExitCode)): $buf $err")
-        }
-        $ms = [int]($deadline - [DateTime]::UtcNow).TotalMilliseconds
-        if ($ms -lt 1) { break }
-        $task = $proc.StandardOutput.ReadLineAsync()
-        if (-not $task.Wait($ms)) { break }
-        $line = $task.Result
-        if ($null -eq $line) { Start-Sleep -Milliseconds 50; continue }
-        [void]$buf.AppendLine($line)
-        if ($line -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
-    }
-    $err = ""
-    try { if ($proc.StandardError -and -not $proc.StandardError.EndOfStream) { $err = $proc.StandardError.ReadToEnd() } } catch { }
-    throw "no listen port: $buf $err"
-}
-
 function Get-Proxy([int]$Port) {
     $tcp = New-Object System.Net.Sockets.TcpClient
     $tcp.ReceiveTimeout = 5000
@@ -112,25 +88,12 @@ function Get-Proxy([int]$Port) {
     return [Text.Encoding]::ASCII.GetString($ms.ToArray())
 }
 
-$psiH = New-Object System.Diagnostics.ProcessStartInfo
-$psiH.FileName = "dotnet"
-$psiH.Arguments = "exec `"$VireDll`" data/native-proxy-reply/proxy-reply.vire $upPort"
-$psiH.WorkingDirectory = $Root
-$psiH.RedirectStandardOutput = $true
-$psiH.RedirectStandardError = $true
-$psiH.UseShellExecute = $false
-$hostProc = [System.Diagnostics.Process]::Start($psiH)
+$hostProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "data/native-proxy-reply/proxy-reply.vire", "$upPort") -WorkingDirectory $Root
 $hport = Get-ListenPort $hostProc
 $h = Get-Proxy $hport
 $hostProc.Kill()
 
-$psiN = New-Object System.Diagnostics.ProcessStartInfo
-$psiN.FileName = $exe
-$psiN.Arguments = "$upPort"
-$psiN.WorkingDirectory = $Root
-$psiN.RedirectStandardOutput = $true
-$psiN.UseShellExecute = $false
-$natProc = [System.Diagnostics.Process]::Start($psiN)
+$natProc = Start-VireProcess -FilePath $exe -ArgumentList @("$upPort") -WorkingDirectory $Root
 $nport = Get-ListenPort $natProc
 $p = Get-Proxy $nport
 $natProc.Kill()

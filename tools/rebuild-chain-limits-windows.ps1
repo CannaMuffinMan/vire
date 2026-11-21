@@ -13,11 +13,10 @@ $Data = Join-Path $Root "data"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 $FixSrc = Join-Path $Root "data/rebuild/chain"
 $FixDst = Join-Path $Root "data/chain"
-$Py = Join-Path $Root "tools/rebuild-chain-remainder.py"
+$ProofDll = Get-VireProofDll
 $gen1 = Join-Path $Data "gen1.exe"
 if (-not (Test-Path $gen1)) { throw "missing data/gen1.exe; run native-selfhost-handoff.ps1 on Windows first" }
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) { throw "python3 required to replay remainder fixtures" }
 
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -67,7 +66,7 @@ $fp = Start-Process -FilePath $failExe -WorkingDirectory $Root -NoNewWindow -Red
 try {
     $fport = Wait-Listen $failOut
     Write-Host "fail_before_listen 127.0.0.1:$fport"
-    & python3 $Py run "$fport" $FixSrc $FixDst fail-before
+    & dotnet exec $ProofDll remainder-run "$fport" $FixSrc $FixDst fail-before
     if ($LASTEXITCODE -eq 0) { throw "FAIL_BEFORE expected remainder mismatch, got match" }
     if ($LASTEXITCODE -ne 2) { throw "FAIL_BEFORE harness error $LASTEXITCODE" }
 } finally {
@@ -82,7 +81,7 @@ $cp = Start-Process -FilePath $chainExe -WorkingDirectory $Root -NoNewWindow -Re
 try {
     $cport = Wait-Listen $chainOut
     Write-Host "native_pe_listen 127.0.0.1:$cport"
-    & python3 $Py run "$cport" $FixSrc $FixDst pass-after
+    & dotnet exec $ProofDll remainder-run "$cport" $FixSrc $FixDst pass-after
     if ($LASTEXITCODE -ne 0) { throw "PASS_AFTER PE remainder mismatch $LASTEXITCODE" }
 } finally {
     Stop-Process -Id $cp.Id -Force -ErrorAction SilentlyContinue
@@ -103,7 +102,7 @@ try {
     $hport = Wait-Listen $hostOut
     $nport = Wait-Listen $chainOut2
     Write-Host "pair host 127.0.0.1:$hport native PE 127.0.0.1:$nport"
-    & python3 $Py pair "$hport" "$nport" $FixSrc $FixDst
+    & dotnet exec $ProofDll remainder-pair "$hport" "$nport" $FixSrc $FixDst
     if ($LASTEXITCODE -ne 0) { throw "HOST_NATIVE PE remainder mismatch $LASTEXITCODE" }
 } finally {
     Stop-Process -Id $hp.Id -Force -ErrorAction SilentlyContinue

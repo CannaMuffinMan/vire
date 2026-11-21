@@ -8,7 +8,7 @@
     <AssemblyName>vire</AssemblyName>
     <RootNamespace>Vire</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;tools/VireProof/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Vire.Tests" />

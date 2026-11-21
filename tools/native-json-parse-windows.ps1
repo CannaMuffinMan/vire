@@ -54,7 +54,7 @@ $outFile = Join-Path $Data "listen-parse-pe.out"
 $proc = Start-Process -FilePath $listenExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput $outFile -PassThru
 Start-Sleep -Milliseconds 400
 $lout = Get-Content -Raw $outFile
-if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $proc.Id -Force; throw "listen-parse PE did not listen" }
+if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { if (-not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }; throw "listen-parse PE did not listen" }
 $port = [int]$Matches[1]
 try {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -72,6 +72,6 @@ try {
     if ($got -notmatch '"a":\s*1') { throw "listen-parse POST PE $got" }
     Write-Host "listen_parse_pe_ok"
 } finally {
-    Stop-Process -Id $proc.Id -Force
+    if ($proc -and -not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }
 }
 Write-Host "Windows PE json/parse and listen+parse completed on this CouchStation. Linux is not PE proof."

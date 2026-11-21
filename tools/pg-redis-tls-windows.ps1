@@ -109,73 +109,13 @@ if (-not $OnWindows) {
     exit 0
 }
 
-Add-Type -AssemblyName System.Security
-Add-Type -TypeDefinition @"
-using System;
-using System.IO;
-using System.Net;
-using System.Net.Security;
-using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading;
-public static class VirePgRedisTlsFix {
-    public static X509Certificate2 WritePfx(string pfxPath, string cerPath, string password) {
-        using (RSA rsa = RSA.Create(2048)) {
-            CertificateRequest req = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            SubjectAlternativeNameBuilder san = new SubjectAlternativeNameBuilder();
-            san.AddDnsName("localhost");
-            san.AddIpAddress(IPAddress.Loopback);
-            req.CertificateExtensions.Add(san.Build());
-            X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(7));
-            File.WriteAllBytes(pfxPath, cert.Export(X509ContentType.Pfx, password));
-            File.WriteAllText(cerPath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(cert.RawData, Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n");
-            return new X509Certificate2(File.ReadAllBytes(pfxPath), password, X509KeyStorageFlags.Exportable);
-        }
-    }
-    public static TcpListener Listen(X509Certificate2 cert, out int port) {
-        TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-        l.Start();
-        port = ((IPEndPoint)l.LocalEndpoint).Port;
-        Thread t = new Thread(() => {
-            try {
-                while (true) {
-                    TcpClient c = l.AcceptTcpClient();
-                    Thread inner = new Thread(() => Serve(c, cert));
-                    inner.IsBackground = true;
-                    inner.Start();
-                }
-            } catch { }
-        });
-        t.IsBackground = true;
-        t.Start();
-        return l;
-    }
-    static void Serve(TcpClient c, X509Certificate2 cert) {
-        try {
-            using (c)
-            using (SslStream s = new SslStream(c.GetStream(), false)) {
-                s.AuthenticateAsServer(new SslServerAuthenticationOptions {
-                    ServerCertificate = cert,
-                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
-                });
-                byte[] buf = new byte[256];
-                int n = s.Read(buf, 0, buf.Length);
-                byte[] pong = Encoding.ASCII.GetBytes("PONG");
-                s.Write(pong, 0, pong.Length);
-            }
-        } catch { }
-    }
-}
-"@
-
+$ProofDll = Get-VireProofDll
 $pfx = Join-Path $Data "pg-redis-tls.pfx"
 $cer = Join-Path $Data "pg-redis-tls.pem"
-$cert = [VirePgRedisTlsFix]::WritePfx($pfx, $cer, "x")
-$port = 0
-$listener = [VirePgRedisTlsFix]::Listen($cert, [ref]$port)
+& dotnet exec $ProofDll write-pfx $pfx $cer "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx failed" }
+$echoProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "tls-echo", $pfx, "x") -WorkingDirectory $Root
+$port = Get-ListenPort $echoProc
 Write-Output "tls_loopback_listen 127.0.0.1:$port"
 
 $wrapRun = @"
@@ -233,6 +173,6 @@ try { $uo = & (Join-Path $Data "pg-redis-wrap-untrusted.exe") 2>&1 | Out-String 
 if ($LASTEXITCODE -eq 0) { throw "untrusted CA must fail closed" }
 Write-Output "pe_untrusted_ca_fail_closed"
 
-try { $listener.Stop() } catch { }
+try { if ($echoProc -and -not $echoProc.HasExited) { $echoProc.Kill() } } catch { }
 Write-Output "PASS_AFTER at $AfterSha PE wrap/pg/redis import SChannel; wrap ping; hostname mismatch and untrusted CA fail closed"
 Write-Output "pg_redis_tls_windows ok"

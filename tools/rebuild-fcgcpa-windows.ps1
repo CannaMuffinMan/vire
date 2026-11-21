@@ -54,7 +54,13 @@ function Read-Http([int]$Port, [string]$Method, [string]$Path, [string]$Send) {
     if ($payload.Length -gt 0) { $stream.Write($payload, 0, $payload.Length) }
     $ms = New-Object System.IO.MemoryStream
     $buf = New-Object byte[] 4096
-    while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    try {
+        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    } catch [System.IO.IOException] {
+        if ($ms.Length -eq 0) { throw }
+    } catch [System.Net.Sockets.SocketException] {
+        if ($ms.Length -eq 0) { throw }
+    }
     $tcp.Close()
     $raw = $ms.ToArray()
     $text = [System.Text.Encoding]::UTF8.GetString($raw)

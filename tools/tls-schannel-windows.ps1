@@ -58,60 +58,11 @@ if ($oldTls -notmatch "emitTlsPeRefuse") {
 }
 Write-Output "FAIL_BEFORE at $BaseSha native PE tls_* fail-closed (emitTlsPeRefuse)"
 
-Add-Type -AssemblyName System.Security
-Add-Type -TypeDefinition @"
-using System;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Net.Security;
-using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-public static class VireSchanFix {
-    public static void WritePfx(string pfxPath, string cerPath, string password) {
-        using (RSA rsa = RSA.Create(2048)) {
-            CertificateRequest req = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            SubjectAlternativeNameBuilder san = new SubjectAlternativeNameBuilder();
-            san.AddDnsName("localhost");
-            san.AddIpAddress(IPAddress.Loopback);
-            req.CertificateExtensions.Add(san.Build());
-            using (X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1))) {
-                File.WriteAllBytes(pfxPath, cert.Export(X509ContentType.Pfx, password));
-                File.WriteAllText(cerPath, "-----BEGIN CERTIFICATE-----\n" + Convert.ToBase64String(cert.Export(X509ContentType.Cert), Base64FormattingOptions.InsertLineBreaks) + "\n-----END CERTIFICATE-----\n");
-            }
-        }
-    }
-    public static string Health(int port, string cerPath) {
-        X509Certificate2 expected = X509CertificateLoader.LoadCertificateFromFile(cerPath);
-        string want = expected.GetCertHashString();
-        HttpClientHandler handler = new HttpClientHandler();
-        handler.ServerCertificateCustomValidationCallback = (req, got, chain, errors) =>
-            got != null && got.GetCertHashString() == want;
-        using (System.Net.Http.HttpClient client = new System.Net.Http.HttpClient(handler)) {
-            client.Timeout = TimeSpan.FromSeconds(10);
-            return client.GetStringAsync("https://127.0.0.1:" + port + "/health").GetAwaiter().GetResult();
-        }
-    }
-    public static void Tls10MustFail(int port) {
-        using (TcpClient tcp = new TcpClient()) {
-            tcp.Connect(IPAddress.Loopback, port);
-            using (SslStream s = new SslStream(tcp.GetStream(), false, (a,b,c,d) => true)) {
-                try {
-                    s.AuthenticateAsClient("localhost", null, SslProtocols.Tls, false);
-                    throw new InvalidOperationException("tls1.0 handshake must fail");
-                } catch (AuthenticationException) { }
-                catch (IOException) { }
-            }
-        }
-    }
-}
-"@ -ReferencedAssemblies "System.Net.Http"
+$ProofDll = Get-VireProofDll
 $pfx = Join-Path $Data "tls-health.pfx"
 $cer = Join-Path $Data "tls-health-cert.pem"
-[VireSchanFix]::WritePfx($pfx, $cer, "")
+& dotnet exec $ProofDll write-pfx $pfx $cer ""
+if ($LASTEXITCODE -ne 0) { throw "write-pfx failed" }
 
 $src = @"
 define route with method, path, body
@@ -157,13 +108,15 @@ if (-not $port) { throw "PE did not print loopback listen port" }
 Write-Output "tls_pe_listen 127.0.0.1:$port"
 $contract = Get-Content -Raw (Join-Path $Root "tests/rebuild/contracts/health.json")
 if ($contract -notmatch '"service":\s*"fcgcpa"') { throw "health contract missing fcgcpa" }
-$body = [VireSchanFix]::Health($port, $cer)
+$body = & dotnet exec $ProofDll https-health $port $cer
+if ($LASTEXITCODE -ne 0) { throw "https-health failed" }
 Write-Output $body
 if ($body -notmatch '"ok":true') { throw "health missing ok" }
 if ($body -notmatch 'fcgcpa') { throw "health missing service" }
 if ($body -notmatch '"payments":false') { throw "health payments must stay false" }
 Write-Output "pe_health_contract_ok"
-[VireSchanFix]::Tls10MustFail($port)
+& dotnet exec $ProofDll tls10-fail $port
+if ($LASTEXITCODE -ne 0) { throw "tls10-fail failed" }
 Write-Output "pe_tls10_fail_closed"
 
 $cli = @"

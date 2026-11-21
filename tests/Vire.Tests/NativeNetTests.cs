@@ -97,6 +97,39 @@ public class NativeNetTests
     }
 
     [Fact]
+    public void DnsResolveGuestPeShapeParksStubAndKeepsLinuxFlagOutsideR4Blob()
+    {
+        string root = DualMode.FindRoot();
+        string rtNet = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
+        Assert.Contains("if nm != \"linux_flag\"", rtNet);
+        Assert.Contains("route_nparams == 0", rtNet);
+        string work = Path.Combine(root, "data", "native-dns-pe", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            File.Copy(Path.Combine(root, "tests", "native", "dns-resolve.vire"), Path.Combine(work, "dns-resolve.vire"));
+            string srcRel = ("data/native-dns-pe/" + Path.GetFileName(work) + "/dns-resolve.vire").Replace('\\', '/');
+            string hexRel = ("data/native-dns-pe/" + Path.GetFileName(work) + "/dns-resolve.hex").Replace('\\', '/');
+            DualMode.Proc compiled = DualMode.RunVire(root, new string[] { "compile-native.vire", srcRel, hexRel, "pe" }, root);
+            string text = DualMode.Norm(compiled.Out + " " + compiled.Err);
+            Assert.True(compiled.Code == 0, text);
+            byte[] pe = HexToPe(root, hexRel);
+            Assert.Equal(0x4d, pe[0]);
+            Assert.Equal(0x5a, pe[1]);
+            string ascii = Encoding.ASCII.GetString(pe);
+            Assert.Contains("ws2_32", ascii);
+            Assert.Contains("GetTickCount", ascii);
+            Assert.Contains("data/vire-dns", ascii);
+            Assert.Contains("that name is not valid", ascii);
+            Assert.DoesNotContain("GetAddrInfo", ascii);
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void HostCompileOfHealthGuestImportsWs2AllowlistOnly()
     {
         string root = DualMode.FindRoot();

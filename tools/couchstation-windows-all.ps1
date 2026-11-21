@@ -14,6 +14,8 @@ Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
 $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
+Get-ChildItem -LiteralPath $Root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '^\.(exe|dll|pdb)$' } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+Remove-Item -ErrorAction SilentlyContinue -Force (Join-Path $Root "g1.exe")
 $Log = Join-Path $Data "couchstation-windows-all.log"
 $Head = (git rev-parse HEAD).Trim()
 $Stamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
@@ -62,11 +64,22 @@ function Require-Script([string]$Rel) {
     $path = Join-Path $Root $Rel
     if (-not (Test-Path $path)) { throw "missing required $Rel (must not skip)" }
 }
-function Run-Script([string]$Rel) {
+function Stop-ProcessTree([int]$Id) {
+    try { & taskkill.exe /PID $Id /T /F | Out-Null } catch { }
+    try { Stop-Process -ErrorAction SilentlyContinue -Id $Id -Force } catch { }
+}
+function Run-Script([string]$Rel, [int]$TimeoutSec = 0) {
     $path = Join-Path $Root $Rel
     Require-Script $Rel
+    if ($TimeoutSec -le 0) {
+        if ($Rel -match "selfhost") { $TimeoutSec = 2400 } else { $TimeoutSec = 900 }
+    }
     $outLog = Join-Path $Data ("couchstation-" + $script:CurrentProof + "-child.log")
-    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+        Stop-ProcessTree $p.Id
+        throw "$Rel wall timeout ${TimeoutSec}s"
+    }
     Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
     Get-Content -ErrorAction SilentlyContinue ($outLog + ".err") | ForEach-Object { Write-Host $_ }
     if ($p.ExitCode -ne 0) { throw "$Rel exit $($p.ExitCode)" }
@@ -85,6 +98,8 @@ Run-Proof "dotnet-build" {
     dotnet build (Join-Path $Root "vire.csproj") -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
     if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
+    dotnet build (Join-Path $Root "tools/VireProof/VireProof.csproj") -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw "vire-proof build failed" }
 }
 
 Run-Proof "dotnet-test" {

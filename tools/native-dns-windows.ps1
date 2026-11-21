@@ -56,8 +56,9 @@ Write-Output "FAIL_BEFORE at $BaseSha showing resolve is unavailable"
 $udp = New-Object System.Net.Sockets.UdpClient
 $udp.Client.Bind((New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Loopback, 0)))
 $port = ([System.Net.IPEndPoint]$udp.Client.LocalEndPoint).Port
-$worker = Start-Job -ScriptBlock {
-    param($u)
+$script:VireDnsUdp = $udp
+$worker = New-Object System.Threading.Thread ([System.Threading.ThreadStart]{
+    $u = $script:VireDnsUdp
     while ($true) {
         $ep = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
         try {
@@ -79,7 +80,9 @@ $worker = Start-Job -ScriptBlock {
             $u.Send($ans, $ans.Length, $ep) | Out-Null
         } catch { break }
     }
-} -ArgumentList $udp
+})
+$worker.IsBackground = $true
+$worker.Start()
 Set-Content -Path (Join-Path $Data "vire-dns") -Value "127.0.0.1 $port`n" -NoNewline
 $env:VIRE_DNS = "127.0.0.1:$port"
 try {
@@ -96,5 +99,4 @@ try {
     Write-Output "PASS_AFTER native DNS loopback fixture"
 } finally {
     try { $udp.Close() } catch { }
-    try { Stop-Job $worker -ErrorAction SilentlyContinue } catch { }
 }

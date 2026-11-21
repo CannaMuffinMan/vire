@@ -3,6 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_HEADLESS = "1"
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
@@ -120,18 +121,6 @@ $upPort = 0
 $listener = [VireListenWsFix]::Listen([ref]$upPort)
 Write-Host "upstream 127.0.0.1:$upPort"
 
-function Get-ListenPort([System.Diagnostics.Process]$proc) {
-    $deadline = (Get-Date).AddSeconds(12)
-    $buf = ""
-    while ((Get-Date) -lt $deadline) {
-        $line = $proc.StandardOutput.ReadLine()
-        if ($null -eq $line) { break }
-        $buf += $line
-        if ($line -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
-    }
-    throw "no listen port: $buf"
-}
-
 function Probe([int]$Port, [string]$Req) {
     $tcp = New-Object System.Net.Sockets.TcpClient
     $tcp.ReceiveTimeout = 5000
@@ -158,22 +147,12 @@ function Transcript([int]$Port) {
     return "bad=$bad`nref=$ref`nok=$ok"
 }
 
-function Start-Bin([string]$File, [string]$Args) {
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $File
-    $psi.Arguments = $Args
-    $psi.WorkingDirectory = $Root
-    $psi.RedirectStandardOutput = $true
-    $psi.UseShellExecute = $false
-    return [System.Diagnostics.Process]::Start($psi)
-}
-
-$hostProc = Start-Bin "dotnet" "exec `"$VireDll`" data/native-listen-ws/listen-ws.vire $upPort"
+$hostProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "data/native-listen-ws/listen-ws.vire", "$upPort") -WorkingDirectory $Root
 $hport = Get-ListenPort $hostProc
 $hostT = Transcript $hport
 $hostProc.Kill()
 
-$natProc = Start-Bin $exe "$upPort"
+$natProc = Start-VireProcess -FilePath $exe -ArgumentList @("$upPort") -WorkingDirectory $Root
 $nport = Get-ListenPort $natProc
 $natT = Transcript $nport
 $natProc.Kill()
