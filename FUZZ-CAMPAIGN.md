@@ -12,7 +12,7 @@ Hard caps asserted unchanged: native arena **32MB** (`33554432`), guest list **1
 | `tests/Vire.Tests/FuzzRegressionTests.cs` | Nested blocks, JSON size, sealed garbage `.vc` |
 | `tests/fuzz/corpus/` | Text seeds (`*.vire`, `*.json`, `http-*.txt`) |
 | `tests/crash/`, `tests/conformance/`, `tests/native/`, `samples/`, `greet.vire`, `guest-*.vire` | Grammar-aware mutation parents |
-| `PHASE0-FUZZ.md` / `tools/fuzz-long.sh` / `.github/workflows/fuzz.yml` | Existing nightly 20k-iter job |
+| `docs/history.md` (Track D log) / `tools/fuzz-long.sh` / `.github/workflows/fuzz.yml` | Existing nightly 20k-iter job |
 
 New grammar seeds: `tests/fuzz/corpus/grammar-builtins.vire`, `grammar-lists.vire`.
 
@@ -40,12 +40,10 @@ Merged `origin/native-compiler` `6e969fc2`. In-process `VIRE_FUZZ_SEED=71117000`
 | gc | 71117103 | 21842 | 40.001 | 0 |
 | path | 71117104 | 430927 | 40.000 | 0 |
 
-Native PE Unicorn (`pe` format flag): 2 clean (`hello-stage`, corpus hello), 1 fail-closed compile (`grammar-lists`), **2 isolated product faults** from `grammar-builtins`:
+Native PE Unicorn (`pe` format flag): 2 clean (`hello-stage`, corpus hello), 1 fail-closed compile (`grammar-lists`), **2 isolated product faults** from `grammar-builtins` (later fixed on `native-compiler`; guests kept as regressions):
 
-- `tests/fuzz/findings/native-pe-json-map.vire` — `json with {"a": 2}` → Unicorn `UC_ERR_READ_UNMAPPED`
-- `tests/fuzz/findings/native-pe-parse-array.vire` — `parse with "[1,true,null]"` → Unicorn `UC_ERR_WRITE_UNMAPPED`
-
-Not fixed here (harness-only PR).
+- `tests/fuzz/findings/native-pe-json-map.vire` — was Unicorn `UC_ERR_READ_UNMAPPED` on `json` of a map; `rt_buf_finish` / `rt_int_text` fix
+- `tests/fuzz/findings/native-pe-parse-array.vire` — was Unicorn `UC_ERR_WRITE_UNMAPPED` on `parse` of `[1,true,null]`; parse cursor fix
 
 ## Canna 20-minute run (2026-11-15, pre-merge)
 

@@ -1,5 +1,7 @@
 # rpc-portal-go blocked (no stubs)
 
+TODO(VIRE-FINISH-NOW): prove remaining rpc-portal-go outbound/auth/static routes listed below on host and native without raising caps.
+
 - GET `/api/holdings` (outbound HTTP, 429 rate limit)
 - GET `/api/rpc` with a node (outbound)
 - `/api/dev/*` JWT cookie, Origin CSRF, AES-GCM vault, Postgres pool
