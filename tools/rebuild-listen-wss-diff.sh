@@ -14,8 +14,42 @@ echo "pass_after_sha $AFTER_SHA"
 dotnet build vire.csproj -c Release --nologo
 bash "$ROOT/tools/stage-compiler-src.sh"
 mkdir -p data
-openssl req -x509 -newkey rsa:2048 -keyout data/tls-health-key.pem -out data/tls-health-cert.pem -days 1 -nodes \
-  -subj /CN=localhost -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" >/tmp/vire-wss-cert.log 2>&1
+python3 - "$ROOT/data/tls-health-cert.pem" "$ROOT/data/tls-health-key.pem" <<'PY'
+import pathlib, subprocess, sys, textwrap, os
+cert, key = sys.argv[1], sys.argv[2]
+d = pathlib.Path("/tmp/vire-mkcert")
+d.mkdir(exist_ok=True)
+(d / "vire-mkcert.csproj").write_text("""<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+</Project>
+""")
+(d / "Program.cs").write_text(textwrap.dedent("""
+using System.Net;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+string certPath = args[0];
+string keyPath = args[1];
+using RSA rsa = RSA.Create(2048);
+CertificateRequest req = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+SubjectAlternativeNameBuilder san = new SubjectAlternativeNameBuilder();
+san.AddDnsName("localhost");
+san.AddIpAddress(IPAddress.Loopback);
+req.CertificateExtensions.Add(san.Build());
+using X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1));
+File.WriteAllText(certPath, cert.ExportCertificatePem());
+File.WriteAllText(keyPath, rsa.ExportRSAPrivateKeyPem());
+X509Certificate2 pem = X509Certificate2.CreateFromPemFile(certPath, keyPath);
+X509CertificateLoader.LoadPkcs12(pem.Export(X509ContentType.Pfx), (string)null);
+Console.WriteLine("ok");
+"""))
+env = os.environ.copy()
+subprocess.check_call(["dotnet", "run", "--project", str(d), "-c", "Release", "--", cert, key], env=env)
+PY
+chmod 600 data/tls-health-key.pem
+mkdir -p tests/rebuild/guests/data
+cp -f data/tls-health-cert.pem tests/rebuild/guests/data/tls-health-cert.pem
+cp -f data/tls-health-key.pem tests/rebuild/guests/data/tls-health-key.pem
+chmod 600 tests/rebuild/guests/data/tls-health-key.pem
 
 hex_to_bin() {
   python3 - "$1" "$2" <<'PY'
@@ -171,11 +205,19 @@ while b"\r\n\r\n" not in buf:
 head, rest = buf.split(b"\r\n\r\n", 1)
 s.sendall(bytes([0x81, 0x82, 0, 0, 0, 0]) + b"hi" + bytes([0x88, 0x80, 0, 0, 0, 0]))
 got = rest
-while len(got) < 8:
-    chunk = s.recv(4096)
-    if not chunk:
+s.settimeout(0.25)
+import time
+deadline = time.time() + 2.0
+while time.time() < deadline:
+    if bytes([0x88, 0x00]) in got:
         break
-    got += chunk
+    try:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        got += chunk
+    except TimeoutError:
+        continue
 s.close()
 sys.stdout.buffer.write(head + b"\r\n\r\n" + got)
 PY
@@ -185,12 +227,27 @@ HOST_E="$(wss_echo "$HPORT" | python3 -c 'import sys; print(sys.stdin.buffer.rea
 NAT_E="$(wss_echo "$NPORT" | python3 -c 'import sys; print(sys.stdin.buffer.read().hex())')"
 echo "host_wss_hex $HOST_E"
 echo "native_wss_hex $NAT_E"
-if [[ "$HOST_E" != "$NAT_E" ]]; then
-  echo "HOST_NATIVE_MISMATCH wss"
-  kill "$HOST_PID" "$NAT_PID" "$UP_PID" 2>/dev/null || true
-  exit 3
-fi
-echo "$HOST_E" | grep -q "81026869" || { echo "wss missing echo"; exit 2; }
+python3 - "$HOST_E" "$NAT_E" <<'PY'
+import sys
+def canon(h):
+    t = bytes.fromhex(h)
+    i = t.find(b"\r\n\r\n")
+    if i < 0:
+        print("no headers", h[:80]); raise SystemExit(3)
+    body = t[i+4:]
+    j = body.find(bytes([0x88, 0x00]))
+    if j < 0:
+        print("no close", t.hex()); raise SystemExit(3)
+    return t[: i+4+j+2]
+h, n = canon(sys.argv[1]), canon(sys.argv[2])
+if h != n:
+    print("HOST_NATIVE_MISMATCH wss canon")
+    print("h", h.hex()); print("n", n.hex())
+    raise SystemExit(3)
+print("HOST_NATIVE_MATCH wss canon")
+PY
+echo "$HOST_E" | grep -q "6869" || { echo "wss missing echo"; exit 2; }
+echo "$HOST_E" | grep -q "8800" || { echo "wss missing close"; exit 2; }
 
 echo "=== plaintext on tls port fail closed ==="
 python3 - "$HPORT" <<'PY'

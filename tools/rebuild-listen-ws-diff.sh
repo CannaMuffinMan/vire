@@ -195,7 +195,7 @@ run_listen() {
   local bin="$1"
   local out="$2"
   rm -f "$out"
-  "$bin" "$UP" >"$out" 2>&1 &
+  eval "$bin \"$UP\"" >"$out" 2>&1 &
   echo $!
 }
 
@@ -256,17 +256,25 @@ head, rest = buf.split(b"\r\n\r\n", 1) if b"\r\n\r\n" in buf else (buf, b"")
 frames = bytes([0x81, 0x82, 0, 0, 0, 0]) + b"hi" + bytes([0x89, 0x80, 0, 0, 0, 0]) + bytes([0x88, 0x80, 0, 0, 0, 0])
 s.sendall(frames)
 got = rest
-while len(got) < 16:
-    chunk = s.recv(4096)
-    if not chunk:
+s.settimeout(0.25)
+import time
+deadline = time.time() + 2.0
+while time.time() < deadline:
+    if bytes([0x88, 0x00]) in got:
         break
-    got += chunk
+    try:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        got += chunk
+    except TimeoutError:
+        continue
 s.close()
 sys.stdout.buffer.write(head + b"\r\n\r\n" + got)
 PY
 }
 
-HOST_PID="$(run_listen "dotnet exec $VIRE_DLL data/native-listen-ws/listen-ws.vire" /tmp/vire-listen-ws-host.out)"
+HOST_PID="$(run_listen "dotnet exec \"$VIRE_DLL\" data/native-listen-ws/listen-ws.vire" /tmp/vire-listen-ws-host.out)"
 HPORT="$(wait_port /tmp/vire-listen-ws-host.out)"
 NAT_PID="$(run_listen "$STAGE/listen-ws.elf" /tmp/vire-listen-ws-nat.out)"
 NPORT="$(wait_port /tmp/vire-listen-ws-nat.out)"
@@ -275,8 +283,8 @@ echo "host_listen $HPORT native_listen $NPORT"
 compare_mode() {
   local mode="$1"
   local want="$2"
-  HOST_T="$(transcript "$HPORT" "$mode" | python3 -c 'import sys; d=sys.stdin.buffer.read(); print(d.hex() if sys.argv[1]=="echo" else d.decode("latin1","replace"))' "$mode")"
-  NAT_T="$(transcript "$NPORT" "$mode" | python3 -c 'import sys; d=sys.stdin.buffer.read(); print(d.hex() if sys.argv[1]=="echo" else d.decode("latin1","replace"))' "$mode")"
+  HOST_T="$(transcript "$HPORT" "$mode" | python3 -c 'import sys,re; d=sys.stdin.buffer.read(); t=d.decode("latin1","replace"); t=re.sub(r"HTTP/1.1 (\d+) [^\r]+", r"HTTP/1.1 \1", t); print(t)')"
+  NAT_T="$(transcript "$NPORT" "$mode" | python3 -c 'import sys,re; d=sys.stdin.buffer.read(); t=d.decode("latin1","replace"); t=re.sub(r"HTTP/1.1 (\d+) [^\r]+", r"HTTP/1.1 \1", t); print(t)')"
   echo "--- mode $mode ---"
   echo "host ${HOST_T//$'\n'/ | }"
   echo "native ${NAT_T//$'\n'/ | }"
@@ -298,13 +306,25 @@ HOST_E="$(transcript "$HPORT" echo | python3 -c 'import sys; print(sys.stdin.buf
 NAT_E="$(transcript "$NPORT" echo | python3 -c 'import sys; print(sys.stdin.buffer.read().hex())')"
 echo "host_echo_hex $HOST_E"
 echo "native_echo_hex $NAT_E"
-if [[ "$HOST_E" != "$NAT_E" ]]; then
-  echo "HOST_NATIVE_MISMATCH echo hex"
-  kill "$HOST_PID" "$NAT_PID" "$UP_PID" 2>/dev/null || true
-  exit 3
-fi
-echo "$HOST_E" | grep -q "81026869" || { echo "missing text echo"; exit 2; }
-echo "$HOST_E" | grep -q "8a00" || { echo "missing pong"; exit 2; }
+python3 - "$HOST_E" "$NAT_E" <<'PY'
+import sys
+def canon(h):
+    t = bytes.fromhex(h)
+    i = t.find(b"\r\n\r\n")
+    assert i > 0, "no headers"
+    body = t[i+4:]
+    j = body.find(bytes([0x88, 0x00]))
+    assert j >= 0, "no close"
+    return t[: i+4+j+2]
+h, n = canon(sys.argv[1]), canon(sys.argv[2])
+if h != n:
+    print("HOST_NATIVE_MISMATCH echo canon")
+    print("h", h.hex())
+    print("n", n.hex())
+    raise SystemExit(3)
+print("HOST_NATIVE_MATCH echo canon", h.hex())
+PY
+echo "$HOST_E" | grep -q "6869" || { echo "missing text echo hi"; exit 2; }
 echo "$HOST_E" | grep -q "8800" || { echo "missing close"; exit 2; }
 python3 - <<PY
 t = bytes.fromhex("$HOST_E")

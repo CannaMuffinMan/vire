@@ -24,7 +24,7 @@ public class ListenWsTunnelTests
         Assert.Contains("Switching Protocols", listen);
         Assert.Contains("land_ws_send", net);
         Assert.Contains("txt_st101", net);
-        Assert.Contains("\"status\":101", net);
+        Assert.Contains("land_ws_gate", net);
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-listen-ws-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-listen-wss-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "listen-ws-windows.ps1")));
