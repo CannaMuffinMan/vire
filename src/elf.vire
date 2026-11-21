@@ -37,11 +37,11 @@ define elfStubNames
 end
 
 define elfNetIatNames
-  return ["iat_gt", "iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn", "iat_cn"]
+  return ["iat_gt", "iat_wsa", "iat_sk", "iat_bd", "iat_ln", "iat_ac", "iat_rv", "iat_sd", "iat_cs", "iat_ss", "iat_gn", "iat_cn", "iat_ev"]
 end
 
 define elfNetStubNames
-  return ["stub_gt", "stub_wsa", "stub_sk", "stub_bd", "stub_ln", "stub_ac", "stub_rv", "stub_sd", "stub_cs", "stub_ss", "stub_gn", "stub_cn"]
+  return ["stub_gt", "stub_wsa", "stub_sk", "stub_bd", "stub_ln", "stub_ac", "stub_rv", "stub_sd", "stub_cs", "stub_ss", "stub_gn", "stub_cn", "stub_ev"]
 end
 
 define emitIatSlots with image, labels, names
@@ -62,6 +62,8 @@ define openElfImage
   pin with labels, "saved_rbx", image
   let image be emitU64 with image, 0
   pin with labels, "cmdline_ptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "envp_ptr", image
   let image be emitU64 with image, 0
   pin with labels, "proc_fd", image
   let image be emitU8 with image, 47
@@ -102,6 +104,8 @@ define openElfNetImage
   pin with labels, "saved_rbx", image
   let image be emitU64 with image, 0
   pin with labels, "cmdline_ptr", image
+  let image be emitU64 with image, 0
+  pin with labels, "envp_ptr", image
   let image be emitU64 with image, 0
   pin with labels, "proc_fd", image
   let image be emitU8 with image, 47

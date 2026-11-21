@@ -1,0 +1,84 @@
+{
+  "id": "fcgbds-dashboard-go",
+  "source": "fcgcpa-prod PR #147 fcgbds-dashboard-go goldens. Upstream nil. Fixture HTML under data/rebuild-dist only.",
+  "headers_that_matter": ["content-type", "connection", "x-content-type-options", "cache-control"],
+  "cases": [
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "body": "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}"
+    },
+    {
+      "name": "get_challenge",
+      "method": "GET",
+      "path": "/api/challenge",
+      "status": 200,
+      "body": "{\"unavailable\":true,\"caption\":\"Visitor check is unavailable. You were not blocked.\"}"
+    },
+    {
+      "name": "get_stream_wall",
+      "method": "GET",
+      "path": "/api/stream-wall/status",
+      "status": 200,
+      "body": "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}"
+    },
+    {
+      "name": "get_events_502",
+      "method": "GET",
+      "path": "/api/events",
+      "status": 502,
+      "body": "{\"error\":\"Failed to fetch events\",\"details\":\"All upstream attempts failed\",\"status\":502}"
+    },
+    {
+      "name": "get_events_detailed_503",
+      "method": "GET",
+      "path": "/api/events-detailed",
+      "status": 503,
+      "body": "{\"error\":\"Detailed events unavailable\",\"status\":503}"
+    },
+    {
+      "name": "get_stats_gated",
+      "method": "GET",
+      "path": "/api/stats",
+      "status": 200,
+      "body": "{\"gated\":true,\"streamUnlocked\":false,\"publicWallEnabled\":false,\"statsAvailable\":false}"
+    },
+    {
+      "name": "challenge_verify_405",
+      "method": "GET",
+      "path": "/api/challenge-verify",
+      "status": 405,
+      "body": "{\"error\":\"Method not allowed\",\"status\":405}"
+    },
+    {
+      "name": "heartbeat_405",
+      "method": "GET",
+      "path": "/api/reviewers-heartbeat",
+      "status": 405,
+      "body": "{\"error\":\"Method not allowed\",\"status\":405}"
+    },
+    {
+      "name": "obs_307",
+      "method": "GET",
+      "path": "/obs",
+      "status": 307,
+      "body": "{\"status\":307}"
+    },
+    {
+      "name": "dist_missing",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    },
+    {
+      "name": "unknown_api_404",
+      "method": "GET",
+      "path": "/api/nope",
+      "status": 404,
+      "body": "{\"error\":\"not_found\",\"status\":404}"
+    }
+  ]
+}

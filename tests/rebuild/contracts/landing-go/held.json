@@ -1,0 +1,353 @@
+{
+  "id": "held",
+  "source": "landing-go held 503 {reason:data_held} pages, derived from source, not live. Shopify/media-lab APIs are out of scope.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control",
+    "location",
+    "www-authenticate",
+    "x-payments-enabled"
+  ],
+  "cases": [
+    {
+      "name": "held_contracts_instagram",
+      "method": "GET",
+      "path": "/contracts/instagram",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_kick",
+      "method": "GET",
+      "path": "/contracts/kick",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_meta",
+      "method": "GET",
+      "path": "/contracts/meta",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_tiktok",
+      "method": "GET",
+      "path": "/contracts/tiktok",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_twitch",
+      "method": "GET",
+      "path": "/contracts/twitch",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_twitter",
+      "method": "GET",
+      "path": "/contracts/twitter",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_contracts_youtube",
+      "method": "GET",
+      "path": "/contracts/youtube",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_couchy-tickets",
+      "method": "GET",
+      "path": "/couchy-tickets",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_creator-partnership-program",
+      "method": "GET",
+      "path": "/creator-partnership-program",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_desktop-unlock",
+      "method": "GET",
+      "path": "/desktop-unlock",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_gift-admin",
+      "method": "GET",
+      "path": "/gift-admin",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_mobile-failsafe",
+      "method": "GET",
+      "path": "/mobile-failsafe",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_mobile-signup",
+      "method": "GET",
+      "path": "/mobile-signup",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_partners",
+      "method": "GET",
+      "path": "/partners",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_partners_brands",
+      "method": "GET",
+      "path": "/partners/brands",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_partners_creators",
+      "method": "GET",
+      "path": "/partners/creators",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop",
+      "method": "GET",
+      "path": "/sop",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_access",
+      "method": "GET",
+      "path": "/sop/access",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_ceo-statement",
+      "method": "GET",
+      "path": "/sop/ceo-statement",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_contracts",
+      "method": "GET",
+      "path": "/sop/contracts",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_creative-director-statement",
+      "method": "GET",
+      "path": "/sop/creative-director-statement",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_founder-statement",
+      "method": "GET",
+      "path": "/sop/founder-statement",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_media-lab_access",
+      "method": "GET",
+      "path": "/sop/media-lab/access",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_sop_partner-creator-statement",
+      "method": "GET",
+      "path": "/sop/partner-creator-statement",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_waitlist-admin",
+      "method": "GET",
+      "path": "/waitlist-admin",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    },
+    {
+      "name": "held_mscb",
+      "method": "GET",
+      "path": "/mscb",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"data_held\"}"
+    }
+  ]
+}

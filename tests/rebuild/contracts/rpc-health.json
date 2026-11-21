@@ -1,0 +1,25 @@
+{
+  "id": "rpc-health",
+  "source": "rpc-portal-go GET /api/health golden {ok:true} derived from source, not live. Extra Go security headers are not part of this fixture.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true}"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+~ landing-go loopback API upstream proxy. Same shape as proxy-http.vire (listen + proxy_reply).
+use "http-client.vire"
+
+define route with method, path, body
+  let port be number with (args at 0)
+  if path == "/healthz"
+    return "ok"
+  end
+  if path == "/api/gateway-down"
+    return proxy_reply with {"method": method, "port": 9, "path": "/", "body": "", "head": "", "prefix": ""}
+  end
+  if path == "/api/upstream/echo"
+    return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/api/upstream"}
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  let port be number with (args at 0)
+  let mode be args at 1
+  if mode == "proxy-echo"
+    let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": "/api/upstream"}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  if mode == "proxy-down"
+    let got be proxy with {"method": "GET", "port": 9, "path": "/", "body": "", "head": "", "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  listen with 0
+end
