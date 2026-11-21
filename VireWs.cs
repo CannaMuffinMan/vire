@@ -32,7 +32,7 @@ static class VireWs
         return path.StartsWith("/ws/", StringComparison.Ordinal);
     }
 
-    public static void Answer(NetworkStream stream, HttpWire.Result headers)
+    public static void Answer(Stream stream, HttpWire.Result headers)
     {
         if (!IsUpgradeGet(headers))
         {
@@ -55,7 +55,7 @@ static class VireWs
         return Convert.ToBase64String(digest);
     }
 
-    static void Echo(NetworkStream stream)
+    static void Echo(Stream stream)
     {
         byte[] assembled = new byte[PayloadCap];
         int assembledLen = 0;
@@ -111,7 +111,7 @@ static class VireWs
         }
     }
 
-    static bool ReadFrame(NetworkStream stream, out int op, out bool fin, out byte[] payload, ref int closeCode)
+    static bool ReadFrame(Stream stream, out int op, out bool fin, out byte[] payload, ref int closeCode)
     {
         op = 0;
         fin = false;
@@ -154,7 +154,7 @@ static class VireWs
         return true;
     }
 
-    static void WriteFrame(NetworkStream stream, int op, byte[] payload)
+    static void WriteFrame(Stream stream, int op, byte[] payload)
     {
         if (payload == null) payload = Array.Empty<byte>();
         if (payload.Length > PayloadCap) return;
@@ -177,7 +177,7 @@ static class VireWs
         if (payload.Length > 0) stream.Write(payload, 0, payload.Length);
     }
 
-    static void WriteClose(NetworkStream stream, int code)
+    static void WriteClose(Stream stream, int code)
     {
         byte[] payload = new byte[2];
         payload[0] = (byte)((code >> 8) & 0xff);
@@ -188,7 +188,7 @@ static class VireWs
         catch (SocketException) { }
     }
 
-    static bool ReadExact(NetworkStream stream, byte[] buffer, int offset, int count)
+    static bool ReadExact(Stream stream, byte[] buffer, int offset, int count)
     {
         int got = 0;
         while (got < count)
