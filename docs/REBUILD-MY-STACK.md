@@ -4,6 +4,21 @@ AI-guided port of an existing service stack into Vire: inventory, capture a cont
 
 This is a method, not a claim that Forever Couch Gang (FCG) already runs on native Vire. Caps stay 32 MB arena, list 100000, 5M steps. No production `fcgcpa-prod` or FCGBC changes. No secrets.
 
+| Rank | Lane | Host | Native ELF | Windows proof | Status |
+|---|---|---|---|---|---|
+| 1 | Compiler / self-host | `compile-native.vire` | gen1=gen2 ELF | `tools/native-selfhost-handoff` family | prior |
+| 2 | Hello / strings | interpreter | static ELF | PE hello | prior |
+| 3 | Files + path gate | `SafePath` | `rt_check_path` + `openat` `O_NOFOLLOW` | prior | prior |
+| 4 | TCP client | `connect` | loopback sockets | `tools/native-tcp-windows.ps1` | prior |
+| 5 | HTTP listener | `listen` + `VireListen` | `rt_listen` blob | prior | prior |
+| 6 | JSON | `json` / `parse` | `rt_json` | prior | prior |
+| 7 | Health contract | `guest-health.vire` `GET /health` | same guest | prior | prior |
+| 8 | Redis | loopback RESP | `rt-redis` | `tools/redis-prove-windows.ps1` | prior |
+| 9 | Postgres client | trust/cleartext | `rt-pg` | `tools/pg-prove-windows.ps1` | prior (#95) |
+| 10 | TLS client | `SslStream` `tls_connect` | OpenSSL 3 `libssl.so.3` | PE SChannel (`tools/tls-schannel-windows.ps1`, PENDING CouchStation) | this lane |
+| 11 | **TLS server / HTTPS listener** | `tls_listen` + `SslStream` on `VireListen` | OpenSSL `TLS_server_method` + `SSL_accept` wrapping `rt_listen` | PE SChannel PFX `tls_listen`; host `tools/tls-server-windows.ps1` | **this lane** |
+| 12 | Edge / public TLS | Railway / reverse proxy | not in-guest | n/a | out of scope (Go sidecars never terminate TLS) |
+
 | Primitives native now | Unblocks (service routes not in this lane) |
 |---|---|
 | SHA-256 (`hash` / `digest` via `rt_sha256`) | Already on `cursor/fcgbc-native-port-1a66` (PR #98) |
@@ -272,4 +287,4 @@ Guest primitive `src/rt-aes.vire`: AES-256-GCM seal/open; 12-byte nonce; 16-byte
 
 ## TLS server (`tls_listen`)
 
-Host `SslStream.AuthenticateAsServer` and Linux ELF OpenSSL `TLS_server_method` terminate HTTPS on the existing HTTP listener. Cert/key are test PEMs under `data/`. Windows PE `tls_listen` stays fail-closed until SChannel. Proof: `TlsServerTests`, `tools/native-elf-tls.sh`, Windows `tools/tls-server-windows.ps1`.
+Host `SslStream.AuthenticateAsServer` and Linux ELF OpenSSL `TLS_server_method` terminate HTTPS on the existing HTTP listener. Cert/key are test PEMs under `data/`. Windows PE uses SChannel (IAT allowlist; PFX `tls_listen`). Linux ELF remains the native proof on this VM. PE execute proof: `tools/tls-schannel-windows.ps1` on CouchStation. Host PE checklist: `TlsServerTests`, `tools/native-elf-tls.sh`, `tools/tls-server-windows.ps1`.

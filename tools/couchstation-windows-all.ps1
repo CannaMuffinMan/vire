@@ -14,6 +14,7 @@ $Log = Join-Path $Data "couchstation-windows-all.log"
 $Head = (git rev-parse HEAD).Trim()
 $Stamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
 $Results = New-Object System.Collections.Generic.List[string]
+$ExitCodes = New-Object System.Collections.Generic.List[string]
 function Log([string]$msg) {
     $line = "$(Get-Date -Format o) $msg"
     Add-Content -LiteralPath $Log -Value $line
@@ -36,21 +37,30 @@ function Run-Proof([string]$Name, [scriptblock]$Body) {
     Log "BEGIN $Name sha $Head log $proofLog"
     try {
         & $Body
-        Log "PASS $Name sha $Head"
-        $script:Results.Add("PASS $Name")
-        Add-Content -LiteralPath $proofLog -Value "PASS $Name sha $Head"
+        Log "PASS $Name sha $Head exit 0"
+        $script:Results.Add("PASS $Name exit 0")
+        $script:ExitCodes.Add("$Name 0")
+        Add-Content -LiteralPath $proofLog -Value "PASS $Name sha $Head exit 0"
     } catch {
         $script:fail = 1
-        Log "FAIL $Name sha $Head err $($_.Exception.Message)"
-        $script:Results.Add("FAIL $Name")
-        Add-Content -LiteralPath $proofLog -Value ("FAIL " + $_.Exception.Message)
+        $code = 1
+        if ($_.Exception.Message -match "exit (\d+)") { $code = [int]$Matches[1] }
+        if ($code -eq 0) { $code = 1 }
+        Log "FAIL $Name sha $Head exit $code err $($_.Exception.Message)"
+        $script:Results.Add("FAIL $Name exit $code")
+        $script:ExitCodes.Add("$Name $code")
+        Add-Content -LiteralPath $proofLog -Value ("FAIL exit $code " + $_.Exception.Message)
     } finally {
         After-Child
     }
 }
+function Require-Script([string]$Rel) {
+    $path = Join-Path $Root $Rel
+    if (-not (Test-Path $path)) { throw "missing required $Rel (must not skip)" }
+}
 function Run-Script([string]$Rel) {
     $path = Join-Path $Root $Rel
-    if (-not (Test-Path $path)) { throw "missing $Rel" }
+    Require-Script $Rel
     $outLog = Join-Path $Data ("couchstation-" + $script:CurrentProof + "-child.log")
     $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
     Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
@@ -80,9 +90,8 @@ Run-Proof "dotnet-test" {
 }
 
 Run-Proof "native-selfhost-handoff" {
-    $h = Join-Path $Root "tools/native-selfhost-handoff.ps1"
-    if (Test-Path $h) { Run-Script "tools/native-selfhost-handoff.ps1" }
-    else { Run-Script "tools/native-selfhost-proof.ps1" }
+    Require-Script "tools/native-selfhost-handoff.ps1"
+    Run-Script "tools/native-selfhost-handoff.ps1"
 }
 
 Run-Proof "pe-selfhost-gen1-eq-gen2-x3" {
@@ -161,6 +170,9 @@ Run-Proof "rebuild-obs-listen-windows" { Run-Script "tools/rebuild-obs-listen-wi
 Run-Proof "rebuild-proxy-windows" { Run-Script "tools/rebuild-proxy-windows.ps1" }
 Run-Proof "tls-server-windows" { Run-Script "tools/tls-server-windows.ps1" }
 Run-Proof "pbkdf2-windows" { Run-Script "tools/pbkdf2-windows.ps1" }
+Run-Proof "apigo-ws-windows" { Run-Script "tools/apigo-ws-windows.ps1" }
+Run-Proof "rebuild-proxy-ws-windows" { Run-Script "tools/rebuild-proxy-ws-windows.ps1" }
+Run-Proof "tls-schannel-windows" { Run-Script "tools/tls-schannel-windows.ps1" }
 
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"
@@ -177,8 +189,18 @@ Run-Proof "session-prove-pe" {
 }
 
 Log "summary_head $Head fail=$fail log=$Log"
-Log "per_pr_results:"
-foreach ($r in $Results) { Log $r }
+Log "=== PASS/FAIL (every proof ran; none skipped) ==="
+$i = 0
+while ($i -lt $Results.Count) {
+    Log $Results[$i]
+    $i = $i + 1
+}
+Log "=== exit codes ==="
+$i = 0
+while ($i -lt $ExitCodes.Count) {
+    Log ("exit " + $ExitCodes[$i])
+    $i = $i + 1
+}
 if ($fail -ne 0) { exit 1 }
 Write-Host "couchstation-windows-all ok. PE proof lives only on this Windows PC."
 exit 0

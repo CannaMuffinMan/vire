@@ -18,6 +18,8 @@ public class CompilerStageTests
         AssertSame(root, Path.Combine("src", "rt-ws.vire"), Path.Combine("data", "src", "rt-ws.vire"));
         AssertSame(root, Path.Combine("src", "elf.vire"), Path.Combine("data", "src", "elf.vire"));
         AssertSame(root, Path.Combine("src", "rt-linux.vire"), Path.Combine("data", "src", "rt-linux.vire"));
+        AssertSame(root, Path.Combine("src", "rt-tls.vire"), Path.Combine("data", "src", "rt-tls.vire"));
+        AssertSame(root, Path.Combine("src", "rt-tls-pe.vire"), Path.Combine("data", "src", "rt-tls-pe.vire"));
         AssertSame(root, Path.Combine("src", "rt-net-blob.txt"), Path.Combine("data", "src", "rt-net-blob.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-pins.txt"), Path.Combine("data", "src", "rt-net-pins.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-fixes.txt"), Path.Combine("data", "src", "rt-net-fixes.txt"));

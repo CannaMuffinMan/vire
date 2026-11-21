@@ -1,0 +1,1058 @@
+~ Windows PE TLS via SChannel (secur32 + crypt32 IAT). TLS 1.2+ only.
+~ Client: certificate chain + hostname (pszTargetName). No skip-verify flags.
+~ Server: sandboxed PFX path; key is the PFX password (may be empty).
+~ Linux ELF is unchanged. Any error fail-closes.
+
+define emitTlsCopyFns with image, fixes, labels
+  pin with labels, "tls_copy", image
+  let image be emitHex with image, "4d85c0740f8a02880148ffc148ffc249ffc875f1c3"
+  pin with labels, "tls_zero", image
+  let image be emitHex with image, "85d27409c6000048ffc1ffc975f7c3"
+  return image
+end
+
+define emitTlsSaveRaw with image, fixes, labels
+  pin with labels, "tls_save_raw", image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_raw_saved"
+  emitList with image, [72, 133, 192, 117]
+  emitU8 with image, 90
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "iat_ac"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_ac_raw"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "iat_rv"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_rv_raw"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "iat_sd"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_sd_raw"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "iat_cs"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_cs_raw"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_raw_saved"
+  emitList with image, [1, 0, 0, 0]
+  emitList with image, [195]
+  return image
+end
+
+define emitTlsHook with image, fixes, labels
+  pin with labels, "tls_hook_io", image
+  emitCallTo with image, fixes, "tls_save_raw"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "stub_ac_sch"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "iat_ac"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "stub_rv_sch"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "iat_rv"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "stub_sd_sch"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "iat_sd"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "stub_cs_sch"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "iat_cs"
+  emitList with image, [195]
+  return image
+end
+
+define emitTlsReadFile with image, fixes, labels
+  ~ rcx = path text object. rax=1 sets tls_fileptr / tls_filesz.
+  pin with labels, "tls_readfile", image
+  emitPro with image
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "trf_fail"
+  emitList with image, [72, 139, 1, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "trf_fail"
+  emitList with image, [72, 131, 193, 8, 186]
+  emitU32 with image, 2147483648
+  emitList with image, [65, 184]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 201, 199, 68, 36, 32]
+  emitU32 with image, 3
+  emitList with image, [199, 68, 36, 40]
+  emitU32 with image, 2097280
+  emitList with image, [72, 199, 68, 36, 48]
+  emitU32 with image, 0
+  let image be emitIat with image, fixes, "iat_cf"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "trf_fail"
+  emitList with image, [72, 137, 69, 248, 72, 137, 193, 49, 210]
+  let image be emitIat with image, fixes, "iat_sz"
+  emitList with image, [61]
+  emitU32 with image, 4294967295
+  emitList with image, [15, 132]
+  emitRel with image, fixes, "trf_close"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "trf_close"
+  emitList with image, [61]
+  emitU32 with image, 1000000
+  emitList with image, [15, 135]
+  emitRel with image, fixes, "trf_close"
+  emitList with image, [137, 69, 232, 137, 193, 255, 192]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 139, 77, 248, 72, 137, 194, 68, 139, 69, 232, 76, 141, 77, 216, 72, 199, 68, 36, 32]
+  emitU32 with image, 0
+  let image be emitIat with image, fixes, "iat_rf"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "trf_close"
+  emitList with image, [72, 139, 69, 224, 139, 77, 232, 198, 4, 1, 0, 72, 137, 5]
+  emitRel with image, fixes, "tls_fileptr"
+  emitList with image, [139, 69, 232, 137, 5]
+  emitRel with image, fixes, "tls_filesz"
+  emitList with image, [72, 139, 77, 248]
+  let image be emitIat with image, fixes, "iat_ch"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  pin with labels, "trf_close", image
+  emitList with image, [72, 139, 77, 248]
+  let image be emitIat with image, fixes, "iat_ch"
+  pin with labels, "trf_fail", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitTlsLoadCa with image, fixes, labels
+  pin with labels, "tls_loadca", image
+  emitPro with image
+  emitCallTo with image, fixes, "tls_readfile"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_dersz"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fileptr"
+  emitList with image, [49, 210, 65, 184]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 201, 72, 141, 5]
+  emitRel with image, fixes, "tls_dersz"
+  emitList with image, [72, 137, 68, 36, 32, 72, 199, 68, 36, 40, 0, 0, 0, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_c2b"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitList with image, [139, 13]
+  emitRel with image, fixes, "tls_dersz"
+  emitList with image, [133, 201, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fileptr"
+  emitList with image, [49, 210, 65, 184]
+  emitU32 with image, 1
+  emitList with image, [76, 139, 77, 240, 72, 141, 5]
+  emitRel with image, fixes, "tls_dersz"
+  emitList with image, [72, 137, 68, 36, 32, 72, 199, 68, 36, 40, 0, 0, 0, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_c2b"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitList with image, [185]
+  emitU32 with image, 2
+  emitList with image, [49, 210, 69, 49, 192, 65, 185]
+  emitU32 with image, 8192
+  emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_ost"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_store"
+  emitList with image, [72, 137, 193, 186]
+  emitU32 with image, 1
+  emitList with image, [76, 139, 69, 240, 68, 139, 13]
+  emitRel with image, fixes, "tls_dersz"
+  emitList with image, [199, 68, 36, 32]
+  emitU32 with image, 4
+  emitList with image, [72, 199, 68, 36, 40, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_addc"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tlc_fail"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  pin with labels, "tlc_fail", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitTlsLoadPfx with image, fixes, labels
+  pin with labels, "tls_loadpfx", image
+  emitPro with image
+  emitCallTo with image, fixes, "tls_readfile"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tpx_fail"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_pw"
+  emitList with image, [186]
+  emitU32 with image, 520
+  emitCallTo with image, fixes, "tls_zero"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_keyptr"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tpx_blob"
+  emitList with image, [72, 139, 8, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tpx_blob"
+  emitList with image, [72, 141, 80, 8, 72, 141, 13]
+  emitRel with image, fixes, "tls_pw"
+  pin with labels, "tpx_w", image
+  emitList with image, [15, 182, 2, 102, 137, 1, 72, 131, 193, 2, 72, 255, 194, 132, 192, 117, 239]
+  pin with labels, "tpx_blob", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_filesz"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_blob"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_fileptr"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_blob8"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_blob"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_pw"
+  emitList with image, [65, 184]
+  emitU32 with image, 32769
+  let image be emitIat with image, fixes, "iat_pfx"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tpx_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_store"
+  emitList with image, [72, 137, 193, 186]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 192, 65, 185]
+  emitU32 with image, 1376256
+  emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 72, 199, 68, 36, 40, 0, 0, 0, 0]
+  let image be emitIat with image, fixes, "iat_find"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tpx_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_cert"
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_cert"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_pacred"
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  pin with labels, "tpx_fail", image
+  emitList with image, [49, 192]
+  emitEpi with image
+  return image
+end
+
+define emitTlsFillCred with image, fixes, labels
+  ~ tls_server 0=client 1=server. Uses tls_store / tls_pacred.
+  pin with labels, "tls_fillcred", image
+  emitPro with image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_sch"
+  emitList with image, [186]
+  emitU32 with image, 80
+  emitCallTo with image, fixes, "tls_zero"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_sch"
+  emitU32 with image, 4
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "tfc_srv"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_proto"
+  emitU32 with image, 10240
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_cflags"
+  emitU32 with image, 4194352
+  emitJmpTo with image, fixes, "tfc_set"
+  pin with labels, "tfc_srv", image
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_proto"
+  emitU32 with image, 5120
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_cflags"
+  emitU32 with image, 4194304
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_sch4"
+  emitU32 with image, 1
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_pacred"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_sch8"
+  pin with labels, "tfc_set", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_proto"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_sch56"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_cflags"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_sch72"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_store"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_sch16"
+  emitList with image, [49, 201, 72, 141, 21]
+  emitRel with image, fixes, "txt_unisp"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [65, 184]
+  emitU32 with image, 2
+  emitList with image, [72, 133, 192, 116]
+  emitU8 with image, 7
+  emitList with image, [65, 184]
+  emitU32 with image, 1
+  emitList with image, [69, 49, 201, 72, 141, 5]
+  emitRel with image, fixes, "tls_sch"
+  emitList with image, [72, 137, 68, 36, 32, 72, 199, 68, 36, 40, 0, 0, 0, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_cred"
+  emitList with image, [72, 137, 68, 36, 56, 72, 141, 5]
+  emitRel with image, fixes, "tls_expiry"
+  emitList with image, [72, 137, 68, 36, 64]
+  let image be emitIat with image, fixes, "iat_ach"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tfc_fail"
+  emitList with image, [49, 192]
+  emitEpi with image
+  pin with labels, "tfc_fail", image
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  return image
+end
+
+define emitTlsSetupOut with image, fixes, labels
+  pin with labels, "tls_setup_out", image
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_outbuf"
+  emitU32 with image, 16384
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_outbuf4"
+  emitU32 with image, 2
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_outbuf8"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_outdesc"
+  emitU32 with image, 0
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_outdesc4"
+  emitU32 with image, 1
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_outbuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_outdesc8"
+  emitList with image, [195]
+  return image
+end
+
+define emitTlsHs with image, fixes, labels
+  pin with labels, "tls_hs", image
+  emitPro with image
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_first"
+  emitList with image, [1, 0, 0, 0]
+  pin with labels, "ths_again", image
+  emitCallTo with image, fixes, "tls_setup_out"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_first"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ths_next"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ths_cli0"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ths_fresh"
+  emitJmpTo with image, fixes, "ths_next"
+  pin with labels, "ths_cli0", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_cred"
+  emitList with image, [49, 210]
+  emitList with image, [76, 139, 5]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [65, 185]
+  emitU32 with image, 49436
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 116]
+  emitU8 with image, 7
+  emitList with image, [65, 185]
+  emitU32 with image, 98652
+  emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 199, 68, 36, 40]
+  emitU32 with image, 16
+  emitList with image, [72, 199, 68, 36, 48, 0, 0, 0, 0, 72, 199, 68, 36, 56, 0, 0, 0, 0]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [72, 137, 68, 36, 64, 72, 141, 5]
+  emitRel with image, fixes, "tls_outdesc"
+  emitList with image, [72, 137, 68, 36, 72, 72, 141, 5]
+  emitRel with image, fixes, "tls_attr"
+  emitList with image, [72, 137, 68, 36, 80, 72, 141, 5]
+  emitRel with image, fixes, "tls_expiry"
+  emitList with image, [72, 137, 68, 36, 88]
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "ths_asc0"
+  let image be emitIat with image, fixes, "iat_isc"
+  emitJmpTo with image, fixes, "ths_after"
+  pin with labels, "ths_asc0", image
+  ~ AcceptSecurityContext: rcx cred, rdx ctx=0, r8 pInput later, r9 fReq
+  ~ First call still needs pInput from recv; jump to next path if hs_len=0 after recv.
+  let image be emitIat with image, fixes, "iat_asc"
+  emitJmpTo with image, fixes, "ths_after"
+  pin with labels, "ths_next", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_inbuf"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_inbuf4"
+  emitU32 with image, 2
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_inbuf8"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_indesc"
+  emitU32 with image, 0
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_indesc4"
+  emitU32 with image, 1
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_inbuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_indesc8"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_cred"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [76, 139, 5]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [65, 185]
+  emitU32 with image, 49436
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 116]
+  emitU8 with image, 7
+  emitList with image, [65, 185]
+  emitU32 with image, 98652
+  emitList with image, [72, 199, 68, 36, 32, 0, 0, 0, 0, 199, 68, 36, 40]
+  emitU32 with image, 16
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_indesc"
+  emitList with image, [72, 137, 68, 36, 48, 72, 199, 68, 36, 56, 0, 0, 0, 0]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [72, 137, 68, 36, 64, 72, 141, 5]
+  emitRel with image, fixes, "tls_outdesc"
+  emitList with image, [72, 137, 68, 36, 72, 72, 141, 5]
+  emitRel with image, fixes, "tls_attr"
+  emitList with image, [72, 137, 68, 36, 80, 72, 141, 5]
+  emitRel with image, fixes, "tls_expiry"
+  emitList with image, [72, 137, 68, 36, 88]
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [72, 133, 192, 15, 133]
+  emitRel with image, fixes, "ths_asc1"
+  let image be emitIat with image, fixes, "iat_isc"
+  emitJmpTo with image, fixes, "ths_after"
+  pin with labels, "ths_asc1", image
+  ~ ASC: rcx cred, rdx ctx (NULL first), r8 pInput, r9 fReq
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_cred"
+  emitList with image, [49, 210]
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_first"
+  emitList with image, [72, 133, 192, 117]
+  emitU8 with image, 7
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [76, 141, 5]
+  emitRel with image, fixes, "tls_indesc"
+  emitList with image, [65, 185]
+  emitU32 with image, 98652
+  emitList with image, [199, 68, 36, 32]
+  emitU32 with image, 16
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [72, 137, 68, 36, 40, 72, 141, 5]
+  emitRel with image, fixes, "tls_outdesc"
+  emitList with image, [72, 137, 68, 36, 48, 72, 141, 5]
+  emitRel with image, fixes, "tls_attr"
+  emitList with image, [72, 137, 68, 36, 56, 72, 141, 5]
+  emitRel with image, fixes, "tls_expiry"
+  emitList with image, [72, 137, 68, 36, 64]
+  let image be emitIat with image, fixes, "iat_asc"
+  pin with labels, "ths_after", image
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_status"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_first"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_outbuf"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ths_nosend"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_outbuf8"
+  emitList with image, [68, 139, 5]
+  emitRel with image, fixes, "tls_outbuf"
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "ths_fail"
+  pin with labels, "ths_nosend", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_status"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "ths_ok"
+  emitList with image, [61]
+  emitU32 with image, 590610
+  emitList with image, [15, 132]
+  emitRel with image, fixes, "ths_fresh"
+  emitList with image, [61]
+  emitU32 with image, 2148074264
+  emitList with image, [15, 132]
+  emitRel with image, fixes, "ths_append"
+  emitJmpTo with image, fixes, "ths_fail"
+  pin with labels, "ths_fresh", image
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitU32 with image, 0
+  pin with labels, "ths_append", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [61]
+  emitU32 with image, 18000
+  emitList with image, [15, 131]
+  emitRel with image, fixes, "ths_fail"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [3, 21]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [185]
+  emitU32 with image, 18432
+  emitList with image, [43, 13]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [65, 137, 200, 69, 49, 201]
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "tls_rv_raw"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "ths_fail"
+  emitList with image, [1, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitJmpTo with image, fixes, "ths_again"
+  pin with labels, "ths_ok", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [186]
+  emitU32 with image, 4
+  emitList with image, [76, 141, 5]
+  emitRel with image, fixes, "tls_sizes"
+  let image be emitIat with image, fixes, "iat_qca"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "ths_fail"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [1, 0, 0, 0]
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [1, 0, 0, 0]
+  emitList with image, [49, 192]
+  emitEpi with image
+  pin with labels, "ths_fail", image
+  emitList with image, [184]
+  emitU32 with image, 1
+  emitEpi with image
+  return image
+end
+
+define emitTlsCrypt with image, fixes, labels
+  ~ tls_enc: rcx unused, rdx=src, r8=len. uses tls_fd. eax=bytes or -1
+  pin with labels, "tls_enc", image
+  emitPro with image
+  emitList with image, [72, 137, 85, 240, 76, 137, 69, 232]
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_sizes"
+  emitList with image, [137, 69, 224, 72, 141, 13]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [72, 1, 193, 72, 139, 85, 240, 76, 139, 69, 232]
+  emitCallTo with image, fixes, "tls_copy"
+  emitList with image, [139, 69, 224, 137, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs4"
+  emitU32 with image, 7
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_bufs8"
+  emitList with image, [139, 69, 232, 137, 5]
+  emitRel with image, fixes, "tls_bufs16"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs20"
+  emitU32 with image, 1
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [3, 69, 224, 72, 137, 5]
+  emitRel with image, fixes, "tls_bufs24"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_sizes4"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_bufs32"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs36"
+  emitU32 with image, 6
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [3, 69, 224, 3, 69, 232, 72, 137, 5]
+  emitRel with image, fixes, "tls_bufs40"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs48"
+  emitU32 with image, 0
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs52"
+  emitU32 with image, 0
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_bufs56"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_desc"
+  emitU32 with image, 0
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_desc4"
+  emitU32 with image, 4
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_desc8"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [49, 210, 76, 141, 5]
+  emitRel with image, fixes, "tls_desc"
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_enc"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tenc_fail"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [3, 5]
+  emitRel with image, fixes, "tls_bufs16"
+  emitList with image, [3, 5]
+  emitRel with image, fixes, "tls_bufs32"
+  emitList with image, [137, 69, 216, 72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [68, 139, 69, 216]
+  emitCallTo with image, fixes, "rt_net_sendall"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "tenc_fail"
+  emitList with image, [139, 69, 232]
+  emitEpi with image
+  pin with labels, "tenc_fail", image
+  emitList with image, [184]
+  emitU32 with image, 4294967295
+  emitEpi with image
+
+  pin with labels, "tls_dec", image
+  ~ rdx=dest, r8=want. eax=got or -1. leftover in tls_plain_len.
+  emitPro with image
+  emitList with image, [72, 137, 85, 240, 76, 137, 69, 232]
+  pin with labels, "tdc_take", image
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_plain_len"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tdc_recv"
+  emitList with image, [59, 69, 232, 118]
+  emitU8 with image, 3
+  emitList with image, [139, 69, 232]
+  emitList with image, [137, 69, 224, 72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "tls_plain"
+  emitList with image, [3, 21]
+  emitRel with image, fixes, "tls_plain_off"
+  emitList with image, [68, 139, 69, 224]
+  emitCallTo with image, fixes, "tls_copy"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_plain_off"
+  emitList with image, [3, 69, 224, 137, 5]
+  emitRel with image, fixes, "tls_plain_off"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_plain_len"
+  emitList with image, [43, 69, 224, 137, 5]
+  emitRel with image, fixes, "tls_plain_len"
+  emitList with image, [139, 69, 224]
+  emitEpi with image
+  pin with labels, "tdc_recv", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [65, 184]
+  emitU32 with image, 18432
+  emitList with image, [69, 49, 201]
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "tls_rv_raw"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "tdc_fail"
+  emitList with image, [137, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_bufs4"
+  emitU32 with image, 1
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_iobuf"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_bufs8"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_desc"
+  emitU32 with image, 0
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_desc4"
+  emitU32 with image, 1
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_desc8"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [49, 210, 76, 141, 5]
+  emitRel with image, fixes, "tls_desc"
+  emitList with image, [69, 49, 201]
+  let image be emitIat with image, fixes, "iat_dec"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tdc_inc"
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_bufs8"
+  emitList with image, [139, 5]
+  emitRel with image, fixes, "tls_bufs"
+  emitList with image, [137, 69, 224, 72, 141, 13]
+  emitRel with image, fixes, "tls_plain"
+  emitList with image, [76, 99, 192, 72, 137, 85, 216]
+  emitCallTo with image, fixes, "tls_copy"
+  emitList with image, [139, 69, 224, 137, 5]
+  emitRel with image, fixes, "tls_plain_len"
+  emitList with image, [199, 5]
+  emitRel with image, fixes, "tls_plain_off"
+  emitU32 with image, 0
+  emitJmpTo with image, fixes, "tdc_take"
+  pin with labels, "tdc_inc", image
+  emitList with image, [61]
+  emitU32 with image, 2148074264
+  emitList with image, [15, 132]
+  emitRel with image, fixes, "tdc_recv"
+  pin with labels, "tdc_fail", image
+  emitList with image, [184]
+  emitU32 with image, 4294967295
+  emitEpi with image
+  return image
+end
+
+define emitTlsPeStubs with image, fixes, labels
+  pin with labels, "stub_ac_sch", image
+  emitPro with image
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "tls_ac_raw"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "sac_fail"
+  emitList with image, [72, 137, 5]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_hs_len"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_first"
+  emitList with image, [1, 0, 0, 0]
+  emitCallTo with image, fixes, "tls_hs"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "sac_bad"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_fd"
+  emitEpi with image
+  pin with labels, "sac_bad", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "tls_cs_raw"
+  pin with labels, "sac_fail", image
+  emitList with image, [72, 199, 192]
+  emitU32 with image, 4294967295
+  emitEpi with image
+
+  pin with labels, "stub_rv_sch", image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "srv_raw"
+  emitPro with image
+  emitList with image, [72, 137, 85, 240, 76, 137, 69, 232]
+  emitList with image, [72, 139, 85, 240, 76, 139, 69, 232]
+  emitCallTo with image, fixes, "tls_dec"
+  emitEpi with image
+  pin with labels, "srv_raw", image
+  emitList with image, [255, 37]
+  emitRel with image, fixes, "tls_rv_raw"
+
+  pin with labels, "stub_sd_sch", image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "ssd_raw"
+  emitPro with image
+  emitList with image, [72, 137, 85, 240, 76, 137, 69, 232]
+  emitList with image, [72, 139, 85, 240, 76, 139, 69, 232]
+  emitCallTo with image, fixes, "tls_enc"
+  emitEpi with image
+  pin with labels, "ssd_raw", image
+  emitList with image, [255, 37]
+  emitRel with image, fixes, "tls_sd_raw"
+
+  pin with labels, "stub_cs_sch", image
+  emitPro with image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  let image be emitIat with image, fixes, "iat_dsc"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_fd"
+  emitList with image, [255, 21]
+  emitRel with image, fixes, "tls_cs_raw"
+  emitEpi with image
+  return image
+end
+
+define emitTlsPeGuest with image, fixes, labels
+  let image be emitTlsCopyFns with image, fixes, labels
+  let image be emitTlsSaveRaw with image, fixes, labels
+  let image be emitTlsHook with image, fixes, labels
+  let image be emitTlsReadFile with image, fixes, labels
+  let image be emitTlsLoadCa with image, fixes, labels
+  let image be emitTlsLoadPfx with image, fixes, labels
+  let image be emitTlsFillCred with image, fixes, labels
+  let image be emitTlsSetupOut with image, fixes, labels
+  let image be emitTlsHs with image, fixes, labels
+  let image be emitTlsCrypt with image, fixes, labels
+  let image be emitTlsPeStubs with image, fixes, labels
+
+  pin with labels, "rt_tls_wrap", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 249, 1, 15, 135]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 13]
+  emitRel with image, fixes, "tls_checkhost"
+  emitList with image, [72, 137, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 13]
+  emitRel with image, fixes, "tls_nameptr"
+  emitList with image, [72, 137, 85, 224]
+  emitList with image, [72, 137, 21]
+  emitRel with image, fixes, "tls_fd"
+  emitJmpTo with image, fixes, "tls_pe_after_fd"
+
+  pin with labels, "rt_tls_connect", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 137, 85, 208, 76, 137, 13]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [72, 139, 2, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [72, 141, 66, 8, 72, 137, 5]
+  emitRel with image, fixes, "tls_nameptr"
+  emitPop2 with image
+  emitList with image, [72, 137, 85, 240, 76, 137, 77, 232, 72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_conn_bad"
+  emitList with image, [72, 139, 85, 240]
+  emitPushTag with image, 2
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 1
+  emitCallTo with image, fixes, "rt_connect"
+  emitPop1 with image
+  emitList with image, [72, 137, 85, 224, 72, 137, 21]
+  emitRel with image, fixes, "tls_fd"
+  pin with labels, "tls_pe_after_fd", image
+  emitCallTo with image, fixes, "tls_save_raw"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 21]
+  emitRel with image, fixes, "tls_captr"
+  emitList with image, [72, 139, 2, 72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tpc_noca"
+  emitList with image, [184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_captr"
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_captr"
+  emitCallTo with image, fixes, "tls_loadca"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tls_hs_fail"
+  pin with labels, "tpc_noca", image
+  emitCallTo with image, fixes, "tls_fillcred"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitCallTo with image, fixes, "tls_hs"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "tls_conn_bad", image
+  emitFail with image, fixes, "msg_tls_args"
+  pin with labels, "tls_wrap_bad", image
+  emitFail with image, fixes, "msg_tls_wrap"
+  pin with labels, "tls_hs_fail", image
+  emitFail with image, fixes, "msg_tls_hs"
+  pin with labels, "tls_ver_fail", image
+  emitFail with image, fixes, "msg_tls_ver"
+
+  pin with labels, "rt_tls_send", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_send_bad"
+  emitList with image, [77, 139, 1, 73, 141, 81, 8]
+  emitCallTo with image, fixes, "tls_enc"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 99, 208]
+  emitPushTag with image, 1
+  emitEpi with image
+  pin with labels, "tls_send_bad", image
+  emitFail with image, fixes, "msg_tls_send"
+
+  pin with labels, "rt_tls_recv", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [73, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [77, 133, 201, 15, 136]
+  emitRel with image, fixes, "tls_recv_bad"
+  emitList with image, [73, 129, 249]
+  emitU32 with image, 1000000
+  emitJcc with image, fixes, 134, "tls_recv_cap"
+  emitList with image, [73, 199, 193]
+  emitU32 with image, 1000000
+  pin with labels, "tls_recv_cap", image
+  emitList with image, [76, 137, 77, 232, 139, 77, 232, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 141, 80, 8, 68, 139, 69, 232]
+  emitCallTo with image, fixes, "tls_dec"
+  emitList with image, [133, 192, 15, 136]
+  emitRel with image, fixes, "tls_hs_fail"
+  emitList with image, [72, 139, 85, 224, 72, 99, 200, 72, 137, 10, 198, 68, 10, 8, 0]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_recv_bad", image
+  emitFail with image, fixes, "msg_tls_recv"
+
+  pin with labels, "rt_tls_close", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 137, 85, 240]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  let image be emitIat with image, fixes, "iat_dsc"
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_cred"
+  let image be emitIat with image, fixes, "iat_fch"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 85, 240]
+  emitPushTag with image, 1
+  emitCallTo with image, fixes, "rt_close"
+  emitEpi with image
+
+  pin with labels, "rt_tls_listen", image
+  emitPro with image
+  emitPop2 with image
+  emitList with image, [72, 137, 85, 208, 76, 137, 77, 216, 72, 137, 13]
+  emitRel with image, fixes, "tls_keyptr"
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitList with image, [73, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 1, 15, 133]
+  emitRel with image, fixes, "tls_listen_args"
+  emitList with image, [72, 137, 85, 224, 184]
+  emitU32 with image, 2
+  emitList with image, [72, 139, 77, 208]
+  emitCallTo with image, fixes, "rt_check_path"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_server"
+  emitList with image, [1, 0, 0, 0]
+  emitList with image, [72, 139, 77, 208]
+  emitCallTo with image, fixes, "tls_loadpfx"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tls_cert_fail"
+  emitCallTo with image, fixes, "tls_fillcred"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_cert_fail"
+  emitCallTo with image, fixes, "tls_hook_io"
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 1
+  emitList with image, [201]
+  emitJmpTo with image, fixes, "rt_listen"
+  pin with labels, "tls_listen_args", image
+  emitFail with image, fixes, "msg_tls_listen"
+  pin with labels, "tls_cert_fail", image
+  emitFail with image, fixes, "msg_tls_cert"
+  return image
+end
+
+

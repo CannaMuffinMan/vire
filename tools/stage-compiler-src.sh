@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/data/src"
 cp "$ROOT/compile-native.vire" "$ROOT/data/compile-native.vire"
 cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-more.vire" "$ROOT/src/rt-net.vire" \
-  "$ROOT/src/rt-ws.vire" "$ROOT/src/rt-dns.vire" "$ROOT/src/elf.vire" "$ROOT/src/rt-linux.vire" "$ROOT/src/rt-tls.vire" "$ROOT/src/rt-crypto.vire" \
+  "$ROOT/src/rt-ws.vire" "$ROOT/src/rt-dns.vire" "$ROOT/src/elf.vire" "$ROOT/src/rt-linux.vire" "$ROOT/src/rt-tls.vire" "$ROOT/src/rt-tls-pe.vire" "$ROOT/src/rt-crypto.vire" \
   "$ROOT/src/rt-net-blob.txt" "$ROOT/src/rt-net-pins.txt" "$ROOT/src/rt-net-fixes.txt" \
   "$ROOT/src/rt-net-json-blob.txt" "$ROOT/src/rt-net-json-pins.txt" "$ROOT/src/rt-net-json-fixes.txt" \
   "$ROOT/src/rt-net-r3-blob.txt" "$ROOT/src/rt-net-r3-pins.txt" "$ROOT/src/rt-net-r3-fixes.txt" \
@@ -25,6 +25,7 @@ pairs = [
     ("src/elf.vire", "data/src/elf.vire"),
     ("src/rt-linux.vire", "data/src/rt-linux.vire"),
     ("src/rt-tls.vire", "data/src/rt-tls.vire"),
+    ("src/rt-tls-pe.vire", "data/src/rt-tls-pe.vire"),
     ("src/rt-crypto.vire", "data/src/rt-crypto.vire"),
     ("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     ("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
