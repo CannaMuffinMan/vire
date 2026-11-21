@@ -4,25 +4,16 @@ use "src/pe.vire"
 use "src/elf.vire"
 use "src/rt-net-unpacked.vire"
 
-define hex8 with n
+define hex2 with n
   let digits be "0123456789abcdef"
-  let x be n
-  if x < 0
-    let x be 0
+  let b be n % 256
+  if b < 0
+    let b be 0
   end
-  let out be ""
-  let i be 0
-  while i < 8
-    let d be x % 16
-    let out be (slice with digits, d, (d + 1)) + out
-    let x be idiv with x, 16
-    let i be i + 1
-  end
-  return out
+  return (slice with digits, (idiv with b, 16), ((idiv with b, 16) + 1)) + (slice with digits, (b % 16), ((b % 16) + 1))
 end
 
-define hex4 with n
-  let digits be "0123456789abcdef"
+define hex8 with n
   let x be n
   if x < 0
     let x be 0
@@ -30,9 +21,23 @@ define hex4 with n
   let out be ""
   let i be 0
   while i < 4
-    let d be x % 16
-    let out be (slice with digits, d, (d + 1)) + out
-    let x be idiv with x, 16
+    let out be out + (hex2 with x)
+    let x be idiv with x, 256
+    let i be i + 1
+  end
+  return out
+end
+
+define hex4 with n
+  let x be n
+  if x < 0
+    let x be 0
+  end
+  let out be ""
+  let i be 0
+  while i < 2
+    let out be out + (hex2 with x)
+    let x be idiv with x, 256
     let i be i + 1
   end
   return out
