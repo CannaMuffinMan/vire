@@ -58,7 +58,7 @@ define route with method, path, body, head
     if method != "GET"
       return method_not_allowed
     end
-    return "{\"enabled\":false}"
+    return "{\"enabled\":false,\"status\":503}"
   end
   if path == "/api/transfer"
     if method == "POST"

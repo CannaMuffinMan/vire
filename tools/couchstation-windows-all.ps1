@@ -173,6 +173,8 @@ Run-Proof "pbkdf2-windows" { Run-Script "tools/pbkdf2-windows.ps1" }
 Run-Proof "apigo-ws-windows" { Run-Script "tools/apigo-ws-windows.ps1" }
 Run-Proof "rebuild-proxy-ws-windows" { Run-Script "tools/rebuild-proxy-ws-windows.ps1" }
 Run-Proof "tls-schannel-windows" { Run-Script "tools/tls-schannel-windows.ps1" }
+Run-Proof "pg-redis-tls-windows" { Run-Script "tools/pg-redis-tls-windows.ps1" }
+Run-Proof "listen-ws-windows" { Run-Script "tools/listen-ws-windows.ps1" }
 
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"

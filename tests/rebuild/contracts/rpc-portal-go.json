@@ -28,7 +28,7 @@
       "method": "GET",
       "path": "/api/rpc",
       "status": 503,
-      "body": "{\"enabled\":false}"
+      "body": "{\"enabled\":false,\"status\":503}"
     },
     {
       "name": "get_dev_auth_missing",
