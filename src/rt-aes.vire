@@ -1,0 +1,534 @@
+~ Guest AES-256-GCM (NIST SP 800-38D, 96-bit nonce, 128-bit tag).
+~ S-box and MixColumns use table lookups / data-dependent GHASH bit skips.
+~ Tag compare walks every byte (not a CPU timing barrier).
+
+define aesXor8 with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  let x be idiv with x, 2
+  let y be idiv with y, 2
+  let p be p + p
+  let xb be x % 2
+  let yb be y % 2
+  if xb != yb
+    let r be r + p
+  end
+  return r
+end
+
+define aesXtime with b
+  let d be b + b
+  if d >= 256
+    let d be d - 256
+    return aesXor8 with d, 27
+  end
+  return d
+end
+
+define aesSbox
+  return [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192, 183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21, 4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117, 9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132, 83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207, 208, 239, 170, 251, 67, 77, 51, 133, 69, 249, 2, 127, 80, 60, 159, 168, 81, 163, 64, 143, 146, 157, 56, 245, 188, 182, 218, 33, 16, 255, 243, 210, 205, 12, 19, 236, 95, 151, 68, 23, 196, 167, 126, 61, 100, 93, 25, 115, 96, 129, 79, 220, 34, 42, 144, 136, 70, 238, 184, 20, 222, 94, 11, 219, 224, 50, 58, 10, 73, 6, 36, 92, 194, 211, 172, 98, 145, 149, 228, 121, 231, 200, 55, 109, 141, 213, 78, 169, 108, 86, 244, 234, 101, 122, 174, 8, 186, 120, 37, 46, 28, 166, 180, 198, 232, 221, 116, 31, 75, 189, 139, 138, 112, 62, 181, 102, 72, 3, 246, 14, 97, 53, 87, 185, 134, 193, 29, 158, 225, 248, 152, 17, 105, 217, 142, 148, 155, 30, 135, 233, 206, 85, 40, 223, 140, 161, 137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187, 22]
+end
+
+define aesRcon with i
+  if i == 1
+    return 1
+  end
+  if i == 2
+    return 2
+  end
+  if i == 3
+    return 4
+  end
+  if i == 4
+    return 8
+  end
+  if i == 5
+    return 16
+  end
+  if i == 6
+    return 32
+  end
+  if i == 7
+    return 64
+  end
+  return 0
+end
+
+define aesCopyN with src
+  let out be []
+  let i be 0
+  let n be length with src
+  while i < n
+    push with out, src at i
+    let i be i + 1
+  end
+  return out
+end
+
+define aesCopy16 with src
+  return [src at 0, src at 1, src at 2, src at 3, src at 4, src at 5, src at 6, src at 7, src at 8, src at 9, src at 10, src at 11, src at 12, src at 13, src at 14, src at 15]
+end
+
+define aesXor16into with z, v
+  let i be 0
+  while i < 16
+    put (aesXor8 with (z at i), (v at i)) into z at i
+    let i be i + 1
+  end
+  return z
+end
+
+define aesAddRound with s, rk, off
+  let i be 0
+  while i < 16
+    let j be off + i
+    put (aesXor8 with (s at i), (rk at j)) into s at i
+    let i be i + 1
+  end
+  return s
+end
+
+define aesSubBytes with s, sbox
+  let i be 0
+  while i < 16
+    put (sbox at (s at i)) into s at i
+    let i be i + 1
+  end
+  return s
+end
+
+define aesShiftRows with s
+  let a1 be s at 1
+  let a5 be s at 5
+  let a9 be s at 9
+  let a13 be s at 13
+  put a5 into s at 1
+  put a9 into s at 5
+  put a13 into s at 9
+  put a1 into s at 13
+  let a2 be s at 2
+  let a6 be s at 6
+  let a10 be s at 10
+  let a14 be s at 14
+  put a10 into s at 2
+  put a14 into s at 6
+  put a2 into s at 10
+  put a6 into s at 14
+  let a3 be s at 3
+  let a7 be s at 7
+  let a11 be s at 11
+  let a15 be s at 15
+  put a15 into s at 3
+  put a3 into s at 7
+  put a7 into s at 11
+  put a11 into s at 15
+  return s
+end
+
+define aesMixOne with s, i
+  let a0 be s at i
+  let i1 be i + 1
+  let a1 be s at i1
+  let i2 be i + 2
+  let a2 be s at i2
+  let i3 be i + 3
+  let a3 be s at i3
+  let x0 be aesXtime with a0
+  let x1 be aesXtime with a1
+  let x2 be aesXtime with a2
+  let x3 be aesXtime with a3
+  let t0 be aesXor8 with x0, x1
+  let t0 be aesXor8 with t0, a1
+  let t0 be aesXor8 with t0, a2
+  let t0 be aesXor8 with t0, a3
+  let t1 be aesXor8 with a0, x1
+  let t1 be aesXor8 with t1, x2
+  let t1 be aesXor8 with t1, a2
+  let t1 be aesXor8 with t1, a3
+  let t2 be aesXor8 with a0, a1
+  let t2 be aesXor8 with t2, x2
+  let t2 be aesXor8 with t2, x3
+  let t2 be aesXor8 with t2, a3
+  let t3 be aesXor8 with x0, a0
+  let t3 be aesXor8 with t3, a1
+  let t3 be aesXor8 with t3, a2
+  let t3 be aesXor8 with t3, x3
+  put t0 into s at i
+  put t1 into s at i1
+  put t2 into s at i2
+  put t3 into s at i3
+  return s
+end
+
+define aesMixColumns with s
+  aesMixOne with s, 0
+  aesMixOne with s, 4
+  aesMixOne with s, 8
+  aesMixOne with s, 12
+  return s
+end
+
+define aesKeyExpand with key, sbox
+  let rk be aesCopyN with key
+  let n be 32
+  while n < 240
+    let wi be idiv with n, 4
+    let t0 be rk at (n - 4)
+    let t1 be rk at (n - 3)
+    let t2 be rk at (n - 2)
+    let t3 be rk at (n - 1)
+    let r be wi % 8
+    if r == 0
+      let a be sbox at t1
+      let rc be aesRcon with (idiv with wi, 8)
+      let t0 be aesXor8 with a, rc
+      let t1 be sbox at t2
+      let t2 be sbox at t3
+      let t3 be sbox at (rk at (n - 4))
+    end
+    if r == 4
+      let t0 be sbox at t0
+      let t1 be sbox at t1
+      let t2 be sbox at t2
+      let t3 be sbox at t3
+    end
+    let b be n - 32
+    push with rk, (aesXor8 with (rk at b), t0)
+    push with rk, (aesXor8 with (rk at (b + 1)), t1)
+    push with rk, (aesXor8 with (rk at (b + 2)), t2)
+    push with rk, (aesXor8 with (rk at (b + 3)), t3)
+    let n be n + 4
+  end
+  return rk
+end
+
+define aesEncryptBlock with rk, sbox, block
+  let s be aesCopy16 with block
+  aesAddRound with s, rk, 0
+  let r be 1
+  while r < 14
+    aesSubBytes with s, sbox
+    aesShiftRows with s
+    aesMixColumns with s
+    aesAddRound with s, rk, (r * 16)
+    let r be r + 1
+  end
+  aesSubBytes with s, sbox
+  aesShiftRows with s
+  aesAddRound with s, rk, 224
+  return s
+end
+
+define gcmShr1 with v
+  let lsb be (v at 15) % 2
+  let i be 15
+  while i > 0
+    let b be v at i
+    let prev be v at (i - 1)
+    let lo be idiv with b, 2
+    let hi be (prev % 2) * 128
+    put (lo + hi) into v at i
+    let i be i - 1
+  end
+  put (idiv with (v at 0), 2) into v at 0
+  if lsb == 1
+    put (aesXor8 with (v at 0), 225) into v at 0
+  end
+  return v
+end
+
+define gcmMul with x, y
+  let z be [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let v be aesCopy16 with y
+  let bi be 0
+  while bi < 16
+    let q be x at bi
+    let flag be idiv with q, 128
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 64
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 32
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 16
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 8
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 4
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be idiv with q, 2
+    let flag be flag % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let flag be q % 2
+    if flag == 1
+      aesXor16into with z, v
+    end
+    gcmShr1 with v
+    let bi be bi + 1
+  end
+  return z
+end
+
+define gcmPad16 with buf
+  let n be length with buf
+  let out be aesCopyN with buf
+  if n == 0
+    return out
+  end
+  let r be n % 16
+  if r == 0
+    return out
+  end
+  let padn be 16 - r
+  let i be 0
+  while i < padn
+    push with out, 0
+    let i be i + 1
+  end
+  return out
+end
+
+define gcmStoreBe32 with out, off, n
+  put (idiv with n, 16777216) into out at off
+  let rest be n % 16777216
+  put (idiv with rest, 65536) into out at (off + 1)
+  let rest be rest % 65536
+  put (idiv with rest, 256) into out at (off + 2)
+  put (rest % 256) into out at (off + 3)
+  return out
+end
+
+define gcmHash with h, aad, ct
+  let y be [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let a be gcmPad16 with aad
+  let c be gcmPad16 with ct
+  let i be 0
+  let an be length with a
+  while i < an
+    let blk be slice with a, i, (i + 16)
+    aesXor16into with y, blk
+    let y be gcmMul with y, h
+    let i be i + 16
+  end
+  let i be 0
+  let cn be length with c
+  while i < cn
+    let blk be slice with c, i, (i + 16)
+    aesXor16into with y, blk
+    let y be gcmMul with y, h
+    let i be i + 16
+  end
+  let lens be [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  gcmStoreBe32 with lens, 4, ((length with aad) * 8)
+  gcmStoreBe32 with lens, 12, ((length with ct) * 8)
+  aesXor16into with y, lens
+  return gcmMul with y, h
+end
+
+define gcmInc32 with block
+  let out be aesCopy16 with block
+  let n be (out at 12) * 16777216
+  let n be n + ((out at 13) * 65536)
+  let n be n + ((out at 14) * 256)
+  let n be n + (out at 15)
+  let n be n + 1
+  if n >= 4294967296
+    let n be n - 4294967296
+  end
+  put (idiv with n, 16777216) into out at 12
+  let n be n % 16777216
+  put (idiv with n, 65536) into out at 13
+  let n be n % 65536
+  put (idiv with n, 256) into out at 14
+  put (n % 256) into out at 15
+  return out
+end
+
+define gcmCtr with rk, sbox, j0, data
+  let out be []
+  let ctr be gcmInc32 with j0
+  let i be 0
+  let n be length with data
+  while i < n
+    let ks be aesEncryptBlock with rk, sbox, ctr
+    let k be 0
+    while k < 16
+      if i < n
+        push with out, (aesXor8 with (data at i), (ks at k))
+        let i be i + 1
+      end
+      let k be k + 1
+    end
+    let ctr be gcmInc32 with ctr
+  end
+  return out
+end
+
+define gcm_ct_eq with left, right
+  let n be length with left
+  let m be length with right
+  let d be 0
+  if n != m
+    let d be 1
+  end
+  let lim be n
+  if m > lim
+    let lim be m
+  end
+  let i be 0
+  while i < lim
+    let a be 0
+    let b be 0
+    if i < n
+      let a be left at i
+    end
+    if i < m
+      let b be right at i
+    end
+    if a != b
+      let d be 1
+    end
+    let i be i + 1
+  end
+  if d == 0
+    return true
+  end
+  return false
+end
+
+define aes_gcm_prepare with key, nonce
+  if (length with key) != 32
+    return ["bad", "key must be 32 bytes"]
+  end
+  if (length with nonce) != 12
+    return ["bad", "nonce must be 12 bytes"]
+  end
+  let sbox be aesSbox
+  let rk be aesKeyExpand with key, sbox
+  let zeros be [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let h be aesEncryptBlock with rk, sbox, zeros
+  let j0 be aesCopyN with nonce
+  push with j0, 0
+  push with j0, 0
+  push with j0, 0
+  push with j0, 1
+  return ["ok", rk, sbox, h, j0]
+end
+
+define aes_gcm_seal with key, nonce, pt, aad
+  let prep be aes_gcm_prepare with key, nonce
+  if (prep at 0) != "ok"
+    return prep
+  end
+  let rk be prep at 1
+  let sbox be prep at 2
+  let h be prep at 3
+  let j0 be prep at 4
+  let ct be gcmCtr with rk, sbox, j0, pt
+  let s be gcmHash with h, aad, ct
+  let tblock be aesEncryptBlock with rk, sbox, j0
+  aesXor16into with tblock, s
+  return ["ok", ct, tblock]
+end
+
+define aes_gcm_open with key, nonce, ct, aad, tag
+  let prep be aes_gcm_prepare with key, nonce
+  if (prep at 0) != "ok"
+    return prep
+  end
+  if (length with tag) != 16
+    return ["bad", "tag must be 16 bytes"]
+  end
+  let rk be prep at 1
+  let sbox be prep at 2
+  let h be prep at 3
+  let j0 be prep at 4
+  let s be gcmHash with h, aad, ct
+  let tblock be aesEncryptBlock with rk, sbox, j0
+  aesXor16into with tblock, s
+  if not (gcm_ct_eq with tag, tblock)
+    return ["bad", "authentication failed"]
+  end
+  let pt be gcmCtr with rk, sbox, j0, ct
+  return ["ok", pt]
+end
