@@ -1,0 +1,43 @@
+~ Host vs native: loopback Redis RESP2 over TLS (rediss:// verify-full).
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define mustOk with tag, got
+  if (got at 0) != "ok"
+    fail with (tag + " " + (got at 1))
+  end
+  say tag + " " + (redis_show with (got at 1))
+  return 0
+end
+
+define main
+  say "redis tls residual no RESP3 no redis ACL username"
+  try
+    tls_connect with "8.8.8.8", 6379, "localhost", "data/redis-ca.pem"
+    fail with "non-loopback missed"
+  miss problem
+    say "non-loopback refused"
+  end
+  let plain be redis_open_rediss with "redis://:SECRET_PLACEHOLDER@127.0.0.1:TLS_PORT_PLACEHOLDER", "localhost", "data/redis-ca.pem"
+  if (plain at 0) == "ok"
+    fail with "plaintext redis url missed"
+  end
+  say "plaintext-url " + (plain at 1)
+  let url be "rediss://:SECRET_PLACEHOLDER@127.0.0.1:TLS_PORT_PLACEHOLDER"
+  let opened be redis_open_rediss with url, "localhost", "data/redis-ca.pem"
+  if (opened at 0) != "ok"
+    fail with (opened at 1)
+  end
+  let h be opened at 1
+  say "auth OK"
+  let ping be redis_ping_tls with h
+  mustOk with "PING", ping
+  let s be redis_set_tls with h, "vire:tls:k", "hello"
+  mustOk with "SET", s
+  let g be redis_get_tls with h, "vire:tls:k"
+  mustOk with "GET", g
+  say "REDIS TLS PROVE pass"
+end

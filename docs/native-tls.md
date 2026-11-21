@@ -56,6 +56,7 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 
 - `sslmode=require` should call the same `tls_connect` (or a thin wrapper) after the TCP `connect`, with `name` = server hostname and `ca` empty (system store) or a PEM under `data/`.
 - HTTPS upstream: `tls_connect` + `tls_send` of an HTTP/1.1 request + `tls_recv`. Still loopback-only on native until the net sandbox grows.
+- Redis `rediss://`: `src/rt-redis.vire` `redis_open_tls` / `redis_open_rediss` call `tls_connect` (verify-full) then RESP2 `AUTH`/`PING`/`SET`/`GET` over `tls_send`/`tls_recv`. Plaintext `redis://` is refused by `redis_open_rediss`.
 
 ## Tests
 
