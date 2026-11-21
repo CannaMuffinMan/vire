@@ -267,6 +267,10 @@ end
 ~ HTML Content-Type, WWW-Authenticate, X-Payments-Enabled. Same needles as host.
 define emitLandingHttp with image, fixes, labels, base, route_nparams
   ~ Packed into rt-net-r3/r4 blobs so compile-native ELF stays under the compiler list cap.
+  ~ Unsigned sub of needle_len vs haystack (hf_no) so {"status":307} does not
+  ~ walk txt_k_www. GET/HEAD empty body is txt_empty (pr_body_ok) so
+  ~ listen+proxy_reply does not SEGV. emitTcpClient in the same blobs uses 4102
+  ~ (SO_RCVTIMEO) and iat_ss.
   return image
 end
 
