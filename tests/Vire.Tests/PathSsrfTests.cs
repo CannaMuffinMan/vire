@@ -325,8 +325,10 @@ public class PathSsrfTests
         string dir = Path.Combine(Path.GetTempPath(), "vire-host-toctou-" + Guid.NewGuid().ToString("n"));
         string data = Path.Combine(dir, "data");
         string outside = Path.Combine(Path.GetTempPath(), "vire-host-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
         Directory.CreateDirectory(data);
         Directory.CreateDirectory(outside);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(data, "note.txt")));
         File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
         File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
         File.WriteAllText(Path.Combine(outside, "marker-outside-only"), "X");
@@ -441,7 +443,17 @@ public class PathSsrfTests
                     CreateNoWindow = true
                 };
                 System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+                if (p == null)
+                {
+                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                    throw new IOException("mklink process missing");
+                }
                 p.WaitForExit(5000);
+                if (p.ExitCode != 0 || !Directory.Exists(data))
+                {
+                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                    throw new IOException("mklink /J failed exit " + p.ExitCode);
+                }
             }
         }
     }

@@ -32,8 +32,9 @@ function Compile-Guest([string]$Src, [string]$Stem) {
     $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "gen1 $Stem compile exit $($p.ExitCode)" }
+    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -PassThru
+    $code = Get-ChildExitCode $p
+    if ($code -ne 0) { throw "gen1 $Stem compile exit $code" }
     Convert-HexToExe $hex $exe
     return $exe
 }
@@ -56,9 +57,7 @@ function Read-Http([int]$Port, [string]$Method, [string]$Path, [string]$Send) {
     $buf = New-Object byte[] 4096
     try {
         while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
-    } catch [System.IO.IOException] {
-        if ($ms.Length -eq 0) { throw }
-    } catch [System.Net.Sockets.SocketException] {
+    } catch {
         if ($ms.Length -eq 0) { throw }
     }
     $tcp.Close()
@@ -166,5 +165,5 @@ try {
     Stop-Process -ErrorAction SilentlyContinue -Id $lp.Id -Force
 }
 
-Write-Host "Windows PE rebuild fcgcpa + unauth sidecar + landing-go steps completed on this CouchStation. Linux is not PE proof."
+Write-Host "PASS_AFTER Windows PE rebuild fcgcpa + unauth sidecar + landing-go steps completed on this CouchStation. Linux is not PE proof."
 & (Join-Path $PSScriptRoot "native-json-parse-windows.ps1")

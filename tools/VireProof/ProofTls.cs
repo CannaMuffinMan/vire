@@ -33,8 +33,9 @@ static class ProofTls
         using (RSA rsa = RSA.Create(2048))
         using (X509Certificate2 cert = MakeCert(rsa))
         {
-            File.WriteAllText(certPath, Pem("CERTIFICATE", cert.Export(X509ContentType.Cert)));
-            File.WriteAllText(keyPath, Pem("RSA PRIVATE KEY", rsa.ExportRSAPrivateKey()));
+            Encoding utf8 = new UTF8Encoding(false);
+            File.WriteAllText(certPath, Pem("CERTIFICATE", cert.Export(X509ContentType.Cert)), utf8);
+            File.WriteAllText(keyPath, Pem("PRIVATE KEY", rsa.ExportPkcs8PrivateKey()), utf8);
         }
     }
 
@@ -43,8 +44,10 @@ static class ProofTls
         using (RSA rsa = RSA.Create(2048))
         using (X509Certificate2 cert = MakeCert(rsa))
         {
-            File.WriteAllBytes(pfxPath, cert.Export(X509ContentType.Pfx, password ?? ""));
-            File.WriteAllText(cerPath, Pem("CERTIFICATE", cert.Export(X509ContentType.Cert)));
+            string pw = password ?? "";
+            X509Certificate2 exportCert = cert.HasPrivateKey ? cert : cert.CopyWithPrivateKey(rsa);
+            File.WriteAllBytes(pfxPath, exportCert.Export(X509ContentType.Pfx, pw));
+            File.WriteAllText(cerPath, Pem("CERTIFICATE", exportCert.Export(X509ContentType.Cert)), new UTF8Encoding(false));
         }
     }
 
@@ -111,6 +114,7 @@ static class ProofTls
                 byte[] pong = Encoding.ASCII.GetBytes("PONG");
                 s.Write(pong, 0, pong.Length);
                 s.Flush();
+                try { c.Client.Shutdown(SocketShutdown.Send); } catch (Exception) { }
             }
         }
         catch (Exception) { }

@@ -113,7 +113,14 @@ static class VireListen
                     }
                     finally
                     {
-                        try { held.Client.Shutdown(SocketShutdown.Send); } catch (Exception) { }
+                        try
+                        {
+                            held.Client.NoDelay = true;
+                            held.Client.LingerState = new LingerOption(true, 2);
+                            held.Client.Shutdown(SocketShutdown.Send);
+                            Thread.Sleep(20);
+                        }
+                        catch (Exception) { }
                         try { held.Close(); } catch (Exception) { }
                         ListenSlots.Release();
                     }

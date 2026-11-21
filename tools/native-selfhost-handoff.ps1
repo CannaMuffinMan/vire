@@ -219,4 +219,4 @@ if ($h1 -ne $h2) {
     }
     throw "gen1/gen2 SHA-256 differ"
 }
-Write-Output "native selfhost handoff ok"
+Write-Output "PASS_AFTER native selfhost handoff ok"

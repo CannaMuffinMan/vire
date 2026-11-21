@@ -1,3 +1,4 @@
+# TODO(VIRE-FINISH-NOW): CouchStation 56be312f PE tls_wrap ping missing PONG vs tls-echo. Host linger added; packed PE wrap still needs Windows re-prove.
 # Native PE Postgres/Redis TLS through SChannel for CouchStation.
 # Loopback 127.0.0.1 only. Throwaway test CA. Caps 32MB / 100000 / 5M.
 # Linux agents cannot execute PE; this script is the Windows execute proof.

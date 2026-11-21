@@ -36,8 +36,9 @@ function Compile-Guest([string]$Src, [string]$Stem) {
     $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "gen1 $Stem compile exit $($p.ExitCode)" }
+    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -PassThru
+    $code = Get-ChildExitCode $p
+    if ($code -ne 0) { throw "gen1 $Stem compile exit $code" }
     Convert-HexToExe $hex $exe
     return $exe
 }

@@ -52,73 +52,9 @@ if (-not $OnWindows) {
     exit 0
 }
 
-Add-Type -TypeDefinition @"
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
-public static class VireListenWsFix {
-    const string Guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    public static TcpListener Listen(out int port) {
-        TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-        l.Start();
-        port = ((IPEndPoint)l.LocalEndpoint).Port;
-        Thread t = new Thread(() => {
-            try {
-                while (true) {
-                    TcpClient c = l.AcceptTcpClient();
-                    Thread inner = new Thread(() => Serve(c));
-                    inner.IsBackground = true;
-                    inner.Start();
-                }
-            } catch { }
-        });
-        t.IsBackground = true;
-        t.Start();
-        return l;
-    }
-    static void Serve(TcpClient c) {
-        try {
-            using (c) {
-                NetworkStream s = c.GetStream();
-                s.ReadTimeout = 5000;
-                byte[] buf = new byte[16384];
-                int n = s.Read(buf, 0, buf.Length);
-                string text = Encoding.ASCII.GetString(buf, 0, n);
-                if (text.Contains("/ws/refuse")) {
-                    byte[] body = Encoding.ASCII.GetBytes("forbidden");
-                    byte[] resp = Encoding.ASCII.GetBytes("HTTP/1.1 403 Forbidden\r\nContent-Length: " + body.Length + "\r\nConnection: close\r\n\r\n");
-                    s.Write(resp, 0, resp.Length);
-                    s.Write(body, 0, body.Length);
-                    return;
-                }
-                if (!text.Contains("Upgrade: websocket")) {
-                    byte[] bad = Encoding.ASCII.GetBytes("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                    s.Write(bad, 0, bad.Length);
-                    return;
-                }
-                string key = "";
-                foreach (string line in text.Split(new string[] { "\r\n" }, StringSplitOptions.None)) {
-                    if (line.StartsWith("Sec-WebSocket-Key:", StringComparison.OrdinalIgnoreCase))
-                        key = line.Substring(18).Trim();
-                }
-                byte[] acc;
-                using (SHA1 sha = SHA1.Create()) {
-                    acc = sha.ComputeHash(Encoding.ASCII.GetBytes(key + Guid));
-                }
-                string accept = Convert.ToBase64String(acc);
-                byte[] ok = Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
-                s.Write(ok, 0, ok.Length);
-            }
-        } catch { }
-    }
-}
-"@
-
-$upPort = 0
-$listener = [VireListenWsFix]::Listen([ref]$upPort)
+$ProofDll = Get-VireProofDll
+$upProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "ws-upstream") -WorkingDirectory $Root
+$upPort = Get-ListenPort $upProc
 Write-Host "upstream 127.0.0.1:$upPort"
 
 function Probe([int]$Port, [string]$Req) {
@@ -130,9 +66,14 @@ function Probe([int]$Port, [string]$Req) {
     $bytes = [Text.Encoding]::ASCII.GetBytes($Req)
     $stream.Write($bytes, 0, $bytes.Length)
     $buf = New-Object byte[] 4096
-    $n = $stream.Read($buf, 0, $buf.Length)
+    $ms = New-Object IO.MemoryStream
+    try {
+        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    } catch {
+        if ($ms.Length -eq 0) { throw }
+    }
     $tcp.Close()
-    return [Text.Encoding]::ASCII.GetString($buf, 0, $n)
+    return [Text.Encoding]::ASCII.GetString($ms.ToArray())
 }
 
 function Transcript([int]$Port) {
@@ -156,9 +97,16 @@ $natProc = Start-VireProcess -FilePath $exe -ArgumentList @("$upPort") -WorkingD
 $nport = Get-ListenPort $natProc
 $natT = Transcript $nport
 $natProc.Kill()
-try { $listener.Stop() } catch { }
+try { if (-not $upProc.HasExited) { $upProc.Kill() } } catch { }
 
-if ($hostT -ne $natT) { throw "HOST_NATIVE_MISMATCH" }
+if ($hostT -ne $natT) {
+    Write-Host "HOST_NATIVE_MISMATCH host_transcript<<<"
+    Write-Host $hostT
+    Write-Host ">>> native_transcript<<<"
+    Write-Host $natT
+    Write-Host ">>>"
+    throw "HOST_NATIVE_MISMATCH"
+}
 Write-Host "HOST_NATIVE_MATCH listen-ws"
 Write-Host ("PASS_AFTER at " + $AfterSha)
 exit 0

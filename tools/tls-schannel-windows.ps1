@@ -1,3 +1,4 @@
+# TODO(VIRE-FINISH-NOW): CouchStation 56be312f PE tls_listen exited 1 (SChannel PFX load/handshake). PKCS8/password fixed here; packed PE tls still needs Windows re-prove.
 # Native PE SChannel TLS proof for CouchStation.
 # Loopback 127.0.0.1 only. Test CA / PFX generated here. Caps unchanged.
 # Does not claim success unless this script runs on Windows.
@@ -61,7 +62,7 @@ Write-Output "FAIL_BEFORE at $BaseSha native PE tls_* fail-closed (emitTlsPeRefu
 $ProofDll = Get-VireProofDll
 $pfx = Join-Path $Data "tls-health.pfx"
 $cer = Join-Path $Data "tls-health-cert.pem"
-& dotnet exec $ProofDll write-pfx $pfx $cer ""
+& dotnet exec $ProofDll write-pfx $pfx $cer "x"
 if ($LASTEXITCODE -ne 0) { throw "write-pfx failed" }
 
 $src = @"
@@ -72,7 +73,7 @@ define route with method, path, body
   return "{\"error\":\"not found\"}"
 end
 define main
-  tls_listen with 0, "data/tls-health.pfx", ""
+  tls_listen with 0, "data/tls-health.pfx", "x"
 end
 "@
 Set-Content -Path (Join-Path $Data "guest-health-schan.vire") -Value $src

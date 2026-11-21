@@ -29,8 +29,9 @@ function Compile-Guest([string]$Src, [string]$Stem) {
     $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "gen1 $Stem compile exit $($p.ExitCode)" }
+    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -PassThru
+    $code = Get-ChildExitCode $p
+    if ($code -ne 0) { throw "gen1 $Stem compile exit $code" }
     Convert-HexToExe $hex $exe
     return $exe
 }
@@ -47,7 +48,11 @@ function Read-Http([int]$Port, [string]$Path, [string]$Cookie) {
     $stream.Write($head, 0, $head.Length)
     $ms = New-Object System.IO.MemoryStream
     $buf = New-Object byte[] 4096
-    while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    try {
+        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    } catch {
+        if ($ms.Length -eq 0) { throw }
+    }
     $tcp.Close()
     $text = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
     $split = $text.IndexOf("`r`n`r`n")
@@ -78,7 +83,7 @@ try {
     $bad2 = Read-Http $port "/inject-cookie" $null
     if ($bad2.Status -ne 500) { throw "PE inject-cookie expected 500 got $($bad2.Status)" }
     if ($bad2.Head -match "Location: /evil") { throw "PE CRLF Set-Cookie escaped" }
-    Write-Host "PE header allowlist + CRLF refusal match"
+    Write-Host "PASS_AFTER PE header allowlist + CRLF refusal match"
 } finally {
     Stop-Process -Id $proc.Id -Force
 }

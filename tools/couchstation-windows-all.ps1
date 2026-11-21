@@ -75,14 +75,50 @@ function Run-Script([string]$Rel, [int]$TimeoutSec = 0) {
         if ($Rel -match "selfhost") { $TimeoutSec = 2400 } else { $TimeoutSec = 900 }
     }
     $outLog = Join-Path $Data ("couchstation-" + $script:CurrentProof + "-child.log")
-    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
+    $errLog = $outLog + ".err"
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+    $null = $p.Handle
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         Stop-ProcessTree $p.Id
         throw "$Rel wall timeout ${TimeoutSec}s"
     }
+    $p.WaitForExit()
     Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
-    Get-Content -ErrorAction SilentlyContinue ($outLog + ".err") | ForEach-Object { Write-Host $_ }
-    if ($p.ExitCode -ne 0) { throw "$Rel exit $($p.ExitCode)" }
+    Get-Content -ErrorAction SilentlyContinue $errLog | ForEach-Object { Write-Host $_ }
+    if (-not $p.HasExited) { throw "$Rel ERROR process still running after WaitForExit" }
+    $codeObj = $p.ExitCode
+    if ($null -eq $codeObj) { throw "$Rel ERROR unknown exit code" }
+    $code = [int]$codeObj
+    $combined = ""
+    if (Test-Path -LiteralPath $outLog) { $combined += [IO.File]::ReadAllText($outLog) }
+    if (Test-Path -LiteralPath $errLog) { $combined += "`n" + [IO.File]::ReadAllText($errLog) }
+    if ($code -ne 0) { throw "$Rel exit $code" }
+    if ($combined -notmatch "PASS_AFTER|HOST_NATIVE_MATCH|\bPASS\b") {
+        throw "$Rel exit 0 missing PASS/FAIL marker"
+    }
+}
+
+function Test-HarnessExitGuard {
+    $probe = Join-Path $Data "harness-nopass.ps1"
+    Set-Content -LiteralPath $probe -Value "Write-Host silent-ok`nexit 0"
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$probe) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $Data "harness-nopass.out") -RedirectStandardError (Join-Path $Data "harness-nopass.err")
+    $null = $p.Handle
+    if (-not $p.WaitForExit(15000)) { Stop-ProcessTree $p.Id; throw "harness probe wall timeout" }
+    $p.WaitForExit()
+    if ($null -eq $p.ExitCode) { throw "ERROR unknown exit code" }
+    $text = ""
+    if (Test-Path (Join-Path $Data "harness-nopass.out")) { $text = [IO.File]::ReadAllText((Join-Path $Data "harness-nopass.out")) }
+    if ($p.ExitCode -eq 0 -and $text -notmatch "PASS_AFTER|HOST_NATIVE_MATCH|\bPASS\b") {
+        Log "harness_guard: null-safe ExitCode=$($p.ExitCode); missing PASS marker treated as FAIL"
+    } else {
+        throw "harness guard expected missing PASS marker"
+    }
+    $caught = $false
+    try { Run-Script "data/harness-nopass.ps1" } catch {
+        if ("$($_.Exception.Message)" -match "missing PASS/FAIL marker") { $caught = $true } else { throw }
+    }
+    if (-not $caught) { throw "Run-Script must FAIL scripts that exit 0 with no PASS/FAIL marker" }
+    Log "harness_exit_guard_ok Handle+WaitForExit+unknown-null+PASS marker"
 }
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -93,6 +129,8 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     }
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
+
+Run-Proof "harness-exit-guard" { Test-HarnessExitGuard }
 
 Run-Proof "dotnet-build" {
     dotnet build (Join-Path $Root "vire.csproj") -c Release --nologo

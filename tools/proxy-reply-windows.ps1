@@ -49,27 +49,10 @@ $ascii = [Text.Encoding]::ASCII.GetString($pe)
 if ($ascii -notmatch "ws2_32") { throw "PE missing ws2_32" }
 Write-Host "proxy_reply_pe_mz_ok ws2_32_ok"
 
-$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Parse("127.0.0.1"), 0)
-$listener.Start()
-$upPort = ([Net.IPEndPoint]$listener.LocalEndpoint).Port
+$ProofDll = Get-VireProofDll
+$upProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "http-upok") -WorkingDirectory $Root
+$upPort = Get-ListenPort $upProc
 Write-Host ("upstream 127.0.0.1:" + $upPort)
-$script:ProxyReplyListener = $listener
-$upThread = New-Object System.Threading.Thread ([System.Threading.ThreadStart]{
-    $lis = $script:ProxyReplyListener
-    while ($true) {
-        try {
-            $c = $lis.AcceptTcpClient()
-            $ns = $c.GetStream()
-            $buf = New-Object byte[] 4096
-            [void]$ns.Read($buf, 0, $buf.Length)
-            $payload = [Text.Encoding]::ASCII.GetBytes("HTTP/1.1 200 OK`r`nContent-Type: text/plain`r`nContent-Length: 5`r`n`r`nup-ok")
-            $ns.Write($payload, 0, $payload.Length)
-            $c.Close()
-        } catch { break }
-    }
-})
-$upThread.IsBackground = $true
-$upThread.Start()
 
 function Get-Proxy([int]$Port) {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -83,7 +66,9 @@ function Get-Proxy([int]$Port) {
     $buf = New-Object byte[] 4096
     try {
         while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
-    } catch { }
+    } catch {
+        if ($ms.Length -eq 0) { throw }
+    }
     $tcp.Close()
     return [Text.Encoding]::ASCII.GetString($ms.ToArray())
 }
@@ -97,7 +82,7 @@ $natProc = Start-VireProcess -FilePath $exe -ArgumentList @("$upPort") -WorkingD
 $nport = Get-ListenPort $natProc
 $p = Get-Proxy $nport
 $natProc.Kill()
-$listener.Stop()
+try { if (-not $upProc.HasExited) { $upProc.Kill() } } catch { }
 
 Write-Host ("host_raw " + $h.Substring(0, [Math]::Min(180, $h.Length)))
 Write-Host ("pe_raw " + $p.Substring(0, [Math]::Min(180, $p.Length)))

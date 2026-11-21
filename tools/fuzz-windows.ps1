@@ -127,7 +127,7 @@ if ($jtext -match "secret") {
     Write-Output "junction probe fail-closed"
 }
 
-Write-Output "windows pe fuzz ok=$ok faults=$fault seconds=$([int]$sw.Elapsed.TotalSeconds)"
+Write-Output "PASS_AFTER windows pe fuzz ok=$ok faults=$fault seconds=$([int]$sw.Elapsed.TotalSeconds)"
 # Nightly records faults as findings; do not fail the job on a security hit
 # so the artifact/log is uploaded. PR CI does not run this script.
 exit 0

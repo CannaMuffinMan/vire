@@ -44,6 +44,23 @@ function ConvertTo-ProcessArguments([string[]]$Argv) {
     return ($parts -join ' ')
 }
 
+function Get-ChildExitCode {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Proc,
+        [int]$TimeoutMs = 0
+    )
+    $null = $Proc.Handle
+    if ($TimeoutMs -gt 0) {
+        if (-not $Proc.WaitForExit($TimeoutMs)) { throw "ERROR process wait timeout" }
+    } else {
+        $Proc.WaitForExit()
+    }
+    $Proc.WaitForExit()
+    if (-not $Proc.HasExited) { throw "ERROR process still running after WaitForExit" }
+    if ($null -eq $Proc.ExitCode) { throw "ERROR unknown exit code" }
+    return [int]$Proc.ExitCode
+}
+
 function Start-VireProcess {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,

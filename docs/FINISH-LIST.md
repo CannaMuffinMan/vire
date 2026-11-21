@@ -20,6 +20,8 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | tools/native-forms.ps1 | native-forms fixtures | Tracked `data/native-forms` try-miss.vire and for-list.vire | medium | tools-ci |
 | compile-native.vire | tokenize | Native lexer must accept fractional number literals | medium | rt-core |
 | src/rt-pg.vire | pg_auth / SCRAM | Guest SCRAM-SHA-256-PLUS using tls-unique / server-end-point | medium | rt-net |
+| tools/tls-schannel-windows.ps1 | PE tls_listen | CouchStation 56be312f: `PE tls_listen exited 1` after write-pfx. PKCS8 PEM + PFX password `x` are in this PR; remaining SChannel load/handshake is PE packed tls, present at pre-cleanup c813695. Re-prove on CouchStation. | high | tools-ci |
+| tools/pg-redis-tls-windows.ps1 | PE tls_wrap ping | CouchStation 56be312f: `PE tls_wrap ping missing PONG` against vire-proof tls-echo. Linger/Shutdown added on host echo; PE wrap handshake is packed SChannel (pre-cleanup). Re-prove on CouchStation. | high | tools-ci |
 | src/rt-crypto.vire | sha256_bytes | Wire guest SHA-256 pad+compress+IV into this wrapper instead of digest | medium | rt-crypto |
 | Vire.cs | Builtin serve | Drop the serve name from Builtins once guests no longer call it | low | host-cs |
 | Compiled.cs | Builtin serve | Drop the serve name once guests no longer call it | low | host-cs |
