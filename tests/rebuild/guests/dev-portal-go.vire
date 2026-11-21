@@ -1,28 +1,184 @@
-~ dev-portal-go loopback port: /fcg-api/ prefix strip + fixture goldens.
-~ JWT session cookie and public HTTPS API target stay blocked. No dist.
+~ dev-portal-go: JWT session, page-gate 307, dist static, /fcg-api/ loopback proxy.
+~ Public HTTPS API target stays blocked. Fixture secret/cookie only.
 use "http-client.vire"
+use "dist-static.vire"
+use "portal-jwt.vire"
+
+define arg_at with i
+  if (length with args) <= i
+    return none
+  end
+  return args at i
+end
+
+define jwt_sec
+  return jwt_secret_bytes with (arg_at with 2)
+end
+
+define clock_now
+  let raw be arg_at with 3
+  if raw == none
+    return 0
+  end
+  return number with raw
+end
+
+define session_token
+  return cookie_named with (arg_at with 4), "fcg_dev_portal_session"
+end
+
+define dist_root
+  return arg_at with 5
+end
+
+define page_auth_on
+  let v be arg_at with 6
+  if v == none
+    return false
+  end
+  if v == ""
+    return false
+  end
+  if v == "-"
+    return false
+  end
+  return true
+end
+
+define page_gate_applies with path
+  if path == "/login"
+    return false
+  end
+  if (length with path) >= 6
+    if (slice with path, 0, 6) == "/login"
+      return false
+    end
+  end
+  if (length with path) >= 13
+    if (slice with path, 0, 13) == "/_next/static"
+      return false
+    end
+  end
+  if path == "/favicon.ico"
+    return false
+  end
+  let n be length with path
+  let i be 0
+  while i < n
+    if (path at i) == "."
+      return false
+    end
+    let i be i + 1
+  end
+  return true
+end
+
+define redir_login
+  return "{\"status\":307}"
+end
+
+define method_not_allowed
+  return "{\"error\":\"method_not_allowed\",\"status\":405}"
+end
 
 define route with method, path, body
-  let port be number with (args at 0)
+  let port be number with (arg_at with 0)
   if path == "/"
-    return "{\"reason\":\"dist_missing\",\"status\":503}"
+    let root be dist_root
+    if root == none
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+    if root == ""
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+    if root == "-"
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+  end
+  if page_gate_applies with path
+    if not (page_auth_on)
+      return redir_login
+    end
   end
   if path == "/api/auth/session"
-    return "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
+    if method == "GET"
+      let sec be jwt_sec
+      if sec == none
+        return "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
+      end
+      let tok be session_token
+      let ok be portal_jwt_ok with tok, sec, (clock_now), "type", "dev_session"
+      if ok != "ok"
+        return "{\"ok\":false,\"status\":401}"
+      end
+      return "{\"ok\":true}"
+    end
+    if method == "POST"
+      let sec be jwt_sec
+      if sec == none
+        return "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
+      end
+      let tok be json_quoted with body, "token"
+      if tok == none
+        return "{\"error\":\"token required\",\"status\":400}"
+      end
+      let ok be portal_jwt_ok with tok, sec, (clock_now), "type", "dev_session"
+      if ok != "ok"
+        return "{\"error\":\"Invalid or expired token\",\"status\":401}"
+      end
+      return "{\"ok\":true}"
+    end
+    if method == "DELETE"
+      return "{\"ok\":true}"
+    end
+    return method_not_allowed
   end
-  if path == "/fcg-api/echo"
-    return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/fcg-api"}
+  if (length with path) >= 9
+    if (slice with path, 0, 9) == "/fcg-api/"
+      return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/fcg-api"}
+    end
   end
-  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+  if method != "GET"
+    if method != "HEAD"
+      return method_not_allowed
+    end
+  end
+  let root be dist_root
+  if root == none
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  if root == "-"
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  let file be dist_path with root, path
+  if file == none
+    return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+  end
+  return read with file
 end
 
 define main
-  let port be number with (args at 0)
-  let mode be args at 1
+  let port be number with (arg_at with 0)
+  let mode be arg_at with 1
   if mode == "proxy-echo"
     let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": "/fcg-api"}
     say (got at "status")
     say (got at "body")
+    halt with 0
+  end
+  if mode == "jwt-sign"
+    let sec be jwt_sec
+    let last be (length with args) - 1
+    let signed be jwt_hs256_sign with (arg_at with last), sec
+    say (signed at 0)
+    say (signed at 1)
+    halt with 0
+  end
+  if mode == "jwt-verify"
+    let sec be jwt_sec
+    let last be (length with args) - 1
+    let ok be portal_jwt_ok with (arg_at with last), sec, (clock_now), "type", "dev_session"
+    say ok
     halt with 0
   end
   listen with 0

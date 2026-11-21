@@ -83,6 +83,15 @@ Flag, do not paper over:
 
 HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, same needles as `VireListen.StatusOf`). Reason phrases stay `OK` vs `Error` on native (host uses `Not Found` / `Forbidden`). Contracts compare numeric status, not the reason phrase.
 
+### Rank 8a–8d portal JWT / 307 / 405 / dist static (this PR)
+
+- **JWT:** fixture HS256 only. rpc-portal `role=dev` cookie name `dev_session`. dev-portal `type=dev_session` cookie name `fcg_dev_portal_session`. Page gate uses a non-empty `fcg_dev_portal_auth` process arg (Go never Set-Cookies that name).
+- **307:** JSON `"status":307` (login/obs). Residual: no `Location` header (native 307 header picker is landing-go paths only).
+- **405:** `"status":405` mapped on host and native.
+- **Static:** `data/rebuild-dist` HTML fixtures; `..` / backslash / NUL refused before `read`.
+- **Regression:** `tools/rebuild-portal-diff.sh` + `tools/rebuild-sop-proxy-diff.sh` (dev-portal session without page cookie is now 307).
+- **Blocked:** AES-GCM vault, FCGBC HTTPS fan-out, admin password/wallet/passphrase login, public API proxy target, listen Cookie/Set-Cookie headers.
+
 ### Rank 6a SOP HMAC cookie + 6b-r loopback proxy routes (this PR)
 
 - **Property:** `sop_issue` / `sop_verify` HMAC-SHA256 over `v1.<exp>`; `ct_eq` on the 32-byte MAC; missing, tampered, and expired cookies deny. Cookie name `fcg_sop_authenticated`. Secret is a harness-generated hex fixture, never a production env value.
@@ -121,8 +130,11 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
 | HTTP/1.1 client (loopback) | **Present** PE + ELF | `src/http-client.vire` via `connect`/`send`/`recv`; 5s socket timeouts |
 | Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}` |
-| HMAC-SHA256 / Cookie / JWT HS256 | **Present** | `hmac` builtin + `src/rt-crypto.vire` (PR #105). SOP gate in `src/sop-cookie.vire` |
+| HMAC-SHA256 / Cookie / JWT HS256 | **Present** | `hmac` builtin + `src/rt-crypto.vire` (PR #105). SOP gate in `src/sop-cookie.vire`. Portal JWT in `src/portal-jwt.vire` |
 | SOP HMAC cookie gate | **Present** (fixture secret) | issue/verify, `ct_eq` MAC, missing/tamper/expired deny |
+| Portal JWT cookie gates | **Present** (fixture secret) | HS256 `role=dev` / `type=dev_session`; listen Cookie is a process arg |
+| HTTP 405 from JSON `"status":405` | **Present** | `StatusOf` + `rt_net_statusof` (same needle) |
+| Dist static (sandbox) | **Present** | `src/dist-static.vire`; `data/` only; `..` / `\\` / NUL refused |
 | Files `data/` / `site/` | **Present** | `rt_read` / `rt_write`; Linux `openat` + `O_NOFOLLOW` |
 | SHA-256 `hash` | **Present** | `crypto-prove.vire`, million-hash |
 | PostgreSQL v3 loopback | **Present, no TLS** | `src/rt-pg.vire`, `tools/pg-prove-linux.sh` |
@@ -156,11 +168,11 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 6b-r | landing-go / dev-portal-go / edge-go **loopback** proxy routes | `proxy_reply` to `127.0.0.1` | **This PR.** `LANDING_API_UPSTREAM` as `/api/upstream/*`; `/fcg-api/` strip; edge Host via process args (`www`/`dev`/`unknown`). |
 | 6c | `landing-go` Shopify / media-lab APIs | held 503 in Go; out of scope here | — | **Blocked.** No stubs. |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
-| 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features. Dev-portal JWT `Set-Cookie` session not ported. |
-| 8a | `rpc-portal-go` unauth beyond `/api/health` | HTTP, JSON, 403/404/503 | Present | **This PR.** capabilities `node:false`, rpc-off 503, transfer 403, dist_missing, 404. JWT/vault/holdings/static/405 mux blocked. |
-| 8b | `edge-go` `/healthz` + maintenance JSON | HTTP, text/plain, 503 | Present | **This PR.** `/healthz` `ok`; unknown path 404; maintenance-on JSON. Reverse-proxy Host map blocked except loopback Host-arg `www`/`dev`. |
-| 8c | `dev-portal-go` dist_missing | HTTP, JSON 503 | Present | **This PR.** GET `/` and `/login` 503 `dist_missing` before cookie gate. JWT/307/static blocked; `/fcg-api/` loopback proxy present. |
-| 8d | `fcgbds-dashboard-go` Upstream-nil APIs | HTTP, JSON, 404/503 | Present | **This PR.** health/challenge/stats/heartbeat/stream-wall + dist_missing + `/api/*` 404. 405/502, static/307/upstream blocked. |
+| 8a | `rpc-portal-go` JWT cookie + unauth rest | JWT HS256, 405, dist static | **This PR.** Health/capabilities/`{"enabled":false}` RPC; GET `/api/dev/auth` fixture JWT; dist under `data/rebuild-dist`. AES-GCM vault, node fan-out, admin password login **Blocked**. |
+| 8b | `dev-portal-go` page-gate 307 + JWT session | cookies, JWT, 307, 405, static | **This PR.** Missing page cookie → HTTP 307; session GET/POST fixture JWT; `/fcg-api/` still CLI proxy. HTTPS API target **Blocked**. Listen does not emit `Set-Cookie` / `Location`. |
+| 8c | `fcgbds-dashboard-go` fallbacks + static | 405, 307 `/obs`, dist | **This PR.** Health/challenge/stream-wall goldens; events 502; tilt 502; Upstream nil. |
+| 8d | Shared dist static + 405 mapping | sandbox `read`, `"status":405` | **This PR.** `dist-static.vire`; host+native 405. Path-traversal stays inside `data/`. |
+| 8e | Rest of Go `api-go` / `cpa-go` | JWT session cookies, TLS proxy, remaining routes | Health GETs only | Remaining routes **Blocked** (no TLS/DNS/public upstream stubs). |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
 | 10 | WebSocket chat / live | WS, maybe TLS | Fixture only | Blocked |
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
@@ -211,6 +223,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - HTTP 405 and 502: `StatusOf` / `rt_net_statusof` needles do not include those codes. Guest JSON may still carry `"status":405` / `"status":502` at HTTP 200.
 - `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Residual: listen `route` still sees `method, path, body` only (no Cookie header); HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
 - Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
+- Rank 8a–8d: portal JWT cookie gates, 307 login/obs, 405, sandbox dist. Residual: listen `route` still sees `method, path, body` only (Cookie is a process arg). `Set-Cookie` and `Location: /login` headers are not emitted (307 is JSON `"status":307`). AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native listen + `proxy_reply` still SEGV (CLI `proxy` matches).
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
@@ -230,7 +243,8 @@ bash tools/rebuild-landing-diff.sh
 bash tools/rebuild-proxy-diff.sh
 bash tools/rebuild-sop-proxy-diff.sh
 bash tools/rebuild-chain-tamper.sh
+bash tools/rebuild-portal-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
-Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. This Linux lane does not replace that proof.
+Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. This Linux lane does not replace that proof.

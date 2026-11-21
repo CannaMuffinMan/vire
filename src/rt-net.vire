@@ -114,6 +114,7 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_suboff", "{\"enabled\":false}"
   parkMsg with image, labels, "txt_authreq", "Authentication required."
   parkMsg with image, labels, "txt_st307", "\"status\":307"
+  parkMsg with image, labels, "txt_st405", "\"status\":405"
   parkMsg with image, labels, "txt_st502", "\"status\":502"
   parkMsg with image, labels, "txt_locp", "\"location\":\"/partners\""
   parkMsg with image, labels, "txt_locs", "\"location\":\"/sop\"}"
@@ -263,8 +264,16 @@ define emitLandingHttp with image, fixes, labels, base
   emitRel with image, fixes, "txt_st307"
   emitCallTo with image, fixes, "rt_net_has"
   emitList with image, [133, 192]
-  emitJcc with image, fixes, 132, "land_st_502"
+  emitJcc with image, fixes, 132, "land_st_405"
   emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 51, 1, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_405", image
+  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "txt_st405"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_502"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 149, 1, 0, 0]
   emitEpi with image
   pin with labels, "land_st_502", image
   emitList with image, [72, 139, 77, 240, 72, 141, 21]

@@ -23,7 +23,7 @@ public class RebuildSopProxyContractTests
         Assert.Contains("/api/gateway-down", landingProxy);
 
         string portal = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "dev-portal-go.vire"));
-        Assert.Contains("/fcg-api/echo", portal);
+        Assert.Contains("/fcg-api/", portal);
         Assert.Contains("dist_missing", portal);
         Assert.Contains("not_configured", portal);
 

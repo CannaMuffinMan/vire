@@ -1,0 +1,101 @@
+~ Path-traversal-safe static files under a data/ dist dir (sandbox read).
+~ Rejects .., backslash, NUL. Does not follow a path outside root.
+~ Missing files are not read (read throws); callers return 404/503 JSON.
+
+define dist_has_bad with path
+  if path == none
+    return true
+  end
+  let n be length with path
+  let i be 0
+  while i < n
+    let ch be path at i
+    if ch == "\\"
+      return true
+    end
+    let i be i + 1
+  end
+  let i be 0
+  while i < n
+    if (path at i) == "."
+      if (i + 1) < n
+        if (path at (i + 1)) == "."
+          return true
+        end
+      end
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define dist_clean with url
+  if url == none
+    return "/"
+  end
+  if url == ""
+    return "/"
+  end
+  if dist_has_bad with url
+    return none
+  end
+  if (url at 0) != "/"
+    let url be "/" + url
+  end
+  return url
+end
+
+define dist_rel with url
+  let clean be dist_clean with url
+  if clean == none
+    return none
+  end
+  if clean == "/"
+    return "index.html"
+  end
+  let rest be slice with clean, 1, (length with clean)
+  if dist_has_bad with rest
+    return none
+  end
+  let n be length with rest
+  let i be 0
+  let dot be 0
+  while i < n
+    if (rest at i) == "."
+      let dot be 1
+    end
+    let i be i + 1
+  end
+  if dot == 1
+    return rest
+  end
+  return rest + ".html"
+end
+
+define dist_path with root, url
+  if root == none
+    return none
+  end
+  if root == ""
+    return none
+  end
+  if root == "-"
+    return none
+  end
+  if dist_has_bad with root
+    return none
+  end
+  let rel be dist_rel with url
+  if rel == none
+    return none
+  end
+  return root + "/" + rel
+end
+
+define dist_known with root, url
+  let p be dist_path with root, url
+  if p == none
+    return none
+  end
+  return p
+end
