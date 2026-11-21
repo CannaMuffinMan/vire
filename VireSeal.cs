@@ -175,11 +175,6 @@ static class VireSeal
         return FromBytes(SealBytes(Encoding.UTF8.GetBytes(text ?? "")));
     }
 
-    public static string Open(string packed)
-    {
-        return Encoding.UTF8.GetString(OpenBytes(ToBytes(packed ?? "")));
-    }
-
     public static byte[] SealBytes(byte[] plain)
     {
         RequireKey();

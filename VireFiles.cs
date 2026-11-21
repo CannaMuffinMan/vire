@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Threading;
 
 static class VireFiles
 {
     static readonly ConcurrentDictionary<string, object> PathGates = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
-    public static object Gate(string path)
+    static object Gate(string path)
     {
         string key = Path.GetFullPath(path ?? ".");
         return PathGates.GetOrAdd(key, _ => new object());
@@ -33,17 +32,6 @@ static class VireFiles
                 catch (UnauthorizedAccessException) { }
                 throw;
             }
-        }
-    }
-
-    public static void AppendAllText(string path, string text)
-    {
-        object gate = Gate(path);
-        lock (gate)
-        {
-            string parent = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
-            File.AppendAllText(path, text);
         }
     }
 
