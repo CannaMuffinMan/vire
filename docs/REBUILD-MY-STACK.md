@@ -130,6 +130,10 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
 | 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
+| 8a | `rpc-portal-go` unauth beyond `/api/health` | HTTP, JSON, 403/404/503 | Present | **This PR.** capabilities `node:false`, rpc-off 503, transfer 403, dist_missing, 404. JWT/vault/holdings/static/405 mux blocked. |
+| 8b | `edge-go` `/healthz` + maintenance JSON | HTTP, text/plain, 503 | Present | **This PR.** `/healthz` `ok`; unknown path 404; maintenance-on JSON. Reverse-proxy Host map blocked. |
+| 8c | `dev-portal-go` dist_missing | HTTP, JSON 503 | Present | **This PR.** GET `/` and `/login` 503 `dist_missing` before cookie gate. JWT/307/proxy/static blocked. |
+| 8d | `fcgbds-dashboard-go` Upstream-nil APIs | HTTP, JSON, 404/503 | Present | **This PR.** health/challenge/stats/heartbeat/stream-wall + dist_missing + `/api/*` 404. 405/502, static/307/upstream blocked. |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
 | 10 | WebSocket chat / live | WS, maybe TLS | Fixture only | Blocked |
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
@@ -145,7 +149,7 @@ Minimal fixtures only (derived from source, not live). No auth, internal hostnam
 - `rpc-portal-go GET /api/health` → 200, `{"ok":true}`
 - `api-go GET /healthz` → 200, `{"status":"ok","live":true}` (Go listen is `API_GO_ADDR`; guest still loopback `listen`)
 
-Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs native per slice).
+Harness: `tools/rebuild-sidecar-diff.sh` (fail-before / pass-after / host vs native per slice). Unauth Go sidecars: `tools/rebuild-unauth-sidecar-diff.sh` (also invoked from the sidecar harness). Goldens in `tests/rebuild/contracts/<service>/`.
 
 ### Rank 1–2 contracts (proven on Linux ELF in prior lanes)
 
@@ -169,7 +173,9 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Byte-identical Node handler vs Vire (private repo unread)
 - Native POST `/block` body read is proven on this branch (bounded leaf heap text). Remaining chain rotate/507/503/migrate is not.
 - Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
-- Remaining sidecar routes beyond the five GET goldens
+- Remaining sidecar routes beyond the five GET goldens plus this PR's unauth rpc-portal-go / edge-go / dev-portal-go / fcgbds-dashboard-go JSON (JWT, reverse-proxy, static files, holdings outbound still blocked)
+- Native listen does not emit Go extra security headers (`X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) or per-route Cache-Control / charset=utf-8; contracts match the native header set (`application/json` without charset, `nosniff`, `no-store`)
+- HTTP 405 and 502: `StatusOf` / `rt_net_statusof` needles do not include those codes (blob not patched in this lane; landing-go conflict). Guest JSON may still carry `"status":405` / `"status":502` at HTTP 200.
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
 - TLS, WebSocket, DNS, public bind
@@ -182,6 +188,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 ```text
 bash tools/rebuild-health-diff.sh
 bash tools/rebuild-sidecar-diff.sh
+bash tools/rebuild-unauth-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```

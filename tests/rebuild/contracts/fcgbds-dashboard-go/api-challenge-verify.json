@@ -1,0 +1,26 @@
+{
+  "id": "fcgbds-dashboard-go/api-challenge-verify",
+  "source": "POST /api/challenge-verify unavailable; GET is 405.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "post_challenge_verify",
+      "method": "POST",
+      "path": "/api/challenge-verify",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"caption\":\"Visitor check could not be scored. You were not blocked.\",\"ok\":false,\"outcome\":\"unavailable\"}\n",
+      "request_body": "{}"
+    }
+  ]
+}
