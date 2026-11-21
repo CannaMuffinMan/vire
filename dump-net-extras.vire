@@ -50,6 +50,25 @@ define packOne with nparams, tag
   let image be emitNetRuntime with image, fixes, labels, true, true, nparams
   write with ("data/src/rt-net-full-" + tag + "-blob.txt"), (hex with image)
   let names be keys with labels
+  let fi0 be 0
+  let fn0 be length with fixes
+  while fi0 < fn0
+    let to0 be (fixes at fi0) at "to"
+    if not (has with labels, to0)
+      let found be false
+      let j be 0
+      while j < (length with names)
+        if (names at j) == to0
+          let found be true
+        end
+        let j be j + 1
+      end
+      if not found
+        push with names, to0
+      end
+    end
+    let fi0 be fi0 + 1
+  end
   let pinRaw be ""
   let i be 0
   let n be length with names
@@ -57,8 +76,9 @@ define packOne with nparams, tag
   while i < n
     let nm be names at i
     let nameText be nameText + nm + "\n"
-    let off be labels at nm
-    let pinRaw be pinRaw + (hex8 with off) + (hex4 with i)
+    if has with labels, nm
+      let pinRaw be pinRaw + (hex8 with (labels at nm)) + (hex4 with i)
+    end
     let i be i + 1
   end
   write with ("data/src/rt-net-full-" + tag + "-names.txt"), nameText
