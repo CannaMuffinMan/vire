@@ -1,0 +1,38 @@
+{
+  "id": "landing-api-upstream-loopback",
+  "source": "fcgcpa-prod PR #147 LANDING_API_UPSTREAM reverse-proxy. Loopback fixture only. HTTPS LANDING_UPSTREAM stays blocked.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "proxy_echo",
+      "method": "GET",
+      "path": "/api/upstream/echo",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "up-ok"
+    },
+    {
+      "name": "proxy_missing_upstream",
+      "method": "GET",
+      "path": "/api/gateway-down",
+      "status": 502,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"bad gateway\",\"status\":502}"
+    }
+  ]
+}

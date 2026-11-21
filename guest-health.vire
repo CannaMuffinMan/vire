@@ -1,6 +1,10 @@
-~ Native PE health clone of FCG GET /health and GET /api/health.
+~ Native FCG unauth JSON: GET /health, /api/health, /info, /connect, /payments, /mine.
 ~ Body fields follow in-tree api/fcgcpa.vire (fcgcpa-prod main 5cc11020 is private
-~ to this token). Both paths are unauthenticated in the Node inventory.
+~ to this token). These paths are unauthenticated in the Node inventory.
+~ Recorded contracts: tests/rebuild/contracts/fcg-*.json
+~ Differential harness: tools/rebuild-health-diff.sh
+~ Native HTTP status follows JSON "status" via rt_net_statusof (host StatusOf).
+~ Payments stay off. POST /mine is not a miner; /mine is 403 like the in-tree door.
 
 define route with method, path, body
   if method == "GET"
@@ -9,6 +13,18 @@ define route with method, path, body
     end
     if path == "/api/health"
       return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if path == "/info"
+      return "{\"service\":\"fcgcpa\",\"role\":\"web2-frontdoor\",\"shell\":\"skinned-browser\",\"connect\":[\"twitch\",\"youtube\"],\"chain\":\"local\",\"chainId\":\"local-demo\",\"mining\":\"local\",\"miningNetwork\":false,\"payments\":false}"
+    end
+    if path == "/connect"
+      return "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
+    end
+    if path == "/payments"
+      return "{\"ok\":false,\"status\":403,\"error\":\"payments are off\"}"
+    end
+    if path == "/mine"
+      return "{\"ok\":false,\"status\":403,\"error\":\"mining stays inside the app\"}"
     end
   end
   return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"

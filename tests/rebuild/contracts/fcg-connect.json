@@ -1,0 +1,25 @@
+{
+  "id": "fcg-connect",
+  "source": "in-tree api/fcgcpa.vire GET /connect. Unauthenticated JSON. Native guest-health.vire serves the same body.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_connect",
+      "method": "GET",
+      "path": "/connect",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"twitch\":\"https://www.twitch.tv\",\"youtube\":\"https://www.youtube.com\"}"
+    }
+  ]
+}

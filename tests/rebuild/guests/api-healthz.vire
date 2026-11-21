@@ -1,0 +1,15 @@
+~ api-go GET /healthz golden (derived from source, not live).
+~ Go process listens on API_GO_ADDR; this guest binds loopback like other Vire listen guests.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/healthz"
+      return "{\"status\":\"ok\",\"live\":true}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

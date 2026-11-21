@@ -1,0 +1,145 @@
+~ rpc-portal-go remaining loopback port (health already in rpc-health.vire).
+~ JWT cookie gate, capabilities, public RPC 503, dist static, 405.
+~ AES-GCM vault, node fan-out, Discord, Origin CSRF stay blocked.
+use "http-client.vire"
+use "dist-static.vire"
+use "portal-jwt.vire"
+
+define arg_at with i
+  if (length with args) <= i
+    return none
+  end
+  return args at i
+end
+
+define jwt_sec
+  return jwt_secret_bytes with (arg_at with 2)
+end
+
+define clock_now
+  let raw be arg_at with 3
+  if raw == none
+    return 0
+  end
+  return number with raw
+end
+
+define session_token with head
+  let fromHead be cookie_named with head, "dev_session"
+  if fromHead != ""
+    return fromHead
+  end
+  return cookie_named with (arg_at with 4), "dev_session"
+end
+
+define dist_root
+  return arg_at with 5
+end
+
+define method_not_allowed
+  return "{\"error\":\"method_not_allowed\",\"status\":405}"
+end
+
+define route with method, path, body, head
+  let port be number with (arg_at with 0)
+  if path == "/api/health"
+    if method != "GET"
+      return method_not_allowed
+    end
+    return "{\"ok\":true}"
+  end
+  if path == "/api/capabilities"
+    if method != "GET"
+      return method_not_allowed
+    end
+    return "{\"node\":false}"
+  end
+  if path == "/api/rpc"
+    if method != "GET"
+      return method_not_allowed
+    end
+    return "{\"enabled\":false}"
+  end
+  if path == "/api/dev/auth"
+    if method == "GET"
+      let sec be jwt_sec
+      let tok be session_token with head
+      let ok be portal_jwt_ok with tok, sec, (clock_now), "role", "dev"
+      if ok != "ok"
+        return "{\"ok\":false,\"status\":401}"
+      end
+      return "{\"ok\":true}"
+    end
+    if method == "POST"
+      return "{\"error\":\"Server not configured\",\"status\":503}"
+    end
+    return method_not_allowed
+  end
+  if path == "/api/dev/breach-status"
+    let sec be jwt_sec
+    let tok be session_token with head
+    let ok be portal_jwt_ok with tok, sec, (clock_now), "role", "dev"
+    if ok != "ok"
+      return "{\"error\":\"Unauthorized\",\"status\":401}"
+    end
+    return "{\"locked\":false}"
+  end
+  if (length with path) >= 5
+    if (slice with path, 0, 5) == "/api/"
+      return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+    end
+  end
+  if method != "GET"
+    if method != "HEAD"
+      return method_not_allowed
+    end
+  end
+  let root be dist_root
+  if root == none
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  if root == "-"
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  let file be dist_path with root, path
+  if file == none
+    return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+  end
+  return read with file
+end
+
+define main
+  let port be number with (arg_at with 0)
+  let mode be arg_at with 1
+  if mode == "jwt-sign"
+    let sec be jwt_sec
+    let last be (length with args) - 1
+    let signed be jwt_hs256_sign with (arg_at with last), sec
+    say (signed at 0)
+    say (signed at 1)
+    halt with 0
+  end
+  if mode == "jwt-verify"
+    let sec be jwt_sec
+    let last be (length with args) - 1
+    let ok be portal_jwt_ok with (arg_at with last), sec, (clock_now), "role", "dev"
+    say ok
+    halt with 0
+  end
+  if mode == "dist-probe"
+    let p be dist_path with (arg_at with 5), (arg_at with 6)
+    if p == none
+      say "deny"
+      halt with 0
+    end
+    say p
+    halt with 0
+  end
+  if mode == "proxy-echo"
+    let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": ""}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  listen with 0
+end

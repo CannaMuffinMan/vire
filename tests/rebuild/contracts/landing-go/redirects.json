@@ -1,0 +1,71 @@
+{
+  "id": "redirects",
+  "source": "landing-go 307 redirects, derived from source, not live. Body carries status/location needles for native mapping.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control",
+    "location",
+    "www-authenticate",
+    "x-payments-enabled"
+  ],
+  "cases": [
+    {
+      "name": "get_partnership",
+      "method": "GET",
+      "path": "/partnership",
+      "status": 307,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "location": "/partners"
+      },
+      "body": "{\"status\":307,\"location\":\"/partners\"}"
+    },
+    {
+      "name": "get_sop_checkin",
+      "method": "GET",
+      "path": "/sop/checkin",
+      "status": 307,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "location": "/sop"
+      },
+      "body": "{\"status\":307,\"location\":\"/sop\"}"
+    },
+    {
+      "name": "get_sop_report",
+      "method": "GET",
+      "path": "/sop/report",
+      "status": 307,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "location": "/sop"
+      },
+      "body": "{\"status\":307,\"location\":\"/sop\"}"
+    },
+    {
+      "name": "get_sop_media-lab",
+      "method": "GET",
+      "path": "/sop/media-lab",
+      "status": 307,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "location": "/sop/access?next=/sop/media-lab"
+      },
+      "body": "{\"status\":307,\"location\":\"/sop/access?next=/sop/media-lab\"}"
+    }
+  ]
+}

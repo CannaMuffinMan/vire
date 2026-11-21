@@ -122,6 +122,68 @@ public class ListenSecurityTests
         }
     }
 
+    [Fact]
+    public void RouteSeesAllowlistedRequestHeadersOnly()
+    {
+        string src = "define route with method, path, body, head\n  return head\nend\ndefine main\n  listen with 0\nend\n";
+        int port = HighPort();
+        using (ListenHost host = ListenHost.Start(src, port))
+        {
+            string got = ReadAll(host.Port, "GET /echo HTTP/1.1\r\nHost: example.test\r\nCookie: a=1\r\nAuthorization: Bearer z\r\nX-Evil: no\r\n\r\n");
+            string body = got.Substring(got.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4);
+            Assert.Contains("Cookie: a=1\r\n", body);
+            Assert.Contains("Host: example.test\r\n", body);
+            Assert.Contains("Authorization: Bearer z\r\n", body);
+            Assert.DoesNotContain("X-Evil", body);
+        }
+    }
+
+    [Fact]
+    public void JsonAllowlistParsesLocationAndSetCookie()
+    {
+        bool refused;
+        string extra = HttpWire.AllowlistedReplyHeaders("{\"ok\":true,\"set-cookie\":\"sid=safe\",\"location\":\"/next\"}", out refused);
+        Assert.False(refused);
+        Assert.Contains("Set-Cookie: sid=safe\r\n", extra);
+        Assert.Contains("Location: /next\r\n", extra);
+    }
+
+    [Fact]
+    public void GuestSetCookieAndLocationCrLfIsRefused()
+    {
+        string src = string.Join("\n", new string[]
+        {
+            "define route with method, path, body, head",
+            "  if path == \"/loc\"",
+            "    return \"{\\\"status\\\":307,\\\"location\\\":\\\"/x\" + (chr with 13) + (chr with 10) + \"Set-Cookie: stolen=1\\\"}\"",
+            "  end",
+            "  if path == \"/set\"",
+            "    return \"{\\\"ok\\\":true,\\\"set-cookie\\\":\\\"sid=1\" + (chr with 13) + (chr with 10) + \"Location: /evil\\\"}\"",
+            "  end",
+            "  return \"{\\\"ok\\\":true,\\\"set-cookie\\\":\\\"sid=safe\\\",\\\"location\\\":\\\"/next\\\"}\"",
+            "end",
+            "define main",
+            "  listen with 0",
+            "end",
+            ""
+        });
+        int port = HighPort();
+        using (ListenHost host = ListenHost.Start(src, port))
+        {
+            string loc = ReadAll(host.Port, "GET /loc HTTP/1.1\r\nHost: x\r\n\r\n");
+            Assert.StartsWith("HTTP/1.1 500 ", loc);
+            Assert.DoesNotContain("stolen=1", HeaderBlock(loc));
+            Assert.DoesNotContain("Set-Cookie: stolen", HeaderBlock(loc));
+            string set = ReadAll(host.Port, "GET /set HTTP/1.1\r\nHost: x\r\n\r\n");
+            Assert.StartsWith("HTTP/1.1 500 ", set);
+            Assert.DoesNotContain("Location: /evil", HeaderBlock(set));
+            string ok = ReadAll(host.Port, "GET /ok HTTP/1.1\r\nHost: x\r\n\r\n");
+            Assert.StartsWith("HTTP/1.1 200 ", ok);
+            Assert.Contains("Set-Cookie: sid=safe\r\n", HeaderBlock(ok));
+            Assert.Contains("Location: /next", HeaderBlock(ok));
+        }
+    }
+
     static string OkRoute()
     {
         return "define route with method, path, body\n  return \"ok\"\nend\ndefine main\n  listen with 0\nend\n";
