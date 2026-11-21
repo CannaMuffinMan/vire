@@ -153,6 +153,7 @@ define tokenize with source
         end
         if i < n
           if (source at i) == "."
+            ~ TODO(VIRE-FINISH-NOW): native lexer must accept fractional number literals
             return {"bad": true, "why": "that number is not ready"}
           end
         end

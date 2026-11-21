@@ -1237,23 +1237,6 @@ define compileUnit with path, seen, state
   return funcs
 end
 
-define assemble with tokens
-  let state be {"i": 0, "toks": tokens, "bad": false}
-  let funcs be []
-  while not ((tokenKind with state) == "eof")
-    if (tokenKind with state) == "bad"
-      say spelling with state
-      put true into state at "bad"
-      stop
-    end
-    if state at "bad"
-      stop
-    end
-    push with funcs, (parseDefine with state)
-  end
-  return {"funcs": funcs, "bad": state at "bad"}
-end
-
 define main
   let files be args
   let state be {"bad": false}
