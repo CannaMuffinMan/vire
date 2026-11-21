@@ -1,0 +1,14 @@
+~ FAIL_BEFORE for fcgbds-go GET /health. Wrong service name.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true,\"service\":\"wrong\",\"paymentsEnabled\":false}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

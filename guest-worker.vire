@@ -1,0 +1,86 @@
+~ Native worker-go skeleton (no HTTP). Env cases are argv KEY=VALUE
+~ because guests have no getenv. Lines match Go stderr; Vire say is stdout.
+~ Contract: tests/rebuild/contracts/worker-go.json
+
+define envGet with key
+  let needle be key + "="
+  let n be length with args
+  let i be 0
+  while i < n
+    let item be args at i
+    if (find with item, needle) == 0
+      return slice with item, (length with needle), (length with item)
+    end
+    let i be i + 1
+  end
+  return ""
+end
+
+define paymentsOn with v
+  let t be lower with v
+  if t == "1"
+    return true
+  end
+  if t == "true"
+    return true
+  end
+  if t == "yes"
+    return true
+  end
+  if t == "on"
+    return true
+  end
+  return false
+end
+
+define main
+  if paymentsOn with (envGet with "PAYMENTS_ENABLED")
+    say "PAYMENTS_ENABLED must stay false"
+    halt with 1
+  end
+  say "worker-go registered jobs disabled"
+  say "registered aggregation disabled"
+  say "registered security-monitoring disabled"
+  say "registered fcgbds-cleanup disabled"
+  say "registered bds-auto-ingest disabled"
+  say "registered governance-timer disabled"
+  say "registered archiver disabled"
+  say "registered backups disabled"
+  say "registered blockchain-node disabled"
+  if (envGet with "FCG_WORKER_ENABLED") == "1"
+    if (envGet with "FCG_JOB_AGGREGATION") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_SECURITY_MONITORING") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_FCGBDS_CLEANUP") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_BDS_AUTO_INGEST") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_GOVERNANCE_TIMER") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_ARCHIVER") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_BACKUPS") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+    if (envGet with "FCG_JOB_BLOCKCHAIN_NODE") == "1"
+      say "refusing to start jobs: skeleton only"
+      halt with 0
+    end
+  end
+  say "disabled"
+  halt with 0
+end

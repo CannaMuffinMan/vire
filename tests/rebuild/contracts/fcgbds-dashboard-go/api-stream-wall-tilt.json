@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-stream-wall-tilt",
+  "source": "GET /api/stream-wall/tilt with Upstream nil is 502. X-Stream-Client is not required for this fail-closed body.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_tilt",
+      "method": "GET",
+      "path": "/api/stream-wall/tilt",
+      "status": 502,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"tilt_upstream_unavailable\",\"status\":502}\n"
+    }
+  ]
+}

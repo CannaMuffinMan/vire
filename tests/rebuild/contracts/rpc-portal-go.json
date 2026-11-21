@@ -1,0 +1,55 @@
+{
+  "id": "rpc-portal-go-rest",
+  "source": "fcgcpa-prod PR #147 rpc-portal-go.json goldens plus JWT cookie gate, 405, dist static. AES-GCM vault and node fan-out stay blocked. Extra Go security headers are not part of this fixture.",
+  "headers_that_matter": ["content-type", "connection", "x-content-type-options", "cache-control"],
+  "cases": [
+    {
+      "name": "get_api_health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true}"
+    },
+    {
+      "name": "get_capabilities_no_node",
+      "method": "GET",
+      "path": "/api/capabilities",
+      "status": 200,
+      "body": "{\"node\":false}"
+    },
+    {
+      "name": "get_rpc_no_base",
+      "method": "GET",
+      "path": "/api/rpc",
+      "status": 503,
+      "body": "{\"enabled\":false,\"status\":503}"
+    },
+    {
+      "name": "get_dev_auth_missing",
+      "method": "GET",
+      "path": "/api/dev/auth",
+      "status": 401,
+      "body": "{\"ok\":false,\"status\":401}"
+    },
+    {
+      "name": "post_health_405",
+      "method": "POST",
+      "path": "/api/health",
+      "status": 405,
+      "body": "{\"error\":\"method_not_allowed\",\"status\":405}"
+    },
+    {
+      "name": "dist_missing",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    }
+  ]
+}

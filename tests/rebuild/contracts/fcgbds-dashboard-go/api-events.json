@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-events",
+  "source": "GET /api/events Upstream nil is 502 Failed to fetch events. Vire adds status:502.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_events",
+      "method": "GET",
+      "path": "/api/events",
+      "status": 502,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"details\":\"All upstream attempts failed\",\"error\":\"Failed to fetch events\",\"status\":502}\n"
+    }
+  ]
+}

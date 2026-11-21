@@ -1,0 +1,16 @@
+{
+  "service": "vire-http-loopback",
+  "notes": "Minimal loopback fixture. No auth, no internal hostnames.",
+  "cases": [
+    {
+      "name": "client-get",
+      "status": 200,
+      "body": "echo-get"
+    },
+    {
+      "name": "client-post",
+      "status": 200,
+      "body": "echo-post:hi-body"
+    }
+  ]
+}

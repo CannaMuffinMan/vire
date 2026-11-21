@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-stats-detailed",
+  "source": "GET /api/stats-detailed Upstream nil 503.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_stats_detailed",
+      "method": "GET",
+      "path": "/api/stats-detailed",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"error\":\"Detailed stats unavailable\",\"statsAvailable\":false,\"status\":503}\n"
+    }
+  ]
+}

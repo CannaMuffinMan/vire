@@ -1,0 +1,6 @@
+~ FAIL_BEFORE: SOP HMAC cookie gate and loopback proxy routes absent.
+define main
+  say "not gated"
+  say "not proxied"
+  halt with 0
+end

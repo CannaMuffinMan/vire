@@ -1,0 +1,25 @@
+{
+  "id": "fcgbds-dashboard-go/api-stats",
+  "source": "GET /api/stats with public wall off (main defaults). 200 gated JSON.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_api_stats_gated",
+      "method": "GET",
+      "path": "/api/stats",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"gated\":true,\"publicWallEnabled\":false,\"statsAvailable\":false,\"streamUnlocked\":false}\n"
+    }
+  ]
+}

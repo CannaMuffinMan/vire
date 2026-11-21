@@ -1,0 +1,87 @@
+use "src/rt-crypto.vire"
+
+define proveLine with tag, got, want
+  if got == want
+    say tag + " PASS " + got
+    return 0
+  end
+  say tag + " FAIL got=" + got + " want=" + want
+  return 1
+end
+
+define main
+  let fails be 0
+  let tab be make_xor_tab
+  let p1 be ascii_bytes with "passwd"
+  let s1 be ascii_bytes with "salt"
+  let pw1 be p1 at 1
+  let salt1 be s1 at 1
+  let got be pbkdf2_sha256_hex_tab with tab, pw1, salt1, 1, 64
+  let nfail be proveLine with "RFC7914 11 c=1", (got at 1), "55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc49ca9cccf179b645991664b39d77ef317c71b845b1e30bd509112041d3a19783"
+  let fails be fails + nfail
+
+  let p2 be ascii_bytes with "password"
+  let s2 be ascii_bytes with "salt"
+  let pw2 be p2 at 1
+  let salt2 be s2 at 1
+  let got be pbkdf2_sha256_hex_tab with tab, pw2, salt2, 1, 32
+  let nfail be proveLine with "RFC6070-SHA256 c=1", (got at 1), "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"
+  let fails be fails + nfail
+  let got be pbkdf2_sha256_hex_tab with tab, pw2, salt2, 2, 32
+  let nfail be proveLine with "RFC6070-SHA256 c=2", (got at 1), "ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43"
+  let fails be fails + nfail
+  let got be pbkdf2_sha256_hex_tab with tab, pw2, salt2, 4096, 32
+  let nfail be proveLine with "RFC6070-SHA256 c=4096", (got at 1), "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a"
+  let fails be fails + nfail
+
+  let dk be pbkdf2_sha256_tab with tab, pw1, salt1, 1, 64
+  let want be dk at 1
+  let same be pbkdf2_sha256_verify_tab with tab, pw1, salt1, 1, want
+  if same
+    say "PBKDF2 ct_eq same PASS"
+  else
+    say "PBKDF2 ct_eq same FAIL"
+    let fails be fails + 1
+  end
+  let wrong be ascii_bytes with "passdx"
+  let diff be pbkdf2_sha256_verify_tab with tab, (wrong at 1), salt1, 1, want
+  if diff
+    say "PBKDF2 wrong password FAIL"
+    let fails be fails + 1
+  else
+    say "PBKDF2 wrong password REJECT"
+  end
+
+  let fcg be fcg_password_dk_tab with tab, pw2, salt2, 1
+  let nfail be proveLine with "FCG login dk32", (hex with (fcg at 1)), "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"
+  let fails be fails + nfail
+  let vok be fcg_password_verify_tab with tab, pw2, salt2, 1, (fcg at 1)
+  if vok
+    say "FCG login verify PASS"
+  else
+    say "FCG login verify FAIL"
+    let fails be fails + 1
+  end
+
+  let badc be pbkdf2_sha256_tab with tab, pw1, salt1, 0, 32
+  if (badc at 0) == "bad"
+    say "PBKDF2 rounds 0 REJECT " + (badc at 1)
+  else
+    say "PBKDF2 rounds 0 FAIL"
+    let fails be fails + 1
+  end
+
+  let p80 be ascii_bytes with "Password"
+  let s80 be ascii_bytes with "NaCl"
+  let got be pbkdf2_sha256_hex_tab with tab, (p80 at 1), (s80 at 1), 80000, 64
+  let nfail be proveLine with "RFC7914 11 c=80000", (got at 1), "4ddcd8f60b98be21830cee5ef22701f9641a4418d04c0414aeff08876b34ab56a1d425a1225833549adb841b51c9b3176a272bdebba1d078478f62b397f33c8d"
+  let fails be fails + nfail
+
+  say "PBKDF2 ct_eq walks the full DK; not a CPU timing barrier"
+
+  if fails == 0
+    say "PBKDF2 PROVE pass"
+  else
+    say "PBKDF2 PROVE fails " + (text with fails)
+  end
+end

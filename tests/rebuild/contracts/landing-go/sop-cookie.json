@@ -1,0 +1,49 @@
+{
+  "id": "landing-sop-hmac-cookie",
+  "source": "fcgcpa-prod PR #147 landing-go SOP cookie fcg_sop_authenticated (authcookie.go / sop_api.go). Fixture HMAC-SHA256 cookie only; not live, not FCG_AUTH_COOKIE_SECRET.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "security": {
+    "mac": "HMAC-SHA256 over ascii v1.<exp>",
+    "compare": "ct_eq on 32-byte digest",
+    "deny": ["missing", "tamper", "expired"]
+  },
+  "residual": [
+    "Listen route may take allowlisted Cookie/Host/Authorization in `head`. POST /api/sop-auth still accepts the cookie in the body when Cookie is missing (CLI/header tests).",
+    "Issue JSON includes set-cookie; listen copies allowlisted fields onto the response after refusing CR/LF/NUL.",
+    "No TLS, DNS, or public upstream."
+  ],
+  "cases": [
+    {
+      "name": "get_missing",
+      "method": "GET",
+      "path": "/api/sop-auth",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":401,\"error\":\"missing\"}"
+    },
+    {
+      "name": "post_empty",
+      "method": "POST",
+      "path": "/api/sop-auth",
+      "body": "",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":401,\"error\":\"missing\"}"
+    }
+  ]
+}

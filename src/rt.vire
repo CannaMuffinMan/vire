@@ -1005,6 +1005,8 @@ define parkRuntime with image, labels
   let image be emitU64 with image, 0
   pin with labels, "stdout_cell", image
   let image be emitU64 with image, 0
+  pin with labels, "linux_flag", image
+  let image be emitU64 with image, 0
   pin with labels, "gc_busy", image
   let image be emitU64 with image, 0
   pin with labels, "wait_cell", image

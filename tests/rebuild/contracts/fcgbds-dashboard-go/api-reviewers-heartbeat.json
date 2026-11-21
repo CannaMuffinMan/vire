@@ -1,0 +1,26 @@
+{
+  "id": "fcgbds-dashboard-go/api-reviewers-heartbeat",
+  "source": "POST /api/reviewers-heartbeat Upstream nil fallback 200. GET 405.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "post_heartbeat",
+      "method": "POST",
+      "path": "/api/reviewers-heartbeat",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"fallback\":true,\"fallbackReason\":\"upstream_blocked_or_unavailable\",\"ok\":false,\"reviewers\":{\"live\":0}}\n",
+      "request_body": "{}"
+    }
+  ]
+}

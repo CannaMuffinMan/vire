@@ -1,0 +1,14 @@
+~ wss:// listen (tls_listen) hijack into a plaintext loopback WS upstream.
+~ Cert/key generated at test time under data/.
+
+define route with method, path, body
+  let port be number with (args at 0)
+  if path == "/ws/echo"
+    return "{\"status\":101,\"port\":" + (text with port) + "}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  tls_listen with 0, "data/tls-health-cert.pem", "data/tls-health-key.pem"
+end

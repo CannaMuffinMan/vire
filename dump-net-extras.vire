@@ -1,0 +1,116 @@
+~ Interpret-only packer for net+dns+tcp+landing. Do not native-compile this file.
+
+use "src/pe.vire"
+use "src/elf.vire"
+use "src/rt-net-unpacked.vire"
+
+define hex2 with n
+  let digits be "0123456789abcdef"
+  let b be n % 256
+  if b < 0
+    let b be 0
+  end
+  return (slice with digits, (idiv with b, 16), ((idiv with b, 16) + 1)) + (slice with digits, (b % 16), ((b % 16) + 1))
+end
+
+define hex8 with n
+  let x be n
+  if x < 0
+    let x be 0
+  end
+  let out be ""
+  let i be 0
+  while i < 4
+    let out be out + (hex2 with x)
+    let x be idiv with x, 256
+    let i be i + 1
+  end
+  return out
+end
+
+define hex4 with n
+  let x be n
+  if x < 0
+    let x be 0
+  end
+  let out be ""
+  let i be 0
+  while i < 2
+    let out be out + (hex2 with x)
+    let x be idiv with x, 256
+    let i be i + 1
+  end
+  return out
+end
+
+define packOne with nparams, tag
+  let image be bytes
+  let labels be {}
+  let fixes be []
+  let image be emitNetRuntime with image, fixes, labels, true, true, nparams
+  write with ("data/src/rt-net-full-" + tag + "-blob.txt"), (hex with image)
+  let names be keys with labels
+  let fi0 be 0
+  let fn0 be length with fixes
+  while fi0 < fn0
+    let to0 be (fixes at fi0) at "to"
+    if not (has with labels, to0)
+      let found be false
+      let j be 0
+      while j < (length with names)
+        if (names at j) == to0
+          let found be true
+        end
+        let j be j + 1
+      end
+      if not found
+        push with names, to0
+      end
+    end
+    let fi0 be fi0 + 1
+  end
+  let pinRaw be ""
+  let i be 0
+  let n be length with names
+  let nameText be ""
+  while i < n
+    let nm be names at i
+    let nameText be nameText + nm + "\n"
+    if has with labels, nm
+      let pinRaw be pinRaw + (hex8 with (labels at nm)) + (hex4 with i)
+    end
+    let i be i + 1
+  end
+  write with ("data/src/rt-net-full-" + tag + "-names.txt"), nameText
+  write with ("data/src/rt-net-full-" + tag + "-pins.txt"), pinRaw
+  let nameIx be {}
+  let i be 0
+  while i < n
+    put i into nameIx at (names at i)
+    let i be i + 1
+  end
+  let fixRaw be ""
+  let fi be 0
+  let fn be length with fixes
+  while fi < fn
+    let item be fixes at fi
+    let to be item at "to"
+    let id be 0
+    if has with nameIx, to
+      let id be nameIx at to
+    end
+    let fixRaw be fixRaw + (hex8 with (item at "at")) + (hex4 with id)
+    let fi be fi + 1
+  end
+  write with ("data/src/rt-net-full-" + tag + "-fixes.txt"), fixRaw
+  say tag
+  say (length with image)
+  say n
+  say fn
+  return true
+end
+
+define main
+  packOne with 3, "r3"
+  packOne with 4, "r4"
+end

@@ -2,6 +2,11 @@ data/*
 !data/src/
 !data/src/**
 !data/compile-native.vire
+!data/rebuild/
+!data/rebuild/**
+!data/rebuild-dist/
+!data/rebuild-dist/**
+rebuild-chain-run.vire
 site/
 err.txt
 out.txt
@@ -15,6 +20,12 @@ publish/
 *.dll
 *.pdb
 *.hex
+pg-tls-run.vire
+pg-tls-neg-run.vire
+pg-tls-verify-run.vire
+redis-tls-run.vire
+redis-tls-neg-run.vire
+redis-tls-verify-run.vire
 
 # secrets, keys, wallets
 .env
