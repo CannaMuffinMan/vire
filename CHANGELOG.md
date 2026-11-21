@@ -1,5 +1,11 @@
 # Changelog
 
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Test certs at test time.
+- `tls_listen`: TLS 1.2+ termination on the HTTP listener (rank 11). Host `SslStream`; Linux ELF `SSL_accept` wrapping `rt_listen`. Loopback tests, fail-closed handshake/plaintext/downgrade. Windows PE still fail-closed. Contract `tests/rebuild/contracts/health.json`.
+- Listen-side RFC 6455 Upgrade hijack: valid websocket GET is spliced onto a loopback upstream (`{"status":101,"port":N}`). Host `VireListen` + native `land_ws_send`. `wss://` on `tls_listen`. `tools/rebuild-listen-ws-diff.sh` / `rebuild-listen-wss-diff.sh`. PE CouchStation: `tools/listen-ws-windows.ps1` (not run on Linux).
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.

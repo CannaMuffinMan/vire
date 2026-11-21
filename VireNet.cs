@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -353,12 +354,18 @@ sealed class VireTcpTable
 {
     int next = 1;
     readonly Dictionary<int, Socket> live = new Dictionary<int, Socket>();
+    readonly Dictionary<int, SslStream> tls = new Dictionary<int, SslStream>();
 
     internal int Put(Socket socket)
     {
         int id = next++;
         live[id] = socket;
         return id;
+    }
+
+    internal void AttachTls(int id, SslStream stream)
+    {
+        tls[id] = stream;
     }
 
     internal Socket Need(object handle, int line, int column)
@@ -370,11 +377,31 @@ sealed class VireTcpTable
         return socket;
     }
 
+    internal SslStream NeedTls(object handle, int line, int column)
+    {
+        Need(handle, line, column);
+        SslStream stream;
+        if (!tls.TryGetValue((int)handle, out stream) || stream == null)
+            throw new VireError("that connection is closed", line, column);
+        return stream;
+    }
+
     internal void Close(object handle, int line, int column)
     {
         Socket socket = Need(handle, line, column);
+        SslStream stream;
+        if (tls.TryGetValue((int)handle, out stream) && stream != null)
+        {
+            try { stream.Dispose(); } catch (Exception) { }
+            tls.Remove((int)handle);
+        }
         live.Remove((int)handle);
         try { socket.Close(); }
         catch (Exception) { throw new VireError("that connection is closed", line, column); }
+    }
+
+    internal void CloseTls(object handle, int line, int column)
+    {
+        Close(handle, line, column);
     }
 }
