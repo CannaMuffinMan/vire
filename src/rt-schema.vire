@@ -168,6 +168,7 @@ define schema_check with value, shape
 end
 
 define schema_parse with raw, shape
+  ~ Public parse-then-check. Guests currently call parse + schema_check.
   let value be parse with raw
   return schema_check with value, shape
 end

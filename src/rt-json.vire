@@ -129,19 +129,6 @@ define json_skip with cur
   return cur
 end
 
-define json_need with cur, mark
-  json_skip with cur
-  let i be cur at "i"
-  if i >= (cur at "n")
-    return json_mark with cur, "ended early"
-  end
-  if ((cur at "s") at i) != mark
-    return json_mark with cur, "expected mark"
-  end
-  put (i + 1) into cur at "i"
-  return mark
-end
-
 define json_read_hex4 with cur
   let s be cur at "s"
   let i be cur at "i"
