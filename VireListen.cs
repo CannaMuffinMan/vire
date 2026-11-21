@@ -466,7 +466,6 @@ static class VireListen
     static string ReasonOf(int code)
     {
         if (code == 200) return "OK";
-        if (code == 204) return "No Content";
         if (code == 206) return "Partial Content";
         if (code == 400) return "Bad Request";
         if (code == 401) return "Unauthorized";
@@ -476,7 +475,6 @@ static class VireListen
         if (code == 411) return "Length Required";
         if (code == 413) return "Payload Too Large";
         if (code == 416) return "Range Not Satisfiable";
-        if (code == 429) return "Too Many Requests";
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";

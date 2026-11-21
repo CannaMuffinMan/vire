@@ -1,0 +1,79 @@
+~ landing-go SOP HMAC cookie gate. Fixture secret only (args).
+~ HTTPS LANDING_UPSTREAM / Shopify stay blocked. Loopback proxy is landing-proxy.vire
+~ (native HMAC runtime + outbound HTTP in one image currently SEGV on Linux ELF).
+use "sop-cookie.vire"
+
+define secret_of
+  let raw be args at 0
+  if raw == none
+    return none
+  end
+  if raw == ""
+    return none
+  end
+  let got be hex_to_bytes with raw
+  if (got at 0) != "ok"
+    return none
+  end
+  return got at 1
+end
+
+define deny_json with reason
+  return "{\"ok\":false,\"status\":401,\"error\":\"" + reason + "\"}"
+end
+
+define route with method, path, body
+  if path == "/healthz"
+    return "ok"
+  end
+  if path == "/api/sop-auth"
+    if method == "GET"
+      return deny_json with "missing"
+    end
+    if method == "POST"
+      let clock be number with (args at 2)
+      let v be sop_verify with (secret_of), body, clock
+      if (v at 0) != "ok"
+        return deny_json with (v at 1)
+      end
+      return "{\"ok\":true}"
+    end
+  end
+  if path == "/api/sop-issue"
+    if method == "POST"
+      let exp be number with body
+      let issued be sop_issue with (secret_of), exp
+      if (issued at 0) != "ok"
+        return deny_json with (issued at 1)
+      end
+      return "{\"ok\":true,\"cookie\":\"" + (issued at 1) + "\"}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  if (length with args) > 3
+  let mode be args at 3
+  if mode == "issue"
+    let issued be sop_issue with (secret_of), (number with (args at 4))
+    say (issued at 0)
+    say (issued at 1)
+    halt with 0
+  end
+  if mode == "verify"
+    let v be sop_verify with (secret_of), (args at 4), (number with (args at 5))
+    say (v at 0)
+    say (v at 1)
+    halt with 0
+  end
+  if mode == "header"
+    let cookie be sop_from_header with (args at 4)
+    let v be sop_verify with (secret_of), cookie, (number with (args at 5))
+    say (v at 0)
+    say (v at 1)
+    halt with 0
+  end
+  end
+  listen with 0
+end

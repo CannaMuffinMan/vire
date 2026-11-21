@@ -1,0 +1,54 @@
+{
+  "id": "edge-go-loopback",
+  "source": "fcgcpa-prod PR #147 edge-go /healthz plus reverse-proxy. Fixture Host via process args (www|dev|unknown). railway.internal and public DNS stay blocked.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "ok",
+      "host": "www"
+    },
+    {
+      "name": "www_proxy",
+      "method": "GET",
+      "path": "/echo",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "up-ok",
+      "host": "www"
+    },
+    {
+      "name": "unknown_host",
+      "method": "GET",
+      "path": "/echo",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":404,\"error\":\"not found\"}",
+      "host": "unknown"
+    }
+  ]
+}

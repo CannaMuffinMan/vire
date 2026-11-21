@@ -1,17 +1,29 @@
-~ dev-portal-go unauth fail-closed routes (derived from source, not live).
-~ Missing dist is checked before the page cookie gate, so GET / is 503 dist_missing
-~ with no cookie. Cookie/JWT session and /fcg-api/ proxy are blocked (no stubs).
+~ dev-portal-go loopback port: /fcg-api/ prefix strip + fixture goldens.
+~ JWT session cookie and public HTTPS API target stay blocked. No dist.
+use "http-client.vire"
 
 define route with method, path, body
+  let port be number with (args at 0)
   if path == "/"
     return "{\"reason\":\"dist_missing\",\"status\":503}"
   end
-  if path == "/login"
-    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  if path == "/api/auth/session"
+    return "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
   end
-  return "{\"reason\":\"dist_missing\",\"status\":503}"
+  if path == "/fcg-api/echo"
+    return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/fcg-api"}
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
 end
 
 define main
-  listen with 18080
+  let port be number with (args at 0)
+  let mode be args at 1
+  if mode == "proxy-echo"
+    let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": "/fcg-api"}
+    say (got at "status")
+    say (got at "body")
+    halt with 0
+  end
+  listen with 0
 end
