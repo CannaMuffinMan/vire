@@ -382,7 +382,7 @@ sealed class Machine
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "digest", "hmac", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
-        "connect", "send", "recv", "close",
+        "connect", "send", "recv", "close", "resolve",
         "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close",
         "start", "wait", "result", "linux"
     });
@@ -735,6 +735,13 @@ sealed class Machine
         }
         if (name == "listen") { Listen(RequirePort(args[0], line), line); return null; }
         if (name == "connect") return VireNet.ConnectHost(args[0] as string, args[1], tcp, line, col);
+        if (name == "resolve")
+        {
+            List<string> addrs = VireDns.ResolveHost(args[0] as string, line, col);
+            List<object> outp = new List<object>();
+            for (int i = 0; i < addrs.Count; i++) outp.Add(addrs[i]);
+            return outp;
+        }
         if (name == "send") return VireNet.SendAll(args[0], args[1], tcp, line, col);
         if (name == "recv") return VireNet.RecvBound(args[0], args[1], tcp, line, col);
         if (name == "close") return VireNet.CloseHandle(args[0], tcp, line, col);

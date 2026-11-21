@@ -65,6 +65,8 @@ define emitLinuxStart with image, fixes, labels
   let image be emitLeaRax with image, fixes, "cmdline_buf"
   let image be emitHex with image, "488905"
   let image be emitRel with image, fixes, "cmdline_ptr"
+  let image be emitLeaRax with image, fixes, "linux_flag"
+  let image be emitHex with image, "48c70001000000"
   let image be emitHex with image, "e9"
   let image be emitRel with image, fixes, "code"
   return image

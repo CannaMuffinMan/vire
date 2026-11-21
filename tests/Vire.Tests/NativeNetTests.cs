@@ -48,6 +48,8 @@ public class NativeNetTests
         Assert.Contains("rt_sha1", ws);
         Assert.Contains("258EAFA5-E914-47DA-95CA-C5AB0DC85B11", ws);
         Assert.Contains("nm == \"connect\"", native);
+        Assert.Contains("nm == \"resolve\"", native);
+        Assert.Contains("rt_resolve", File.ReadAllText(Path.Combine(root, "src", "rt-dns.vire")));
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("iat_cn", pe);

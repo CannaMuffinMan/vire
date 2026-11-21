@@ -1,3 +1,5 @@
+use "src/rt-dns.vire"
+
 ~ Native Winsock HTTP/1.1 + JSON for compiled Windows x64 guests.
 ~ Compact blob + packed reloc tables so the compiler PE stays under the hex cap.
 ~ RFC 9112: request lines and field lines end with CR LF. rt_net_hdrunsafe
@@ -87,6 +89,7 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
     ~ Ctype trampoline applied after landing code is pinned (see emitLandingHttp).
+    let image be emitDnsRuntime with image, fixes, labels
     let image be emitTcpClient with image, fixes, labels
     return emitLandingHttp with image, fixes, labels, base
   end
@@ -175,6 +178,7 @@ define parkNet with image, labels
   parkMsg with image, labels, "msg_conn_port", "connect needs a port from 1 to 65535"
   parkMsg with image, labels, "msg_conn_host", "connect needs a host and a port"
   parkMsg with image, labels, "msg_conn_fail", "could not connect"
+  let image be parkDns with image, labels
   parkMsg with image, labels, "msg_send_bad", "send needs a connection and text"
   parkMsg with image, labels, "msg_recv_bad", "recv needs a connection and a size"
   parkMsg with image, labels, "msg_conn_closed", "that connection is closed"
@@ -397,6 +401,7 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [73, 129, 249]
   emitU32 with image, 65535
   emitJcc with image, fixes, 135, "conn_port"
+  pin with labels, "conn_recheck", image
   emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 131, 249, 9, 15, 133]
   emitRel with image, fixes, "conn_notloop"
   emitList with image, [129, 122, 8, 49, 50, 55, 46]
@@ -453,10 +458,21 @@ define emitTcpClient with image, fixes, labels
   emitList with image, [72, 139, 85, 248, 72, 139, 10, 72, 133, 201, 15, 132]
   emitRel with image, fixes, "conn_addr"
   emitList with image, [15, 182, 66, 8, 131, 248, 48, 15, 130]
-  emitRel with image, fixes, "conn_addr"
+  emitRel with image, fixes, "conn_dns"
   emitList with image, [131, 248, 57, 15, 135]
-  emitRel with image, fixes, "conn_addr"
+  emitRel with image, fixes, "conn_dns"
   emitJmpTo with image, fixes, "conn_priv"
+  pin with labels, "conn_dns", image
+  emitList with image, [72, 139, 85, 248]
+  emitPushTag with image, 2
+  emitCallTo with image, fixes, "rt_resolve"
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 4, 15, 133]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [72, 139, 10, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "conn_addr"
+  emitList with image, [72, 139, 66, 16, 72, 139, 80, 8, 72, 137, 85, 248]
+  emitJmpTo with image, fixes, "conn_recheck"
   pin with labels, "conn_host", image
   emitFail with image, fixes, "msg_conn_host"
   pin with labels, "conn_port", image
