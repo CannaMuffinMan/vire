@@ -188,6 +188,18 @@ def run_remainder(port, fix_src, fix_dst, mode):
         check_headers(hd2, "get_chain_tamper_503", mismatches)
     print("case tamper POST status %s body %s" % (st, body))
 
+    # 507 before rotate so native arena is not still holding a 512 KB segment.
+    if mode != "fail-before":
+        restore_genesis(fix_src, fix_dst)
+        build_full_64(fix_dst)
+        overflow = "z" * 4000
+        st, hd, body = http_req(port, "POST", "/block", json.dumps({"text": overflow}, separators=(",", ":")))
+        want507 = "{\"ok\":false,\"status\":507,\"error\":\"chain full\"}"
+        if st != 507 or body != want507:
+            mismatches.append("post_block_full_507 got %s %s" % (st, body))
+        check_headers(hd, "post_block_full_507", mismatches)
+        print("case 507 status %s body %s" % (st, body))
+
     # previousHash already in static contract; rotate
     restore_genesis(fix_src, fix_dst)
     last, chunk = build_near_rotate(fix_dst)
@@ -225,26 +237,6 @@ def run_remainder(port, fix_src, fix_dst, mode):
             return 4
         print("REMAINDER_FAIL_BEFORE_MISMATCH")
         return 2
-
-    # 507
-    restore_genesis(fix_src, fix_dst)
-    build_full_64(fix_dst)
-    overflow = "z" * 4000
-    try:
-        st, hd, body = http_req(port, "POST", "/block", json.dumps({"text": overflow}, separators=(",", ":")))
-    except (OSError, SystemExit) as ex:
-        if mode != "fail-before":
-            raise
-        st, hd, body = 0, {}, str(ex)
-    want507 = "{\"ok\":false,\"status\":507,\"error\":\"chain full\"}"
-    if mode == "fail-before":
-        if st == 507 and body == want507:
-            mismatches.append("FAIL_BEFORE 507 unexpectedly matched")
-    else:
-        if st != 507 or body != want507:
-            mismatches.append("post_block_full_507 got %s %s" % (st, body))
-        check_headers(hd, "post_block_full_507", mismatches)
-    print("case 507 status %s body %s" % (st, body))
 
     # migrate
     if fix_dst.exists():
@@ -368,17 +360,6 @@ def pair_remainder(host_port, native_port, fix_src, fix_dst):
     # per side with restore.
 
     restore_genesis(fix_src, fix_dst)
-    last, chunk = build_near_rotate(fix_dst)
-    hs, hh, hb = http_req(host_port, "POST", "/block", json.dumps({"text": chunk}, separators=(",", ":")))
-    restore_genesis(fix_src, fix_dst)
-    build_near_rotate(fix_dst)
-    ns, nh, nb = http_req(native_port, "POST", "/block", json.dumps({"text": chunk}, separators=(",", ":")))
-    if hs != ns or hb != nb:
-        mismatches.append("rotate host %s %s native %s %s" % (hs, hb, ns, nb))
-    else:
-        print("pair remainder rotate host %s native %s" % (hs, ns))
-
-    restore_genesis(fix_src, fix_dst)
     build_full_64(fix_dst)
     overflow = "z" * 4000
     hs, hh, hb = http_req(host_port, "POST", "/block", json.dumps({"text": overflow}, separators=(",", ":")))
@@ -389,6 +370,17 @@ def pair_remainder(host_port, native_port, fix_src, fix_dst):
         mismatches.append("507 host %s %s native %s %s" % (hs, hb, ns, nb))
     else:
         print("pair remainder 507 host %s native %s" % (hs, ns))
+
+    restore_genesis(fix_src, fix_dst)
+    last, chunk = build_near_rotate(fix_dst)
+    hs, hh, hb = http_req(host_port, "POST", "/block", json.dumps({"text": chunk}, separators=(",", ":")))
+    restore_genesis(fix_src, fix_dst)
+    build_near_rotate(fix_dst)
+    ns, nh, nb = http_req(native_port, "POST", "/block", json.dumps({"text": chunk}, separators=(",", ":")))
+    if hs != ns or hb != nb:
+        mismatches.append("rotate host %s %s native %s %s" % (hs, hb, ns, nb))
+    else:
+        print("pair remainder rotate host %s native %s" % (hs, ns))
 
     def mig():
         if fix_dst.exists():

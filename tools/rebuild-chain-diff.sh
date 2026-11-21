@@ -371,7 +371,16 @@ install_fixtures
 diff_contracts "$HPORT"
 echo "host contract ok"
 pair_host_native "$HPORT" "$GPORT"
+stop_guest "$GPID"
+stop_guest "$HPID"
 install_fixtures
+ids="$(run_cmd rebuild-chain "./data/rebuild-chain.elf")"
+GPID="${ids%% *}"
+GPORT="${ids##* }"
+ids="$(run_cmd rebuild-chain-host dotnet exec "$VIRE_DLL" "$ROOT/rebuild-chain-run.vire")"
+HPID="${ids%% *}"
+HPORT="${ids##* }"
+echo "remainder_listen native 127.0.0.1:$GPORT host 127.0.0.1:$HPORT"
 python3 "$REMAINDER_PY" run "$GPORT" "$FIX_SRC" "$FIX_DST" pass-after
 echo "native remainder contract ok"
 install_fixtures
