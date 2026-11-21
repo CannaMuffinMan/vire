@@ -1,0 +1,17 @@
+~ Loopback HTTPS clone of FCG GET /health. Cert/key paths stay under data/.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+    if path == "/api/health"
+      return "{\"ok\":true,\"service\":\"fcgcpa\",\"payments\":false}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  tls_listen with 0, "data/tls-health-cert.pem", "data/tls-health-key.pem"
+end

@@ -28,17 +28,42 @@ static class VireTls
 
     internal static SslStream WrapServer(Stream inner, X509Certificate2 cert, int line)
     {
+        if (inner.CanTimeout)
+        {
+            inner.ReadTimeout = ConnectTimeoutMs;
+            inner.WriteTimeout = ConnectTimeoutMs;
+        }
         SslStream ssl = new SslStream(inner, false);
         try
         {
-            ssl.AuthenticateAsServer(new SslServerAuthenticationOptions
+            SslServerAuthenticationOptions opts = new SslServerAuthenticationOptions
             {
                 ServerCertificate = cert,
                 EnabledSslProtocols = Tls12Plus,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
                 ClientCertificateRequired = false,
                 EncryptionPolicy = EncryptionPolicy.RequireEncryption
-            });
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    opts.CipherSuitesPolicy = new CipherSuitesPolicy(new TlsCipherSuite[]
+                    {
+                        TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                        TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                        TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                        TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                        TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                        TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+                        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+                        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                        TlsCipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+                    });
+                }
+                catch (PlatformNotSupportedException) { }
+            }
+            ssl.AuthenticateAsServer(opts);
             return ssl;
         }
         catch (Exception)

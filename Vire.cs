@@ -1429,6 +1429,13 @@ sealed class Machine
         VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p);
     }
 
+    internal void ListenCoreTls(int port, int line, CancellationToken stop, string certPath, string keyPath)
+    {
+        if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
+        X509Certificate2 cert = VireTls.LoadPemPair(certPath, keyPath, line, 1);
+        VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p, cert);
+    }
+
     object DispatchRoute(string method, string path, string body, string head, int line, out int maxOutput)
     {
         Machine worker = ForkRequest();

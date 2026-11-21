@@ -260,3 +260,7 @@ RESP2 Redis `rediss://` uses the existing TLS client (`tls_connect` + `tls_send`
 ## AES-256-GCM vault (guest)
 
 Guest primitive `src/rt-aes.vire`: AES-256-GCM seal/open; 12-byte nonce; 16-byte tag. Authentication failure returns `["bad", "authentication failed"]` and never plaintext. Fixture keys only. Source-level constant-time S-box (Boyar–Peralta), branch-free xtime, GHASH always masked-XOR then shift (`AesGcmKatTests`). Proof: `tools/aes-gcm-linux.sh`. Windows: `tools/aes-gcm-windows.ps1`. Residual: not TVLA; compiler/CPU/cache/`idiv` of secret bytes may still leak.
+
+## TLS server (`tls_listen`)
+
+Host `SslStream.AuthenticateAsServer` and Linux ELF OpenSSL `TLS_server_method` terminate HTTPS on the existing HTTP listener. Cert/key are test PEMs under `data/`. Windows PE `tls_listen` stays fail-closed until SChannel. Proof: `TlsServerTests`, `tools/native-elf-tls.sh`, Windows `tools/tls-server-windows.ps1`.

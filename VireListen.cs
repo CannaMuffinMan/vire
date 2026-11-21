@@ -178,7 +178,10 @@ static class VireListen
     {
         Stream stream = client.GetStream();
         if (tlsCert != null)
-            stream = VireTls.WrapServer(stream, tlsCert, line);
+        {
+            try { stream = VireTls.WrapServer(stream, tlsCert, line); }
+            catch (VireError) { return; }
+        }
         DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
         byte[] buffer = new byte[HttpWire.MaxHeaderBlock + HttpWire.MaxRequestBody + 16];
         int got = 0;
