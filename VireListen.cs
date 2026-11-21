@@ -195,6 +195,11 @@ static class VireListen
             SendParseFail(stream, headers.Status, headers);
             return;
         }
+        if (VireWs.IsUpgradeGet(headers))
+        {
+            VireWs.Answer(stream, headers);
+            return;
+        }
         int bodyAt = headers.BodyAt;
         int contentLength = headers.ContentLength;
         long need64 = (long)bodyAt + contentLength;
