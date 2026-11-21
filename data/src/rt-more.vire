@@ -799,7 +799,7 @@ define emitMore with image, fixes, labels
   emitUnparkSlot with image, 248
   emitList with image, [72, 137, 69, 232, 72, 139, 85, 240, 72, 137, 16, 72, 141, 72, 8, 76, 139, 77, 248, 73, 141, 81, 16, 76, 137, 208, 76, 139, 69, 240]
   emitCallTo with image, fixes, "rt_memcpy"
-  emitList with image, [72, 139, 85, 232, 72, 139, 69, 240, 198, 68, 2, 8, 0]
+  emitList with image, [72, 139, 85, 232, 72, 139, 69, 240, 198, 68, 2, 8, 0, 72, 137, 208]
   emitEpi with image
 
   pin with labels, "rt_int_text", image
@@ -836,7 +836,7 @@ define emitMore with image, fixes, labels
   emitUnparkSlot with image, 248
   emitList with image, [72, 137, 69, 216, 72, 139, 85, 232, 72, 137, 16, 72, 141, 72, 8, 72, 139, 85, 248, 72, 131, 194, 32, 72, 43, 85, 232, 76, 139, 69, 232]
   emitCallTo with image, fixes, "rt_memcpy"
-  emitList with image, [72, 139, 85, 216, 72, 139, 69, 232, 198, 68, 2, 8, 0]
+  emitList with image, [72, 139, 85, 216, 72, 139, 69, 232, 198, 68, 2, 8, 0, 72, 137, 208]
   emitEpi with image
 
   pin with labels, "rt_to_text", image

@@ -46,7 +46,7 @@ Write a `.vire` guest that implements only the captured endpoints. Compile with 
 
 `guest-health.vire` serves `GET /health`, `GET /api/health`, `GET /info`, `GET /connect`, `GET /payments`, `GET /mine`. Native `rt_net_statusof` maps JSON `"status":N` to the HTTP status line the same way host `VireListen.StatusOf` does.
 
-`guest-chain.vire` serves `GET /chain` and `POST /block` against committed genesis fixtures in `data/rebuild/chain` (copied to `data/chain` by the harness). Proof is `hash` of the same bytes host `json` would emit for `[index, previous, text]` (`"[" + text(index) + "," + json(previous) + "," + json(text) + "]"`). Native listen+`parse` and json-of-list currently crash, so the guest does not call those in `route`.
+`guest-chain.vire` serves `GET /chain` and `POST /block` against committed genesis fixtures in `data/rebuild/chain` (copied to `data/chain` by the harness). Proof is `hash` of the same bytes host `json` would emit for `[index, previous, text]` (`"[" + text(index) + "," + json(previous) + "," + json(text) + "]"`). Native listen+`parse` and json-of-list of small values run on ELF after the runtime cursor/`rt_buf_finish` fix (GET with no Content-Length now gets an empty leaf body instead of leftover GPR). `guest-chain.vire` parses POST `/block` bodies. `api/fcgcpa.vire` already used `parse`; there is no guest workaround to remove. Segment files still use find/slice: native parse of tens of KB of string payload is not valid yet, and 64×512 KB would exceed the 32MB arena. Remainder 507 is checked before rotate so native bump-allocation is not still holding a 512 KB segment.
 
 ### 4. Side-by-side differential harness
 

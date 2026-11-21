@@ -1,5 +1,7 @@
 ~ Native FCG GET /chain + POST /block. Same rules as api/fcgcpa.vire.
-~ Native listen+parse segfaults; this guest does not call parse.
+~ POST /block parses the request body with builtin parse (listen+parse is fixed).
+~ Segment files still use find/slice: native parse of ~16KB+ string payload
+~ is not valid yet, and 64×512KB would exceed the 32MB arena.
 ~ Proof = hash of "[" + text(index) + "," + json(previous) + "," + json(text) + "]"
 ~ Segment rotate at 512 KB, 507 at segment 64, 503 on tamper,
 ~ data/chain.json migrate, previousHash / hash aliases.
@@ -138,6 +140,16 @@ define takeQuotedPrefer with body, first, second
     return a
   end
   return takeQuoted with body, second
+end
+
+define clientField with block, first, second
+  if has with block, first
+    return block at first
+  end
+  if has with block, second
+    return block at second
+  end
+  return none
 end
 
 define blockJson with index, previous, proof, text
@@ -416,20 +428,23 @@ define bootChain
 end
 
 define appendBlock with body
+  let block be none
+  try
+    let block be parse with body
+  miss problem
+    return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
+  end
   if not verifyChain
     return "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}"
   end
-  let shape be rejectShape with body
-  if shape == "bad"
+  try
+    if not (has with block, "text")
+      return "{\"ok\":false,\"status\":400,\"error\":\"text is required\"}"
+    end
+  miss problem
     return "{\"ok\":false,\"status\":400,\"error\":\"bad block\"}"
   end
-  if shape == "need"
-    return "{\"ok\":false,\"status\":400,\"error\":\"text is required\"}"
-  end
-  if shape == "notext"
-    return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
-  end
-  let text be takeText with body
+  let text be block at "text"
   if not (textOk with text)
     return "{\"ok\":false,\"status\":400,\"error\":\"text is not allowed\"}"
   end
@@ -437,14 +452,24 @@ define appendBlock with body
   let index be (takeInt with headRaw, "index") + 1
   let previous be takeQuoted with headRaw, "proof"
   let proof be makeProof with index, previous, text
-  let givenPrev be takeQuotedPrefer with body, "previous", "previousHash"
-  if givenPrev != ""
+  let givenPrev be none
+  try
+    let givenPrev be clientField with block, "previous", "previousHash"
+  miss problem
+    let givenPrev be none
+  end
+  if givenPrev != none
     if givenPrev != previous
       return "{\"ok\":false,\"status\":400,\"error\":\"previous does not match\"}"
     end
   end
-  let givenProof be takeQuotedPrefer with body, "proof", "hash"
-  if givenProof != ""
+  let givenProof be none
+  try
+    let givenProof be clientField with block, "proof", "hash"
+  miss problem
+    let givenProof be none
+  end
+  if givenProof != none
     if givenProof != proof
       return "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
     end
