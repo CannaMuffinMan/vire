@@ -13,6 +13,7 @@ New-Item -ItemType Directory -Force -Path $Data | Out-Null
 $Log = Join-Path $Data "couchstation-windows-all.log"
 $Head = (git rev-parse HEAD).Trim()
 $Stamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
+$Results = New-Object System.Collections.Generic.List[string]
 function Log([string]$msg) {
     $line = "$(Get-Date -Format o) $msg"
     Add-Content -LiteralPath $Log -Value $line
@@ -29,13 +30,20 @@ function After-Child {
     Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
 }
 function Run-Proof([string]$Name, [scriptblock]$Body) {
-    Log "BEGIN $Name sha $Head"
+    $script:CurrentProof = $Name
+    $proofLog = Join-Path $Data ("couchstation-" + $Name + ".log")
+    Set-Content -LiteralPath $proofLog -Value "BEGIN $Name sha $Head"
+    Log "BEGIN $Name sha $Head log $proofLog"
     try {
         & $Body
         Log "PASS $Name sha $Head"
+        $script:Results.Add("PASS $Name")
+        Add-Content -LiteralPath $proofLog -Value "PASS $Name sha $Head"
     } catch {
         $script:fail = 1
         Log "FAIL $Name sha $Head err $($_.Exception.Message)"
+        $script:Results.Add("FAIL $Name")
+        Add-Content -LiteralPath $proofLog -Value ("FAIL " + $_.Exception.Message)
     } finally {
         After-Child
     }
@@ -43,8 +51,11 @@ function Run-Proof([string]$Name, [scriptblock]$Body) {
 function Run-Script([string]$Rel) {
     $path = Join-Path $Root $Rel
     if (-not (Test-Path $path)) { throw "missing $Rel" }
-    powershell -NoProfile -File $path
-    if ($LASTEXITCODE -ne 0) { throw "$Rel exit $LASTEXITCODE" }
+    $outLog = Join-Path $Data ("couchstation-" + $script:CurrentProof + "-child.log")
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
+    Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
+    Get-Content -ErrorAction SilentlyContinue ($outLog + ".err") | ForEach-Object { Write-Host $_ }
+    if ($p.ExitCode -ne 0) { throw "$Rel exit $($p.ExitCode)" }
 }
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -139,6 +150,15 @@ Run-Proof "rebuild-proxy-windows-pe" {
     Log "proxy_pe_mz_ok ws2_32_ok (host-vs-PE modes still need a loopback upstream on this PC)"
 }
 
+Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-windows.ps1" }
+Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
+Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
+Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "redis-tls-prove-windows" { Run-Script "tools/redis-tls-prove-windows.ps1" }
+Run-Proof "aes-gcm-windows" { Run-Script "tools/aes-gcm-windows.ps1" }
+Run-Proof "rebuild-headers-windows" { Run-Script "tools/rebuild-headers-windows.ps1" }
+Run-Proof "tls-server-windows" { Run-Script "tools/tls-server-windows.ps1" }
+
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"
     if (-not (Test-Path $src)) { throw "missing session-prove.vire" }
@@ -154,6 +174,8 @@ Run-Proof "session-prove-pe" {
 }
 
 Log "summary_head $Head fail=$fail log=$Log"
+Log "per_pr_results:"
+foreach ($r in $Results) { Log $r }
 if ($fail -ne 0) { exit 1 }
 Write-Host "couchstation-windows-all ok. PE proof lives only on this Windows PC."
 exit 0
