@@ -381,7 +381,7 @@ sealed class Machine
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
-        "round", "pick", "clear", "hash", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
+        "round", "pick", "clear", "hash", "digest", "hmac", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close",
         "tls_connect", "tls_listen", "tls_send", "tls_recv", "tls_close",
         "start", "wait", "result", "linux"
@@ -619,7 +619,7 @@ sealed class Machine
                 throw new VireError("start takes a definition name and at most one value", line, col);
             need = args.Count;
         }
-        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv" || name == "tls_send" || name == "tls_recv") need = 2;
+        if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv" || name == "tls_send" || name == "tls_recv" || name == "hmac") need = 2;
         if (name == "tls_listen") need = 3;
         if (name == "tls_connect") need = 4;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
@@ -773,6 +773,8 @@ sealed class Machine
             if (raw == null) return VireSeal.HashText(Show(args[0]));
             return VireSeal.HashGuest(raw);
         }
+        if (name == "digest") return Program.Sha256Bytes(args[0], line, col);
+        if (name == "hmac") return Program.HmacSha256(args[0], args[1], line, col);
         if (name == "seal")
         {
             string raw = args[0] as string;
@@ -2922,6 +2924,43 @@ sealed class Program
         double quote = Math.Floor(num / den);
         if (quote > int.MaxValue || quote < int.MinValue) return quote;
         return (int)quote;
+    }
+
+    internal static byte[] BytesFromList(object value, int line, int col, string need)
+    {
+        List<object> list = value as List<object>;
+        if (list == null) throw new VireError(need, line, col);
+        int n = list.Count;
+        if (n > 100000) throw new VireError("list is too large", line, col);
+        byte[] raw = new byte[n];
+        for (int i = 0; i < n; i++)
+        {
+            double real;
+            if (!AsReal(list[i], out real) || real != Math.Floor(real)) throw new VireError(need, line, col);
+            raw[i] = (byte)((int)real & 255);
+        }
+        return raw;
+    }
+
+    internal static List<object> IntBytes(byte[] raw)
+    {
+        List<object> list = new List<object>(raw.Length);
+        for (int i = 0; i < raw.Length; i++) list.Add((int)raw[i]);
+        return list;
+    }
+
+    internal static List<object> Sha256Bytes(object value, int line, int col)
+    {
+        byte[] raw = BytesFromList(value, line, col, "digest needs a list of whole numbers");
+        return IntBytes(SHA256.HashData(raw));
+    }
+
+    internal static List<object> HmacSha256(object keyObj, object msgObj, int line, int col)
+    {
+        byte[] key = BytesFromList(keyObj, line, col, "hmac needs two lists of whole numbers");
+        byte[] msg = BytesFromList(msgObj, line, col, "hmac needs two lists of whole numbers");
+        using (HMACSHA256 hmac = new HMACSHA256(key))
+            return IntBytes(hmac.ComputeHash(msg));
     }
 
     internal static string HexBytes(object value, int line, int col)
