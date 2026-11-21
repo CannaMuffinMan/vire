@@ -106,6 +106,7 @@ Run-Proof "pe-selfhost-gen1-eq-gen2-x3" {
 Run-Proof "native-net-windows" { Run-Script "tools/native-net-windows.ps1" }
 Run-Proof "rebuild-fcgcpa-windows" { Run-Script "tools/rebuild-fcgcpa-windows.ps1" }
 Run-Proof "rebuild-fcgbds-worker-windows" { Run-Script "tools/rebuild-fcgbds-worker-windows.ps1" }
+Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
 Run-Proof "json-prove-windows" { Run-Script "tools/json-prove-windows.ps1" }
 Run-Proof "crypto-prove-windows" { Run-Script "tools/crypto-prove-windows.ps1" }
 Run-Proof "pg-prove-windows" { Run-Script "tools/pg-prove-windows.ps1" }

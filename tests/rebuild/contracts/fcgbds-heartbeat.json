@@ -1,0 +1,58 @@
+{
+  "id": "fcgbds-heartbeat-json",
+  "source": "fcgbds-go POST /api/bot-defense/reviewers/heartbeat with JSON sessionId (Query nil). Derived from the existing fcgbds-go.json field names, not live. Rank 3 remainder: native+host now read the POST body (leaf Content-Length) instead of query-only.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "volatile_fields": ["lastSeenAt"],
+  "cases": [
+    {
+      "name": "post_missing_session",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{}",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body_fields": { "error": "sessionId is required" }
+    },
+    {
+      "name": "post_empty_session",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{\"sessionId\":\"\"}",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body_fields": { "error": "sessionId is required" }
+    },
+    {
+      "name": "post_json_session_ok",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{\"sessionId\":\"abc-1\"}",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body_fields": {
+        "ok": true,
+        "reviewers": { "live": 1, "ttlSeconds": 90 }
+      }
+    }
+  ]
+}

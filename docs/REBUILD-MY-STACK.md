@@ -180,6 +180,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 1 | `GET /health` and `GET /api/health` JSON | HTTP, JSON | Both present | **Done (PR #92 + this lane).** |
 | 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | Done (PR #93). |
 | 3 | `fcgbds-go` `GET /health` | HTTP, JSON | Present | **This PR.** Field match; `ts` omitted (no guest clock). |
+| 3f | `fcgbds-go` POST heartbeat JSON `sessionId` | HTTP, JSON, POST body | Present (leaf body after #113) | **This PR.** Host vs native vs `tests/rebuild/contracts/fcgbds-heartbeat.json`. Query-only guest is FAIL_BEFORE. |
 | 3a | `fcgbc-go` `GET /pending-transactions` | HTTP, JSON | Present | **This PR.** Body `[]`. |
 | 3b | `cpa-go` `GET /health` | HTTP, text/plain | Present | **This PR.** `ok\\n` + native/host text/plain Content-Type. |
 | 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
@@ -272,6 +273,7 @@ bash tools/rebuild-sop-proxy-diff.sh
 bash tools/rebuild-chain-tamper.sh
 bash tools/rebuild-portal-diff.sh
 bash tools/rebuild-header-diff.sh
+bash tools/rebuild-fcgbds-heartbeat-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
