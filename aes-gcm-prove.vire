@@ -1,0 +1,171 @@
+use "src/rt-aes.vire"
+
+define proveLine with tag, got, want
+  if got == want
+    say tag + " PASS " + got
+    return 0
+  end
+  say tag + " FAIL got=" + got + " want=" + want
+  return 1
+end
+
+define showBad with tag, got
+  let st be got at 0
+  if st == "bad"
+    let why be got at 1
+    say tag + " REJECT " + why
+    return 0
+  end
+  say tag + " FAIL expected reject got " + st
+  return 1
+end
+
+define zeros with n
+  let xs be []
+  let i be 0
+  while i < n
+    push with xs, 0
+    let i be i + 1
+  end
+  return xs
+end
+
+define main
+  let fails be 0
+  let key be zeros with 32
+  let nonce be zeros with 12
+  let empty be []
+  let got be aes_gcm_seal with key, nonce, empty, empty
+  if (got at 0) != "ok"
+    say "NIST empty seal FAIL"
+    halt with 1
+  end
+  let nfail be proveLine with "NIST SP800-38D empty CT", (hex with (got at 1)), ""
+  let fails be fails + nfail
+  let nfail be proveLine with "NIST SP800-38D empty TAG", (hex with (got at 2)), "530f8afbc74536b9a963b4f1c4cb738b"
+  let fails be fails + nfail
+  let opened be aes_gcm_open with key, nonce, (got at 1), empty, (got at 2)
+  if (opened at 0) != "ok"
+    say "NIST empty open FAIL"
+    let fails be fails + 1
+  else
+    let nfail be proveLine with "NIST SP800-38D empty PT", (hex with (opened at 1)), ""
+    let fails be fails + nfail
+  end
+
+  let pt16 be zeros with 16
+  let got be aes_gcm_seal with key, nonce, pt16, empty
+  if (got at 0) != "ok"
+    say "NIST 1block seal FAIL"
+    halt with 1
+  end
+  let ct16 be got at 1
+  let tag16 be got at 2
+  let nfail be proveLine with "NIST SP800-38D 1block CT", (hex with ct16), "cea7403d4d606b6e074ec5d3baf39d18"
+  let fails be fails + nfail
+  let nfail be proveLine with "NIST SP800-38D 1block TAG", (hex with tag16), "d0d1c8a799996bf0265b98b5d48ab919"
+  let fails be fails + nfail
+  let opened be aes_gcm_open with key, nonce, ct16, empty, tag16
+  if (opened at 0) != "ok"
+    say "NIST 1block open FAIL"
+    let fails be fails + 1
+  else
+    let nfail be proveLine with "NIST SP800-38D 1block PT", (hex with (opened at 1)), "00000000000000000000000000000000"
+    let fails be fails + nfail
+  end
+
+  let aad16 be zeros with 16
+  let got be aes_gcm_seal with key, nonce, pt16, aad16
+  if (got at 0) != "ok"
+    say "NIST AAD seal FAIL"
+    halt with 1
+  end
+  let nfail be proveLine with "NIST AAD CT", (hex with (got at 1)), "cea7403d4d606b6e074ec5d3baf39d18"
+  let fails be fails + nfail
+  let nfail be proveLine with "NIST AAD TAG", (hex with (got at 2)), "ae9b1771dba9cf62b39be017940330b4"
+  let fails be fails + nfail
+  let opened be aes_gcm_open with key, nonce, (got at 1), aad16, (got at 2)
+  if (opened at 0) != "ok"
+    say "NIST AAD open FAIL"
+    let fails be fails + 1
+  else
+    say "NIST AAD open PASS"
+  end
+
+  let badTag be aesCopyN with tag16
+  put (aesXor8 with (badTag at 0), 1) into badTag at 0
+  let tamper be aes_gcm_open with key, nonce, ct16, empty, badTag
+  let nfail be showBad with "WYCHEPROOF tag-tamper", tamper
+  let fails be fails + nfail
+  if (length with tamper) != 2
+    say "WYCHEPROOF tag-tamper leaked FAIL"
+    let fails be fails + 1
+  end
+  if (length with tamper) == 2
+    if (tamper at 0) == "ok"
+      say "WYCHEPROOF tag-tamper leaked plaintext FAIL"
+      let fails be fails + 1
+    end
+    if (tamper at 0) != "ok"
+      say "WYCHEPROOF tag-tamper no-plaintext PASS"
+    end
+  end
+
+  let badAad be zeros with 16
+  put 1 into badAad at 0
+  let aadTamp be aes_gcm_open with key, nonce, (got at 1), badAad, (got at 2)
+  let nfail be showBad with "WYCHEPROOF aad-tamper", aadTamp
+  let fails be fails + nfail
+  if (aadTamp at 0) == "ok"
+    say "WYCHEPROOF aad-tamper leaked plaintext FAIL"
+    let fails be fails + 1
+  else
+    say "WYCHEPROOF aad-tamper no-plaintext PASS"
+  end
+
+  let shortTag be slice with tag16, 0, 8
+  let trunc be aes_gcm_open with key, nonce, ct16, empty, shortTag
+  let nfail be showBad with "WYCHEPROOF truncated-tag", trunc
+  let fails be fails + nfail
+
+  let shortNonce be zeros with 11
+  let badN be aes_gcm_seal with key, shortNonce, empty, empty
+  let nfail be showBad with "NONCE 11", badN
+  let fails be fails + nfail
+  let longNonce be zeros with 13
+  let badN be aes_gcm_seal with key, longNonce, empty, empty
+  let nfail be showBad with "NONCE 13", badN
+  let fails be fails + nfail
+
+  let same be gcm_ct_eq with tag16, tag16
+  if not same
+    say "CT eq same FAIL"
+    let fails be fails + 1
+  else
+    say "CT eq same PASS"
+  end
+  let diff be gcm_ct_eq with tag16, badTag
+  if diff
+    say "CT eq diff FAIL"
+    let fails be fails + 1
+  else
+    say "CT eq diff PASS"
+  end
+  let s0 be aesSboxByte with 0
+  let s1 be aesSboxByte with 1
+  let s255 be aesSboxByte with 255
+  let nfail be proveLine with "SBOX 0", (text with s0), "99"
+  let fails be fails + nfail
+  let nfail be proveLine with "SBOX 1", (text with s1), "124"
+  let fails be fails + nfail
+  let nfail be proveLine with "SBOX 255", (text with s255), "22"
+  let fails be fails + nfail
+  say "AES-GCM residual: source has no secret S-box index / GHASH bit skip; tag walk is not a CPU timing barrier"
+
+  if fails == 0
+    say "AES-GCM PROVE pass"
+  else
+    say "AES-GCM PROVE fails " + (text with fails)
+    halt with 1
+  end
+end
