@@ -252,3 +252,7 @@ Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3
 ## Rank 9 Redis TLS (`rediss://`)
 
 RESP2 Redis `rediss://` uses the existing TLS client (`tls_connect` + `tls_send`/`tls_recv`). Certificate chain and hostname checks are verify-full. `redis://` is refused by `redis_open_rediss`. Loopback 127.0.0.1 only. Proof: `tools/redis-tls-prove-linux.sh`. Windows: `tools/redis-tls-prove-windows.ps1` (Redis 6+ `tls-port`). RESP3, ACL username, DNS/non-loopback, client certs, production Redis: not in this PR.
+
+## AES-256-GCM vault (guest)
+
+Guest primitive `src/rt-aes.vire`: AES-256-GCM seal/open; 12-byte nonce; 16-byte tag. Authentication failure returns `["bad", "authentication failed"]` and never plaintext. Fixture keys only. Proof: `tools/aes-gcm-linux.sh`. Windows: `tools/aes-gcm-windows.ps1`. Residual: later #119 constant-time S-box/xtime/GHASH pass.
