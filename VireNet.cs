@@ -245,8 +245,25 @@ static class VireNet
         if (string.IsNullOrEmpty(host))
             throw new VireError("that address is not allowed", line, column);
         IPAddress literal;
-        if (!IPAddress.TryParse(host, out literal))
-            throw new VireError("that address is not allowed", line, column);
+        if (IPAddress.TryParse(host, out literal))
+            return CheckConnectLiteral(literal, line, column);
+        List<string> addrs = VireDns.ResolveHost(host, line, column);
+        if (addrs == null || addrs.Count == 0)
+            throw new VireError("could not resolve", line, column);
+        VireError last = null;
+        for (int i = 0; i < addrs.Count; i++)
+        {
+            IPAddress got;
+            if (!IPAddress.TryParse(addrs[i], out got)) continue;
+            try { return CheckConnectLiteral(got, line, column); }
+            catch (VireError err) { last = err; }
+        }
+        if (last != null) throw last;
+        throw new VireError("that address is not allowed", line, column);
+    }
+
+    static IPAddress CheckConnectLiteral(IPAddress literal, int line, int column)
+    {
         if (literal.IsIPv4MappedToIPv6) literal = literal.MapToIPv4();
         if (literal.AddressFamily != AddressFamily.InterNetwork)
             throw new VireError("that address is not allowed", line, column);

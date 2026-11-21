@@ -34,6 +34,8 @@ public class NativeNetTests
         Assert.Contains("nm == \"json\"", native);
         Assert.Contains("nm == \"listen\"", native);
         Assert.Contains("nm == \"connect\"", native);
+        Assert.Contains("nm == \"resolve\"", native);
+        Assert.Contains("rt_resolve", File.ReadAllText(Path.Combine(root, "src", "rt-dns.vire")));
         Assert.Contains("openNetImage", native);
         string pe = File.ReadAllText(Path.Combine(root, "src", "pe.vire"));
         Assert.Contains("iat_cn", pe);

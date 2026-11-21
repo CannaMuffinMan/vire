@@ -688,6 +688,9 @@ define noteNeed with state, nm
   if nm == "close"
     put true into state at "needNet"
   end
+  if nm == "resolve"
+    put true into state at "needNet"
+  end
   if nm == "json"
     put true into state at "needJson"
   end
@@ -1129,7 +1132,7 @@ define emitFix with gen, name
   if begins with name, "rt_ws"
     let later be true
   end
-  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse"
+  if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse" or name == "rt_resolve"
     let later be true
   end
   if (begins with name, "rt_") and (later == false)
@@ -1240,7 +1243,7 @@ define builtinArity with nm
   if nm == "args" or nm == "ticks" or nm == "linux"
     return 0
   end
-  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
+  if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen" or nm == "resolve"
     return 1
   end
   if nm == "close"

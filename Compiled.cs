@@ -979,6 +979,14 @@ sealed class CompiledMachine
             if (args.Count != 2) throw new VireError("connect takes 2 values, got " + args.Count, line, col);
             return VireNet.ConnectHost(args[0] as string, args[1], tcp, line, col);
         }
+        if (name == "resolve")
+        {
+            if (args.Count != 1) throw new VireError("resolve takes 1 values, got " + args.Count, line, col);
+            List<string> addrs = VireDns.ResolveHost(args[0] as string, line, col);
+            List<object> outp = new List<object>();
+            for (int i = 0; i < addrs.Count; i++) outp.Add(addrs[i]);
+            return outp;
+        }
         if (name == "send")
         {
             if (args.Count != 2) throw new VireError("send takes 2 values, got " + args.Count, line, col);
