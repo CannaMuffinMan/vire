@@ -1,5 +1,6 @@
 ~ Guest WebSocket emit for native PE and ELF (Win64 ABI, Linux net stubs).
-~ RFC 6455 over the HTTP listener: peek Upgrade, else rt_net_client.
+~ RFC 6455 101 only after the HTTP route returns status 101. Packed rt_listen
+~ owns HTTP. ws_listen is the standalone echo builtin.
 ~ Loopback 127.0.0.1 only. No TLS / wss. No permessage-deflate.
 ~ SHA-1 and standard base64 are handshake-only; guest hash stays SHA-256.
 
@@ -293,8 +294,10 @@ define emitWsB64 with image, fixes, labels
 end
 
 define emitWsListen with image, fixes, labels
+  ~ rt_listen stays the packed HTTP listener (route first). This pin is
+  ~ only the standalone echo builtin (ws_listen). Overwriting rt_listen
+  ~ used to 101 before the handler ran.
   pin with labels, "rt_ws_listen", image
-  pin with labels, "rt_listen", image
   emitPro with image
   emitPop1 with image
   emitList with image, [72, 131, 248, 1, 15, 133]

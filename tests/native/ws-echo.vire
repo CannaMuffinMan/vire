@@ -4,7 +4,7 @@ define route with method, path, body
   if path == "/health"
     return {"ok": true}
   end
-  return {"ok": false}
+  return "{\"status\":101}"
 end
 
 define main

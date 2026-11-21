@@ -2,12 +2,12 @@
 ~ Route returns {"status":101,"port":N}; host/native listen splices the client.
 
 define route with method, path, body
-  let port be number with (args at 0)
-  if path == "/ws/echo"
-    return "{\"status\":101,\"port\":" + (text with port) + "}"
-  end
   if path == "/ws/refuse"
     return "{\"error\":\"forbidden\",\"status\":403}"
+  end
+  if path == "/ws/echo"
+    let port be number with (args at 0)
+    return "{\"status\":101,\"port\":" + (text with port) + "}"
   end
   return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
 end

@@ -1,5 +1,9 @@
 # Changelog
 
+## WebSocket refuse fail-closed (this branch)
+
+- Packed native `listen` no longer overwrites HTTP `rt_listen` with an auto-101 dispatcher. RFC 6455 101 is emitted only when the route returns `"status":101`. GET `/ws/refuse` is 403 on host and ELF (`tools/ws-refuse-proof.sh`). With `"port"` both splice (host `TryWsHijack` / packed `land_ws_send`). CouchStation: `tools/ws-refuse-windows.ps1` (PE not executed here). Residual: listen+`proxy_reply` GET `/proxy` still empty HTTP natively; native 101 without `"port"` is JSON HTTP 101 (in-process echo stays on the host). Those are not the refuse bug. Caps unchanged.
+
 ## Native Postgres / Redis TLS on PE SChannel (this branch)
 
 - Merge of #109 / #116 onto #126. ELF OpenSSL is unchanged. PE `tls_wrap` is emitted through the SChannel guest (`src/rt-tls-pe.vire`): hostname verification on, TLS 1.2+, no skip-verify, no `LoadLibrary`. `pg_open_ssl` verify-full and `rediss://` (tls_connect) use that stack. CouchStation: `tools/pg-redis-tls-windows.ps1`. Residual: SCRAM-SHA-256-PLUS, RESP3, PE execute on this Linux agent.

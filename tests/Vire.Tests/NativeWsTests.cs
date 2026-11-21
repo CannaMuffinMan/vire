@@ -16,6 +16,7 @@ public class NativeWsTests
         Assert.Equal(ws, staged);
         Assert.Contains("emitWsRuntime", ws);
         Assert.Contains("ws_dispatch", ws);
+        Assert.DoesNotContain("pin with labels, \"rt_listen\", image", ws);
         Assert.Contains("rt_loop_tick", ws);
         Assert.Contains("rt_note_wait", ws);
         Assert.Contains("ws_clcode", ws);
@@ -75,6 +76,7 @@ public class NativeWsTests
             HandshakeEcho(host.Port, "/ws/kick");
             HandshakeEcho(host.Port, "/ws/chat");
             HandshakeEcho(host.Port, "/live");
+            HandshakeRefuse(host.Port, "/healthz");
             AssertClose(host.Port, "/", Mask(1, Encoding.ASCII.GetBytes("no"), false, 0, false), 1002);
             AssertClose(host.Port, "/", Mask(1, Encoding.ASCII.GetBytes("x"), true, 1, false), 1002);
             AssertClose(host.Port, "/", Mask(9, Encoding.ASCII.GetBytes("p"), true, 0, false, false), 1002);
@@ -84,6 +86,54 @@ public class NativeWsTests
         Assert.Equal(5000000, Program.ProgramStepCap);
         Assert.Contains("33554432", File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt.vire")));
         Assert.Contains("100000", File.ReadAllText(Path.Combine(DualMode.FindRoot(), "Vire.cs")).Substring(0, 4000));
+    }
+
+    static void HandshakeRefuse(int port, string path)
+    {
+        using (TcpClient client = new TcpClient())
+        {
+            client.ReceiveTimeout = 4000;
+            client.SendTimeout = 4000;
+            client.Connect("127.0.0.1", port);
+            NetworkStream stream = client.GetStream();
+            string key = Convert.ToBase64String(Encoding.ASCII.GetBytes("0123456789abcdef"));
+            byte[] req = Encoding.ASCII.GetBytes(
+                "GET " + path + " HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\n"
+                + "Connection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\n"
+                + "Sec-WebSocket-Version: 13\r\n\r\n");
+            stream.Write(req, 0, req.Length);
+            string head = ReadHeaders(stream);
+            Assert.DoesNotContain("101", head);
+            Assert.DoesNotContain("Switching Protocols", head);
+            Assert.Contains("200", head);
+        }
+    }
+
+    [Fact]
+    public void HostListenRefusesWebsocketWhenRouteStatusIsNot101()
+    {
+        string guest = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tests", "rebuild", "guests", "listen-ws.vire"));
+        using (ListenHost host = ListenHost.Start(guest))
+        {
+            using (TcpClient client = new TcpClient())
+            {
+                client.ReceiveTimeout = 4000;
+                client.SendTimeout = 4000;
+                client.Connect("127.0.0.1", host.Port);
+                NetworkStream stream = client.GetStream();
+                string key = Convert.ToBase64String(Encoding.ASCII.GetBytes("0123456789abcdef"));
+                byte[] req = Encoding.ASCII.GetBytes(
+                    "GET /ws/refuse HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\n"
+                    + "Connection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\n"
+                    + "Sec-WebSocket-Version: 13\r\n\r\n");
+                stream.Write(req, 0, req.Length);
+                string head = ReadHeaders(stream);
+                Assert.Contains("403", head);
+                Assert.DoesNotContain("Switching Protocols", head);
+                Assert.DoesNotContain("Sec-WebSocket-Accept:", head);
+            }
+        }
+        Assert.Equal(5000000, Program.ProgramStepCap);
     }
 
     static void HandshakeEcho(int port, string path)
