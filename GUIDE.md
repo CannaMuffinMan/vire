@@ -213,6 +213,8 @@ say now
 
 `fetch with "https://example.com"` performs one HTTP GET. The address must start with `http://` or `https://`. The wait is at most 5 seconds, and the body is at most 1,000,000 bytes.
 
+Native compiled programs use `tls_connect` / `tls_wrap` / `tls_send` / `tls_recv` / `tls_close` for outbound HTTPS and Postgres `sslmode=require`/`verify-full` on the loopback TCP path (see `docs/native-tls.md`). Native `tls_listen` is fail-closed. Certificate checks stay on. There is no flag that turns them off. CA files stay under `data/` or `site/` (empty CA uses the system store).
+
 ## 10. Packages
 
 A package is a folder under `deps`. Its code lives in `lib.vire`. The package name is a word of letters, digits, and underscores.

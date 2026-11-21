@@ -158,6 +158,18 @@ static class VireSeal
         }
     }
 
+    // Guest `hash` and native rt_sha256 both digest Latin-1 string bytes (one
+    // byte per chr). Lockfiles keep HashText UTF-8. HMAC/SCRAM needs this path
+    // so host interpreter matches PE/ELF on pads with bytes 128-255.
+    public static string HashGuest(string text)
+    {
+        using (SHA256 sha = SHA256.Create())
+        {
+            byte[] bytes = sha.ComputeHash(ToBytes(text ?? ""));
+            return ToHex(bytes);
+        }
+    }
+
     public static string Seal(string text)
     {
         return FromBytes(SealBytes(Encoding.UTF8.GetBytes(text ?? "")));

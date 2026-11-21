@@ -1,5 +1,14 @@
 # Changelog
 
+## Native Postgres TLS (this branch)
+
+- `pg_open_ssl` sends SSLRequest, refuses `'N'` for `require`/`verify-full`, then `tls_wrap` (cert check on; hostname for verify-full). SCRAM-SHA-256 and simple query over TLS. Test CA generated at prove time. Channel binding SCRAM-SHA-256-PLUS is residual.
+- Guest `tls_wrap` wraps an existing loopback TCP handle. Windows PE Schannel IAT (`secur32`/`crypt32`) is emitted, not a fail-closed stub.
+
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Native `tls_listen` fail-closed. Test certs at test time.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.

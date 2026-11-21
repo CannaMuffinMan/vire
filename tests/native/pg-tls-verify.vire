@@ -1,0 +1,24 @@
+~ Host-only verify-full negatives (wrong hostname, untrusted CA). Native ELF keeps a single SSL*.
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define main
+  let port be PORT_PLACEHOLDER
+  let user be "PGUSER_PLACEHOLDER"
+  let db be "PGDB_PLACEHOLDER"
+  let secret be "PGSECRET_PLACEHOLDER"
+  let badhost be pg_open_ssl with "127.0.0.1", port, user, db, secret, "verify-full", "evil.example", "data/pg-ca.pem"
+  if (badhost at "ok") == true
+    fail with "wrong hostname missed"
+  end
+  say "wrong-host " + (badhost at "why")
+  let badca be pg_open_ssl with "127.0.0.1", port, user, db, secret, "verify-full", "localhost", "data/pg-untrusted.pem"
+  if (badca at "ok") == true
+    fail with "untrusted ca missed"
+  end
+  say "untrusted-ca " + (badca at "why")
+  say "PG TLS VERIFY pass"
+end
