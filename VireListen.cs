@@ -318,7 +318,7 @@ static class VireListen
         if (text.IndexOf("\"reason\":\"data_held\"", StringComparison.Ordinal) >= 0) return 503;
         if (text == "{\"enabled\":false}") return 503;
         if (text == "Authentication required.") return 401;
-        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400, 307 };
+        int[] codes = { 507, 503, 502, 500, 431, 413, 411, 408, 404, 403, 401, 400, 307 };
         for (int i = 0; i < codes.Length; i++)
         {
             string needle = "\"status\":" + codes[i];
@@ -371,6 +371,7 @@ static class VireListen
         if (code == 431) return "Request Header Fields Too Large";
         if (code == 500) return "Internal Server Error";
         if (code == 501) return "Not Implemented";
+        if (code == 502) return "Bad Gateway";
         if (code == 503) return "Service Unavailable";
         if (code == 507) return "Insufficient Storage";
         return "OK";
