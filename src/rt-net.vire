@@ -63,6 +63,7 @@ end
 ~ Prebuilt json encode/parse (rt-net-json-blob). Cursor is {ptr, end}.
 ~ rt_buf_finish returns the text object in rax. Encode keeps the buffer in
 ~ rax across helper calls; parse walks [ptr] against end.
+~ JSON Content-Type is application/json with no charset (Go writeJSON).
 
 define emitNetRuntime with image, fixes, labels, has_route, need_net
   let base be length with image
@@ -84,7 +85,8 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
   parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
   parkMsg with image, labels, "txt_sp_err", " Error\r\n"
-  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json; charset=utf-8\r\nContent-Length: "
+  ~ JSON listen replies match Go writeJSON: Content-Type application/json, no charset.
+  parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json\r\nContent-Length: "
   parkMsg with image, labels, "txt_hdr2", "\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n\r\n"
   parkMsg with image, labels, "txt_GET", "GET"
   parkMsg with image, labels, "txt_POST", "POST"

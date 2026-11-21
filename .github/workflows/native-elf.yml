@@ -23,6 +23,8 @@ jobs:
         run: bash tools/native-elf-nofollow.sh
       - name: loopback TCP connect/listen
         run: bash tools/native-elf-tcp.sh
+      - name: FCG health contract vs native ELF
+        run: bash tools/rebuild-health-diff.sh
       - name: selfhost gen1=gen2
         run: bash tools/native-elf-selfhost.sh
 
