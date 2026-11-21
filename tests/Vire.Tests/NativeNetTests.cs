@@ -44,6 +44,8 @@ public class NativeNetTests
         string guest = File.ReadAllText(Path.Combine(root, "guest-health.vire"));
         Assert.Contains("path == \"/health\"", guest);
         Assert.Contains("path == \"/api/health\"", guest);
+        Assert.Contains("path == \"/info\"", guest);
+        Assert.Contains("path == \"/connect\"", guest);
         Assert.Contains("service", guest);
         Assert.Contains("fcgcpa", guest);
         Assert.Contains("payments", guest);
