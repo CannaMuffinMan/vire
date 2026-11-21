@@ -70,6 +70,169 @@ define http_hop with name
   return false
 end
 
+define http_hop_ws with name
+  if name == "connection"
+    return false
+  end
+  if name == "upgrade"
+    return false
+  end
+  if name == "sec-websocket-key"
+    return false
+  end
+  if name == "sec-websocket-version"
+    return false
+  end
+  if name == "sec-websocket-accept"
+    return false
+  end
+  if name == "sec-websocket-protocol"
+    return false
+  end
+  return http_hop with name
+end
+
+define http_has_token with raw, want
+  let t be lower with (http_trim with raw)
+  if t == ""
+    return false
+  end
+  let parts be split with t, ","
+  let i be 0
+  let n be length with parts
+  while i < n
+    let bit be http_trim with (parts at i)
+    if bit == want
+      return true
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define http_ws_key_ok with raw
+  let t be http_trim with raw
+  if (length with t) != 24
+    return false
+  end
+  if (slice with t, 22, 24) != "=="
+    return false
+  end
+  let abc be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  let i be 0
+  while i < 22
+    if (find with abc, (t at i)) < 0
+      return false
+    end
+    let i be i + 1
+  end
+  return true
+end
+
+define http_ws_intent with method, extra
+  let block be extra
+  if block == none
+    let block be ""
+  end
+  if block == ""
+    return 0
+  end
+  if not (begins with block, "x")
+    let block be "x\r\n" + block
+  end
+  let lines be split with block, "\r\n"
+  let i be 1
+  let n be length with lines
+  let upgrade be ""
+  let connection be ""
+  let key be ""
+  let version be ""
+  while i < n
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon > 0
+        let name be lower with (http_trim with (slice with line, 0, colon))
+        let value be slice with line, (colon + 1), (length with line)
+        if name == "upgrade"
+          let upgrade be value
+        end
+        if name == "connection"
+          let connection be value
+        end
+        if name == "sec-websocket-key"
+          let key be value
+        end
+        if name == "sec-websocket-version"
+          let version be value
+        end
+      end
+    end
+    let i be i + 1
+  end
+  let wantWs be false
+  if http_has_token with upgrade, "websocket"
+    let wantWs be true
+  end
+  if key != ""
+    let wantWs be true
+  end
+  if version != ""
+    let wantWs be true
+  end
+  if not wantWs
+    return 0
+  end
+  if method != "GET"
+    return -1
+  end
+  if not (http_has_token with upgrade, "websocket")
+    return -1
+  end
+  if not (http_has_token with connection, "upgrade")
+    return -1
+  end
+  if (http_trim with version) != "13"
+    return -1
+  end
+  if not (http_ws_key_ok with key)
+    return -1
+  end
+  return 1
+end
+
+define http_strip_keep with head, keepWs
+  let lines be split with head, "\r\n"
+  let i be 1
+  let n be length with lines
+  let out be ""
+  while i < n
+    let line be lines at i
+    if line != ""
+      let colon be find with line, ":"
+      if colon > 0
+        let name be lower with (http_trim with (slice with line, 0, colon))
+        let hop be true
+        if keepWs
+          let hop be http_hop_ws with name
+        end
+        if not keepWs
+          let hop be http_hop with name
+        end
+        if not hop
+          if name != "host"
+            if name != "content-length"
+              let out be out + line + "\r\n"
+            end
+          end
+        end
+      end
+    end
+    let i be i + 1
+  end
+  return out
+end
+
 define http_cl_digits with raw
   let t be http_trim with raw
   let n be length with t
@@ -153,28 +316,7 @@ define http_scan with head
 end
 
 define http_strip_hops with head
-  let lines be split with head, "\r\n"
-  let i be 1
-  let n be length with lines
-  let out be ""
-  while i < n
-    let line be lines at i
-    if line != ""
-      let colon be find with line, ":"
-      if colon > 0
-        let name be lower with (http_trim with (slice with line, 0, colon))
-        if not (http_hop with name)
-          if name != "host"
-            if name != "content-length"
-              let out be out + line + "\r\n"
-            end
-          end
-        end
-      end
-    end
-    let i be i + 1
-  end
-  return out
+  return http_strip_keep with head, false
 end
 
 define http_rewrite_loc with loc, prefix
@@ -223,6 +365,52 @@ define http_recv_all with h
       return {"bad": true, "why": "oversize", "raw": got}
     end
     let nrecv be nrecv + 1
+  end
+  return {"bad": false, "raw": got}
+end
+
+define http_recv_head with h
+  let got be ""
+  let nrecv be 0
+  while nrecv < 64
+    let chunk be recv with h, 4096
+    if chunk == ""
+      stop
+    end
+    let got be got + chunk
+    if (find with got, "\r\n\r\n") >= 0
+      if (length with got) > 16384
+        return {"bad": true, "why": "headers", "raw": got}
+      end
+      return {"bad": false, "raw": got}
+    end
+    if (length with got) > 16384
+      return {"bad": true, "why": "headers", "raw": got}
+    end
+    let nrecv be nrecv + 1
+  end
+  return {"bad": true, "why": "timeout", "raw": got}
+end
+
+define http_recv_tunnel with h, seed
+  let got be seed
+  if got == none
+    let got be ""
+  end
+  let nrecv be 0
+  while nrecv < 64
+    if (length with got) > 65536
+      return {"bad": true, "why": "oversize", "raw": got}
+    end
+    let chunk be recv with h, 4096
+    if chunk == ""
+      stop
+    end
+    let got be got + chunk
+    let nrecv be nrecv + 1
+  end
+  if (length with got) > 65536
+    return {"bad": true, "why": "oversize", "raw": got}
   end
   return {"bad": false, "raw": got}
 end
@@ -289,6 +477,10 @@ define http_parse_resp with raw
   return {"bad": false, "status": status, "headers": head, "body": body}
 end
 
+define http_bad_req with why
+  return {"ok": false, "status": 400, "headers": "", "body": "{\"error\":\"bad request\"}", "error": why}
+end
+
 define http with spec
   let method be spec at "method"
   let port be spec at "port"
@@ -307,9 +499,13 @@ define http with spec
   if extra == none
     let extra be ""
   end
+  let ws be http_ws_intent with method, extra
+  if ws < 0
+    return http_bad_req with "upgrade"
+  end
   if method != "GET"
     if method != "POST"
-      return {"ok": false, "status": 400, "headers": "", "body": "{\"error\":\"bad request\"}", "error": "method"}
+      return http_bad_req with "method"
     end
   end
   if path == ""
@@ -318,18 +514,26 @@ define http with spec
   if extra != ""
     let scanned be http_scan with ("x\r\n" + extra)
     if scanned at "bad"
-      return {"ok": false, "status": 400, "headers": "", "body": "{\"error\":\"bad request\"}", "error": scanned at "why"}
+      return http_bad_req with (scanned at "why")
     end
   end
   let req be method + " " + path + " HTTP/1.1\r\n"
   let req be req + "Host: 127.0.0.1:" + (text with port) + "\r\n"
-  let req be req + "Connection: close\r\n"
-  if extra != ""
-    let req be req + (http_strip_hops with ("x\r\n" + extra))
+  if ws == 1
+    if extra != ""
+      let req be req + (http_strip_keep with ("x\r\n" + extra), true)
+    end
+    let req be req + "\r\n"
   end
-  let req be req + "Content-Length: " + (text with (length with body)) + "\r\n\r\n"
-  if body != ""
-    let req be req + body
+  if ws != 1
+    let req be req + "Connection: close\r\n"
+    if extra != ""
+      let req be req + (http_strip_hops with ("x\r\n" + extra))
+    end
+    let req be req + "Content-Length: " + (text with (length with body)) + "\r\n\r\n"
+    if body != ""
+      let req be req + body
+    end
   end
   let opened be 0
   let h be 0
@@ -337,6 +541,40 @@ define http with spec
     let h be connect with "127.0.0.1", port
     let opened be 1
     send with h, req
+    if ws == 1
+      let packed be http_recv_head with h
+      if packed at "bad"
+        close with h
+        let opened be 0
+        return {"ok": false, "status": 0, "headers": "", "body": "", "error": packed at "why"}
+      end
+      let parsed be http_parse_resp with (packed at "raw")
+      if parsed at "bad"
+        close with h
+        let opened be 0
+        return {"ok": false, "status": 0, "headers": "", "body": "", "error": parsed at "why"}
+      end
+      if (parsed at "status") != 101
+        close with h
+        let opened be 0
+        return {"ok": true, "status": parsed at "status", "headers": parsed at "headers", "body": parsed at "body", "error": ""}
+      end
+      let endAt be find with (packed at "raw"), "\r\n\r\n"
+      let seed be ""
+      if endAt >= 0
+        let seed be slice with (packed at "raw"), (endAt + 4), (length with (packed at "raw"))
+      end
+      if body != ""
+        send with h, body
+      end
+      let tun be http_recv_tunnel with h, seed
+      close with h
+      let opened be 0
+      if tun at "bad"
+        return {"ok": false, "status": 101, "headers": parsed at "headers", "body": "", "error": tun at "why"}
+      end
+      return {"ok": true, "status": 101, "headers": parsed at "headers", "body": tun at "raw", "error": ""}
+    end
     let packed be http_recv_all with h
     close with h
     let opened be 0
@@ -368,6 +606,11 @@ define proxy with spec
   if extra == none
     let extra be ""
   end
+  let method be spec at "method"
+  let ws be http_ws_intent with method, extra
+  if ws < 0
+    return http_bad_req with "upgrade"
+  end
   if extra != ""
     let scanned be http_scan with ("x\r\n" + extra)
     if scanned at "bad"
@@ -376,7 +619,17 @@ define proxy with spec
   end
   let got be http with spec
   if not (got at "ok")
+    if (got at "status") == 400
+      return got
+    end
     return http_gateway
+  end
+  if (got at "status") == 101
+    let fwd be http_strip_keep with (got at "headers"), true
+    let fwd be fwd + "X-Forwarded-For: 127.0.0.1\r\n"
+    let fwd be fwd + "X-Forwarded-Host: 127.0.0.1\r\n"
+    let fwd be fwd + "X-Forwarded-Proto: http\r\n"
+    return {"ok": true, "status": 101, "headers": fwd, "body": got at "body", "location": "", "error": ""}
   end
   let prefix be ""
   if has with spec, "prefix"

@@ -23,6 +23,8 @@ public class RebuildProxyContractTests
         Assert.Contains("Bad Gateway", listen);
         Assert.Contains("define http with spec", http);
         Assert.Contains("define proxy with spec", http);
+        Assert.Contains("define http_ws_intent with method, extra", http);
+        Assert.Contains("sec-websocket-key", http);
         Assert.Contains("transfer-encoding", http);
         Assert.Contains("X-Forwarded-For", http);
         Assert.Contains("X-Forwarded-Host", http);
@@ -31,14 +33,21 @@ public class RebuildProxyContractTests
         Assert.DoesNotContain("LoadLibraryA", http);
         Assert.Contains("use \"http-client.vire\"", guest);
         Assert.Contains("client-get", guest);
+        Assert.Contains("proxy-ws", guest);
         Assert.DoesNotContain("define http with spec", fail);
         Assert.DoesNotContain("LANDING_UPSTREAM", guest);
         Assert.DoesNotContain("fcgcpa-prod", guest);
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-windows.ps1")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-ws-diff.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-ws-windows.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "proxy", "echo.json")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "proxy", "ws-echo.json")));
         string docs = File.ReadAllText(Path.Combine(root, "docs", "REBUILD-MY-STACK.md"));
         Assert.Contains("src/http-client.vire", docs);
         Assert.Contains("rebuild-proxy-diff.sh", docs);
+        Assert.Contains("rebuild-proxy-ws-diff.sh", docs);
+        Assert.Contains("65536", File.ReadAllText(Path.Combine(root, "src", "http-client.vire")));
+        Assert.Equal(5000000, Program.ProgramStepCap);
     }
 }
