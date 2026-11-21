@@ -1,0 +1,30 @@
+{
+  "id": "fcgbds-health",
+  "source": "fcgbds-go GET /health golden fields derived from source, not live. Go also sends ts=now(); this Vire guest has no clock and omits ts. Field match only.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_health",
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body_fields": {
+        "ok": true,
+        "service": "fcgbds-core",
+        "dbConfigured": false,
+        "paymentsEnabled": false
+      }
+    }
+  ]
+}

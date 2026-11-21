@@ -1,0 +1,88 @@
+~ Fixture JWT HS256 + Cookie helpers for portal session gates.
+~ Secrets are process args, never production env values.
+use "rt-crypto.vire"
+
+define json_quoted with text, key
+  let needle be "\"" + key + "\":\""
+  let pos be find with text, needle
+  if pos < 0
+    return none
+  end
+  let fromp be pos + (length with needle)
+  let n be length with text
+  let i be fromp
+  while i < n
+    if (text at i) == "\""
+      stop
+    end
+    let i be i + 1
+  end
+  if i >= n
+    return none
+  end
+  return slice with text, fromp, i
+end
+
+define cookie_named with header, name
+  if header == none
+    return ""
+  end
+  if header == ""
+    return ""
+  end
+  if header == "-"
+    return ""
+  end
+  let pairs be cookie_parse with header
+  let i be 0
+  let n be length with pairs
+  while i < n
+    let p be pairs at i
+    if (p at 0) == name
+      return p at 1
+    end
+    let i be i + 1
+  end
+  return ""
+end
+
+define jwt_secret_bytes with raw
+  if raw == none
+    return none
+  end
+  if raw == ""
+    return none
+  end
+  if raw == "-"
+    return none
+  end
+  let got be ascii_bytes with raw
+  if (got at 0) != "ok"
+    return none
+  end
+  return got at 1
+end
+
+define portal_jwt_ok with token, secret, clock, want_key, want_val
+  if secret == none
+    return "missing"
+  end
+  if token == none
+    return "missing"
+  end
+  if token == ""
+    return "missing"
+  end
+  let v be jwt_hs256_verify with token, secret, clock
+  if (v at 0) != "ok"
+    return v at 1
+  end
+  let field be jwt_field_string with (v at 1), want_key
+  if (field at 0) != "ok"
+    return "role"
+  end
+  if (field at 1) != want_val
+    return "role"
+  end
+  return "ok"
+end

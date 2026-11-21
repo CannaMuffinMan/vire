@@ -1,0 +1,39 @@
+use "src/rt-crypto.vire"
+
+define fillBytes with n, v
+  let xs be []
+  let i be 0
+  while i < n
+    push with xs, v
+    let i be i + 1
+  end
+  return xs
+end
+
+define main
+  let k1 be fillBytes with 20, 11
+  let m1 be ascii_bytes with "Hi There"
+  say hmac_sha256_hex with k1, (m1 at 1)
+  let k2 be ascii_bytes with "Jefe"
+  let m2 be ascii_bytes with "what do ya want for nothing?"
+  say hmac_sha256_hex with (k2 at 1), (m2 at 1)
+  let k6 be fillBytes with 131, 170
+  let m6 be ascii_bytes with "Test Using Larger Than Block-Size Key - Hash Key First"
+  say hmac_sha256_hex with k6, (m6 at 1)
+  let m7 be ascii_bytes with "This is a test using a larger than block-size key and a larger than block-size data. The key needs to be hashed before being used by the HMAC algorithm."
+  say hmac_sha256_hex with k6, (m7 at 1)
+  let secret be ascii_bytes with "secret"
+  let payload be "{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"iat\":1516239022}"
+  let signed be jwt_hs256_sign with payload, (secret at 1)
+  say signed at 1
+  let noneTok be "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxIn0.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  let gotv be jwt_hs256_verify with noneTok, (secret at 1), none
+  say gotv at 0
+  let ck be cookie_parse with "Cookie: SID=31d4d96e407aad42; lang=en-US"
+  let p0 be ck at 0
+  say (p0 at 0) + "=" + (p0 at 1)
+  let setc be cookie_set with "SID", "x", "/", true, true, "Lax", 60
+  say setc at 1
+  let bad be cookie_set with "a", "b;c", none, false, false, none, none
+  say bad at 0
+end

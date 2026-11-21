@@ -1,0 +1,14 @@
+~ edge-go maintenance-on JSON for non-health paths (derived from source, not live).
+~ SHA-256 bypass and CIDR allowlist are blocked. Healthz still passes.
+~ Body keys follow Go maintenanceJSON plus "status":503 for Vire HTTP mapping.
+
+define route with method, path, body
+  if path == "/healthz"
+    return "ok"
+  end
+  return "{\"code\":\"maintenance_mode\",\"error\":\"maintenance\",\"message\":\"Forever Couch Gang is down for maintenance. Please try again soon.\",\"status\":503}"
+end
+
+define main
+  listen with 18080
+end

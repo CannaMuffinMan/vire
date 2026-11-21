@@ -1,0 +1,25 @@
+{
+  "id": "rpc-portal-go/dist-missing",
+  "source": "rpc-portal-go GET / with RPC_PORTAL_DIST unset. handleStatic writeJSON reason dist_missing HTTP 503. Vire adds status:503. Does not serve files.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_root_dist_missing",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    }
+  ]
+}

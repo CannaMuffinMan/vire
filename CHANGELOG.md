@@ -1,5 +1,28 @@
 # Changelog
 
+## WebSocket refuse fail-closed (this branch)
+
+- Packed native `listen` no longer overwrites HTTP `rt_listen` with an auto-101 dispatcher. RFC 6455 101 is emitted only when the route returns `"status":101`. GET `/ws/refuse` is 403 on host and ELF (`tools/ws-refuse-proof.sh`). With `"port"` both splice (host `TryWsHijack` / packed `land_ws_send`). CouchStation: `tools/ws-refuse-windows.ps1` (PE not executed here). Residual: native 101 without `"port"` is JSON HTTP 101 (in-process echo stays on the host). Caps unchanged.
+
+## Packed listen + proxy_reply (this branch)
+
+- Packed 3-param `listen` parks the route `body` as `lea rdx,[rip+txt_empty]` (in-place blob+2728, reloc `txt_empty`) so GET/HEAD nobody is a heap text, not integer 1. FAIL_BEFORE `962be3ac`: native empty HTTP / SEGV `rdx=1` vs host `200 up-ok`. Extra Vire trampoline statements overflowed list cap 100000 on self-host; this patch does not grow `emitLandingHttp`. `tools/proxy-reply-proof.sh`. CouchStation: `tools/proxy-reply-windows.ps1` (PE not executed here). Residual: packed POST body is also `txt_empty` on this 24-byte site; `land_st_405` still dropped (list cap 100000, not raised). Caps unchanged.
+
+## Native Postgres / Redis TLS on PE SChannel (this branch)
+
+- Merge of #109 / #116 onto #126. ELF OpenSSL is unchanged. PE `tls_wrap` is emitted through the SChannel guest (`src/rt-tls-pe.vire`): hostname verification on, TLS 1.2+, no skip-verify, no `LoadLibrary`. `pg_open_ssl` verify-full and `rediss://` (tls_connect) use that stack. CouchStation: `tools/pg-redis-tls-windows.ps1`. Residual: SCRAM-SHA-256-PLUS, RESP3, PE execute on this Linux agent.
+
+## Native Postgres TLS (this branch)
+
+- `pg_open_ssl` sends SSLRequest, refuses `'N'` for `require`/`verify-full`, then `tls_wrap` (cert check on; hostname for verify-full). SCRAM-SHA-256 and simple query over TLS. Test CA generated at prove time. Channel binding SCRAM-SHA-256-PLUS is residual.
+- Guest `tls_wrap` wraps an existing loopback TCP handle. Windows PE SChannel IAT (`secur32`/`crypt32`) is emitted, not a fail-closed stub.
+
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Test certs at test time.
+- `tls_listen`: TLS 1.2+ termination on the HTTP listener (rank 11). Host `SslStream`; Linux ELF `SSL_accept` wrapping `rt_listen`. Loopback tests, fail-closed handshake/plaintext/downgrade. Windows PE still fail-closed. Contract `tests/rebuild/contracts/health.json`.
+- Listen-side RFC 6455 Upgrade hijack: valid websocket GET is spliced onto a loopback upstream (`{"status":101,"port":N}`). Host `VireListen` + native `land_ws_send`. `wss://` on `tls_listen`. `tools/rebuild-listen-ws-diff.sh` / `rebuild-listen-wss-diff.sh`. PE CouchStation: `tools/listen-ws-windows.ps1` (not run on Linux).
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.
@@ -18,6 +41,7 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - Close-out. `PHASE0-DONE.md` maps each Phase 0 done-criterion to a test or CI job. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
 
 - Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Findings in `PHASE0-FUZZ.md`.
+- Fuzz campaign (`FUZZ-CAMPAIGN.md`): grammar-aware frontend, builtins, GC/list-cap, path bind, Unicorn + Windows PE jobs. Nightly stays off the PR `check.yml` path. Caps unchanged.
 
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
 

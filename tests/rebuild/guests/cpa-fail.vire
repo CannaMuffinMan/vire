@@ -1,0 +1,14 @@
+~ FAIL_BEFORE for cpa-go GET /health.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "nope\n"
+    end
+  end
+  return "x"
+end
+
+define main
+  listen with 0
+end

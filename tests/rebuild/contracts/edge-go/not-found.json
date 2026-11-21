@@ -1,0 +1,25 @@
+{
+  "id": "edge-go/not-found",
+  "source": "edge-go unknown Host / path is stdlib 404. Reverse-proxy is blocked. Vire JSON 404.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "get_unknown",
+      "method": "GET",
+      "path": "/nope",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "rpc-portal-go/api-transfer",
+  "source": "rpc-portal-go POST /api/transfer with value-transfer flags off (payments stay off). Go map keys sort as code then error. Vire adds status:403.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control"
+  ],
+  "cases": [
+    {
+      "name": "post_api_transfer_off",
+      "method": "POST",
+      "path": "/api/transfer",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"code\":\"value_transfer_disabled\",\"error\":\"$FCGC is not offered to the public. User-to-user transfer is disabled.\",\"status\":403}",
+      "request_body": "{}"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+~ Loopback HTTP + RFC 6455 echo for native compile tests.
+
+define route with method, path, body
+  if path == "/health"
+    return {"ok": true}
+  end
+  return "{\"status\":101}"
+end
+
+define main
+  listen with 0
+end

@@ -1,0 +1,35 @@
+~ api-go chat/live WebSocket door on native RFC 6455.
+~ Go source is not in this repo. Upgrade is terminated here (echo/relay),
+~ not opaque-proxied to Node. Loopback 127.0.0.1 only.
+
+define route with method, path, body
+  if path == "/health"
+    return {"ok": true}
+  end
+  if path == "/healthz"
+    return {"status": "ok", "live": true}
+  end
+  if path == "/ws/kick"
+    return "{\"status\":101}"
+  end
+  if path == "/ws/chat"
+    return "{\"status\":101}"
+  end
+  if path == "/ws/live"
+    return "{\"status\":101}"
+  end
+  if path == "/chat"
+    return "{\"status\":101}"
+  end
+  if path == "/live"
+    return "{\"status\":101}"
+  end
+  if path == "/"
+    return "{\"status\":101}"
+  end
+  return {"ok": false, "status": 404, "error": "not found"}
+end
+
+define main
+  listen with 0
+end

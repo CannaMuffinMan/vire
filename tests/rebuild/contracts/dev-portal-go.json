@@ -1,0 +1,53 @@
+{
+  "id": "dev-portal-go-loopback",
+  "source": "fcgcpa-prod PR #147 dev-portal-go.json goldens plus /fcg-api/ prefix proxy onto loopback. JWT session uses the Cookie request header. Public HTTPS target stays blocked.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control",
+    "location"
+  ],
+  "cases": [
+    {
+      "name": "dist_missing",
+      "method": "GET",
+      "path": "/",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+    },
+    {
+      "name": "session_login_redirect",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 307,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "location": "/login"
+      },
+      "body": "{\"status\":307,\"location\":\"/login\"}"
+    },
+    {
+      "name": "fcg_api_proxy",
+      "method": "GET",
+      "path": "/fcg-api/echo",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "up-ok"
+    }
+  ]
+}

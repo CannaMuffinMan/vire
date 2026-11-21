@@ -23,8 +23,10 @@ $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $BaseSha"
 Write-Output "pass_after_sha $AfterSha"
 
-$wt = Join-Path $env:RUNNER_TEMP "vire-json-fail-before"
-if (-not $env:RUNNER_TEMP) { $wt = Join-Path $env:TEMP "vire-json-fail-before" }
+$tmpRoot = $env:RUNNER_TEMP
+if (-not $tmpRoot) { $tmpRoot = $env:TEMP }
+if (-not $tmpRoot) { $tmpRoot = Join-Path $Root "data" }
+$wt = Join-Path $tmpRoot "vire-json-fail-before"
 if (Test-Path $wt) { Remove-Item -Recurse -Force $wt }
 git worktree add --detach $wt $BaseSha
 Push-Location $wt

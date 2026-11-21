@@ -1,0 +1,28 @@
+~ Host-only verify-full negatives (wrong hostname, untrusted CA, expired cert).
+~ Native ELF keeps a single SSL*.
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define main
+  let url be "rediss://:SECRET_PLACEHOLDER@127.0.0.1:TLS_PORT_PLACEHOLDER"
+  let badhost be redis_open_rediss with url, "evil.example", "data/redis-ca.pem"
+  if (badhost at 0) == "ok"
+    fail with "wrong hostname missed"
+  end
+  say "wrong-host " + (badhost at 1)
+  let badca be redis_open_rediss with url, "localhost", "data/redis-untrusted.pem"
+  if (badca at 0) == "ok"
+    fail with "untrusted ca missed"
+  end
+  say "untrusted-ca " + (badca at 1)
+  let expiredUrl be "rediss://:SECRET_PLACEHOLDER@127.0.0.1:EXP_PORT_PLACEHOLDER"
+  let expired be redis_open_rediss with expiredUrl, "localhost", "data/redis-ca.pem"
+  if (expired at 0) == "ok"
+    fail with "expired cert missed"
+  end
+  say "expired-cert " + (expired at 1)
+  say "REDIS TLS VERIFY pass"
+end

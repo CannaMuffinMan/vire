@@ -1,0 +1,14 @@
+~ cpa-go GET /health golden ok\\n text/plain (derived from source, not live).
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "ok\n"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end
