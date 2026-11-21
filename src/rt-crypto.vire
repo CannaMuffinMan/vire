@@ -1964,6 +1964,16 @@ define cookie_strip_prefix with header
   return slice with header, 7, n
 end
 
+define cookie_line_end with ch
+  if ch == "\r"
+    return true
+  end
+  if ch == "\n"
+    return true
+  end
+  return false
+end
+
 define cookie_parse with header
   let text be cookie_strip_prefix with header
   let n be length with text
@@ -1973,6 +1983,9 @@ define cookie_parse with header
   while i < n
     let i be cookie_skip_ows with text, i
     if i >= n
+      stop
+    end
+    if cookie_line_end with (text at i)
       stop
     end
     if (text at i) == ";"
@@ -1985,6 +1998,9 @@ define cookie_parse with header
     if i >= n
       stop
     end
+    if cookie_line_end with (text at i)
+      stop
+    end
     let start be i
     while i < n
       let ch be text at i
@@ -1992,6 +2008,9 @@ define cookie_parse with header
         stop
       end
       if ch == ";"
+        stop
+      end
+      if cookie_line_end with ch
         stop
       end
       let i be i + 1
@@ -2014,6 +2033,9 @@ define cookie_parse with header
     let vs be i
     while i < n
       if (text at i) == ";"
+        stop
+      end
+      if cookie_line_end with (text at i)
         stop
       end
       let i be i + 1

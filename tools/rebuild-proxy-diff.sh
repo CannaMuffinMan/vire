@@ -207,6 +207,77 @@ run_pair proxy-fail "bad gateway"
 run_pair proxy-smuggle "bad gateway"
 
 echo "HOST_NATIVE_MATCH"
+
+echo "=== listen + proxy_reply host vs native ==="
+run_listen() {
+  local name="$1"
+  shift
+  local out="/tmp/vire-proxy-listen-${name}.out"
+  rm -f "$out"
+  "$@" >"$out" 2>&1 &
+  local pid=$!
+  local i
+  for i in $(seq 1 200); do
+    if grep -q "listening on 127.0.0.1:" "$out" 2>/dev/null; then
+      break
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      cat "$out"
+      echo "guest $name exited before listen"
+      kill "$UP_PID" 2>/dev/null || true
+      exit 1
+    fi
+    sleep 0.05
+  done
+  local port
+  port="$(sed -n 's/.*listening on 127.0.0.1:\([0-9]*\).*/\1/p' "$out" | head -1)"
+  if [[ -z "$port" ]]; then
+    cat "$out"
+    echo "no listen port for $name"
+    kill "$pid" 2>/dev/null || true
+    kill "$UP_PID" 2>/dev/null || true
+    exit 1
+  fi
+  echo "$pid $port"
+}
+read HOST_PID HOST_PORT < <(run_listen px-host dotnet exec "$VIRE_DLL" data/native-proxy/proxy-http.vire "$UP" listen)
+read NAT_PID NAT_PORT < <(run_listen px-nat ./data/native-proxy/proxy-http.elf "$UP" listen)
+python3 - "$HOST_PORT" "$NAT_PORT" <<'PY'
+import socket, sys
+def get(port, path, body=None):
+    if body is None:
+        req = f"GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n".encode()
+    else:
+        payload = body.encode()
+        req = f"POST {path} HTTP/1.1\r\nHost: x\r\nContent-Length: {len(payload)}\r\nConnection: close\r\n\r\n".encode() + payload
+    s = socket.create_connection(("127.0.0.1", int(port)), 5)
+    s.sendall(req); s.settimeout(5)
+    data = b""
+    while True:
+        try:
+            c = s.recv(4096)
+        except socket.timeout:
+            break
+        if not c:
+            break
+        data += c
+    s.close()
+    raw = data.decode("utf-8", "replace")
+    if not raw.startswith("HTTP/"):
+        raise SystemExit("empty/bad http from %s %s %r" % (port, path, raw[:80]))
+    return int(raw.split(" ")[1]), raw.split("\r\n\r\n", 1)[1]
+for path, body, want in [("/proxy", None, "up-ok"), ("/proxy", "from-listen", "from-listen")]:
+    hs, hb = get(sys.argv[1], path, body)
+    ns, nb = get(sys.argv[2], path, body)
+    if hs != 200 or ns != 200 or want not in hb or hb != nb:
+        raise SystemExit("listen proxy %s %s/%r %s/%r" % (path, hs, hb, ns, nb))
+print("listen+proxy_reply host-vs-native match")
+PY
+kill "$HOST_PID" 2>/dev/null || true
+wait "$HOST_PID" 2>/dev/null || true
+kill "$NAT_PID" 2>/dev/null || true
+wait "$NAT_PID" 2>/dev/null || true
+
 echo "PASS_AFTER at $AFTER_SHA"
 kill "$UP_PID" 2>/dev/null || true
 wait "$UP_PID" 2>/dev/null || true

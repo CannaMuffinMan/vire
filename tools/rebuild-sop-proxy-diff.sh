@@ -362,7 +362,7 @@ def get(port, path):
     return st, body
 cases = [
     ("/", 503, '{"reason":"dist_missing","status":503}'),
-    ("/api/auth/session", 307, '{"status":307}'),
+    ("/api/auth/session", 307, '{"status":307,"location":"/login"}'),
 ]
 for path, st, body in cases:
     hs, hb = get(sys.argv[1], path)

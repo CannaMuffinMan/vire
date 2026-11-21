@@ -157,6 +157,8 @@ Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
 Run-Proof "redis-tls-prove-windows" { Run-Script "tools/redis-tls-prove-windows.ps1" }
 Run-Proof "aes-gcm-windows" { Run-Script "tools/aes-gcm-windows.ps1" }
 Run-Proof "rebuild-headers-windows" { Run-Script "tools/rebuild-headers-windows.ps1" }
+Run-Proof "rebuild-obs-listen-windows" { Run-Script "tools/rebuild-obs-listen-windows.ps1" }
+Run-Proof "rebuild-proxy-windows" { Run-Script "tools/rebuild-proxy-windows.ps1" }
 Run-Proof "tls-server-windows" { Run-Script "tools/tls-server-windows.ps1" }
 Run-Proof "pbkdf2-windows" { Run-Script "tools/pbkdf2-windows.ps1" }
 

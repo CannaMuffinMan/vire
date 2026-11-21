@@ -423,4 +423,4 @@ stop_guest "$NAT_PID"
 
 echo "PASS_AFTER at $AFTER_SHA"
 echo "JWT cookie gates, 307, 405, dist static proven host-vs-native"
-echo "blocked: AES-GCM vault, FCGBC fan-out, HTTPS API, listen+proxy_reply SEGV"
+echo "blocked: AES-GCM vault, FCGBC fan-out, HTTPS API"

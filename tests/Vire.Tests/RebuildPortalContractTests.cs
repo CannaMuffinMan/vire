@@ -20,6 +20,8 @@ public class RebuildPortalContractTests
         string jwt = File.ReadAllText(Path.Combine(root, "src", "portal-jwt.vire"));
         Assert.Contains("jwt_hs256_verify", jwt);
         Assert.DoesNotContain("JWT_SECRET", jwt);
+        string crypto = File.ReadAllText(Path.Combine(root, "src", "rt-crypto.vire"));
+        Assert.Contains("cookie_line_end", crypto);
 
         string rpc = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "rpc-portal-go.vire"));
         Assert.Contains("/api/dev/auth", rpc);
@@ -35,6 +37,8 @@ public class RebuildPortalContractTests
         string dash = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "fcgbds-dashboard-go.vire"));
         Assert.Contains("fcgbds-dashboard", dash);
         Assert.Contains("/obs", dash);
+        string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
+        Assert.Contains("Unsigned sub of needle_len", net);
 
         using (JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "rpc-portal-go.json"))))
         {

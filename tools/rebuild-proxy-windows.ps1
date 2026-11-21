@@ -14,6 +14,7 @@ Write-Host "Stand up a 127.0.0.1 upstream that answers /echo /chunk /clte /dupcl
 Write-Host "Run host interpreter vs PE for modes: client-get, client-post, client-chunk, client-clte,"
 Write-Host "  client-dupcl, client-oversize, client-timeout, proxy-get, proxy-post, proxy-loc,"
 Write-Host "  proxy-fail, proxy-smuggle"
+Write-Host "Then listen + GET/POST /proxy (proxy_reply) host vs PE; require 200 up-ok / posted body"
 Write-Host "Require identical stdout (status/body/error needles) and 502 {error:bad gateway} on fail"
 Write-Host "Do not skip tests. Caps stay 32MB / 100000 / 5M. No external network."
 exit 1
