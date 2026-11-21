@@ -17,6 +17,7 @@ public class RebuildHealthContractTests
         CheckContract(root, "fcg-health.json", guest, new[] { "/health", "/api/health" });
         CheckContract(root, "fcg-info.json", guest, new[] { "/info" });
         CheckContract(root, "fcg-connect.json", guest, new[] { "/connect" });
+        CheckContract(root, "fcg-payments.json", guest, new[] { "/payments", "/mine" });
 
         string healthJson = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "fcg-health.json"));
         using JsonDocument doc = JsonDocument.Parse(healthJson);
@@ -30,6 +31,10 @@ public class RebuildHealthContractTests
         Assert.DoesNotContain("path == \"/api/health\"", fail);
         Assert.DoesNotContain("path == \"/info\"", fail);
         Assert.DoesNotContain("path == \"/connect\"", fail);
+        Assert.DoesNotContain("path == \"/payments\"", fail);
+        Assert.DoesNotContain("path == \"/mine\"", fail);
+        Assert.Contains("payments are off", guest);
+        Assert.Contains("mining stays inside the app", guest);
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-health-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "docs", "REBUILD-MY-STACK.md")));
     }

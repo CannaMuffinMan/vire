@@ -1,0 +1,16 @@
+~ Intentionally wrong chain guest for FAIL_BEFORE of tools/rebuild-chain-diff.sh.
+~ Empty chain and 200 on POST. Not a product server.
+
+define route with method, path, body
+  if path == "/chain"
+    return "[]"
+  end
+  if path == "/block"
+    return "{\"ok\":true}"
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

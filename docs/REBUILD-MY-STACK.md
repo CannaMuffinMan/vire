@@ -44,7 +44,9 @@ Source of the JSON bodies is in-tree `api/fcgcpa.vire` plus L5 note that Node `G
 
 Write a `.vire` guest that implements only the captured endpoints. Compile with `compile-native.vire` to a native binary (ELF here, PE on Windows). Do not wrap Node/Go. Do not present a stub as the port.
 
-`guest-health.vire` serves `GET /health`, `GET /api/health`, `GET /info`, `GET /connect`. Native `rt_net_statusof` maps JSON `"status":N` to the HTTP status line the same way host `VireListen.StatusOf` does.
+`guest-health.vire` serves `GET /health`, `GET /api/health`, `GET /info`, `GET /connect`, `GET /payments`, `GET /mine`. Native `rt_net_statusof` maps JSON `"status":N` to the HTTP status line the same way host `VireListen.StatusOf` does.
+
+`guest-chain.vire` serves `GET /chain` and `POST /block` against committed genesis fixtures in `data/rebuild/chain` (copied to `data/chain` by the harness). Proof is `hash` of the same bytes host `json` would emit for `[index, previous, text]` (`"[" + text(index) + "," + json(previous) + "," + json(text) + "]"`). Native listen+`parse` and json-of-list currently crash, so the guest does not call those in `route`.
 
 ### 4. Side-by-side differential harness
 
@@ -115,8 +117,8 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 3b | `cpa-go` `GET /health` | HTTP, text/plain | Present | **This PR.** `ok\\n` + native/host text/plain Content-Type. |
 | 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
 | 3d | `api-go` `GET /healthz` | HTTP, JSON | Present | **This PR.** `{"status":"ok","live":true}`. Not `api-go` `/api/health`. |
-| 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | Next in-tree JSON after sidecar goldens |
-| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | All present on native | After 3. Needs chain fixtures, not prod data |
+| 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | **Done (this PR).** GET 403 bodies match `api/fcgcpa.vire`; payments stay off. |
+| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET on native; POST body handle is **unsafe** | **GET /chain done (this PR) host+native.** Host POST fail-closed + accept vs golden. Native POST cannot read `body` without a segfault (rt-net). |
 | 5 | Host `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen`; native guest has no token gate | Human review: port header check or keep host |
 | 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
@@ -147,12 +149,20 @@ Recorded in `tests/rebuild/contracts/`:
 - `GET /info` → 200, same headers, body from `api/fcgcpa.vire` `/info`
 - `GET /connect` → 200, same headers, body `{"twitch":"https://www.twitch.tv","youtube":"https://www.youtube.com"}`
 - `GET /nope` → HTTP **404**, body `{"ok":false,"status":404,"error":"not found"}` (host `StatusOf` and native `rt_net_statusof`)
+- `GET /payments` → HTTP **403**, body `{"ok":false,"status":403,"error":"payments are off"}`
+- `GET /mine` → HTTP **403**, body `{"ok":false,"status":403,"error":"mining stays inside the app"}`
+- `GET /chain` (genesis fixture) → 200, body one genesis block whose `proof` is host `hash` of `[0,"0",""]`
+- `POST /block` malformed → HTTP **400** (`bad block` / `text is required` / `text is not allowed` / `proof does not match`)
+- `POST /block {"text":"fixture-one"}` → 200, proof `hash` of `[1,<genesis proof>,"fixture-one"]`
+
+Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `tools/rebuild-chain-diff.sh`. Windows PE steps (CouchStation only): `tools/rebuild-fcgcpa-windows.ps1` — this Linux lane does not claim PE proof.
 
 ### What this PR does not prove
 
 - Byte-identical Node handler vs Vire (private repo unread)
-- Remaining `api/fcgcpa.vire` routes (`/payments`, `/mine`, `/chain`, `/block`)
-- Remaining sidecar routes beyond these five GET goldens
+- Native listen POST `body` (any use of the parameter segfaults). Host `POST /block` matches the recorded contract. A later rt-net body fix is required before native POST can be paired; this PR does not edit `compile-native.vire` / emitters.
+- Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
+- Remaining sidecar routes beyond the five GET goldens
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
 - TLS, WebSocket, DNS, public bind
@@ -165,7 +175,8 @@ Recorded in `tests/rebuild/contracts/`:
 ```text
 bash tools/rebuild-health-diff.sh
 bash tools/rebuild-sidecar-diff.sh
+bash tools/rebuild-chain-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
-Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). This Linux lane does not replace that proof.
+Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. This Linux lane does not replace that proof.
