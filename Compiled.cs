@@ -592,6 +592,16 @@ sealed class CompiledMachine
             return Program.HexBytes(args[0], line, col);
         }
         if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
+        if (name == "digest")
+        {
+            if (args.Count != 1) throw new VireError("digest takes 1 values, got " + args.Count, line, col);
+            return Program.Sha256Bytes(args[0], line, col);
+        }
+        if (name == "hmac")
+        {
+            if (args.Count != 2) throw new VireError("hmac takes 2 values, got " + args.Count, line, col);
+            return Program.HmacSha256(args[0], args[1], line, col);
+        }
         if (name == "chr")
         {
             if (args.Count != 1) throw new VireError("chr takes 1 values, got " + args.Count, line, col);

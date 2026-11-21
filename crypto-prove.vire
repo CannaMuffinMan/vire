@@ -96,6 +96,20 @@ define main
   let got be hmac_sha256_hex with k6, msg7
   let nfail be proveLine with "RFC4231 7", got, "9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2"
   let fails be fails + nfail
+  let a1hdr be "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9"
+  let a1pay be "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
+  let a1sig be "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+  let a1tok be a1hdr + "." + a1pay + "." + a1sig
+  let a1key be b64url_decode with "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+  let a1k be a1key at 1
+  let a1v be jwt_hs256_verify with a1tok, a1k, none
+  if (a1v at 0) == "ok"
+    say "RFC7515 A.1 PASS"
+  end
+  if (a1v at 0) != "ok"
+    say "RFC7515 A.1 FAIL"
+    let fails be fails + 1
+  end
 
   let got be b64url_encode with []
   let nfail be proveLine with "RFC4648 empty", got, ""
@@ -290,6 +304,35 @@ define main
     say "CT neq PASS"
   end
   say "CT eq residual not a CPU timing barrier"
+
+  let ck be cookie_parse with "Cookie: SID=31d4d96e407aad42; lang=en-US"
+  let p0 be ck at 0
+  let sid be (p0 at 0) + "=" + (p0 at 1)
+  let nfail be proveLine with "cookie SID", sid, "SID=31d4d96e407aad42"
+  let fails be fails + nfail
+  let p1 be ck at 1
+  let lang be (p1 at 0) + "=" + (p1 at 1)
+  let nfail be proveLine with "cookie lang", lang, "lang=en-US"
+  let fails be fails + nfail
+  let dup be cookie_parse with "a=1; a=2; b = 3"
+  let d0 be dup at 0
+  let nfail be proveLine with "cookie first-wins", d0 at 1, "1"
+  let fails be fails + nfail
+  let d1 be dup at 1
+  let nfail be proveLine with "cookie trim", d1 at 1, "3"
+  let fails be fails + nfail
+  let setc be cookie_set with "SID", "31d4d96e407aad42", "/", true, true, "Strict", 3600
+  let nfail be proveLine with "set-cookie", setc at 1, "SID=31d4d96e407aad42; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600"
+  let fails be fails + nfail
+  let badn be cookie_set with "SI\rD", "x", none, false, false, none, none
+  let nfail be showBad with "cookie CR name", badn
+  let fails be fails + nfail
+  let badv be cookie_set with "SID", "x;y", none, false, false, none, none
+  let nfail be showBad with "cookie semi value", badv
+  let fails be fails + nfail
+  let badl be cookie_set with "SID", "x\ny", none, false, false, none, none
+  let nfail be showBad with "cookie LF value", badl
+  let fails be fails + nfail
 
   if fails == 0
     say "CRYPTO PROVE pass"

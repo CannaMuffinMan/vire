@@ -859,23 +859,7 @@ define cryptoPad with buf
 end
 
 define sha256_bytes with buf
-  let ks be cryptoK
-  let state be cryptoIv
-  let padded be cryptoPad with buf
-  let i be 0
-  let n be length with padded
-  while i < n
-    let block be slice with padded, i, (i + 64)
-    let state be cryptoCompress with state, block, ks
-    let i be i + 64
-  end
-  let out be []
-  let j be 0
-  while j < 8
-    let out be cryptoStoreWord with out, (state at j)
-    let j be j + 1
-  end
-  return out
+  return digest with buf
 end
 
 define sha256_hex with buf
@@ -1214,28 +1198,7 @@ define cat_bytes with a, b
 end
 
 define hmac_sha256 with key, msg
-  let k be copy_bytes with key
-  if (length with k) > 64
-    let k be sha256_bytes with k
-  end
-  while (length with k) < 64
-    push with k, 0
-  end
-  let ip be []
-  let op be []
-  let i be 0
-  while i < 64
-    let b be k at i
-    let x be cryptoXor16 with b, 54
-    push with ip, x
-    let y be cryptoXor16 with b, 92
-    push with op, y
-    let i be i + 1
-  end
-  let cat be cat_bytes with ip, msg
-  let inner be sha256_bytes with cat
-  let cat be cat_bytes with op, inner
-  return sha256_bytes with cat
+  return hmac with key, msg
 end
 
 define hmac_sha256_hex with key, msg
@@ -1947,4 +1910,170 @@ define jwt_hs256_verify with token, secret, clock
     end
   end
   return ["ok", pt at 1]
+end
+
+define cookie_is_ows with ch
+  if ch == " "
+    return true
+  end
+  if ch == "\t"
+    return true
+  end
+  return false
+end
+
+define cookie_skip_ows with text, i
+  let n be length with text
+  while i < n
+    if not (cookie_is_ows with (text at i))
+      stop
+    end
+    let i be i + 1
+  end
+  return i
+end
+
+define cookie_has_inject with text
+  let n be length with text
+  let i be 0
+  while i < n
+    let ch be text at i
+    if ch == "\r"
+      return true
+    end
+    if ch == "\n"
+      return true
+    end
+    if ch == ";"
+      return true
+    end
+    let i be i + 1
+  end
+  return false
+end
+
+define cookie_strip_prefix with header
+  let n be length with header
+  if n < 7
+    return header
+  end
+  let p be lower with (slice with header, 0, 7)
+  if p != "cookie:"
+    return header
+  end
+  return slice with header, 7, n
+end
+
+define cookie_parse with header
+  let text be cookie_strip_prefix with header
+  let n be length with text
+  let i be cookie_skip_ows with text, 0
+  let out be []
+  let seen be {}
+  while i < n
+    let i be cookie_skip_ows with text, i
+    if i >= n
+      stop
+    end
+    if (text at i) == ";"
+      let i be i + 1
+    end
+    if i >= n
+      stop
+    end
+    let i be cookie_skip_ows with text, i
+    if i >= n
+      stop
+    end
+    let start be i
+    while i < n
+      let ch be text at i
+      if ch == "="
+        stop
+      end
+      if ch == ";"
+        stop
+      end
+      let i be i + 1
+    end
+    let name be slice with text, start, i
+    let name be slice with name, 0, (length with name)
+    let j be (length with name) - 1
+    while j >= 0
+      if not (cookie_is_ows with (name at j))
+        stop
+      end
+      let j be j - 1
+    end
+    let name be slice with name, 0, (j + 1)
+    if i < n
+      if (text at i) == "="
+        let i be i + 1
+      end
+    end
+    let vs be i
+    while i < n
+      if (text at i) == ";"
+        stop
+      end
+      let i be i + 1
+    end
+    let val be slice with text, vs, i
+    let val be slice with val, (cookie_skip_ows with val, 0), (length with val)
+    let k be (length with val) - 1
+    while k >= 0
+      if not (cookie_is_ows with (val at k))
+        stop
+      end
+      let k be k - 1
+    end
+    let val be slice with val, 0, (k + 1)
+    if (length with name) > 0
+      if not (has with seen, name)
+        put 1 into seen at name
+        push with out, [name, val]
+      end
+    end
+    if i < n
+      if (text at i) == ";"
+        let i be i + 1
+      end
+    end
+  end
+  return out
+end
+
+define cookie_set with name, value, path, httponly, secure, samesite, max_age
+  if cookie_has_inject with name
+    return ["bad", "injected name"]
+  end
+  if cookie_has_inject with value
+    return ["bad", "injected value"]
+  end
+  if (length with name) == 0
+    return ["bad", "empty name"]
+  end
+  let out be name + "=" + value
+  if path != none
+    if cookie_has_inject with path
+      return ["bad", "injected path"]
+    end
+    let out be out + "; Path=" + path
+  end
+  if httponly
+    let out be out + "; HttpOnly"
+  end
+  if secure
+    let out be out + "; Secure"
+  end
+  if samesite != none
+    if cookie_has_inject with samesite
+      return ["bad", "injected samesite"]
+    end
+    let out be out + "; SameSite=" + samesite
+  end
+  if max_age != none
+    let out be out + "; Max-Age=" + (text with max_age)
+  end
+  return ["ok", out]
 end
