@@ -60,6 +60,12 @@ define route with method, path, body, head
     end
     return "{\"enabled\":false}"
   end
+  if path == "/api/transfer"
+    if method == "POST"
+      return "{\"code\":\"value_transfer_disabled\",\"error\":\"$FCGC is not offered to the public. User-to-user transfer is disabled.\",\"status\":403}"
+    end
+    return method_not_allowed
+  end
   if path == "/api/dev/auth"
     if method == "GET"
       let sec be jwt_sec

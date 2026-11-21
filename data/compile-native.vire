@@ -5,7 +5,6 @@ use "src/elf.vire"
 use "src/rt-net.vire"
 use "src/rt-ws.vire"
 use "src/rt-tls.vire"
-use "src/rt-dns.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
