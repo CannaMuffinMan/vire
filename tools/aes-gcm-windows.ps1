@@ -19,15 +19,15 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
 
-$BaseSha = (git merge-base HEAD origin/native-compiler).Trim()
-if (-not $BaseSha) { $BaseSha = (git rev-parse HEAD^).Trim() }
+$TableSha = if ($env:AES_GCM_FAIL_BEFORE_SHA) { $env:AES_GCM_FAIL_BEFORE_SHA } else { "04ea5186c6ed3ce35451df318e29a1db9b9eabe8" }
 $AfterSha = (git rev-parse HEAD).Trim()
-Write-Output "fail_before_sha $BaseSha"
+Write-Output "fail_before_sha $TableSha"
 Write-Output "pass_after_sha $AfterSha"
-
-$baseHas = git cat-file -e "${BaseSha}:src/rt-aes.vire" 2>$null
-if ($LASTEXITCODE -eq 0) { throw "base already has src/rt-aes.vire" }
-Write-Output "FAIL_BEFORE at ${BaseSha}: src/rt-aes.vire absent (no guest AES-256-GCM)"
+$BeforeSrc = git show "${TableSha}:src/rt-aes.vire"
+if ($BeforeSrc -notmatch "sbox at") { throw "FAIL_BEFORE expected table lookup at $TableSha" }
+if ($BeforeSrc -notmatch "if d >= 256") { throw "FAIL_BEFORE expected xtime branch at $TableSha" }
+if ($BeforeSrc -notmatch "if flag == 1") { throw "FAIL_BEFORE expected GHASH bit skip at $TableSha" }
+Write-Output "FAIL_BEFORE at ${TableSha}: S-box table lookup, xtime branch, GHASH bit skip present"
 
 Write-Output "aes_gcm_host_start"
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -79,5 +79,8 @@ if ($hostNorm -ne $peNorm) {
     Write-Output "HOST_PE_MISMATCH"
     throw "host interpreter and gen1 PE stdout differ"
 }
-Write-Output "PASS_AFTER at $AfterSha host and gen1 PE AES-GCM outputs identical"
+$AfterSrc = Get-Content -Raw (Join-Path $Root "src/rt-aes.vire")
+if ($AfterSrc -match "sbox at") { throw "PASS_AFTER still has sbox at" }
+if ($AfterSrc -match "if flag == 1") { throw "PASS_AFTER still has GHASH skip" }
+Write-Output "PASS_AFTER at $AfterSha host and gen1 PE AES-GCM outputs identical; no secret sbox index / GHASH skip in source"
 Write-Output "aes gcm windows prove ok"
