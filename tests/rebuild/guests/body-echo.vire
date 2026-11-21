@@ -1,0 +1,20 @@
+~ Isolated native request-body safety probe. Reads `body` with length/slice.
+~ Must not crash. Returns JSON with the bounded body length.
+
+define route with method, path, body
+  if path == "/echo"
+    if method == "POST"
+      let n be length with body
+      let prefix be slice with body, 0, n
+      if n > 8
+        let prefix be slice with body, 0, 8
+      end
+      return "{\"ok\":true,\"n\":" + (text with n) + ",\"p\":" + (json with prefix) + "}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

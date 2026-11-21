@@ -83,13 +83,20 @@ Flag, do not paper over:
 
 HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, same needles as `VireListen.StatusOf`). Reason phrases stay `OK` vs `Error` on native (host uses `Not Found` / `Forbidden`). Contracts compare numeric status, not the reason phrase.
 
+### Rank 4–5 security property (this PR)
+
+- **Property:** a native listen guest may read `body` only as a heap text whose length is the parsed `Content-Length`, at most `HttpWire.MaxRequestBody` (1_000_000). The object header is marked leaf so GC does not walk payload bytes as pointers. POST/PUT without `Content-Length` is 411 `{"error":"content length required"}`. Oversize CL is 413 `{"error":"body too large"}`. Duplicate/malformed CL stays 400 via the existing parser. The route `body` argument is never a leftover GPR or a `.data` park.
+- **Regression:** `tests/rebuild/guests/body-echo.vire` + `tools/rebuild-body-token-diff.sh`; chain goldens in `tools/rebuild-chain-diff.sh`.
+- **Platforms:** ELF (proven here). PE uses the same blob; `GetEnvironmentVariableA` is on the net kernel32 IAT. CouchStation must re-run the PE commands below.
+- **Residual:** token compare pads 256-byte buffers and XOR-folds (constant-time on the padded copy, not on header parsing). Env token length &lt; 16 means the gate is off (same as host). Arena 32MB / list 100000 / steps 5M unchanged. Header names are scanned in any order; the last header before `\\r\\n\\r\\n` is included.
+
 ## Native capabilities (this HEAD)
 
 | Capability | Native status | Evidence |
 | --- | --- | --- |
 | HTTP listen (loopback) | **Present** PE + ELF | `src/rt-net.vire`, `tools/native-net-windows.ps1`, `tools/native-elf-tcp.sh` |
 | HTTP status from JSON `"status"` | **Present** | `rt_net_statusof`; harness `GET /nope` → 404 |
-| Content-Type JSON vs text/plain | **Present** | `rt_net_ctype` + host `ContentTypeOf`; `GET /health` `ok\\n` is text/plain |
+| Content-Type JSON vs text/plain | **Present** | JSON is `application/json` (no charset, Go writeJSON). `rt_net_ctype` + host `ContentTypeOf`; `ok\\n` is text/plain |
 | JSON encode/parse | **Present** | `rt_json` / `rt_parse`, `json-prove.vire` |
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
@@ -118,8 +125,8 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
 | 3d | `api-go` `GET /healthz` | HTTP, JSON | Present | **This PR.** `{"status":"ok","live":true}`. Not `api-go` `/api/health`. |
 | 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | **Done (this PR).** GET 403 bodies match `api/fcgcpa.vire`; payments stay off. |
-| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET on native; POST body handle is **unsafe** | **GET /chain done (this PR) host+native.** Host POST fail-closed + accept vs golden. Native POST cannot read `body` without a segfault (rt-net). |
-| 5 | Host `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen`; native guest has no token gate | Human review: port header check or keep host |
+| 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST on native (bounded body, Content-Length required) | **Done (this PR).** Native `rt-net` request body is a leaf heap text capped at 1_000_000, fail-closed 411/413/400. Host vs native `/block` vs `tests/rebuild/contracts/fcg-chain.json`. |
+| 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
 | 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
 | 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
@@ -160,7 +167,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 ### What this PR does not prove
 
 - Byte-identical Node handler vs Vire (private repo unread)
-- Native listen POST `body` (any use of the parameter segfaults). Host `POST /block` matches the recorded contract. A later rt-net body fix is required before native POST can be paired; this PR does not edit `compile-native.vire` / emitters.
+- Native POST `/block` body read is proven on this branch (bounded leaf heap text). Remaining chain rotate/507/503/migrate is not.
 - Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
 - Remaining sidecar routes beyond the five GET goldens
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
@@ -168,7 +175,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - TLS, WebSocket, DNS, public bind
 - Go microservices
 - Payments on, mining network, testnet
-- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset) and after `rt_net_statusof` blob pins. `compile-native.vire` was not edited.
+- Compiler self-host identity is re-proved after `parkNet` `txt_hdrs` (JSON Content-Type without charset), `rt_net_statusof` blob pins, and the body/token blob. `compile-native.vire` was not edited.
 
 ## Commands
 
