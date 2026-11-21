@@ -10,7 +10,7 @@ unset VIRE_BUDGET || true
 unset FCG_API_TOKEN || true
 
 AFTER_SHA="$(git rev-parse HEAD)"
-BEFORE_SHA="b0d6fcb47359f3e771d4e4a92ac6f6a3b035061f"
+BEFORE_SHA="b7f117308bfc383aca9fc6e82b4e76b50421bb2a"
 VIRE_DLL="$ROOT/bin/Release/net10.0/vire.dll"
 STAGE="$ROOT/data/native-headers"
 mkdir -p "$STAGE" data

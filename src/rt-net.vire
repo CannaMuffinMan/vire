@@ -150,6 +150,24 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_nm_authz", "authorization"
   pin with labels, "guest_extra", image
   emitU64 with image, 0
+  pin with labels, "head_hold", image
+  let z2 be 0
+  while z2 < 4104
+    let image be emitU8 with image, 0
+    let z2 be z2 + 1
+  end
+  pin with labels, "head_out", image
+  let z3 be 0
+  while z3 < 1032
+    let image be emitU8 with image, 0
+    let z3 be z3 + 1
+  end
+  pin with labels, "extra_hold", image
+  let z4 be 0
+  while z4 < 1032
+    let image be emitU8 with image, 0
+    let z4 be z4 + 1
+  end
   parkMsg with image, labels, "txt_GET", "GET"
   parkMsg with image, labels, "txt_POST", "POST"
   parkMsg with image, labels, "txt_HEAD", "HEAD"
@@ -461,9 +479,17 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   emitList with image, [72, 255, 69, 232]
   emitJmpTo with image, fixes, "jf_scan"
   pin with labels, "jf_end", image
-  emitList with image, [72, 139, 77, 248, 76, 141, 81, 8, 76, 3, 85, 216, 72, 139, 85, 232, 72, 43, 85, 216]
-  emitList with image, [76, 137, 209]
-  emitCallTo with image, fixes, "rt_net_mktext"
+  ~ Park haystack, alloc, then copy from the updated object (no interior ptr across GC).
+  emitList with image, [72, 139, 85, 232, 72, 43, 85, 216, 72, 137, 85, 208]
+  emitParkSlot with image, fixes, 248
+  emitList with image, [72, 139, 77, 208, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 200, 72, 139, 85, 208, 72, 137, 16]
+  emitList with image, [72, 141, 72, 8, 72, 139, 85, 248, 72, 141, 82, 8, 72, 3, 85, 216, 76, 139, 69, 208]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 200]
   emitEpi with image
   pin with labels, "jf_miss", image
   emitList with image, [49, 192]
@@ -475,96 +501,129 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   pin with labels, "rt_net_addfield", image
   let image be emitPro with image
   emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 76, 137, 69, 232, 76, 137, 77, 224]
+  emitParkSlot with image, fixes, 248
+  emitParkSlot with image, fixes, 232
   emitList with image, [72, 139, 77, 248, 72, 139, 85, 240]
   emitCallTo with image, fixes, "rt_net_jsonfield"
   emitList with image, [72, 131, 248, 2]
   emitJcc with image, fixes, 132, "af_bad"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "af_keep"
-  emitList with image, [72, 137, 69, 216, 72, 139, 77, 232, 72, 139, 85, 224]
+  emitList with image, [72, 137, 69, 216]
+  emitUnparkSlot with image, 232
+  emitUnparkSlot with image, 248
+  emitParkSlot with image, fixes, 232
+  emitParkSlot with image, fixes, 216
+  emitList with image, [72, 139, 77, 232, 72, 139, 85, 224]
   emitCallTo with image, fixes, "rt_text_cat"
+  emitUnparkSlot with image, 216
+  emitUnparkSlot with image, 232
   emitList with image, [72, 137, 193, 72, 139, 85, 216]
+  emitParkSlot with image, fixes, 248
   emitCallTo with image, fixes, "rt_text_cat"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 137, 193, 72, 141, 21]
   emitRel with image, fixes, "txt_crlf"
   emitCallTo with image, fixes, "rt_text_cat"
   emitEpi with image
   pin with labels, "af_keep", image
+  emitUnparkSlot with image, 232
+  emitUnparkSlot with image, 248
   emitList with image, [72, 139, 69, 232]
   emitEpi with image
   pin with labels, "af_bad", image
+  emitUnparkSlot with image, 232
+  emitUnparkSlot with image, 248
   emitList with image, [184, 2, 0, 0, 0]
   emitEpi with image
 
   pin with labels, "rt_net_guestextra", image
   let image be emitPro with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 141, 5]
-  emitRel with image, fixes, "txt_empty"
-  emitEpi with image
-  emitList with image, [72, 137, 77, 248, 72, 141, 5]
-  emitRel with image, fixes, "txt_empty"
-  emitList with image, [72, 137, 69, 240]
+  emitRel with image, fixes, "extra_hold"
+  emitList with image, [72, 199, 0, 0, 0, 0, 0]
+  emitParkSlot with image, fixes, 248
   emitList with image, [72, 139, 77, 248, 72, 141, 21]
   emitRel with image, fixes, "txt_k_loc"
-  emitList with image, [76, 139, 69, 240, 76, 141, 13]
-  emitRel with image, fixes, "txt_hn_loc"
-  emitCallTo with image, fixes, "rt_net_addfield"
+  emitCallTo with image, fixes, "rt_net_jsonfield"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 131, 248, 2]
   emitJcc with image, fixes, 132, "ge_bad"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "ge_skip1"
-  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 137, 194, 72, 141, 13]
+  emitRel with image, fixes, "txt_hn_loc"
+  emitCallTo with image, fixes, "rt_net_extraapp"
   pin with labels, "ge_skip1", image
+  emitParkSlot with image, fixes, 248
   emitList with image, [72, 139, 77, 248, 72, 141, 21]
   emitRel with image, fixes, "txt_k_set"
-  emitList with image, [76, 139, 69, 240, 76, 141, 13]
-  emitRel with image, fixes, "txt_hn_set"
-  emitCallTo with image, fixes, "rt_net_addfield"
+  emitCallTo with image, fixes, "rt_net_jsonfield"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 131, 248, 2]
   emitJcc with image, fixes, 132, "ge_bad"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "ge_skip2"
-  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 137, 194, 72, 141, 13]
+  emitRel with image, fixes, "txt_hn_set"
+  emitCallTo with image, fixes, "rt_net_extraapp"
   pin with labels, "ge_skip2", image
+  emitParkSlot with image, fixes, 248
   emitList with image, [72, 139, 77, 248, 72, 141, 21]
   emitRel with image, fixes, "txt_k_www"
-  emitList with image, [76, 139, 69, 240, 76, 141, 13]
-  emitRel with image, fixes, "txt_hn_www"
-  emitCallTo with image, fixes, "rt_net_addfield"
+  emitCallTo with image, fixes, "rt_net_jsonfield"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 131, 248, 2]
   emitJcc with image, fixes, 132, "ge_bad"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "ge_skip3"
-  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 137, 194, 72, 141, 13]
+  emitRel with image, fixes, "txt_hn_www"
+  emitCallTo with image, fixes, "rt_net_extraapp"
   pin with labels, "ge_skip3", image
+  emitParkSlot with image, fixes, 248
   emitList with image, [72, 139, 77, 248, 72, 141, 21]
   emitRel with image, fixes, "txt_k_cc"
-  emitList with image, [76, 139, 69, 240, 76, 141, 13]
-  emitRel with image, fixes, "txt_hn_cc"
-  emitCallTo with image, fixes, "rt_net_addfield"
+  emitCallTo with image, fixes, "rt_net_jsonfield"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 131, 248, 2]
   emitJcc with image, fixes, 132, "ge_bad"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "ge_skip4"
-  emitList with image, [72, 137, 69, 240]
+  emitList with image, [72, 137, 194, 72, 141, 13]
+  emitRel with image, fixes, "txt_hn_cc"
+  emitCallTo with image, fixes, "rt_net_extraapp"
   pin with labels, "ge_skip4", image
-  emitList with image, [72, 139, 69, 240]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "extra_hold"
   emitEpi with image
   pin with labels, "ge_bad", image
   emitList with image, [49, 192]
   emitEpi with image
 
   pin with labels, "rt_net_afterroute", image
+  ~ rdx is the route text. Parks below r13 are listen ctx then recv buf (pushroute).
   emitList with image, [72, 137, 85, 176, 72, 137, 209]
+  emitParkRcx with image, fixes
   emitCallTo with image, fixes, "rt_net_guestextra"
   emitList with image, [72, 133, 192]
   emitJcc with image, fixes, 132, "ar_fail"
   emitList with image, [72, 137, 5]
   emitRel with image, fixes, "guest_extra"
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 176]
+  emitUnparkRcx with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [76, 139, 69, 176, 72, 139, 77, 248, 72, 139, 9]
   emitCallTo with image, fixes, "rt_net_statusof"
   emitJmpTo with image, fixes, "ar_send"
   pin with labels, "ar_fail", image
+  emitUnparkRcx with image
+  emitUnparkRcx with image
+  emitUnparkRcx with image
+  emitList with image, [72, 137, 77, 248]
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "txt_empty"
   emitList with image, [72, 137, 5]
@@ -586,13 +645,14 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   emitRel with image, fixes, "txt_hdr2"
   emitList with image, [72, 199, 2, 77, 0, 0, 0]
   emitList with image, [72, 141, 66, 85, 72, 137, 69, 232]
+  emitList with image, [72, 139, 77, 232, 198, 1, 13, 198, 65, 1, 10, 72, 131, 69, 232, 2, 72, 131, 69, 240, 2]
   emitList with image, [72, 139, 77, 248, 72, 133, 201]
   emitJcc with image, fixes, 132, "ae_end"
   emitList with image, [72, 139, 1, 72, 133, 192]
   emitJcc with image, fixes, 132, "ae_end"
   emitList with image, [72, 61, 0, 2, 0, 0]
   emitJcc with image, fixes, 135, "ae_end"
-  emitList with image, [72, 137, 69, 240, 76, 141, 65, 8, 72, 139, 85, 240]
+  emitList with image, [72, 1, 69, 240, 76, 141, 65, 8, 72, 137, 194]
   pin with labels, "ae_cp", image
   emitList with image, [72, 133, 210]
   emitJcc with image, fixes, 132, "ae_end"
@@ -606,11 +666,21 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   emitEpi with image
 
   pin with labels, "rt_net_ci1", image
-  emitList with image, [137, 193, 128, 249, 65, 114, 6, 128, 249, 90, 119, 2, 4, 32, 195]
+  ~ Fold A-Z to a-z in al only. Must not clobber rcx (haystack) or rdx (name).
+  emitList with image, [60, 65, 114, 6, 60, 90, 119, 2, 4, 32, 195]
 
   pin with labels, "rt_net_reqfield", image
   let image be emitPro with image
   emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 72, 199, 69, 232, 0, 0, 0, 0]
+  pin with labels, "rf_skipl", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 1, 72, 59, 69, 232]
+  emitJcc with image, fixes, 134, "rf_none"
+  emitList with image, [72, 139, 77, 248, 76, 141, 81, 8, 76, 3, 85, 232, 65, 15, 182, 2, 60, 10]
+  emitJcc with image, fixes, 132, "rf_hdr0"
+  emitList with image, [72, 255, 69, 232]
+  emitJmpTo with image, fixes, "rf_skipl"
+  pin with labels, "rf_hdr0", image
+  emitList with image, [72, 255, 69, 232]
   pin with labels, "rf_line", image
   emitList with image, [72, 139, 77, 248, 72, 139, 1, 72, 59, 69, 232]
   emitJcc with image, fixes, 134, "rf_none"
@@ -663,9 +733,16 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   emitList with image, [72, 255, 69, 200]
   emitJmpTo with image, fixes, "rf_ve"
   pin with labels, "rf_take", image
-  emitList with image, [72, 139, 77, 248, 76, 141, 81, 8, 76, 3, 85, 208, 72, 139, 85, 200, 72, 43, 85, 208]
-  emitList with image, [76, 137, 209]
-  emitCallTo with image, fixes, "rt_net_mktext"
+  emitList with image, [72, 139, 85, 200, 72, 43, 85, 208, 72, 137, 85, 192]
+  emitParkSlot with image, fixes, 248
+  emitList with image, [72, 139, 77, 192, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitUnparkSlot with image, 248
+  emitList with image, [72, 137, 69, 184, 72, 139, 85, 192, 72, 137, 16]
+  emitList with image, [72, 141, 72, 8, 72, 139, 85, 248, 72, 141, 82, 8, 72, 3, 85, 208, 76, 139, 69, 192]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitList with image, [72, 139, 69, 184]
   emitEpi with image
   pin with labels, "rf_nl", image
   emitList with image, [72, 255, 69, 232]
@@ -685,73 +762,217 @@ define emitHeaderGates with image, fixes, labels, base, route_nparams
   pin with labels, "rt_net_onehead", image
   let image be emitPro with image
   emitList with image, [72, 137, 77, 248, 72, 137, 85, 240, 76, 137, 69, 232, 76, 137, 77, 224]
+  emitParkSlot with image, fixes, 248
   emitList with image, [72, 139, 77, 248, 72, 139, 85, 240]
   emitCallTo with image, fixes, "rt_net_reqfield"
   emitList with image, [72, 139, 8, 72, 133, 201]
   emitJcc with image, fixes, 132, "oh_keep"
-  emitList with image, [72, 137, 69, 216, 72, 139, 77, 232, 72, 139, 85, 224]
+  emitList with image, [72, 137, 69, 216]
+  emitUnparkSlot with image, 248
+  emitParkSlot with image, fixes, 248
+  emitParkSlot with image, fixes, 216
+  emitList with image, [72, 139, 77, 232, 72, 139, 85, 224]
   emitCallTo with image, fixes, "rt_text_cat"
+  emitUnparkSlot with image, 216
+  emitUnparkSlot with image, 248
   emitList with image, [72, 137, 193, 72, 139, 85, 216]
+  emitParkSlot with image, fixes, 248
   emitCallTo with image, fixes, "rt_text_cat"
+  emitUnparkSlot with image, 248
   emitList with image, [72, 137, 193, 72, 141, 21]
   emitRel with image, fixes, "txt_crlf"
   emitCallTo with image, fixes, "rt_text_cat"
   emitEpi with image
   pin with labels, "oh_keep", image
+  emitUnparkSlot with image, 248
   emitList with image, [72, 139, 69, 232]
+  emitEpi with image
+
+  pin with labels, "rt_net_headapp", image
+  ~ rdx = value text, r9 = "Name: " prefix. Append prefix+value+CRLF into head_out.
+  let image be emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 76, 141, 80, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_out"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ha_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ha_p", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ha_pv"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ha_p"
+  pin with labels, "ha_pv", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 10, 76, 141, 82, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_out"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ha_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ha_v", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ha_pc"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ha_v"
+  pin with labels, "ha_pc", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "txt_crlf"
+  emitList with image, [72, 139, 8, 76, 141, 80, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_out"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ha_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ha_c", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ha_done"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ha_c"
+  pin with labels, "ha_done", image
+  emitEpi with image
+
+  pin with labels, "rt_net_extraapp", image
+  let image be emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 137, 85, 240]
+  emitList with image, [72, 139, 69, 248, 72, 139, 8, 76, 141, 80, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "extra_hold"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ea_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ea_p", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ea_pv"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ea_p"
+  pin with labels, "ea_pv", image
+  emitList with image, [72, 139, 85, 240, 72, 139, 10, 76, 141, 82, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "extra_hold"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ea_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ea_v", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ea_pc"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ea_v"
+  pin with labels, "ea_pc", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "txt_crlf"
+  emitList with image, [72, 139, 8, 76, 141, 80, 8]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "extra_hold"
+  emitList with image, [76, 139, 0, 77, 141, 28, 8, 73, 129, 251, 0, 4, 0, 0]
+  emitJcc with image, fixes, 135, "ea_done"
+  emitList with image, [76, 141, 88, 8, 77, 1, 195, 72, 1, 8]
+  pin with labels, "ea_c", image
+  emitList with image, [72, 133, 201]
+  emitJcc with image, fixes, 132, "ea_done"
+  emitList with image, [65, 138, 2, 65, 136, 3, 73, 255, 194, 73, 255, 195, 72, 255, 201]
+  emitJmpTo with image, fixes, "ea_c"
+  pin with labels, "ea_done", image
   emitEpi with image
 
   pin with labels, "rt_net_reqhead", image
   let image be emitPro with image
-  emitList with image, [72, 141, 5]
-  emitRel with image, fixes, "txt_empty"
-  emitEpi with image
-  emitList with image, [72, 137, 77, 248, 72, 139, 81, 8, 72, 139, 65, 24, 72, 133, 192]
+  ~ rbx = haystack text, r12 = acc. rbp-8 ctx, rbp-16 buf, rbp-24 headerEnd.
+  emitList with image, [83, 65, 84]
+  emitList with image, [72, 137, 77, 248, 72, 139, 81, 8, 72, 137, 85, 240, 72, 139, 65, 24, 72, 133, 192]
   emitJcc with image, fixes, 132, "rh_empty"
   emitJcc with image, fixes, 136, "rh_empty"
-  emitList with image, [72, 61, 0, 64, 0, 0]
+  emitList with image, [72, 61, 0, 16, 0, 0]
   emitJcc with image, fixes, 135, "rh_empty"
-  emitList with image, [72, 137, 193, 72, 135, 202]
-  emitCallTo with image, fixes, "rt_net_mktext"
-  emitList with image, [72, 137, 69, 240, 72, 141, 13]
-  emitRel with image, fixes, "txt_empty"
   emitList with image, [72, 137, 69, 232]
-  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_hold"
+  emitList with image, [72, 139, 85, 232, 72, 137, 16]
+  emitList with image, [77, 49, 192]
+  pin with labels, "rh_cpy", image
+  emitList with image, [72, 139, 69, 232, 76, 59, 192]
+  emitJcc with image, fixes, 131, "rh_cdone"
+  emitList with image, [72, 139, 77, 240, 66, 138, 4, 1]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "head_hold"
+  emitList with image, [66, 136, 68, 1, 8]
+  emitList with image, [73, 255, 192]
+  emitJmpTo with image, fixes, "rh_cpy"
+  pin with labels, "rh_cdone", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_out"
+  emitList with image, [72, 199, 0, 0, 0, 0, 0]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "head_hold"
+  emitList with image, [72, 141, 21]
   emitRel with image, fixes, "txt_nm_cookie"
-  emitList with image, [76, 139, 69, 232, 76, 141, 13]
+  emitCallTo with image, fixes, "rt_net_reqfield"
+  emitList with image, [72, 139, 8, 72, 133, 201]
+  emitJcc with image, fixes, 132, "rh_host"
+  emitList with image, [72, 137, 69, 200]
+  emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_hn_cookie"
-  emitCallTo with image, fixes, "rt_net_onehead"
-  emitList with image, [72, 137, 69, 232, 72, 139, 77, 240, 72, 141, 21]
+  emitList with image, [72, 139, 85, 200]
+  emitCallTo with image, fixes, "rt_net_headapp"
+  pin with labels, "rh_host", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "head_hold"
+  emitList with image, [72, 141, 21]
   emitRel with image, fixes, "txt_nm_host"
-  emitList with image, [76, 139, 69, 232, 76, 141, 13]
+  emitCallTo with image, fixes, "rt_net_reqfield"
+  emitList with image, [72, 139, 8, 72, 133, 201]
+  emitJcc with image, fixes, 132, "rh_auth"
+  emitList with image, [72, 137, 69, 200]
+  emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_hn_host"
-  emitCallTo with image, fixes, "rt_net_onehead"
-  emitList with image, [72, 137, 69, 232, 72, 139, 77, 240, 72, 141, 21]
+  emitList with image, [72, 139, 85, 200]
+  emitCallTo with image, fixes, "rt_net_headapp"
+  pin with labels, "rh_auth", image
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "head_hold"
+  emitList with image, [72, 141, 21]
   emitRel with image, fixes, "txt_nm_authz"
-  emitList with image, [76, 139, 69, 232, 76, 141, 13]
+  emitCallTo with image, fixes, "rt_net_reqfield"
+  emitList with image, [72, 139, 8, 72, 133, 201]
+  emitJcc with image, fixes, 132, "rh_done"
+  emitList with image, [72, 137, 69, 200]
+  emitList with image, [72, 141, 13]
   emitRel with image, fixes, "txt_hn_authz"
-  emitCallTo with image, fixes, "rt_net_onehead"
+  emitList with image, [72, 139, 85, 200]
+  emitCallTo with image, fixes, "rt_net_headapp"
+  pin with labels, "rh_done", image
+  emitList with image, [72, 141, 5]
+  emitRel with image, fixes, "head_out"
+  emitList with image, [65, 92, 91]
   emitEpi with image
   pin with labels, "rh_empty", image
+  emitList with image, [65, 92, 91]
   emitList with image, [72, 141, 5]
   emitRel with image, fixes, "txt_empty"
   emitEpi with image
 
   pin with labels, "rt_net_pushroute", image
+  ~ Park listen ctx and recv buf across route HMAC/proxy allocs (no rbp GC walk).
+  emitList with image, [72, 139, 77, 248, 131, 73, 248, 1, 131, 73, 252, 2]
+  emitParkRcx with image, fixes
+  emitList with image, [72, 139, 77, 248, 72, 139, 73, 8, 131, 73, 248, 1, 131, 73, 252, 2]
+  emitParkRcx with image, fixes
+  emitList with image, [73, 139, 77, 232, 72, 137, 77, 248]
   emitList with image, [72, 139, 77, 248, 72, 139, 81, 40, 73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 85, 8, 73, 131, 197, 16]
   emitList with image, [72, 139, 77, 248, 72, 139, 81, 48, 73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 85, 8, 73, 131, 197, 16]
   emitList with image, [72, 139, 77, 248, 72, 139, 81, 64, 73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 85, 8, 73, 131, 197, 16]
-  emitList with image, [72, 139, 77, 248]
-  emitCallTo with image, fixes, "rt_net_reqhead"
-  emitList with image, [73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 69, 8, 73, 131, 197, 16]
+  if route_nparams == 4
+    emitList with image, [72, 139, 77, 248]
+    emitCallTo with image, fixes, "rt_net_reqhead"
+    emitList with image, [73, 139, 77, 184, 72, 137, 77, 248]
+    emitList with image, [73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 69, 8, 73, 131, 197, 16]
+  end
   emitJmpTo with image, fixes, "pr_back"
 
   put 233 into image at (base + 2789)
   push with fixes, {"at": (base + 2790), "to": "rt_net_afterroute"}
-  if route_nparams == 4
-    put 233 into image at (base + 2680)
-    push with fixes, {"at": (base + 2681), "to": "rt_net_pushroute"}
-  end
+  put 233 into image at (base + 2680)
+  push with fixes, {"at": (base + 2681), "to": "rt_net_pushroute"}
   return image
 end
 
