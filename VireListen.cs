@@ -139,11 +139,6 @@ static class VireListen
         throw new VireError("that port is reserved", 1);
     }
 
-    static int HeaderEnd(byte[] buffer, int got)
-    {
-        return HttpWire.HeaderEnd(buffer, got);
-    }
-
     static bool ReadTimed(Stream stream, byte[] buffer, ref int got, int want, DateTime deadline)
     {
         while (got < want)
@@ -198,12 +193,12 @@ static class VireListen
             int before = got;
             if (!ReadOnce(stream, buffer, ref got, HttpWire.MaxHeaderBlock, headerDead))
             {
-                if (HeaderEnd(buffer, got) >= 0) break;
+                if (HttpWire.HeaderEnd(buffer, got) >= 0) break;
                 SendApi(stream, 408, "{\"error\":\"timeout\"}", null);
                 return;
             }
             if (got == before) { SendApi(stream, 408, "{\"error\":\"timeout\"}", null); return; }
-            headerEnd = HeaderEnd(buffer, got);
+            headerEnd = HttpWire.HeaderEnd(buffer, got);
         }
         HttpWire.Result headers = HttpWire.ParseHeaders(buffer, got);
         if (headers.Status != 0)

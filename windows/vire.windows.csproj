@@ -13,6 +13,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <!-- TODO(VIRE-FINISH-NOW): include remaining host .cs files so a WINDOWS build matches linux -->
     <Compile Include="..\Vire.cs" />
     <Compile Include="..\Compiled.cs" />
   </ItemGroup>

@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Net.Http;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -69,11 +67,6 @@ sealed class Env
     public bool Has(string name)
     {
         return Values.ContainsKey(name);
-    }
-
-    public object Get(string name, int line)
-    {
-        return Get(name, line, 1);
     }
 
     public object Get(string name, int line, int column)
@@ -594,11 +587,6 @@ sealed class Machine
         catch (UnauthorizedAccessException) { traceStopped = true; }
     }
 
-    object Builtin(string name, List<object> args, int line)
-    {
-        return Builtin(name, args, line, 1);
-    }
-
     // TickCount64 can exceed int. Saturate so ticks stays a positive whole number and does not wrap backwards.
     internal static int ClockTicks()
     {
@@ -904,6 +892,7 @@ sealed class Machine
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
         if (name == "serve")
+            // TODO(VIRE-FINISH-NOW): drop the serve name from Builtins once guests no longer call it
             throw new VireError("serve was removed; use listen", line, col);
         if (name == "files")
         {
@@ -1812,11 +1801,6 @@ sealed class Machine
         if (value is bool || !(value is int)) throw new VireError("slice bounds must be whole numbers", line);
         return (int)value;
     }
-    static int IndexOf(object value, int line, int size)
-    {
-        return IndexOf(value, line, size, 1);
-    }
-
     static int IndexOf(object value, int line, int size, int col)
     {
         if (value is bool || !(value is int)) throw new VireError("an index must be a whole number", line, col);
@@ -1941,7 +1925,6 @@ sealed class Parser
     int i;
     int nest;
     int blockNest;
-    static readonly HashSet<string> Stoppers = new HashSet<string>(new string[] { "end", "else", "miss", "eof" });
 
     public Parser(List<Token> tokens) { this.tokens = tokens; }
 
@@ -3134,11 +3117,6 @@ sealed class Program
     internal static bool HeadlessDesktop()
     {
         return Environment.GetEnvironmentVariable("VIRE_HEADLESS") == "1";
-    }
-
-    public static void RunFile(string program, string folder)
-    {
-        RunFile(program, folder, null);
     }
 
     public static void RunFile(string program, string folder, Budget budget)
