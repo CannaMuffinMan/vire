@@ -1,4 +1,6 @@
 ~ Native FCG GET /chain + POST /block. Same rules as api/fcgcpa.vire.
+~ Four-param route selects the r4 listen blob. Packed 3-param listen WS
+~ peeks the first recv and POST+parse SEGVs; do not touch /ws/refuse.
 ~ POST /block parses the request body with builtin parse (listen+parse is fixed).
 ~ Segment files still use find/slice: native parse of ~16KB+ string payload
 ~ is not valid yet, and 64×512KB would exceed the 32MB arena.
@@ -500,7 +502,8 @@ define appendBlock with body
   return reply + ",\"proof\":\"" + proof + "\"}"
 end
 
-define route with method, path, body
+define route with method, path, body, head
+  ~ `head` unused; arity selects r4 (Cookie/Host/Authorization) listen blob.
   if path == "/chain"
     if not (fileHere with "data/chain/head.json")
       bootChain

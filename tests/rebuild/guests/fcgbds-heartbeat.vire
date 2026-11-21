@@ -32,7 +32,7 @@ define session_id with body
   return slice with body, fromp, i
 end
 
-define route with method, path, body
+define route with method, path, body, head
   if method == "POST"
     if path == "/api/bot-defense/reviewers/heartbeat"
       let sid be session_id with body

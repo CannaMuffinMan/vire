@@ -93,7 +93,10 @@ def http_req(port, method, path, body=""):
         req += f"Content-Length: {len(payload)}\r\n"
     req += "\r\n"
     s = socket.create_connection(("127.0.0.1", port), 8)
-    s.sendall(req.encode("ascii") + payload)
+    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    s.sendall(req.encode("ascii"))
+    if payload:
+        s.sendall(payload)
     s.settimeout(8)
     data = b""
     while True:
@@ -104,6 +107,15 @@ def http_req(port, method, path, body=""):
         if not chunk:
             break
         data += chunk
+        split = data.find(b"\r\n\r\n")
+        if split >= 0:
+            cl = None
+            for line in data[:split].split(b"\r\n")[1:]:
+                if line.lower().startswith(b"content-length:"):
+                    cl = int(line.split(b":", 1)[1].strip())
+                    break
+            if cl is not None and len(data[split + 4 :]) >= cl:
+                break
     s.close()
     raw = data.decode("utf-8", "replace")
     if not raw.startswith("HTTP/"):

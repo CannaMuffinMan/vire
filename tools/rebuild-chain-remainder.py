@@ -24,26 +24,45 @@ def proof_of(index, previous, text):
 
 
 def http_req(port, method, path, body_send, timeout=30):
+    # Split header/body writes: packed 3-param listen WS peeks the first recv
+    # into ws_hbuf. A single sendall of POST headers+body leaves the body in
+    # that peek, so rt_net_client then 408s waiting on the socket. Host
+    # VireListen does not peek. Do not change /ws/refuse.
     payload = body_send.encode("utf-8") if body_send is not None else b""
     lines = ["%s %s HTTP/1.1" % (method, path), "Host: 127.0.0.1", "Connection: close"]
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
-    req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
+    head = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii")
     s = socket.create_connection(("127.0.0.1", port), timeout)
-    s.sendall(req)
+    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    s.sendall(head)
+    if payload:
+        s.sendall(payload)
     s.settimeout(timeout)
     chunks = []
+    raw = b""
     try:
         while True:
             data = s.recv(65536)
             if not data:
                 break
             chunks.append(data)
+            raw = b"".join(chunks)
+            split = raw.find(b"\r\n\r\n")
+            if split >= 0:
+                headers_blob = raw[:split]
+                body = raw[split + 4 :]
+                clen = None
+                for line in headers_blob.split(b"\r\n")[1:]:
+                    if line.lower().startswith(b"content-length:"):
+                        clen = int(line.split(b":", 1)[1].strip())
+                        break
+                if clen is not None and len(body) >= clen:
+                    break
     except socket.timeout:
-        pass
+        raw = b"".join(chunks)
     s.close()
-    raw = b"".join(chunks)
     split = raw.find(b"\r\n\r\n")
     if split < 0:
         raise OSError("missing header terminator")
@@ -57,6 +76,9 @@ def http_req(port, method, path, body_send, timeout=30):
             continue
         k, v = line.split(":", 1)
         headers[k.strip().lower()] = v.strip()
+    if "content-length" in headers:
+        n = int(headers["content-length"])
+        body = body.encode("utf-8")[:n].decode("utf-8")
     return status, headers, body
 
 
