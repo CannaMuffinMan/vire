@@ -2,7 +2,8 @@
 
 ## Native TLS (this branch)
 
-- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Native `tls_listen` fail-closed. Test certs at test time.
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Test certs at test time.
+- `tls_listen`: TLS 1.2+ termination on the HTTP listener (rank 11). Host `SslStream`; Linux ELF `SSL_accept` wrapping `rt_listen`. Loopback tests, fail-closed handshake/plaintext/downgrade. Windows PE still fail-closed. Contract `tests/rebuild/contracts/health.json`.
 
 ## Phase 0
 

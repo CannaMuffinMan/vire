@@ -57,8 +57,10 @@ public class TlsTests
         string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
         Assert.Contains("tls_connect", native);
         Assert.Contains("rt_tls_connect", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
+        Assert.Contains("rt_tls_listen", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("SSL_VERIFY", File.ReadAllText(Path.Combine(root, "docs", "native-tls.md")));
         Assert.DoesNotContain("SSL_VERIFY_NONE", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
+        Assert.DoesNotContain("native tls_listen is fail-closed", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
     }
 
     [Fact]

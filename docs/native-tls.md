@@ -2,7 +2,7 @@
 
 ## Goal
 
-Outbound TLS for the FCG stack: HTTPS upstream calls and (with the Postgres lane) `sslmode=require`. Go sidecars never listen TLS; edge/Railway terminates inbound TLS. Guest APIs: `tls_connect`, `tls_send`, `tls_recv`, `tls_close`. `tls_listen` stays **fail-closed** on native ELF (unproven; host interpreter still serves TLS). Existing TCP `connect` / `listen` / `send` / `recv` / `close` are unchanged.
+Outbound TLS for the FCG stack: HTTPS upstream calls and (with the Postgres lane) `sslmode=require`. Inbound TLS for a loopback FCG service is `tls_listen` on the existing HTTP listener (rank 11 in `docs/REBUILD-MY-STACK.md`) so a separate proxy is not required on CouchStation. Public/edge TLS stays at Railway. Guest APIs: `tls_connect`, `tls_send`, `tls_recv`, `tls_close`, `tls_listen`. Existing TCP `connect` / `listen` / `send` / `recv` / `close` are unchanged.
 
 ## Linux choice (OS TLS stack)
 
@@ -28,7 +28,7 @@ tls_connect with host, port, name, ca
 tls_send with handle, text
 tls_recv with handle, size
 tls_close with handle
-tls_listen with port, cert, key   ~ native ELF fail-closed; host interpreter only
+tls_listen with port, cert, key   ~ host SslStream; Linux ELF OpenSSL server; Windows PE fail-closed
 ```
 
 - `tls_connect` is loopback `127.0.0.1` only (same gate as `connect`). `name` is SNI and the name checked on the certificate.
@@ -43,7 +43,8 @@ tls_listen with port, cert, key   ~ native ELF fail-closed; host interpreter onl
 | Certificate validation on by default | Host: `SslClientAuthenticationOptions` with custom root or system roots. Native ELF: `SSL_CTX_set_verify(SSL_VERIFY_PEER)`, `SSL_set1_host`, `SSL_get_verify_result == 0`. |
 | No protocol downgrade | Host: `Tls12 \| Tls13`. Native: min TLS1.2 / max TLS1.3 via `SSL_CTX_ctrl`. |
 | No insecure flags by default | No skip-verify, no `SSL_VERIFY_NONE`. |
-| Path sandbox | CA/cert files: `data/` or `site/` only. Empty CA = system store, not an arbitrary libc `open`. |
+| Path sandbox | CA/cert/key files: `data/` or `site/` only. Empty CA = system store, not an arbitrary libc `open`. |
+| TLS server | Host: `Tls12 \| Tls13`, `RequireEncryption`, Linux `CipherSuitesPolicy` AEAD suites. ELF: `TLS_server_method`, min TLS 1.2 / max TLS 1.3, `SSL_OP_NO_COMPRESSION \| SSL_OP_NO_TLSv1 \| SSL_OP_NO_TLSv1_1`. Handshake / plaintext / truncated ClientHello fail closed (no HTTP). Tests bind `127.0.0.1` only. |
 | Caps | Arena 32MB, list 100000, steps 5M unchanged. Native `connect` still refuses non-loopback. |
 | Dynamic ELF only for TLS guests | TCP/hello/selfhost images stay static. |
 
@@ -57,7 +58,9 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 ## Tests
 
 - Host: `tests/Vire.Tests/TlsTests.cs` (handshake vs `openssl s_server`; DualMode refuses `../` and `/etc/...` CA paths).
-- Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping round-trip vs a TLS 1.2+ peer).
+- Host TLS server: `tests/Vire.Tests/TlsServerTests.cs` (`GET /health` vs `tests/rebuild/contracts/health.json`; plaintext, TLS 1.0, truncated handshake, bad cert path).
+- Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping; `tls_listen` `/health`; negatives fail-closed).
+- Windows host: `tools/tls-server-windows.ps1` (SslStream `/health`).
 
 ## Shared files
 
