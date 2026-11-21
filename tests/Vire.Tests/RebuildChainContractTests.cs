@@ -13,7 +13,10 @@ public class RebuildChainContractTests
         string guest = File.ReadAllText(Path.Combine(root, "guest-chain.vire"));
         string fail = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "fail-before-chain.vire"));
         string api = File.ReadAllText(Path.Combine(root, "api", "fcgcpa.vire"));
-        Assert.Contains("hash with dumped", guest);
+        Assert.Contains("previousHash", guest);
+        Assert.Contains("chain full", guest);
+        Assert.Contains("chain invalid", guest);
+        Assert.Contains("524288", guest);
         Assert.Contains("hash with (json with row)", api);
         Assert.Contains("path == \"/chain\"", guest);
         Assert.Contains("path == \"/block\"", guest);
@@ -50,18 +53,22 @@ public class RebuildChainContractTests
                 Assert.Equal(200, status);
                 Assert.Contains(genesisHash, body);
             }
-            if (name.StartsWith("post_block") && name != "post_block_accept_fixture_one")
+            if (name.StartsWith("post_block") && name != "post_block_accept_fixture_one" && name != "post_block_previousHash_ok")
                 Assert.Equal(400, status);
-            if (name == "post_block_accept_fixture_one")
+            if (name == "post_block_accept_fixture_one" || name == "post_block_previousHash_ok")
             {
                 Assert.Equal(200, status);
                 string wantProof = Sha256Hex("[1,\"" + genesisHash + "\",\"fixture-one\"]");
                 Assert.Contains(wantProof, body);
             }
         }
-        Assert.True(n >= 6);
+        Assert.True(n >= 9);
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-diff.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-tamper.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-remainder.py")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgcpa-windows.ps1")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "fail-before-chain-remainder.vire")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "fcg-chain-remainder.json")));
     }
 
     static string Sha256Hex(string text)

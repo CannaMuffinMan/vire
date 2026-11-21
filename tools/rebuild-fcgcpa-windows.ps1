@@ -103,6 +103,19 @@ try {
     Copy-Item (Join-Path $Root "data/rebuild/chain/head.json") (Join-Path $Data "chain/head.json") -Force
     Copy-Item (Join-Path $Root "data/rebuild/chain/000001.json") (Join-Path $Data "chain/000001.json") -Force
     Assert-Case (Read-Http $cport "POST" "/block" '{"text":"fixture-one"}') 200 '{"ok":true,"accepted":true,"index":1,"proof":"52d7f3a9d3dfa0458a20ff820cab94c1df2acea128dacd450a6e45456c27f561"}' "post_block_accept_fixture_one"
+    Copy-Item (Join-Path $Root "data/rebuild/chain/head.json") (Join-Path $Data "chain/head.json") -Force
+    Copy-Item (Join-Path $Root "data/rebuild/chain/000001.json") (Join-Path $Data "chain/000001.json") -Force
+    Assert-Case (Read-Http $cport "POST" "/block" '{"text":"x","previousHash":"not-the-tip"}') 400 '{"ok":false,"status":400,"error":"previous does not match"}' "post_block_previousHash_mismatch"
+    Assert-Case (Read-Http $cport "POST" "/block" '{"text":"x","hash":"deadbeef"}') 400 '{"ok":false,"status":400,"error":"proof does not match"}' "post_block_hash_alias_mismatch"
+    Copy-Item (Join-Path $Root "data/rebuild/chain/head.json") (Join-Path $Data "chain/head.json") -Force
+    Copy-Item (Join-Path $Root "data/rebuild/chain/000001.json") (Join-Path $Data "chain/000001.json") -Force
+    $keep = Read-Http $cport "POST" "/block" '{"text":"keep"}'
+    if ($keep.Status -ne 200) { throw "tamper setup $($keep.Status) $($keep.Body)" }
+    $seg = Join-Path $Data "chain/000001.json"
+    $raw = [System.IO.File]::ReadAllText($seg)
+    [System.IO.File]::WriteAllText($seg, $raw.Replace("keep", "tamper"))
+    Assert-Case (Read-Http $cport "POST" "/block" '{"text":"more"}') 503 '{"ok":false,"status":503,"error":"chain invalid"}' "post_block_tamper_503"
+    Write-Host "PE remainder rotate/507/migrate/concurrent: run Linux tools/rebuild-chain-diff.sh; this script does not fill 512 KB segments."
 } finally {
     Stop-Process -Id $cp.Id -Force
 }

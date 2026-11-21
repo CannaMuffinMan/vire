@@ -92,6 +92,49 @@
       "body": "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
     },
     {
+      "name": "post_block_previousHash_mismatch",
+      "method": "POST",
+      "path": "/block",
+      "body_send": "{\"text\":\"x\",\"previousHash\":\"not-the-tip\"}",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":400,\"error\":\"previous does not match\"}"
+    },
+    {
+      "name": "post_block_hash_alias_mismatch",
+      "method": "POST",
+      "path": "/block",
+      "body_send": "{\"text\":\"x\",\"hash\":\"deadbeef\"}",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":false,\"status\":400,\"error\":\"proof does not match\"}"
+    },
+    {
+      "name": "post_block_previousHash_ok",
+      "method": "POST",
+      "path": "/block",
+      "body_send": "{\"text\":\"fixture-one\",\"previousHash\":\"a9df21e6e7672bdb9cea28047aa39ba0fa96d54ae0791a9bab30078f5a2d4fad\"}",
+      "restore_chain": true,
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      },
+      "body": "{\"ok\":true,\"accepted\":true,\"index\":1,\"proof\":\"52d7f3a9d3dfa0458a20ff820cab94c1df2acea128dacd450a6e45456c27f561\"}"
+    },
+    {
       "name": "post_block_accept_fixture_one",
       "method": "POST",
       "path": "/block",
