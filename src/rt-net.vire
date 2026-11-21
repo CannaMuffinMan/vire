@@ -99,6 +99,8 @@ define emitNetRuntime with image, fixes, labels, has_route, need_net, route_npar
     let image be emitHex with image, (read with "data/src/rt-net-blob.txt")
     applyPackedPins with labels, base, (read with "data/src/rt-net-pins.txt"), names
     applyPackedFixes with fixes, base, (read with "data/src/rt-net-fixes.txt"), names
+    put (base + 8032) into labels at "land_ws_send"
+    put (base + 7843) into labels at "land_ws_gate"
     let image be emitTcpClient with image, fixes, labels
     return emitLandingHttp with image, fixes, labels, base
   end
