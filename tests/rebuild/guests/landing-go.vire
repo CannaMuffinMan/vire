@@ -1,0 +1,230 @@
+~ landing-go native port. Unauth fixtures from source-backed contract (not live).
+~ SOP HMAC cookies, reverse-proxy upstreams, Shopify/media-lab are out of scope.
+~ Rank 6 static HTML is in-tree strings via landingHtml.
+
+define landingHtml with path
+  return "<!doctype html><html><head><title>FCG</title></head><body><h1>" + path + "</h1></body></html>"
+end
+
+define held
+  return "{\"reason\":\"data_held\"}"
+end
+
+define redir with loc
+  return "{\"status\":307,\"location\":\"" + loc + "\"}"
+end
+
+define route with method, path, body
+  if path == "/healthz"
+    return "ok"
+  end
+  if path == "/api/capabilities"
+    return "{\"merch\":false,\"adsense\":false,\"adsenseClientId\":null,\"billing\":false}"
+  end
+  if path == "/api/couchy/status"
+    return "{\"maintenance\":true}"
+  end
+  if path == "/api/live-popup"
+    return "{\"channel\":null,\"platform\":null,\"title\":null,\"endedAt\":null,\"clipUrl\":null,\"posterUrl\":null,\"isLive\":false,\"streamUrl\":null}"
+  end
+  if path == "/api/auth"
+    return "Authentication required."
+  end
+  if path == "/api/internal/version"
+    return "{\"version\":\"unknown\",\"status\":\"offline\"}"
+  end
+  if path == "/api/subscription"
+    return "{\"enabled\":false}"
+  end
+  if path == "/partnership"
+    return redir with "/partners"
+  end
+  if path == "/sop/checkin"
+    return redir with "/sop"
+  end
+  if path == "/sop/report"
+    return redir with "/sop"
+  end
+  if path == "/sop/media-lab"
+    return redir with "/sop/access?next=/sop/media-lab"
+  end
+  if path == "/contracts/instagram"
+    return held
+  end
+  if path == "/contracts/kick"
+    return held
+  end
+  if path == "/contracts/meta"
+    return held
+  end
+  if path == "/contracts/tiktok"
+    return held
+  end
+  if path == "/contracts/twitch"
+    return held
+  end
+  if path == "/contracts/twitter"
+    return held
+  end
+  if path == "/contracts/youtube"
+    return held
+  end
+  if path == "/couchy-tickets"
+    return held
+  end
+  if path == "/creator-partnership-program"
+    return held
+  end
+  if path == "/desktop-unlock"
+    return held
+  end
+  if path == "/gift-admin"
+    return held
+  end
+  if path == "/mobile-failsafe"
+    return held
+  end
+  if path == "/mobile-signup"
+    return held
+  end
+  if path == "/partners"
+    return held
+  end
+  if path == "/partners/brands"
+    return held
+  end
+  if path == "/partners/creators"
+    return held
+  end
+  if path == "/sop"
+    return held
+  end
+  if path == "/sop/access"
+    return held
+  end
+  if path == "/sop/ceo-statement"
+    return held
+  end
+  if path == "/sop/contracts"
+    return held
+  end
+  if path == "/sop/creative-director-statement"
+    return held
+  end
+  if path == "/sop/founder-statement"
+    return held
+  end
+  if path == "/sop/media-lab/access"
+    return held
+  end
+  if path == "/sop/partner-creator-statement"
+    return held
+  end
+  if path == "/waitlist-admin"
+    return held
+  end
+  if path == "/mscb"
+    return held
+  end
+  if path == "/"
+    return landingHtml with path
+  end
+  if path == "/subscription"
+    return landingHtml with path
+  end
+  if path == "/refunds"
+    return landingHtml with path
+  end
+  if path == "/terms"
+    return landingHtml with path
+  end
+  if path == "/privacy"
+    return landingHtml with path
+  end
+  if path == "/do-not-sell"
+    return landingHtml with path
+  end
+  if path == "/legal/fcgbds-eula"
+    return landingHtml with path
+  end
+  if path == "/promos/official-rules"
+    return landingHtml with path
+  end
+  if path == "/whitepaper"
+    return landingHtml with path
+  end
+  if path == "/bot-defense-system"
+    return landingHtml with path
+  end
+  if path == "/ai-partnership"
+    return landingHtml with path
+  end
+  if path == "/b2b"
+    return landingHtml with path
+  end
+  if path == "/countdown-source"
+    return landingHtml with path
+  end
+  if path == "/dev"
+    return landingHtml with path
+  end
+  if path == "/gift-admin/first-partner"
+    return landingHtml with path
+  end
+  if path == "/guinness-reviewer"
+    return landingHtml with path
+  end
+  if path == "/join"
+    return landingHtml with path
+  end
+  if path == "/night-city"
+    return landingHtml with path
+  end
+  if path == "/partners/b2b"
+    return landingHtml with path
+  end
+  if path == "/partnerships"
+    return landingHtml with path
+  end
+  if path == "/sop/checkin-thursday"
+    return landingHtml with path
+  end
+  if path == "/sop/checkin-tuesday"
+    return landingHtml with path
+  end
+  if path == "/sop/kpi-dashboard"
+    return landingHtml with path
+  end
+  if path == "/sop/meeting-saturday"
+    return landingHtml with path
+  end
+  if path == "/sop/rebuild-timeline"
+    return landingHtml with path
+  end
+  if path == "/sop/stabilization-checklist"
+    return landingHtml with path
+  end
+  if path == "/sop/weekly-scorecard"
+    return landingHtml with path
+  end
+  if path == "/teleparty-integration"
+    return landingHtml with path
+  end
+  if path == "/utility-overview"
+    return landingHtml with path
+  end
+  if path == "/youtube-verification-guide"
+    return landingHtml with path
+  end
+  if path == "/welcome-to-the-gang"
+    return landingHtml with path
+  end
+  if path == "/mscb/oauth-done"
+    return landingHtml with path
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 18080
+end

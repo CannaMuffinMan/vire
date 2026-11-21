@@ -296,7 +296,8 @@ static class VireListen
         if (text.Length > maxOutput) text = "{\"error\":\"response too large\"}";
         bool fcgbc = FcgbcHttp();
         int code = fcgbc ? FcgbcStatus(method, text) : StatusOf(text, 200);
-        string extra = fcgbc ? FcgbcCors(head) : null;
+        string extra = ExtraHeadersOf(text);
+        if (fcgbc) extra = extra + FcgbcCors(head);
         SendApi(stream, code, text, extra);
     }
 
@@ -412,6 +413,7 @@ static class VireListen
                 continue;
             }
             if (c == '{' || c == '[') return "application/json";
+            if (c == '<') return "text/html; charset=utf-8";
             return "text/plain; charset=utf-8";
         }
         return "text/plain; charset=utf-8";
@@ -420,13 +422,45 @@ static class VireListen
     static int StatusOf(string text, int fallback)
     {
         if (text == null) return fallback;
-        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400 };
+        if (text.IndexOf("\"reason\":\"data_held\"", StringComparison.Ordinal) >= 0) return 503;
+        if (text == "{\"enabled\":false}") return 503;
+        if (text == "Authentication required.") return 401;
+        int[] codes = { 507, 503, 500, 431, 413, 411, 408, 404, 403, 401, 400, 307 };
         for (int i = 0; i < codes.Length; i++)
         {
             string needle = "\"status\":" + codes[i];
             if (text.IndexOf(needle, StringComparison.Ordinal) >= 0) return codes[i];
         }
         return fallback;
+    }
+
+    static string ExtraHeadersOf(string text)
+    {
+        if (text == null) return "";
+        string extra = "";
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                i++;
+                continue;
+            }
+            if (c == '<') extra += "X-Payments-Enabled: off\r\n";
+            break;
+        }
+        if (text.IndexOf("\"location\":\"/sop/access?next=/sop/media-lab\"", StringComparison.Ordinal) >= 0)
+            extra += "Location: /sop/access?next=/sop/media-lab\r\n";
+        else if (text.IndexOf("\"location\":\"/partners\"", StringComparison.Ordinal) >= 0)
+            extra += "Location: /partners\r\n";
+        else if (text.IndexOf("\"location\":\"/sop\"}", StringComparison.Ordinal) >= 0)
+            extra += "Location: /sop\r\n";
+        if (text == "Authentication required.")
+            extra += "WWW-Authenticate: Basic realm=\"Protected\"\r\n";
+        if (text.IndexOf("\"adsenseClientId\"", StringComparison.Ordinal) >= 0)
+            extra += "X-Payments-Enabled: off\r\n";
+        return extra;
     }
 
     static string ReasonOf(int code)
