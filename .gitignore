@@ -4,6 +4,8 @@ data/*
 !data/compile-native.vire
 !data/rebuild/
 !data/rebuild/**
+!data/rebuild-dist/
+!data/rebuild-dist/**
 rebuild-chain-run.vire
 site/
 err.txt

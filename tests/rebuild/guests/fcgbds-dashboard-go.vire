@@ -1,0 +1,111 @@
+~ fcgbds-dashboard-go loopback port. Upstream is nil (same as Go main).
+~ Health, wall fallbacks, 405, 307 /obs, sandbox dist static.
+use "dist-static.vire"
+
+define arg_at with i
+  if (length with args) <= i
+    return none
+  end
+  return args at i
+end
+
+define dist_root
+  return arg_at with 0
+end
+
+define method_not_allowed
+  return "{\"error\":\"method_not_allowed\",\"status\":405}"
+end
+
+define route with method, path, body
+  if path == "/api/health"
+    return "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}"
+  end
+  if path == "/api/challenge"
+    return "{\"unavailable\":true,\"caption\":\"Visitor check is unavailable. You were not blocked.\"}"
+  end
+  if path == "/api/challenge-verify"
+    if method != "POST"
+      return "{\"error\":\"Method not allowed\",\"status\":405}"
+    end
+    return "{\"ok\":false,\"outcome\":\"unavailable\",\"caption\":\"Visitor check could not be scored. You were not blocked.\"}"
+  end
+  if path == "/api/events"
+    return "{\"error\":\"Failed to fetch events\",\"details\":\"All upstream attempts failed\",\"status\":502}"
+  end
+  if path == "/api/events-detailed"
+    return "{\"error\":\"Detailed events unavailable\",\"status\":503}"
+  end
+  if path == "/api/stats"
+    return "{\"gated\":true,\"streamUnlocked\":false,\"publicWallEnabled\":false,\"statsAvailable\":false}"
+  end
+  if path == "/api/stats-detailed"
+    return "{\"error\":\"Detailed stats unavailable\",\"statsAvailable\":false,\"status\":503}"
+  end
+  if path == "/api/reviewers-heartbeat"
+    if method != "POST"
+      return "{\"error\":\"Method not allowed\",\"status\":405}"
+    end
+    return "{\"ok\":false,\"fallback\":true,\"fallbackReason\":\"upstream_blocked_or_unavailable\",\"reviewers\":{\"live\":0}}"
+  end
+  if path == "/api/stream-wall/status"
+    if method != "GET"
+      return "{\"error\":\"method_not_allowed\",\"status\":405}"
+    end
+    return "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}"
+  end
+  if path == "/api/stream-wall/tilt"
+    if method != "GET"
+      if method != "POST"
+        return "{\"error\":\"method_not_allowed\",\"status\":405}"
+      end
+    end
+    return "{\"error\":\"tilt_upstream_unavailable\",\"status\":502}"
+  end
+  if (length with path) >= 5
+    if (slice with path, 0, 5) == "/api/"
+      return "{\"error\":\"not_found\",\"status\":404}"
+    end
+  end
+  if path == "/obs"
+    return "{\"status\":307}"
+  end
+  if path == "/bot-test-transparency-obs"
+    return "{\"status\":307}"
+  end
+  if path == "/defense-reports"
+    let root be dist_root
+    if root == none
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+    if root == "-"
+      return "{\"reason\":\"dist_missing\",\"status\":503}"
+    end
+    let file be dist_path with root, path
+    if file == none
+      return "{\"reason\":\"export_missing\",\"status\":503}"
+    end
+    return read with file
+  end
+  if method != "GET"
+    if method != "HEAD"
+      return method_not_allowed
+    end
+  end
+  let root be dist_root
+  if root == none
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  if root == "-"
+    return "{\"reason\":\"dist_missing\",\"status\":503}"
+  end
+  let file be dist_path with root, path
+  if file == none
+    return "{\"reason\":\"not_found\",\"status\":404}"
+  end
+  return read with file
+end
+
+define main
+  listen with 0
+end
