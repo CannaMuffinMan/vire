@@ -44,8 +44,11 @@ compile_guest() {
 echo "pass_after_sha $AFTER_SHA"
 echo "fail_before_base $BEFORE_SHA"
 
-python3 - <<'PY' &
-import socket, threading, os, time
+PORTFILE="/tmp/vire-proxy-up-$$.port"
+rm -f "$PORTFILE" /tmp/vire-proxy-up.port
+
+python3 - "$PORTFILE" <<'PY' &
+import socket, threading, os, time, sys
 
 def handle(c):
     try:
@@ -140,7 +143,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(("127.0.0.1", 0))
 s.listen(32)
 port = s.getsockname()[1]
-open("/tmp/vire-proxy-up.port", "w").write(str(port))
+open(sys.argv[1], "w").write(str(port))
 print("upstream 127.0.0.1:%s" % port, flush=True)
 while True:
     c, _ = s.accept()
@@ -148,10 +151,10 @@ while True:
 PY
 UP_PID=$!
 for i in $(seq 1 50); do
-  if [[ -f /tmp/vire-proxy-up.port ]]; then break; fi
+  if [[ -f "$PORTFILE" ]]; then break; fi
   sleep 0.05
 done
-UP="$(cat /tmp/vire-proxy-up.port)"
+UP="$(cat "$PORTFILE")"
 echo "upstream_port $UP"
 
 echo "=== FAIL_BEFORE (no primitive, as at $BEFORE_SHA) ==="
