@@ -1,0 +1,463 @@
+{
+  "id": "pages",
+  "source": "landing-go fixture HTML pages (rank 6 static string emit), derived from source, not live.",
+  "headers_that_matter": [
+    "content-type",
+    "connection",
+    "x-content-type-options",
+    "cache-control",
+    "location",
+    "www-authenticate",
+    "x-payments-enabled"
+  ],
+  "cases": [
+    {
+      "name": "html_",
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/</h1></body></html>"
+    },
+    {
+      "name": "html_subscription",
+      "method": "GET",
+      "path": "/subscription",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/subscription</h1></body></html>"
+    },
+    {
+      "name": "html_refunds",
+      "method": "GET",
+      "path": "/refunds",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/refunds</h1></body></html>"
+    },
+    {
+      "name": "html_terms",
+      "method": "GET",
+      "path": "/terms",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/terms</h1></body></html>"
+    },
+    {
+      "name": "html_privacy",
+      "method": "GET",
+      "path": "/privacy",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/privacy</h1></body></html>"
+    },
+    {
+      "name": "html_do-not-sell",
+      "method": "GET",
+      "path": "/do-not-sell",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/do-not-sell</h1></body></html>"
+    },
+    {
+      "name": "html_legal_fcgbds-eula",
+      "method": "GET",
+      "path": "/legal/fcgbds-eula",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/legal/fcgbds-eula</h1></body></html>"
+    },
+    {
+      "name": "html_promos_official-rules",
+      "method": "GET",
+      "path": "/promos/official-rules",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/promos/official-rules</h1></body></html>"
+    },
+    {
+      "name": "html_whitepaper",
+      "method": "GET",
+      "path": "/whitepaper",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/whitepaper</h1></body></html>"
+    },
+    {
+      "name": "html_bot-defense-system",
+      "method": "GET",
+      "path": "/bot-defense-system",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/bot-defense-system</h1></body></html>"
+    },
+    {
+      "name": "html_ai-partnership",
+      "method": "GET",
+      "path": "/ai-partnership",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/ai-partnership</h1></body></html>"
+    },
+    {
+      "name": "html_b2b",
+      "method": "GET",
+      "path": "/b2b",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/b2b</h1></body></html>"
+    },
+    {
+      "name": "html_countdown-source",
+      "method": "GET",
+      "path": "/countdown-source",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/countdown-source</h1></body></html>"
+    },
+    {
+      "name": "html_dev",
+      "method": "GET",
+      "path": "/dev",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/dev</h1></body></html>"
+    },
+    {
+      "name": "html_gift-admin_first-partner",
+      "method": "GET",
+      "path": "/gift-admin/first-partner",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/gift-admin/first-partner</h1></body></html>"
+    },
+    {
+      "name": "html_guinness-reviewer",
+      "method": "GET",
+      "path": "/guinness-reviewer",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/guinness-reviewer</h1></body></html>"
+    },
+    {
+      "name": "html_join",
+      "method": "GET",
+      "path": "/join",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/join</h1></body></html>"
+    },
+    {
+      "name": "html_night-city",
+      "method": "GET",
+      "path": "/night-city",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/night-city</h1></body></html>"
+    },
+    {
+      "name": "html_partners_b2b",
+      "method": "GET",
+      "path": "/partners/b2b",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/partners/b2b</h1></body></html>"
+    },
+    {
+      "name": "html_partnerships",
+      "method": "GET",
+      "path": "/partnerships",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/partnerships</h1></body></html>"
+    },
+    {
+      "name": "html_sop_checkin-thursday",
+      "method": "GET",
+      "path": "/sop/checkin-thursday",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/checkin-thursday</h1></body></html>"
+    },
+    {
+      "name": "html_sop_checkin-tuesday",
+      "method": "GET",
+      "path": "/sop/checkin-tuesday",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/checkin-tuesday</h1></body></html>"
+    },
+    {
+      "name": "html_sop_kpi-dashboard",
+      "method": "GET",
+      "path": "/sop/kpi-dashboard",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/kpi-dashboard</h1></body></html>"
+    },
+    {
+      "name": "html_sop_meeting-saturday",
+      "method": "GET",
+      "path": "/sop/meeting-saturday",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/meeting-saturday</h1></body></html>"
+    },
+    {
+      "name": "html_sop_rebuild-timeline",
+      "method": "GET",
+      "path": "/sop/rebuild-timeline",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/rebuild-timeline</h1></body></html>"
+    },
+    {
+      "name": "html_sop_stabilization-checklist",
+      "method": "GET",
+      "path": "/sop/stabilization-checklist",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/stabilization-checklist</h1></body></html>"
+    },
+    {
+      "name": "html_sop_weekly-scorecard",
+      "method": "GET",
+      "path": "/sop/weekly-scorecard",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/sop/weekly-scorecard</h1></body></html>"
+    },
+    {
+      "name": "html_teleparty-integration",
+      "method": "GET",
+      "path": "/teleparty-integration",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/teleparty-integration</h1></body></html>"
+    },
+    {
+      "name": "html_utility-overview",
+      "method": "GET",
+      "path": "/utility-overview",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/utility-overview</h1></body></html>"
+    },
+    {
+      "name": "html_youtube-verification-guide",
+      "method": "GET",
+      "path": "/youtube-verification-guide",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/youtube-verification-guide</h1></body></html>"
+    },
+    {
+      "name": "html_welcome-to-the-gang",
+      "method": "GET",
+      "path": "/welcome-to-the-gang",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/welcome-to-the-gang</h1></body></html>"
+    },
+    {
+      "name": "html_mscb_oauth-done",
+      "method": "GET",
+      "path": "/mscb/oauth-done",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "connection": "close",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+        "x-payments-enabled": "off"
+      },
+      "body": "<!doctype html><html><head><title>FCG</title></head><body><h1>/mscb/oauth-done</h1></body></html>"
+    }
+  ]
+}

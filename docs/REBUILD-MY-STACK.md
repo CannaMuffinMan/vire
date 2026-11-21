@@ -96,7 +96,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | --- | --- | --- |
 | HTTP listen (loopback) | **Present** PE + ELF | `src/rt-net.vire`, `tools/native-net-windows.ps1`, `tools/native-elf-tcp.sh` |
 | HTTP status from JSON `"status"` | **Present** | `rt_net_statusof`; harness `GET /nope` → 404 |
-| Content-Type JSON vs text/plain | **Present** | JSON is `application/json` (no charset, Go writeJSON). `rt_net_ctype` + host `ContentTypeOf`; `ok\\n` is text/plain |
+| Content-Type JSON vs text/plain vs HTML | **Present** | JSON is `application/json` (no charset). HTML is `text/html; charset=utf-8`. `rt_net_ctype` + host `ContentTypeOf` |
 | JSON encode/parse | **Present** | `rt_json` / `rt_parse`, `json-prove.vire` |
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
@@ -127,7 +127,10 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 3e | `api/fcgcpa.vire` `/payments` and `/mine` 403 | HTTP, JSON, status from `"status"` | Mapping present | **Done (this PR).** GET 403 bodies match `api/fcgcpa.vire`; payments stay off. |
 | 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST on native (bounded body, Content-Length required) | **Done (this PR).** Native `rt-net` request body is a leaf heap text capped at 1_000_000, fail-closed 411/413/400. Host vs native `/block` vs `tests/rebuild/contracts/fcg-chain.json`. |
 | 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
-| 6 | Static landing / Couch Potato HTML emit | `write` of strings | Present | Interpreter already; native write prove is separate from HTTP |
+| 6 | `landing-go` unauth fixtures (healthz, JSON APIs, 307s, held-503, fixture HTML) | HTTP, JSON, text/html, Location / WWW-Authenticate | Present on this PR (Linux ELF harness) | **This PR.** Rank 6 static HTML is in-tree strings. Host vs native `tools/rebuild-landing-diff.sh`. |
+| 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | Missing | **Blocked.** No stubs. |
+| 6b | `landing-go` reverse-proxy (`LANDING_UPSTREAM` / `LANDING_API_UPSTREAM`) | outbound HTTP proxy | Loopback client only; no Host rewrite | **Blocked.** No stubs. |
+| 6c | `landing-go` Shopify / media-lab APIs | held 503 in Go; out of scope here | — | **Blocked.** No stubs. |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
 | 8 | Rest of Go `api-go` / `cpa-go` | JWT, cookies, proxy, … | Health GETs only | Remaining routes blocked on missing native features |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
@@ -162,7 +165,7 @@ Recorded in `tests/rebuild/contracts/`:
 - `POST /block` malformed → HTTP **400** (`bad block` / `text is required` / `text is not allowed` / `proof does not match`)
 - `POST /block {"text":"fixture-one"}` → 200, proof `hash` of `[1,<genesis proof>,"fixture-one"]`
 
-Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `tools/rebuild-chain-diff.sh`. Windows PE steps (CouchStation only): `tools/rebuild-fcgcpa-windows.ps1` — this Linux lane does not claim PE proof.
+Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `tools/rebuild-chain-diff.sh`, `tools/rebuild-landing-diff.sh`. Windows PE steps (CouchStation only): `tools/rebuild-fcgcpa-windows.ps1` — this Linux lane does not claim PE proof.
 
 ### What this PR does not prove
 
@@ -170,6 +173,8 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Native POST `/block` body read is proven on this branch (bounded leaf heap text). Remaining chain rotate/507/503/migrate is not.
 - Remaining `api/fcgcpa.vire` chain behavior: segment rotate at 512 KB, 507 when full, 503 on tamper, old `data/chain.json` migrate, concurrent posts, `previousHash` alias beyond `previous`/`proof`
 - Remaining sidecar routes beyond the five GET goldens
+- `landing-go` SOP HMAC cookies, reverse-proxy upstreams, Shopify/media-lab (blocked; no stubs)
+- Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
 - TLS, WebSocket, DNS, public bind
@@ -183,6 +188,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 bash tools/rebuild-health-diff.sh
 bash tools/rebuild-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
+bash tools/rebuild-landing-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
