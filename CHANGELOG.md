@@ -1,5 +1,11 @@
 # Changelog
 
+## Tests/docs dead-code cleanup (this branch)
+
+- Root emit/compile probe programs (`probe-*.vire`), unused `dump-net-extras.vire`, superseded `make-hello.vire`, and unreferenced `guest-empty.vire` removed. Live guests, samples, and xUnit fixtures were not deleted.
+- Obsolete handoff/phase/perf/audit notes (`PHASE0-DONE.md`, `PHASE0-FUZZ.md`, `LOCAL-CLI-HANDOFF.md`, `INTEGRATE-38.md`, `COMPILE-EXTEND.md`, `COMPILE-PERF.md`, `EMIT-PERF.md`, `SELFHOST.md`, `SECURITY-AUDIT.md`, and the Nov 5 `NATIVE-COMPILER.md` work log) folded into `docs/history.md`. `NATIVE-COMPILER.md` keeps current self-host status only.
+- Unfinished rebuild sidecars stay as `TODO(VIRE-FINISH-NOW)` lines in their `BLOCKED.md` files and `docs/finish-list/tests-docs.md`. Caps unchanged.
+
 ## WebSocket refuse fail-closed (this branch)
 
 - Packed native `listen` no longer overwrites HTTP `rt_listen` with an auto-101 dispatcher. RFC 6455 101 is emitted only when the route returns `"status":101`. GET `/ws/refuse` is 403 on host and ELF (`tools/ws-refuse-proof.sh`). With `"port"` both splice (host `TryWsHijack` / packed `land_ws_send`). CouchStation: `tools/ws-refuse-windows.ps1` (PE not executed here). Residual: native 101 without `"port"` is JSON HTTP 101 (in-process echo stays on the host). Caps unchanged.
@@ -38,9 +44,9 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - C8. `serve` removed. `listen` GET/HEAD of `site/` with SafePath, no listing, 404 on traversal, symlink, and `.vire`.
 - C9. `SECURITY.md`, GUIDE limits/seal/`listen`/paths/.NET 10, this changelog.
 
-- Close-out. `PHASE0-DONE.md` maps each Phase 0 done-criterion to a test or CI job. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
+- Close-out. Phase 0 done-criteria map (archived in `docs/history.md`) to tests and CI jobs. Crash corpus runs in-process. Self-host CI compares unsealed stage-1/2/3 payloads with `cmp`. `tracked-binaries` job fails if git tracks exe/dll/pdb/hex or non-fixture `.vc`. Docker `FROM` digests and Actions SHAs stay pinned; tests fail if a pin is dropped.
 
-- Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Findings in `PHASE0-FUZZ.md`.
+- Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Track D finding table archived in `docs/history.md`.
 - Fuzz campaign (`FUZZ-CAMPAIGN.md`): grammar-aware frontend, builtins, GC/list-cap, path bind, Unicorn + Windows PE jobs. Nightly stays off the PR `check.yml` path. Caps unchanged.
 
 Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
