@@ -230,6 +230,7 @@ try:
     ctx10.check_hostname = False
     ctx10.verify_mode = ssl.CERT_NONE
     p = socket.create_connection(("127.0.0.1", port), timeout=5)
+    p.settimeout(5)
     t10 = ctx10.wrap_socket(p, server_hostname="localhost")
     t10.close()
     raise SystemExit("tls1.0 handshake must fail")
