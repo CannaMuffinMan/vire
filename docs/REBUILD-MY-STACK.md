@@ -192,6 +192,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 1 | `GET /health` and `GET /api/health` JSON | HTTP, JSON | Both present | **Done (PR #92 + this lane).** |
 | 2 | Other unauth JSON on `api/fcgcpa.vire` (`/info`, `/connect`) | HTTP, JSON | Present | Done (PR #93). |
 | 3 | `fcgbds-go` `GET /health` | HTTP, JSON | Present | **This PR.** Field match; `ts` omitted (no guest clock). |
+| 3f | `fcgbds-go` POST heartbeat JSON `sessionId` | HTTP, JSON, POST body | Present (leaf body after #113) | **This PR.** Host vs native vs `tests/rebuild/contracts/fcgbds-heartbeat.json`. Query-only guest is FAIL_BEFORE. |
 | 3a | `fcgbc-go` `GET /pending-transactions` | HTTP, JSON | Present | **This PR.** Body `[]`. |
 | 3b | `cpa-go` `GET /health` | HTTP, text/plain | Present | **This PR.** `ok\\n` + native/host text/plain Content-Type. |
 | 3c | `rpc-portal-go` `GET /api/health` | HTTP, JSON | Present | **This PR.** `{"ok":true}`. Not Node/fcgcpa health. |
@@ -257,7 +258,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Native `erase` of `data/chain.json` after migrate (guest writes empty text; host `api/fcgcpa.vire` unlinks)
 - Remaining sidecar routes beyond the five GET goldens plus unauth rpc-portal-go / edge-go / dev-portal-go / fcgbds-dashboard-go JSON (JWT, reverse-proxy, static files, holdings outbound still blocked)
 - Native listen does not emit Go extra security headers (`X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) or per-route Cache-Control / charset=utf-8; contracts match the native header set (`application/json` without charset, `nosniff`, `no-store`)
-- HTTP 405 and 502: `StatusOf` / `rt_net_statusof` needles do not include those codes. Guest JSON may still carry `"status":405` / `"status":502` at HTTP 200.
+- HTTP 405 and 502: host `StatusOf` and unpacked/r3/r4 `rt_net_statusof` map `"status":405` / `"status":502`. Packed 3-param `emitLandingHttp` maps 101 (listen WS) instead of 405: restoring `land_st_405` on that emitList path overflowed compiler list 100000 during self-host. Cap stays 100000; do not restore until list usage drops. Guest JSON on that path may still carry `"status":405` at HTTP 200.
 - `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Listen `route` may take `head` with Cookie/Host/Authorization. HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
 - Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
 - Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, dashboard `/obs` `"status":307`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native `rt_net_find` refuses a needle longer than the haystack (unsigned wrap used to scan `.data` and 500 `/obs`). listen+`proxy_reply` is proven on `tools/rebuild-proxy-diff.sh`.
@@ -287,6 +288,7 @@ bash tools/rebuild-portal-diff.sh
 bash tools/rebuild-header-diff.sh
 bash tools/rebuild-listen-ws-diff.sh
 bash tools/rebuild-listen-wss-diff.sh
+bash tools/rebuild-fcgbds-heartbeat-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
