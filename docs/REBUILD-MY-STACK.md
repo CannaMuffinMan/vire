@@ -248,3 +248,7 @@ dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
 Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. This Linux lane does not replace that proof.
+
+## Rank 9 Redis TLS (`rediss://`)
+
+RESP2 Redis `rediss://` uses the existing TLS client (`tls_connect` + `tls_send`/`tls_recv`). Certificate chain and hostname checks are verify-full. `redis://` is refused by `redis_open_rediss`. Loopback 127.0.0.1 only. Proof: `tools/redis-tls-prove-linux.sh`. Windows: `tools/redis-tls-prove-windows.ps1` (Redis 6+ `tls-port`). RESP3, ACL username, DNS/non-loopback, client certs, production Redis: not in this PR.

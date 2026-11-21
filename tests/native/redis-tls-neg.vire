@@ -1,0 +1,16 @@
+~ rediss:// against a plaintext Redis port must fail closed (no downgrade).
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define main
+  let url be "rediss://127.0.0.1:PLAIN_PORT_PLACEHOLDER"
+  let got be redis_open_rediss with url, "localhost", "data/redis-ca.pem"
+  if (got at 0) == "ok"
+    fail with "plaintext downgrade missed"
+  end
+  say "downgrade " + (got at 1)
+  say "REDIS TLS NEG pass"
+end

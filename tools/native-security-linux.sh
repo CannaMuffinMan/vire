@@ -48,5 +48,5 @@ else
   echo "missing native websocket runtime"
   exit 1
 fi
-echo "residual: guest Redis client is src/rt-redis.vire"
+echo "residual: guest Redis client is src/rt-redis.vire (rediss:// TLS in tools/redis-tls-prove-linux.sh)"
 echo "native_security_linux ok"
