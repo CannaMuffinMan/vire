@@ -1,5 +1,19 @@
 # Changelog
 
+## Native Postgres / Redis TLS on PE SChannel (this branch)
+
+- Merge of #109 / #116 onto #126. ELF OpenSSL is unchanged. PE `tls_wrap` is emitted through the SChannel guest (`src/rt-tls-pe.vire`): hostname verification on, TLS 1.2+, no skip-verify, no `LoadLibrary`. `pg_open_ssl` verify-full and `rediss://` (tls_connect) use that stack. CouchStation: `tools/pg-redis-tls-windows.ps1`. Residual: SCRAM-SHA-256-PLUS, RESP3, PE execute on this Linux agent.
+
+## Native Postgres TLS (this branch)
+
+- `pg_open_ssl` sends SSLRequest, refuses `'N'` for `require`/`verify-full`, then `tls_wrap` (cert check on; hostname for verify-full). SCRAM-SHA-256 and simple query over TLS. Test CA generated at prove time. Channel binding SCRAM-SHA-256-PLUS is residual.
+- Guest `tls_wrap` wraps an existing loopback TCP handle. Windows PE SChannel IAT (`secur32`/`crypt32`) is emitted, not a fail-closed stub.
+
+## Native TLS (this branch)
+
+- Guest `tls_connect` / `tls_send` / `tls_recv` / `tls_close`. Host `SslStream`. Linux ELF OpenSSL 3 only on TLS guests (`docs/native-tls.md`). CA paths use the data/site gate. `OpenSSL_version_num` must be ≥ 3.0. Test certs at test time.
+- `tls_listen`: TLS 1.2+ termination on the HTTP listener (rank 11). Host `SslStream`; Linux ELF `SSL_accept` wrapping `rt_listen`. Loopback tests, fail-closed handshake/plaintext/downgrade. Windows PE still fail-closed. Contract `tests/rebuild/contracts/health.json`.
+
 ## Phase 0
 
 Hardening of the local runner on .NET 10. Commits C0–C9, in order.

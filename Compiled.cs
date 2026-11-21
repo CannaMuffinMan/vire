@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 
@@ -105,6 +106,13 @@ sealed class CompiledMachine
     {
         if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
         VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p);
+    }
+
+    internal void ListenCoreTls(int port, int line, CancellationToken stop, string certPath, string keyPath)
+    {
+        if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line);
+        X509Certificate2 cert = VireTls.LoadPemPair(certPath, keyPath, line, 1);
+        VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p, cert);
     }
 
     public object Call(string name, List<object> args, int line, int col)
@@ -591,7 +599,12 @@ sealed class CompiledMachine
             if (args.Count != 1) throw new VireError("hex takes 1 values, got " + args.Count, line, col);
             return Program.HexBytes(args[0], line, col);
         }
-        if (name == "hash") return VireSeal.HashText(args[0] as string ?? Show(args[0]));
+        if (name == "hash")
+        {
+            string raw = args[0] as string;
+            if (raw == null) return VireSeal.HashText(Show(args[0]));
+            return VireSeal.HashGuest(raw);
+        }
         if (name == "chr")
         {
             if (args.Count != 1) throw new VireError("chr takes 1 values, got " + args.Count, line, col);
@@ -993,6 +1006,46 @@ sealed class CompiledMachine
         {
             if (args.Count != 1) throw new VireError("close takes 1 values, got " + args.Count, line, col);
             return VireNet.CloseHandle(args[0], tcp, line, col);
+        }
+        if (name == "tls_connect")
+        {
+            if (args.Count != 4) throw new VireError("tls_connect takes 4 values, got " + args.Count, line, col);
+            string ca = args[3] as string;
+            if (ca == null) throw new VireError("tls_connect needs a host, a port, a name, and a ca file", line, col);
+            if (ca.Length > 0) ca = Safe(ca, line, col);
+            return VireTls.Connect(args[0] as string, args[1], args[2] as string, ca, tcp, root, line, col);
+        }
+        if (name == "tls_wrap")
+        {
+            if (args.Count != 4) throw new VireError("tls_wrap takes 4 values, got " + args.Count, line, col);
+            string wrapCa = args[2] as string;
+            if (wrapCa == null) throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, col);
+            if (wrapCa.Length > 0) wrapCa = Safe(wrapCa, line, col);
+            return VireTls.Wrap(args[0], args[1] as string, wrapCa, args[3], tcp, line, col);
+        }
+        if (name == "tls_listen")
+        {
+            if (args.Count != 3) throw new VireError("tls_listen takes 3 values, got " + args.Count, line, col);
+            if (!funcs.ContainsKey("route")) throw new VireError("listen needs define route with method, path, body", line, col);
+            int tlsPort = Machine.RequirePort(args[0], line);
+            X509Certificate2 cert = VireTls.LoadPemPair(Safe(args[1], line, col), Safe(args[2], line, col), line, col);
+            VireListen.WithCancel(tlsPort, line, root, DispatchRoute, Show, p => ListenPort = p, cert);
+            return null;
+        }
+        if (name == "tls_send")
+        {
+            if (args.Count != 2) throw new VireError("tls_send takes 2 values, got " + args.Count, line, col);
+            return VireTls.SendAll(args[0], args[1], tcp, line, col);
+        }
+        if (name == "tls_recv")
+        {
+            if (args.Count != 2) throw new VireError("tls_recv takes 2 values, got " + args.Count, line, col);
+            return VireTls.RecvBound(args[0], args[1], tcp, line, col);
+        }
+        if (name == "tls_close")
+        {
+            if (args.Count != 1) throw new VireError("tls_close takes 1 values, got " + args.Count, line, col);
+            return VireTls.CloseHandle(args[0], tcp, line, col);
         }
         if (name == "line")
         {

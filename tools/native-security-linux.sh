@@ -46,5 +46,5 @@ if grep -RniE 'websocket' src compile-native.vire >/dev/null 2>&1; then
   echo "unexpected WebSocket frame parser present"
   exit 1
 fi
-echo "residual: no WebSocket frame parser; guest Redis client is src/rt-redis.vire"
+echo "residual: no WebSocket frame parser; guest Redis client is src/rt-redis.vire (rediss:// TLS in tools/redis-tls-prove-linux.sh)"
 echo "native_security_linux ok"
