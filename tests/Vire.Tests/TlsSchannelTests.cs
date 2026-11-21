@@ -58,6 +58,44 @@ public class TlsSchannelTests
     }
 
     [Fact]
+    public void NativePeTlsWrapGuestImportsSchannelAllowlist()
+    {
+        string root = DualMode.FindRoot();
+        string work = Path.Combine(root, "data", "tls-schannel", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            File.WriteAllText(Path.Combine(work, "guest.vire"),
+                "define main\n  tls_wrap with 1, \"localhost\", \"\", 1\nend\n");
+            string srcRel = Rel(work, "guest.vire");
+            string hexRel = Rel(work, "guest.hex");
+            DualMode.Proc compiled = DualMode.RunVire(
+                root,
+                new string[] { "compile-native.vire", srcRel, hexRel, "pe" },
+                root);
+            Assert.True(compiled.Code == 0, DualMode.Norm(compiled.Out + " " + compiled.Err));
+            Assert.Contains("compiled", DualMode.Norm(compiled.Out));
+            byte[] pe = HexToBytes(root, hexRel);
+            Assert.Equal((byte)'M', pe[0]);
+            Assert.Equal((byte)'Z', pe[1]);
+            string ascii = Encoding.ASCII.GetString(pe);
+            Assert.Contains("secur32.dll", ascii.ToLowerInvariant());
+            Assert.Contains("crypt32.dll", ascii.ToLowerInvariant());
+            Assert.DoesNotContain("libssl.so.3", ascii);
+            var names = PeImports.Names(pe);
+            Assert.Contains("InitializeSecurityContextA", names);
+            Assert.Contains("EncryptMessage", names);
+            Assert.DoesNotContain("LoadLibraryA", names);
+            Assert.DoesNotContain("GetProcAddress", names);
+            Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire")));
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void NativeElfTlsGuestDoesNotImportSchannel()
     {
         string root = DualMode.FindRoot();

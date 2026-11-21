@@ -19,7 +19,7 @@ Linux has no SChannel. The kernel does not perform the handshake.
 | Minimum version | `OpenSSL_version_num() >= 0x30000000` (3.0.0). Below that, `tls_connect` fail-closes. Loading `libssl.so.3` already requires the OPENSSL_3.0 ELF version. |
 | Not used for non-TLS | If a program never calls `tls_*`, the image has no INTERP and no DT_NEEDED. |
 
-Windows native PE: SChannel via a fixed `secur32.dll` + `crypt32.dll` IAT (`openTlsPeImage` / `openPeTlsImage`: `AcquireCredentialsHandleA`, `InitializeSecurityContextA` / `AcceptSecurityContext`, `EncryptMessage` / `DecryptMessage`). TLS 1.2|1.3 only (`SP_PROT_TLS1_2_* | SP_PROT_TLS1_3_*`). Client verification is on (`SCH_CRED_AUTO_CRED_VALIDATION`, `pszTargetName` = `name`). No `SCH_CRED_NO_SERVERNAME_CHECK`, no `SCH_CRED_MANUAL_CRED_VALIDATION`, no `SCH_CRED_IGNORE_NO_REVOCATION_CHECK`. Empty `ca` uses the system store; a non-empty `ca` is a sandboxed PEM loaded into an in-memory root store. Server cert is a sandboxed PFX (`tls_listen` cert path); `key` is the PFX password (empty allowed). Host `SslStream` still runs on both OS. Windows PE execute proof: `tools/tls-schannel-windows.ps1` (PENDING unless CouchStation ran it). `tools/pg-tls-prove-windows.ps1` remains the Postgres-over-TLS PE checklist.
+Windows native PE: `openTlsPeImage` SChannel via a fixed `secur32.dll` + `crypt32.dll` IAT (`AcquireCredentialsHandleA`, `InitializeSecurityContextA` / `AcceptSecurityContext`, `EncryptMessage` / `DecryptMessage`). TLS 1.2|1.3 only (`SP_PROT_TLS1_2_* | SP_PROT_TLS1_3_*`). Client verification is on (`SCH_CRED_AUTO_CRED_VALIDATION`, `pszTargetName` = `name`). No `SCH_CRED_NO_SERVERNAME_CHECK`, no `SCH_CRED_MANUAL_CRED_VALIDATION`, no `SCH_CRED_IGNORE_NO_REVOCATION_CHECK`. Empty `ca` uses the system store; a non-empty `ca` is a sandboxed PEM loaded into an in-memory root store. Server cert is a sandboxed PFX (`tls_listen` cert path); `key` is the PFX password (empty allowed). Host `SslStream` still runs on both OS. Windows PE execute proofs: `tools/tls-schannel-windows.ps1` and `tools/pg-redis-tls-windows.ps1` (PENDING unless CouchStation ran them).
 
 ## Guest API
 
@@ -65,6 +65,7 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 - Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping; `tls_listen` `/health`; negatives fail-closed).
 - Windows host: `tools/tls-server-windows.ps1` (SslStream `/health`).
 - Windows PE SChannel: `tools/tls-schannel-windows.ps1` (PENDING CouchStation).
+- Windows PE Postgres/Redis TLS: `tools/pg-redis-tls-windows.ps1` (PENDING CouchStation; loopback test servers only).
 
 ## Shared files
 

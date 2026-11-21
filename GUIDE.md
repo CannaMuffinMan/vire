@@ -213,7 +213,7 @@ say now
 
 `fetch with "https://example.com"` performs one HTTP GET. The address must start with `http://` or `https://`. The wait is at most 5 seconds, and the body is at most 1,000,000 bytes.
 
-Native compiled programs use `tls_connect` / `tls_wrap` / `tls_send` / `tls_recv` / `tls_close` for outbound HTTPS and Postgres `sslmode=require`/`verify-full` on the loopback TCP path, and `tls_listen` with a cert/key under `data/` or `site/` to terminate TLS on the HTTP listener (see `docs/native-tls.md`). Certificate checks stay on. There is no flag that turns them off. Empty CA on `tls_connect` uses the system store. Native Windows PE TLS stays fail-closed until SChannel is proven.
+Native compiled programs use `tls_connect` / `tls_wrap` / `tls_send` / `tls_recv` / `tls_close` for outbound HTTPS and Postgres `sslmode=require`/`verify-full` on the loopback TCP path, and `tls_listen` with a cert/key under `data/` or `site/` to terminate TLS on the HTTP listener (see `docs/native-tls.md`). Certificate checks stay on. There is no flag that turns them off. Empty CA uses the system store. Native Windows PE TLS uses SChannel (prove execute on CouchStation).
 
 ## 10. Packages
 

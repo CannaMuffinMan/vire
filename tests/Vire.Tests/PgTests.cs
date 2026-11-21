@@ -26,6 +26,7 @@ public class PgTests
         Assert.Contains("pg-prove-windows.ps1", yml);
         Assert.Contains("native-pg-windows", yml);
         Assert.Contains("pg-tls-prove-windows.ps1", yml);
+        Assert.Contains("pg-redis-tls-windows.ps1", yml);
         Assert.Contains("native-pg-tls-windows", yml);
         string tlsPs = File.ReadAllText(Path.Combine(root, "tools", "pg-tls-prove-windows.ps1"));
         Assert.Contains("VIRE_BUDGET", tlsPs);

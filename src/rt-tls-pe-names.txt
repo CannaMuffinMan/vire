@@ -132,7 +132,7 @@ iat_dsc
 tls_wrap_bad
 tls_checkhost
 tls_captr
-tls_pe_after_fd
+tls_pe_after_tcp
 tls_conn_bad
 rt_connect
 tpc_noca

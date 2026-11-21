@@ -860,6 +860,7 @@ define emitTlsPeGuest with image, fixes, labels
   pin with labels, "rt_tls_wrap", image
   emitPro with image
   emitPop2 with image
+  ~ rax/rdx = ca, r8/r9 = checkHost. Hostname stays on (pszTargetName).
   emitList with image, [72, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
   emitList with image, [73, 131, 248, 1, 15, 133]
@@ -871,16 +872,18 @@ define emitTlsPeGuest with image, fixes, labels
   emitList with image, [72, 137, 21]
   emitRel with image, fixes, "tls_captr"
   emitPop2 with image
+  ~ rax/rdx = handle, r8/r9 = name
   emitList with image, [72, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
   emitList with image, [73, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
-  emitList with image, [76, 137, 13]
+  emitList with image, [73, 139, 1, 73, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [73, 141, 65, 8, 72, 137, 5]
   emitRel with image, fixes, "tls_nameptr"
-  emitList with image, [72, 137, 85, 224]
-  emitList with image, [72, 137, 21]
+  emitList with image, [72, 137, 85, 224, 72, 137, 21]
   emitRel with image, fixes, "tls_fd"
-  emitJmpTo with image, fixes, "tls_pe_after_fd"
+  emitJmpTo with image, fixes, "tls_pe_after_tcp"
 
   pin with labels, "rt_tls_connect", image
   emitPro with image
@@ -908,7 +911,7 @@ define emitTlsPeGuest with image, fixes, labels
   emitPop1 with image
   emitList with image, [72, 137, 85, 224, 72, 137, 21]
   emitRel with image, fixes, "tls_fd"
-  pin with labels, "tls_pe_after_fd", image
+  pin with labels, "tls_pe_after_tcp", image
   emitCallTo with image, fixes, "tls_save_raw"
   emitList with image, [72, 199, 5]
   emitRel with image, fixes, "tls_server"
