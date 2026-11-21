@@ -16,10 +16,19 @@ end
 define emitHex with image, raw
   let i be 0
   let n be length with raw
-  while i + 1 < n
-    let v be ((hexNibble with (raw at i)) * 16) + (hexNibble with (raw at (i + 1)))
-    let image be emitU8 with image, v
-    let i be i + 2
+  while i < n
+    let ch be raw at i
+    if ch == " " or ch == "\n" or ch == "\r" or ch == "\t"
+      let i be i + 1
+    end
+    if ch != " " and ch != "\n" and ch != "\r" and ch != "\t"
+      if i + 1 >= n
+        stop
+      end
+      let v be ((hexNibble with (raw at i)) * 16) + (hexNibble with (raw at (i + 1)))
+      let image be emitU8 with image, v
+      let i be i + 2
+    end
   end
   return image
 end
@@ -104,6 +113,22 @@ define parkNet with image, labels
   parkMsg with image, labels, "txt_http11", "HTTP/1.1 "
   parkMsg with image, labels, "txt_sp_ok", " OK\r\n"
   parkMsg with image, labels, "txt_sp_err", " Error\r\n"
+  parkMsg with image, labels, "txt_sp_101", " Switching Protocols\r\n"
+  parkMsg with image, labels, "txt_sp_206", " Partial Content\r\n"
+  parkMsg with image, labels, "txt_sp_400", " Bad Request\r\n"
+  parkMsg with image, labels, "txt_sp_401", " Unauthorized\r\n"
+  parkMsg with image, labels, "txt_sp_403", " Forbidden\r\n"
+  parkMsg with image, labels, "txt_sp_404", " Not Found\r\n"
+  parkMsg with image, labels, "txt_sp_408", " Request Timeout\r\n"
+  parkMsg with image, labels, "txt_sp_411", " Length Required\r\n"
+  parkMsg with image, labels, "txt_sp_413", " Payload Too Large\r\n"
+  parkMsg with image, labels, "txt_sp_416", " Range Not Satisfiable\r\n"
+  parkMsg with image, labels, "txt_sp_431", " Request Header Fields Too Large\r\n"
+  parkMsg with image, labels, "txt_sp_500", " Internal Server Error\r\n"
+  parkMsg with image, labels, "txt_sp_501", " Not Implemented\r\n"
+  parkMsg with image, labels, "txt_sp_502", " Bad Gateway\r\n"
+  parkMsg with image, labels, "txt_sp_503", " Service Unavailable\r\n"
+  parkMsg with image, labels, "txt_sp_507", " Insufficient Storage\r\n"
   ~ JSON listen replies match Go writeJSON: Content-Type application/json, no charset.
   parkMsg with image, labels, "txt_hdrs", "Content-Type: application/json\r\nContent-Length: "
   parkMsg with image, labels, "txt_hdrs_plain", "Content-Type: text/plain; charset=utf-8\r\nContent-Length: "
@@ -233,9 +258,42 @@ define parkNet with image, labels
   return image
 end
 
+~ Match host VireListen.ReasonOf for every status sendhttp emits.
+define emitNetReason with image, fixes, labels
+  pin with labels, "rt_net_reason", image
+  let image be emitList with image, [139, 69, 240]
+  let pairs be [[200, "phr_200", "txt_sp_ok"], [101, "phr_101", "txt_sp_101"], [206, "phr_206", "txt_sp_206"], [400, "phr_400", "txt_sp_400"], [401, "phr_401", "txt_sp_401"], [403, "phr_403", "txt_sp_403"], [404, "phr_404", "txt_sp_404"], [408, "phr_408", "txt_sp_408"], [411, "phr_411", "txt_sp_411"], [413, "phr_413", "txt_sp_413"], [416, "phr_416", "txt_sp_416"], [431, "phr_431", "txt_sp_431"], [500, "phr_500", "txt_sp_500"], [501, "phr_501", "txt_sp_501"], [502, "phr_502", "txt_sp_502"], [503, "phr_503", "txt_sp_503"], [507, "phr_507", "txt_sp_507"]]
+  let i be 0
+  let n be length with pairs
+  while i < n
+    let p be pairs at i
+    let image be emitList with image, [61]
+    let image be emitU32 with image, (p at 0)
+    let image be emitJcc with image, fixes, 132, (p at 1)
+    let i be i + 1
+  end
+  let image be emitList with image, [72, 141, 21]
+  let image be emitRel with image, fixes, "txt_sp_ok"
+  let image be emitJmpTo with image, fixes, "sh_ph"
+  let i be 0
+  while i < n
+    let p be pairs at i
+    pin with labels, (p at 1), image
+    let image be emitList with image, [72, 141, 21]
+    let image be emitRel with image, fixes, (p at 2)
+    let image be emitJmpTo with image, fixes, "sh_ph"
+    let i be i + 1
+  end
+  return image
+end
+
 ~ Landing-go extras: 503 data_held / subscription, 401 auth text, 307 location,
 ~ HTML Content-Type, WWW-Authenticate, X-Payments-Enabled. Same needles as host.
 define emitLandingHttp with image, fixes, labels, base, route_nparams
+  let image be emitNetReason with image, fixes, labels
+  let send be labels at "rt_net_sendhttp"
+  put 233 into image at (send + 76)
+  push with fixes, {"at": (send + 77), "to": "rt_net_reason"}
   put (labels at "rt_net_statusof") into labels at "rt_net_statusof_blob"
   pin with labels, "rt_net_has", image
   let image be emitPro with image

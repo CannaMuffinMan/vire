@@ -61,8 +61,14 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $pinDir "data") | Out-Null
     $utf8nb = New-Object System.Text.UTF8Encoding $false
     [IO.File]::WriteAllText((Join-Path $pinDir "data/redis-tls-fail-before.vire"), "define main`n  redis_open_tls with 16380, `"localhost`", `"data/redis-ca.pem`"`nend`n", $utf8nb)
-    $beforeOut = & dotnet exec $pinDll "data/redis-tls-fail-before.vire" 2>&1 | Out-String
-    $beforeCode = $LASTEXITCODE
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $beforeOut = & dotnet exec $pinDll "data/redis-tls-fail-before.vire" 2>&1 | Out-String
+        $beforeCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
     Write-Output $beforeOut.TrimEnd()
     Write-Output "fail_before_host_exit $beforeCode"
     if ($beforeCode -eq 0) { throw "FAIL_BEFORE unexpectedly passed at $PinSha" }

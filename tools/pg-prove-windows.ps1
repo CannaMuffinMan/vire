@@ -57,8 +57,14 @@ function Invoke-FailBeforePinBuild {
         $utf8nb = New-Object System.Text.UTF8Encoding $false
         [System.IO.File]::WriteAllText($guestPath, $guest, $utf8nb)
         Write-Output "pg_fail_before_pin_dll $pinDll"
-        $beforeOut = & dotnet exec $pinDll "data/pg-fail-before.vire" 2>&1 | Out-String
-        $beforeCode = $LASTEXITCODE
+        $savedEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $beforeOut = & dotnet exec $pinDll "data/pg-fail-before.vire" 2>&1 | Out-String
+            $beforeCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $savedEap
+        }
         Write-Output $beforeOut.TrimEnd()
         Write-Output "fail_before_host_exit $beforeCode"
         if ($beforeCode -eq 0) { throw "FAIL_BEFORE unexpectedly passed at $PinSha" }

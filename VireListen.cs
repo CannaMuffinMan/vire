@@ -486,7 +486,7 @@ static class VireListen
         return extra;
     }
 
-    static string ReasonOf(int code)
+    internal static string ReasonOf(int code)
     {
         if (code == 200) return "OK";
         if (code == 101) return "Switching Protocols";

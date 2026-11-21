@@ -33,7 +33,7 @@ Copy-Item (Join-Path $Root "compile-native.vire") (Join-Path $Work "compile-nati
 Copy-Item -Recurse (Join-Path $Root "src") (Join-Path $Work "src")
 Copy-Item (Join-Path $Root "tests/native/hello-stage.vire") (Join-Path $Work "hello-stage.vire")
 
-$code = Invoke-Vire compile-native.vire "data/native-selfhost/compile-native.vire" "data/native-selfhost/gen1.hex"
+$code = Invoke-Vire --compiler compile-native.vire "data/native-selfhost/compile-native.vire" "data/native-selfhost/gen1.hex"
 if ($code -ne 0) { Write-Output "FAIL host compile compile-native.vire exit=$code"; exit 1 }
 Hex-ToExe (Join-Path $Work "gen1.hex") (Join-Path $Work "gen1.exe")
 

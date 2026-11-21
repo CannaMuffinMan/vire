@@ -23,7 +23,9 @@ $TableSha = if ($env:AES_GCM_FAIL_BEFORE_SHA) { $env:AES_GCM_FAIL_BEFORE_SHA } e
 $AfterSha = (git rev-parse HEAD).Trim()
 Write-Output "fail_before_sha $TableSha"
 Write-Output "pass_after_sha $AfterSha"
-$BeforeSrc = git show "${TableSha}:src/rt-aes.vire"
+git cat-file -e "$TableSha^{commit}" 2>$null
+if ($LASTEXITCODE -ne 0) { git fetch --depth 1 origin $TableSha }
+$BeforeSrc = @(& git show "${TableSha}:src/rt-aes.vire") -join "`n"
 if ($BeforeSrc -notmatch "sbox at") { throw "FAIL_BEFORE expected table lookup at $TableSha" }
 if ($BeforeSrc -notmatch "if d >= 256") { throw "FAIL_BEFORE expected xtime branch at $TableSha" }
 if ($BeforeSrc -notmatch "if flag == 1") { throw "FAIL_BEFORE expected GHASH bit skip at $TableSha" }

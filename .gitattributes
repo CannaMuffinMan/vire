@@ -1,1 +1,10 @@
+* text=auto eol=lf
+*.vire text eol=lf
+*.sh text eol=lf
+*.cs text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
 tests/native/fixtures/gc-tagged-walk/** text eol=lf
+tests/fuzz/corpus/http-*.txt binary

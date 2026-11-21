@@ -98,7 +98,11 @@ if ($code -ne 0) { throw "PE rediss compile failed" }
 $env:VIRE_BUDGET = "5000000"
 Assert-PeSchannel (Join-Path $Data "redis-tls-pe.hex") "redis_tls"
 
-if (-not $IsWindows) {
+$OnWindows = ($env:OS -eq "Windows_NT")
+if (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) {
+    if ($IsWindows) { $OnWindows = $true }
+}
+if (-not $OnWindows) {
     Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation must run this script"
     Write-Output "PASS_AFTER compile-only: wrap/pg/redis PE import SChannel"
     Write-Output "pg_redis_tls_windows compile_ok"
@@ -206,7 +210,9 @@ Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 $code = Invoke-Vire "compile-native.vire" "data/pg-redis-wrap-mismatch.vire" "data/pg-redis-wrap-mismatch.hex" "pe"
 Convert-HexToExe (Join-Path $Data "pg-redis-wrap-mismatch.hex") (Join-Path $Data "pg-redis-wrap-mismatch.exe")
 $env:VIRE_BUDGET = "5000000"
-$mm = & (Join-Path $Data "pg-redis-wrap-mismatch.exe") 2>&1 | Out-String
+$savedEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try { $mm = & (Join-Path $Data "pg-redis-wrap-mismatch.exe") 2>&1 | Out-String } finally { $ErrorActionPreference = $savedEap }
 if ($LASTEXITCODE -eq 0) { throw "hostname mismatch must fail closed" }
 Write-Output "pe_hostname_mismatch_fail_closed"
 
@@ -221,7 +227,9 @@ Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 $code = Invoke-Vire "compile-native.vire" "data/pg-redis-wrap-untrusted.vire" "data/pg-redis-wrap-untrusted.hex" "pe"
 Convert-HexToExe (Join-Path $Data "pg-redis-wrap-untrusted.hex") (Join-Path $Data "pg-redis-wrap-untrusted.exe")
 $env:VIRE_BUDGET = "5000000"
-$uo = & (Join-Path $Data "pg-redis-wrap-untrusted.exe") 2>&1 | Out-String
+$savedEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try { $uo = & (Join-Path $Data "pg-redis-wrap-untrusted.exe") 2>&1 | Out-String } finally { $ErrorActionPreference = $savedEap }
 if ($LASTEXITCODE -eq 0) { throw "untrusted CA must fail closed" }
 Write-Output "pe_untrusted_ca_fail_closed"
 

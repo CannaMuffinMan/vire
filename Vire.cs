@@ -665,7 +665,7 @@ sealed class Machine
             if (raw == null) throw new VireError("number needs text or a number", line, col);
             int whole;
             double real;
-            if (raw.IndexOf('.') < 0 && int.TryParse(raw, out whole)) return whole;
+            if (raw.IndexOf('.') < 0 && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out whole)) return whole;
             if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out real)) return real;
             throw new VireError("that text is not a number", line, col);
         }
@@ -850,6 +850,7 @@ sealed class Machine
             string sep = args[1] as string;
             if (raw == null || sep == null || sep.Length == 0) throw new VireError("split needs text and a separator", line, col);
             string[] bits = raw.Split(new string[] { sep }, StringSplitOptions.None);
+            if (bits.Length > itemCap) throw new VireError("list is too large", line, col);
             List<object> items = new List<object>();
             foreach (string bit in bits) items.Add(bit);
             return items;
@@ -1664,7 +1665,7 @@ sealed class Machine
             List<object> items = new List<object>();
             foreach (object item in (List<object>)tree[1])
             {
-                if (items.Count >= MaxItems) throw new VireError("list is too large", line, col);
+                if (items.Count >= itemCap) throw new VireError("list is too large", line, col);
                 items.Add(Eval(item, env));
             }
             return items;
@@ -3166,8 +3167,7 @@ sealed class Program
         seen.Add(full);
         try
         {
-        string folderFull = folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(folderFull, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
+        if (!VirePaths.InFolder(folder, full))
             throw new VireError("use stays inside the program folder", 1);
         VirePaths.RefuseReparse(full, folder, 1);
         if (CompilerProgress != 0) CompilerNote("loading " + Path.GetFileName(full));
@@ -3400,6 +3400,13 @@ sealed class Program
 
     internal static int Execute(string[] args)
     {
+        try
+        {
+            Console.OutputEncoding = new UTF8Encoding(false);
+            Console.InputEncoding = new UTF8Encoding(false);
+        }
+        catch (IOException) { }
+        catch (ArgumentException) { }
         bool hostCompiler = HasHostCompilerFlag(args);
         args = StripHostCompiler(args);
         if (hostCompiler)

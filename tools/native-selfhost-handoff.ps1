@@ -38,30 +38,43 @@ function Invoke-Bounded {
     if (Test-Path $outFile) { Remove-Item -Force $outFile }
     if (Test-Path $errFile) { Remove-Item -Force $errFile }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $start = @{
-        FilePath = $FilePath
-        WorkingDirectory = $Root
-        NoNewWindow = $true
-        PassThru = $true
-        RedirectStandardInput = $inFile
-        RedirectStandardOutput = $outFile
-        RedirectStandardError = $errFile
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = $FilePath
+    $info.WorkingDirectory = $Root
+    $info.UseShellExecute = $false
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    if ($ArgumentList -and $ArgumentList.Count -gt 0) {
+        $info.Arguments = ($ArgumentList | ForEach-Object {
+            if ($_ -match '\s') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+        }) -join " "
     }
-    if ($ArgumentList -and $ArgumentList.Count -gt 0) { $start.ArgumentList = $ArgumentList }
-    $p = Start-Process @start
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo = $info
+    [void]$p.Start()
+    $p.StandardInput.Close()
+    $outTask = $p.StandardOutput.ReadToEndAsync()
+    $errTask = $p.StandardError.ReadToEndAsync()
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         try { $p.Kill($true) } catch { }
         $sw.Stop()
         throw "$Name timed out after $([int]$sw.Elapsed.TotalSeconds)s (limit ${TimeoutSec}s)"
     }
+    [void]$outTask.Wait()
+    [void]$errTask.Wait()
+    $code = $p.ExitCode
+    if ($null -eq $code) { $code = -1 }
     $sw.Stop()
-    $stdout = if (Test-Path $outFile) { Get-Content -Raw $outFile } else { "" }
-    $stderr = if (Test-Path $errFile) { Get-Content -Raw $errFile } else { "" }
+    $stdout = $outTask.Result
+    $stderr = $errTask.Result
+    Set-Content -Path $outFile -Value $stdout
+    Set-Content -Path $errFile -Value $stderr
     Write-Host ("step_" + $Name + "_sec " + $sw.Elapsed.TotalSeconds.ToString("0.000"))
-    Write-Host ("step_" + $Name + "_exit " + $p.ExitCode)
+    Write-Host ("step_" + $Name + "_exit " + $code)
     if ($stderr) { Write-Host $stderr.TrimEnd() }
     if ($stdout) { Write-Host $stdout.TrimEnd() }
-    if ($p.ExitCode -eq -1073741819 -or $p.ExitCode -eq 0xC0000005) {
+    if ($code -eq -1073741819 -or $code -eq 0xC0000005) {
         Write-Host "crash_access_violation $Name pid $($p.Id)"
         foreach ($ripFile in @((Join-Path $Root "crash-rip.txt"), (Join-Path $Data "crash-rip.txt"), (Join-Path $Root "data/crash-rip.txt"))) {
             if (Test-Path $ripFile) {
@@ -75,27 +88,24 @@ function Invoke-Bounded {
             Write-Host "wer_event1000_query_failed $($_.Exception.Message)"
         }
     }
-    if ($p.ExitCode -ne 0) { throw "$Name exit $($p.ExitCode)" }
+    if ($code -ne 0) { throw "$Name exit $code" }
     return @{ StdOut = $stdout; StdErr = $stderr; Sec = $sw.Elapsed.TotalSeconds }
 }
 
 Write-VireHostInfo
 
 Copy-Item (Join-Path $Root "compile-native.vire") (Join-Path $Data "compile-native.vire") -Force
-Copy-Item (Join-Path $Root "src/asm.vire") (Join-Path $Src "asm.vire") -Force
-Copy-Item (Join-Path $Root "src/pe.vire") (Join-Path $Src "pe.vire") -Force
-Copy-Item (Join-Path $Root "src/rt.vire") (Join-Path $Src "rt.vire") -Force
-Copy-Item (Join-Path $Root "src/rt-more.vire") (Join-Path $Src "rt-more.vire") -Force
-Copy-Item (Join-Path $Root "src/rt-net.vire") (Join-Path $Src "rt-net.vire") -Force
-Copy-Item (Join-Path $Root "src/elf.vire") (Join-Path $Src "elf.vire") -Force
-Copy-Item (Join-Path $Root "src/rt-linux.vire") (Join-Path $Src "rt-linux.vire") -Force
-foreach ($blob in @(
+foreach ($leaf in @(
+    "asm.vire", "pe.vire", "rt.vire", "rt-more.vire", "rt-net.vire", "rt-ws.vire",
+    "rt-dns.vire", "elf.vire", "rt-linux.vire", "rt-tls.vire", "rt-tls-pe.vire",
+    "rt-crypto.vire",
+    "rt-tls-pe-blob.txt", "rt-tls-pe-pins.txt", "rt-tls-pe-fixes.txt",
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt",
     "rt-net-r3-blob.txt", "rt-net-r3-pins.txt", "rt-net-r3-fixes.txt",
     "rt-net-r4-blob.txt", "rt-net-r4-pins.txt", "rt-net-r4-fixes.txt"
 )) {
-    Copy-Item (Join-Path $Root "src/$blob") (Join-Path $Src $blob) -Force
+    Copy-Item (Join-Path $Root "src/$leaf") (Join-Path $Src $leaf) -Force
 }
 Copy-Item (Join-Path $Root "guest-hello.vire") (Join-Path $Data "guest-hello.vire") -Force
 $pairs = @(
@@ -105,8 +115,16 @@ $pairs = @(
     @("src/rt.vire", "data/src/rt.vire"),
     @("src/rt-more.vire", "data/src/rt-more.vire"),
     @("src/rt-net.vire", "data/src/rt-net.vire"),
+    @("src/rt-ws.vire", "data/src/rt-ws.vire"),
+    @("src/rt-dns.vire", "data/src/rt-dns.vire"),
     @("src/elf.vire", "data/src/elf.vire"),
     @("src/rt-linux.vire", "data/src/rt-linux.vire"),
+    @("src/rt-tls.vire", "data/src/rt-tls.vire"),
+    @("src/rt-tls-pe.vire", "data/src/rt-tls-pe.vire"),
+    @("src/rt-crypto.vire", "data/src/rt-crypto.vire"),
+    @("src/rt-tls-pe-blob.txt", "data/src/rt-tls-pe-blob.txt"),
+    @("src/rt-tls-pe-pins.txt", "data/src/rt-tls-pe-pins.txt"),
+    @("src/rt-tls-pe-fixes.txt", "data/src/rt-tls-pe-fixes.txt"),
     @("src/rt-net-blob.txt", "data/src/rt-net-blob.txt"),
     @("src/rt-net-pins.txt", "data/src/rt-net-pins.txt"),
     @("src/rt-net-fixes.txt", "data/src/rt-net-fixes.txt"),

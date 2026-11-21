@@ -50,7 +50,8 @@ static class VirePaths
                 if (i == 0 || i == parts.Length - 1) continue;
                 throw new VireError("files stay inside the program folder", line, column);
             }
-            if (part == "." || part == "..")
+            if (part == ".") continue;
+            if (part == "..")
                 throw new VireError("files stay inside the program folder", line, column);
             if (part.EndsWith(".") || part.EndsWith(" "))
                 throw new VireError("files stay inside the program folder", line, column);
@@ -236,7 +237,14 @@ static class VirePaths
         using FileStream fs = OpenFile(path, FileMode.Open, FileAccess.Read, folder, line, column);
         ConfirmOpenedUnder(fs.SafeFileHandle, folder, line, column);
         using StreamReader reader = new StreamReader(fs, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
-        return reader.ReadToEnd();
+        return NormalizeNewlines(reader.ReadToEnd());
+    }
+
+    public static string NormalizeNewlines(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
+        return text.Replace("\r\n", "\n").Replace("\r", "\n");
     }
 
     // Tests set this. Product OpenFile does not read process environment.

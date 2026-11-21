@@ -3,6 +3,10 @@
 # Unsets VIRE_BUDGET first (inherited 5000000 fails BudgetCapTests).
 # Never prints FCG_API_TOKEN. Loopback only. Caps stay 32MB / 100000 / 5M.
 $ErrorActionPreference = "Stop"
+$env:UseSharedCompilation = "false"
+$env:MSBUILDDISABLENODEREUSE = "1"
+$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = "1"
+try { dotnet build-server shutdown | Out-Null } catch { }
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
@@ -116,7 +120,8 @@ Run-Proof "pe-json-map-fault-90" {
     $hex = Join-Path $Data "json-map.hex"
     $exe = Join-Path $Data "json-map.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire tests/fuzz/findings/native-pe-json-map.vire data/json-map.hex pe
+    Copy-Item (Join-Path $Root "tests/fuzz/findings/native-pe-json-map.vire") (Join-Path $Data "json-map.vire") -Force
+    & dotnet exec $VireDll --compiler compile-native.vire data/json-map.vire data/json-map.hex pe
     if ($LASTEXITCODE -ne 0) { throw "json-map compile exit $LASTEXITCODE" }
     Convert-HexToExe $hex $exe
     $out = & $exe
@@ -129,7 +134,8 @@ Run-Proof "pe-parse-array-fault-90" {
     $hex = Join-Path $Data "parse-array.hex"
     $exe = Join-Path $Data "parse-array.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire tests/fuzz/findings/native-pe-parse-array.vire data/parse-array.hex pe
+    Copy-Item (Join-Path $Root "tests/fuzz/findings/native-pe-parse-array.vire") (Join-Path $Data "parse-array.vire") -Force
+    & dotnet exec $VireDll --compiler compile-native.vire data/parse-array.vire data/parse-array.hex pe
     if ($LASTEXITCODE -ne 0) { throw "parse-array compile exit $LASTEXITCODE" }
     Convert-HexToExe $hex $exe
     $code = 0
@@ -181,9 +187,10 @@ Run-Proof "proxy-reply-windows" { Run-Script "tools/proxy-reply-windows.ps1" }
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"
     if (-not (Test-Path $src)) { throw "missing session-prove.vire" }
+    Copy-Item $src (Join-Path $Data "session-prove.vire") -Force
     $hex = Join-Path $Data "session-prove.hex"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire $src data/session-prove.hex pe
+    & dotnet exec $VireDll --compiler compile-native.vire data/session-prove.vire data/session-prove.hex pe
     if ($LASTEXITCODE -ne 0) { throw "session-prove compile exit $LASTEXITCODE" }
     Convert-HexToExe $hex (Join-Path $Data "session-prove.exe")
     $peOut = & (Join-Path $Data "session-prove.exe") | Out-String

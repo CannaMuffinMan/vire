@@ -83,11 +83,12 @@ $worker = Start-Job -ScriptBlock {
 Set-Content -Path (Join-Path $Data "vire-dns") -Value "127.0.0.1 $port`n" -NoNewline
 $env:VIRE_DNS = "127.0.0.1:$port"
 try {
-    $code = Invoke-Vire "compile-native.vire" "tests/native/dns-resolve.vire" "data/dns-resolve.hex"
+    Copy-Item (Join-Path $Root "tests/native/dns-resolve.vire") (Join-Path $Data "dns-resolve.vire") -Force
+    $code = Invoke-Vire "compile-native.vire" "data/dns-resolve.vire" "data/dns-resolve.hex"
     if ($code -ne 0) { throw "compile-native dns-resolve failed" }
     Convert-HexToExe (Join-Path $Data "dns-resolve.hex") (Join-Path $Data "dns-resolve.exe")
     $pe = & (Join-Path $Data "dns-resolve.exe")
-    $hostOut = & dotnet exec $VireDll "tests/native/dns-resolve.vire"
+    $hostOut = & dotnet exec $VireDll "data/dns-resolve.vire"
     Write-Output "host_out $hostOut"
     Write-Output "pe_out $pe"
     if ($pe -notmatch "127.0.0.1") { throw "PE missing 127.0.0.1" }

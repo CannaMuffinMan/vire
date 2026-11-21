@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using Xunit;
 
@@ -54,18 +53,6 @@ public class CompilerStageTests
 
     static void RunStage(string root)
     {
-        ProcessStartInfo info = new ProcessStartInfo();
-        info.FileName = "bash";
-        info.Arguments = "tools/stage-compiler-src.sh";
-        info.WorkingDirectory = root;
-        info.RedirectStandardOutput = true;
-        info.RedirectStandardError = true;
-        info.UseShellExecute = false;
-        Process process = Process.Start(info);
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30000), "stage-compiler-src timed out");
-        Assert.Equal(0, process.ExitCode);
-        Assert.Contains("stage-compiler-src ok", stdout + stderr);
+        CompilerStage.CopyToData(root);
     }
 }
