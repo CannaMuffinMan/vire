@@ -1,8 +1,11 @@
-~ Guest PostgreSQL frontend/backend protocol v3 on loopback TCP (PR #64).
-~ No TLS. No DNS. Auth: AuthenticationOk (trust) and cleartext PasswordMessage.
-~ SCRAM-SHA-256 is a residual: guest HMAC/SHA-256 exists, but SASL+PBKDF2 at
-~ default 4096 iterations would blow the 5M step cap, so CI uses trust.
-~ Caps stay 32MB / 100000 / 5M.
+~ Guest PostgreSQL frontend/backend protocol v3 on loopback TCP.
+~ No TLS (depends on the separate native TLS lane). No DNS.
+~ Auth: AuthenticationOk (trust), cleartext PasswordMessage, SCRAM-SHA-256
+~ (HMAC-SHA-256 via native `hash` / Latin-1 guest bytes; PBKDF2 iteration
+~ cap 8192 so a hostile server cannot burn the 5M step budget).
+~ Prove scripts set scram_iterations=32; default 4096 is the same
+~ protocol and stays under the cap if the guest xor loop is later nativized.
+~ Caps stay 32MB / 100000 / 5M. Recv cap 1000000. Message length fail-closed.
 
 define pg_tab
   let s be ""
@@ -41,12 +44,18 @@ define pg_be16 with n
 end
 
 define pg_u16be with raw, i, tab
+  if (i + 2) > (length with raw)
+    return none
+  end
   let hi be pg_u8 with (raw at i), tab
   let lo be pg_u8 with (raw at (i + 1)), tab
   return (hi * 256) + lo
 end
 
 define pg_u32be with raw, i, tab
+  if (i + 4) > (length with raw)
+    return none
+  end
   let a be pg_u8 with (raw at i), tab
   let b be pg_u8 with (raw at (i + 1)), tab
   let c be pg_u8 with (raw at (i + 2)), tab
@@ -65,46 +74,101 @@ define pg_cstr with raw, i
     let out be out + ch
     let i be i + 1
   end
-  return [out, i]
+  return none
 end
 
 define pg_msg with kind, body
   return kind + (pg_be32 with ((length with body) + 4)) + body
 end
 
+define pg_max_msg
+  return 1000000
+end
+
+define pg_max_iter
+  return 8192
+end
+
 define pg_fill with conn, want
+  if want < 0
+    put "bad length" into conn at "why"
+    return false
+  end
+  if want > (pg_max_msg)
+    put "oversize" into conn at "why"
+    return false
+  end
   let buf be conn at "buf"
   let h be conn at "h"
   while (length with buf) < want
-    let chunk be recv with h, 4096
+    try
+      let chunk be recv with h, 4096
+    miss problem
+      put "timeout" into conn at "why"
+      return false
+    end
     if chunk == ""
+      put "closed" into conn at "why"
       return false
     end
     let buf be buf + chunk
+    if (length with buf) > (pg_max_msg)
+      put "oversize" into conn at "why"
+      return false
+    end
   end
   put buf into conn at "buf"
   return true
 end
 
+define pg_take with buf, tab
+  let n be length with buf
+  if n < 5
+    return {"ok": false, "why": "truncated"}
+  end
+  let t be buf at 0
+  let ln be pg_u32be with buf, 1, tab
+  if ln == none
+    return {"ok": false, "why": "truncated"}
+  end
+  if ln < 4
+    return {"ok": false, "why": "bad length"}
+  end
+  if ln > (pg_max_msg)
+    return {"ok": false, "why": "oversize"}
+  end
+  let total be ln + 1
+  if n < total
+    return {"ok": false, "why": "truncated"}
+  end
+  let payload be slice with buf, 5, total
+  let rest be slice with buf, total, n
+  return {"ok": true, "why": "", "t": t, "p": payload, "rest": rest}
+end
+
 define pg_read with conn
+  put "" into conn at "why"
   if not (pg_fill with conn, 5)
     return none
   end
   let buf be conn at "buf"
   let tab be conn at "tab"
-  let t be buf at 0
-  let ln be pg_u32be with buf, 1, tab
-  if ln < 4
+  let got be pg_take with buf, tab
+  if (got at "ok") == false
+    put (got at "why") into conn at "why"
     return none
   end
-  let total be ln + 1
-  if not (pg_fill with conn, total)
+  if not (pg_fill with conn, ((length with (got at "p")) + 5))
     return none
   end
   let buf be conn at "buf"
-  let payload be slice with buf, 5, total
-  put (slice with buf, total, (length with buf)) into conn at "buf"
-  return {"t": t, "p": payload}
+  let got be pg_take with buf, tab
+  if (got at "ok") == false
+    put (got at "why") into conn at "why"
+    return none
+  end
+  put (got at "rest") into conn at "buf"
+  return {"t": (got at "t"), "p": (got at "p")}
 end
 
 define pg_err with payload, tab
@@ -119,6 +183,9 @@ define pg_err with payload, tab
     end
     let i be i + 1
     let got be pg_cstr with payload, i
+    if got == none
+      return "malformed error"
+    end
     let val be got at 0
     let i be got at 1
     if k == "M"
@@ -127,6 +194,9 @@ define pg_err with payload, tab
     if k == "C"
       let code be val
     end
+  end
+  if (code == "") and (msg == "")
+    return "malformed error"
   end
   return code + " " + msg
 end
@@ -138,15 +208,389 @@ define pg_startup with user, db
   return (pg_be32 with ((length with body) + 4)) + body
 end
 
-define pg_auth with conn, secret
+define pg_xor8 with a, b
+  let r be 0
+  let p be 1
+  let i be 0
+  while i < 8
+    let ab be a % 2
+    let bb be b % 2
+    if ab != bb
+      let r be r + p
+    end
+    let a be idiv with a, 2
+    let b be idiv with b, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define pg_unhex with hx
+  let n be length with hx
+  if (n % 2) != 0
+    return none
+  end
+  let digits be "0123456789abcdef"
+  let out be ""
+  let i be 0
+  while i < n
+    let hi be find with digits, (hx at i)
+    let lo be find with digits, (hx at (i + 1))
+    if hi < 0
+      return none
+    end
+    if lo < 0
+      return none
+    end
+    let out be out + (chr with ((hi * 16) + lo))
+    let i be i + 2
+  end
+  return out
+end
+
+define pg_sha with raw
+  return pg_unhex with (hash with raw)
+end
+
+define pg_xor_raw with a, b, tab
+  let n be length with a
+  if n != (length with b)
+    return none
+  end
+  let out be ""
+  let i be 0
+  while i < n
+    let x be pg_u8 with (a at i), tab
+    let y be pg_u8 with (b at i), tab
+    let out be out + (chr with (pg_xor8 with x, y))
+    let i be i + 1
+  end
+  return out
+end
+
+define pg_hmac with key, msg, tab
+  let k be key
+  if (length with k) > 64
+    let k be pg_sha with k
+    if k == none
+      return none
+    end
+  end
+  while (length with k) < 64
+    let k be k + (chr with 0)
+  end
+  let ip be ""
+  let op be ""
+  let i be 0
+  while i < 64
+    let b be pg_u8 with (k at i), tab
+    let ip be ip + (chr with (pg_xor8 with b, 54))
+    let op be op + (chr with (pg_xor8 with b, 92))
+    let i be i + 1
+  end
+  let inner be pg_sha with (ip + msg)
+  if inner == none
+    return none
+  end
+  return pg_sha with (op + inner)
+end
+
+define pg_pbkdf2 with secret, salt, rounds, tab
+  if rounds < 1
+    return none
+  end
+  if rounds > (pg_max_iter)
+    return none
+  end
+  let block be salt + (pg_be32 with 1)
+  let u be pg_hmac with secret, block, tab
+  if u == none
+    return none
+  end
+  let t be u
+  let i be 1
+  while i < rounds
+    let u be pg_hmac with secret, u, tab
+    if u == none
+      return none
+    end
+    let t be pg_xor_raw with t, u, tab
+    if t == none
+      return none
+    end
+    let i be i + 1
+  end
+  return t
+end
+
+define pg_b64tab
+  return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+end
+
+define pg_b64enc with raw, tab
+  let table be pg_b64tab
+  let n be length with raw
+  let out be ""
+  let i be 0
+  while i < n
+    let b0 be pg_u8 with (raw at i), tab
+    let b1 be 0
+    let b2 be 0
+    let got be 1
+    if (i + 1) < n
+      let b1 be pg_u8 with (raw at (i + 1)), tab
+      let got be 2
+    end
+    if (i + 2) < n
+      let b2 be pg_u8 with (raw at (i + 2)), tab
+      let got be 3
+    end
+    let n0 be idiv with b0, 4
+    let n1 be ((b0 % 4) * 16) + (idiv with b1, 16)
+    let n2 be ((b1 % 16) * 4) + (idiv with b2, 64)
+    let n3 be b2 % 64
+    let out be out + (table at n0) + (table at n1)
+    if got == 1
+      let out be out + "=="
+    end
+    if got == 2
+      let out be out + (table at n2) + "="
+    end
+    if got == 3
+      let out be out + (table at n2) + (table at n3)
+    end
+    let i be i + 3
+  end
+  return out
+end
+
+define pg_b64dec with text, tab
+  let table be pg_b64tab
+  let n be length with text
+  if n == 0
+    return ""
+  end
+  if (n % 4) != 0
+    return none
+  end
+  let pad be 0
+  if (text at (n - 1)) == "="
+    let pad be 1
+  end
+  if (text at (n - 2)) == "="
+    let pad be 2
+  end
+  let out be ""
+  let i be 0
+  while i < n
+    let c0 be find with table, (text at i)
+    let c1 be find with table, (text at (i + 1))
+    let c2 be 0
+    let c3 be 0
+    if (text at (i + 2)) != "="
+      let c2 be find with table, (text at (i + 2))
+    end
+    if (text at (i + 3)) != "="
+      let c3 be find with table, (text at (i + 3))
+    end
+    if c0 < 0
+      return none
+    end
+    if c1 < 0
+      return none
+    end
+    if c2 < 0
+      return none
+    end
+    if c3 < 0
+      return none
+    end
+    let b0 be (c0 * 4) + (idiv with c1, 16)
+    let b1 be ((c1 % 16) * 16) + (idiv with c2, 4)
+    let b2 be ((c2 % 4) * 64) + c3
+    let last be 0
+    if (i + 4) == n
+      let last be 1
+    end
+    let out be out + (chr with (b0 % 256))
+    if last == 0
+      let out be out + (chr with (b1 % 256)) + (chr with (b2 % 256))
+    end
+    if (last == 1) and (pad < 2)
+      let out be out + (chr with (b1 % 256))
+    end
+    if (last == 1) and (pad == 0)
+      let out be out + (chr with (b2 % 256))
+    end
+    let i be i + 4
+  end
+  return out
+end
+
+define pg_scram_escape with name
+  let out be ""
+  let i be 0
+  let n be length with name
+  while i < n
+    let ch be name at i
+    if ch == "="
+      let out be out + "=3D"
+    end
+    if ch == ","
+      let out be out + "=2C"
+    end
+    if (ch != "=") and (ch != ",")
+      let out be out + ch
+    end
+    let i be i + 1
+  end
+  return out
+end
+
+define pg_scram_attr with raw, key
+  let parts be split with raw, ","
+  let i be 0
+  while i < (length with parts)
+    let p be parts at i
+    if (length with p) >= 2
+      if (slice with p, 0, 2) == (key + "=")
+        return slice with p, 2, (length with p)
+      end
+    end
+    let i be i + 1
+  end
+  return none
+end
+
+define pg_scram_nonce with user, db
+  let hx be hash with (user + "/" + db + "/vire-scram")
+  return slice with hx, 0, 24
+end
+
+define pg_scram_client_first with user, nonce
+  let bare be "n=" + (pg_scram_escape with user) + ",r=" + nonce
+  return ["n,," + bare, bare]
+end
+
+define pg_scram_parse_server_first with payload, clientNonce
+  let r be pg_scram_attr with payload, "r"
+  let s be pg_scram_attr with payload, "s"
+  let i be pg_scram_attr with payload, "i"
+  if r == none
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  if s == none
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  if i == none
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  if (length with r) < (length with clientNonce)
+    return {"ok": false, "why": "nonce mismatch"}
+  end
+  if (slice with r, 0, (length with clientNonce)) != clientNonce
+    return {"ok": false, "why": "nonce mismatch"}
+  end
+  try
+    let rounds be number with i
+  miss problem
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  if rounds != (idiv with rounds, 1)
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  if rounds < 1
+    return {"ok": false, "why": "bad iteration"}
+  end
+  if rounds > (pg_max_iter)
+    return {"ok": false, "why": "iteration cap"}
+  end
+  return {"ok": true, "why": "", "r": r, "s": s, "i": rounds}
+end
+
+define pg_scram_final with secret, user, clientNonce, serverFirst, tab
+  let parsed be pg_scram_parse_server_first with serverFirst, clientNonce
+  if (parsed at "ok") == false
+    return parsed
+  end
+  let salt be pg_b64dec with (parsed at "s"), tab
+  if salt == none
+    return {"ok": false, "why": "malformed SASL"}
+  end
+  let salted be pg_pbkdf2 with secret, salt, (parsed at "i"), tab
+  if salted == none
+    return {"ok": false, "why": "SCRAM kdf"}
+  end
+  let first be pg_scram_client_first with user, clientNonce
+  let bare be first at 1
+  let withoutProof be "c=biws,r=" + (parsed at "r")
+  let authMsg be bare + "," + serverFirst + "," + withoutProof
+  let clientKey be pg_hmac with salted, "Client Key", tab
+  let storedKey be pg_sha with clientKey
+  let sig be pg_hmac with storedKey, authMsg, tab
+  let proof be pg_xor_raw with clientKey, sig, tab
+  if proof == none
+    return {"ok": false, "why": "SCRAM proof"}
+  end
+  let serverKey be pg_hmac with salted, "Server Key", tab
+  let serverSig be pg_hmac with serverKey, authMsg, tab
+  let msg be withoutProof + ",p=" + (pg_b64enc with proof, tab)
+  return {"ok": true, "why": "", "msg": msg, "v": (pg_b64enc with serverSig, tab)}
+end
+
+define pg_sasl_mechs with payload
+  let i be 0
+  let n be length with payload
+  let found be 0
+  let plus be 0
+  while i < n
+    let got be pg_cstr with payload, i
+    if got == none
+      stop
+    end
+    let name be got at 0
+    let i be got at 1
+    if name == ""
+      stop
+    end
+    if name == "SCRAM-SHA-256"
+      let found be 1
+    end
+    if name == "SCRAM-SHA-256-PLUS"
+      let plus be 1
+    end
+  end
+  return {"scram": found, "plus": plus}
+end
+
+define pg_sasl_init with user, nonce
+  let first be pg_scram_client_first with user, nonce
+  let z be chr with 0
+  let body be "SCRAM-SHA-256" + z + (pg_be32 with (length with (first at 0))) + (first at 0)
+  return pg_msg with "p", body
+end
+
+define pg_auth with conn, secret, user
   let tab be conn at "tab"
   let h be conn at "h"
   let ready be false
   let method be "none"
+  let scramWant be ""
+  let clientNonce be ""
+  let turns be 0
   while not ready
+    let turns be turns + 1
+    if turns > 64
+      return "auth loop"
+    end
     let m be pg_read with conn
     if m == none
-      return "closed before ready"
+      let why be conn at "why"
+      if why == ""
+        return "closed before ready"
+      end
+      return why
     end
     let t be m at "t"
     if t == "E"
@@ -154,20 +598,53 @@ define pg_auth with conn, secret
     end
     if t == "R"
       let kind be pg_u32be with (m at "p"), 0, tab
+      if kind == none
+        return "malformed auth"
+      end
       let handled be 0
       if kind == 0
         let method be "trust"
+        if scramWant != ""
+          let method be "scram-sha-256"
+        end
         let handled be 1
       end
       if kind == 3
         let method be "cleartext"
         let pw be secret + (chr with 0)
-        let pkt be pg_msg with "p", pw
-        send with h, pkt
+        send with h, (pg_msg with "p", pw)
         let handled be 1
       end
       if kind == 10
-        return "SCRAM-SHA-256 residual (SASL); CI uses trust"
+        let mechs be pg_sasl_mechs with (slice with (m at "p"), 4, (length with (m at "p")))
+        if (mechs at "scram") != 1
+          return "unsupported SASL"
+        end
+        let clientNonce be pg_scram_nonce with user, (conn at "db")
+        send with h, (pg_sasl_init with user, clientNonce)
+        let method be "scram-sha-256"
+        let handled be 1
+      end
+      if kind == 11
+        let serverFirst be slice with (m at "p"), 4, (length with (m at "p"))
+        let fin be pg_scram_final with secret, user, clientNonce, serverFirst, tab
+        if (fin at "ok") == false
+          return fin at "why"
+        end
+        let scramWant be fin at "v"
+        send with h, (pg_msg with "p", (fin at "msg"))
+        let handled be 1
+      end
+      if kind == 12
+        let final be slice with (m at "p"), 4, (length with (m at "p"))
+        let v be pg_scram_attr with final, "v"
+        if v == none
+          return "malformed SASL"
+        end
+        if v != scramWant
+          return "server signature"
+        end
+        let handled be 1
       end
       if handled == 0
         return "unsupported auth"
@@ -182,10 +659,14 @@ define pg_auth with conn, secret
 end
 
 define pg_open with host, port, user, db, secret
-  let h be connect with host, port
-  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none"}
+  try
+    let h be connect with host, port
+  miss problem
+    return {"ok": false, "why": problem}
+  end
+  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none", "why": "", "db": db, "types": []}
   send with h, (pg_startup with user, db)
-  let why be pg_auth with conn, secret
+  let why be pg_auth with conn, secret, user
   if why != "ok"
     close with h
     return {"ok": false, "why": why}
@@ -195,10 +676,17 @@ end
 
 define pg_rows_parse with payload, tab
   let n be pg_u16be with payload, 0, tab
+  if n == none
+    return none
+  end
   let i be 2
   let cells be []
   let k be 0
+  let plen be length with payload
   while k < n
+    if (i + 4) > plen
+      return none
+    end
     let a be pg_u8 with (payload at i), tab
     let b be pg_u8 with (payload at (i + 1)), tab
     let c be pg_u8 with (payload at (i + 2)), tab
@@ -206,8 +694,15 @@ define pg_rows_parse with payload, tab
     let i be i + 4
     if (a == 255) and (b == 255) and (c == 255) and (d == 255)
       push with cells, none
-    else
+    end
+    if (a != 255) or (b != 255) or (c != 255) or (d != 255)
       let ln be (((a * 256) + b) * 256 + c) * 256 + d
+      if ln > (pg_max_msg)
+        return none
+      end
+      if (i + ln) > plen
+        return none
+      end
       push with cells, (slice with payload, i, (i + ln))
       let i be i + ln
     end
@@ -216,25 +711,128 @@ define pg_rows_parse with payload, tab
   return cells
 end
 
-define pg_query with conn, sql
+define pg_row_desc with payload, tab
+  let n be pg_u16be with payload, 0, tab
+  if n == none
+    return none
+  end
+  let i be 2
+  let types be []
+  let k be 0
+  let plen be length with payload
+  while k < n
+    let got be pg_cstr with payload, i
+    if got == none
+      return none
+    end
+    let i be got at 1
+    if (i + 18) > plen
+      return none
+    end
+    let typ be pg_u32be with payload, (i + 6), tab
+    if typ == none
+      return none
+    end
+    push with types, typ
+    let i be i + 18
+    let k be k + 1
+  end
+  return types
+end
+
+define pg_cell_decode with raw, oid
+  if raw == none
+    return none
+  end
+  if oid == 16
+    if raw == "t"
+      return true
+    end
+    if raw == "f"
+      return false
+    end
+    return raw
+  end
+  if (oid == 20) or (oid == 21) or (oid == 23)
+    try
+      let n be number with raw
+      if n == (idiv with n, 1)
+        return n
+      end
+    miss problem
+      return raw
+    end
+    return raw
+  end
+  if (oid == 700) or (oid == 701)
+    try
+      return number with raw
+    miss problem
+      return raw
+    end
+  end
+  return raw
+end
+
+define pg_decode_row with cells, types
+  let out be []
+  let i be 0
+  let n be length with cells
+  while i < n
+    let oid be 25
+    if i < (length with types)
+      let oid be types at i
+    end
+    push with out, (pg_cell_decode with (cells at i), oid)
+    let i be i + 1
+  end
+  return out
+end
+
+define pg_wait_ready with conn
   let h be conn at "h"
   let tab be conn at "tab"
-  send with h, (pg_msg with "Q", (sql + (chr with 0)))
   let rows be []
+  let decoded be []
   let cmd be ""
   let err be ""
   let ready be false
+  let types be conn at "types"
+  let turns be 0
   while not ready
+    let turns be turns + 1
+    if turns > 10000
+      return {"ok": false, "why": "response loop", "rows": rows, "cmd": cmd, "decoded": decoded}
+    end
     let m be pg_read with conn
     if m == none
-      return {"ok": false, "why": "closed", "rows": rows, "cmd": cmd}
+      let why be conn at "why"
+      if why == ""
+        let why be "closed"
+      end
+      return {"ok": false, "why": why, "rows": rows, "cmd": cmd, "decoded": decoded}
     end
     let t be m at "t"
+    if t == "T"
+      let types be pg_row_desc with (m at "p"), tab
+      if types == none
+        return {"ok": false, "why": "malformed row description", "rows": rows, "cmd": cmd, "decoded": decoded}
+      end
+      put types into conn at "types"
+    end
     if t == "D"
-      push with rows, (pg_rows_parse with (m at "p"), tab)
+      let cells be pg_rows_parse with (m at "p"), tab
+      if cells == none
+        return {"ok": false, "why": "malformed data row", "rows": rows, "cmd": cmd, "decoded": decoded}
+      end
+      push with rows, cells
+      push with decoded, (pg_decode_row with cells, types)
     end
     if t == "C"
       let got be pg_cstr with (m at "p"), 0
+      if got == none
+        return {"ok": false, "why": "malformed command", "rows": rows, "cmd": cmd, "decoded": decoded}
+      end
       let cmd be got at 0
     end
     if t == "E"
@@ -245,53 +843,57 @@ define pg_query with conn, sql
     end
   end
   if err != ""
-    return {"ok": false, "why": err, "rows": rows, "cmd": cmd}
+    return {"ok": false, "why": err, "rows": rows, "cmd": cmd, "decoded": decoded}
   end
-  return {"ok": true, "why": "", "rows": rows, "cmd": cmd}
+  return {"ok": true, "why": "", "rows": rows, "cmd": cmd, "decoded": decoded}
 end
 
-define pg_bind_body with sql, arg
+define pg_query with conn, sql
+  let h be conn at "h"
+  send with h, (pg_msg with "Q", (sql + (chr with 0)))
+  return pg_wait_ready with conn
+end
+
+define pg_bind_body with sql, args
   let z be chr with 0
+  let n be length with args
   let p be pg_msg with "P", (z + sql + z + (pg_be16 with 0))
-  let b be z + z + (pg_be16 with 0) + (pg_be16 with 1) + (pg_be32 with (length with arg)) + arg + (pg_be16 with 0)
+  let b be z + z + (pg_be16 with 0) + (pg_be16 with n)
+  let i be 0
+  while i < n
+    let arg be args at i
+    if arg == none
+      let b be b + (chr with 255) + (chr with 255) + (chr with 255) + (chr with 255)
+    end
+    if arg != none
+      let arg be text with arg
+      let b be b + (pg_be32 with (length with arg)) + arg
+    end
+    let i be i + 1
+  end
+  let b be b + (pg_be16 with 0)
   let b be pg_msg with "B", b
   let e be pg_msg with "E", (z + (pg_be32 with 0))
   let s be pg_msg with "S", ""
   return p + b + e + s
 end
 
-define pg_exec_param with conn, sql, arg
+define pg_exec_param with conn, sql, args
   let h be conn at "h"
-  let tab be conn at "tab"
-  send with h, (pg_bind_body with sql, arg)
-  let rows be []
-  let cmd be ""
-  let err be ""
-  let ready be false
-  while not ready
-    let m be pg_read with conn
-    if m == none
-      return {"ok": false, "why": "closed", "rows": rows, "cmd": cmd}
-    end
-    let t be m at "t"
-    if t == "D"
-      push with rows, (pg_rows_parse with (m at "p"), tab)
-    end
-    if t == "C"
-      let got be pg_cstr with (m at "p"), 0
-      let cmd be got at 0
-    end
-    if t == "E"
-      let err be pg_err with (m at "p"), tab
-    end
-    if t == "Z"
-      let ready be true
-    end
-  end
-  if err != ""
-    return {"ok": false, "why": err, "rows": rows, "cmd": cmd}
-  end
-  return {"ok": true, "why": "", "rows": rows, "cmd": cmd}
+  send with h, (pg_bind_body with sql, args)
+  return pg_wait_ready with conn
+end
+
+define pg_begin with conn
+  return pg_query with conn, "BEGIN"
+end
+
+define pg_commit with conn
+  return pg_query with conn, "COMMIT"
+end
+
+define pg_rollback with conn
+  return pg_query with conn, "ROLLBACK"
 end
 
 define pg_close with conn
