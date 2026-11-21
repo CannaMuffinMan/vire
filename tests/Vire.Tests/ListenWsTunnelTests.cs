@@ -21,6 +21,8 @@ public class ListenWsTunnelTests
         string listen = File.ReadAllText(Path.Combine(root, "VireListen.cs"));
         string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
         Assert.Contains("TryWsHijack", listen);
+        Assert.DoesNotContain("headers.Path != \"/ws/refuse\"", listen);
+        Assert.Contains("wsIntent == 1 && code == 101", listen);
         Assert.Contains("Switching Protocols", listen);
         Assert.Contains("land_ws_send", net);
         Assert.Contains("txt_st101", net);

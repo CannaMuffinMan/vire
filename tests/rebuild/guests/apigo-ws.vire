@@ -10,19 +10,22 @@ define route with method, path, body
     return {"status": "ok", "live": true}
   end
   if path == "/ws/kick"
-    return {"ok": false, "status": 426, "error": "upgrade required"}
+    return "{\"status\":101}"
   end
   if path == "/ws/chat"
-    return {"ok": false, "status": 426, "error": "upgrade required"}
+    return "{\"status\":101}"
   end
   if path == "/ws/live"
-    return {"ok": false, "status": 426, "error": "upgrade required"}
+    return "{\"status\":101}"
   end
   if path == "/chat"
-    return {"ok": false, "status": 426, "error": "upgrade required"}
+    return "{\"status\":101}"
   end
   if path == "/live"
-    return {"ok": false, "status": 426, "error": "upgrade required"}
+    return "{\"status\":101}"
+  end
+  if path == "/"
+    return "{\"status\":101}"
   end
   return {"ok": false, "status": 404, "error": "not found"}
 end

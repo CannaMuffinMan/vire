@@ -10,8 +10,10 @@ Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
 
 $AfterSha = (git rev-parse HEAD).Trim()
-$FailBefore = "69048e0d7537e7945bdefd3148e251ee88ab1fc4"
-Write-Host ("FAIL_BEFORE at " + $FailBefore + ": VireListen had no TryWsHijack; Upgrade was JSON HTTP")
+$FailBeforeHijack = "69048e0d7537e7945bdefd3148e251ee88ab1fc4"
+$FailBeforeRefuse = "a64cfe5fdb398ac7c8049bd41ac431d780a0b09e"
+Write-Host ("FAIL_BEFORE at " + $FailBeforeHijack + ": VireListen had no TryWsHijack; Upgrade was JSON HTTP")
+Write-Host ("FAIL_BEFORE at " + $FailBeforeRefuse + ": packed ELF accepted GET /ws/refuse with 101")
 Write-Host ("PASS_AFTER expect " + $AfterSha)
 
 $rt = Get-Content -Raw (Join-Path $Root "src\rt.vire")

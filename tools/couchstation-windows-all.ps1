@@ -175,6 +175,7 @@ Run-Proof "rebuild-proxy-ws-windows" { Run-Script "tools/rebuild-proxy-ws-window
 Run-Proof "tls-schannel-windows" { Run-Script "tools/tls-schannel-windows.ps1" }
 Run-Proof "pg-redis-tls-windows" { Run-Script "tools/pg-redis-tls-windows.ps1" }
 Run-Proof "listen-ws-windows" { Run-Script "tools/listen-ws-windows.ps1" }
+Run-Proof "ws-refuse-windows" { Run-Script "tools/ws-refuse-windows.ps1" }
 Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
 Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
 

@@ -176,7 +176,7 @@ Isolated harness: `tools/rebuild-chain-limits-diff.sh` (FAIL_BEFORE `5c3ed01abe2
 | SHA-256 `hash` | **Present** | `crypto-prove.vire`, million-hash |
 | PostgreSQL v3 loopback | **Present, no TLS** | `src/rt-pg.vire`, `tools/pg-prove-linux.sh` |
 | Redis loopback | **Present, no TLS** | `src/rt-redis.vire` |
-| WebSocket listen | **Present** loopback hijack | `VireListen.TryWsHijack` + native `land_ws_send`; `tools/rebuild-listen-ws-diff.sh` |
+| WebSocket listen | **Present** loopback hijack | 101 only if route status is 101; refuse is 403 (`tools/ws-refuse-proof.sh`). `TryWsHijack` / `land_ws_packed` splice when `"port"` is present. |
 | TLS server or client | **Present** ELF + host | `tls_listen` / `tls_connect`; wss via `tools/rebuild-listen-wss-diff.sh`. PE TLS still fail-closed |
 | DNS | **Missing** | connect is numeric / loopback |
 | Public bind | Host only with `VIRE_BIND=public` and a 16+ char token; native guests print `127.0.0.1` | `GUIDE.md`, `txt_listen` |
@@ -261,7 +261,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - HTTP 405 and 502: host `StatusOf` and unpacked/r3/r4 `rt_net_statusof` map `"status":405` / `"status":502`. Packed 3-param `emitLandingHttp` maps 101 (listen WS) instead of 405: restoring `land_st_405` on that emitList path overflowed compiler list 100000 during self-host. Cap stays 100000; do not restore until list usage drops. Guest JSON on that path may still carry `"status":405` at HTTP 200.
 - `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Listen `route` may take `head` with Cookie/Host/Authorization. HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
 - Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
-- Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, dashboard `/obs` `"status":307`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native `rt_net_find` refuses a needle longer than the haystack (unsigned wrap used to scan `.data` and 500 `/obs`). listen+`proxy_reply` is proven on `tools/rebuild-proxy-diff.sh`.
+- Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, dashboard `/obs` `"status":307`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native `rt_net_find` refuses a needle longer than the haystack (unsigned wrap used to scan `.data` and 500 `/obs`). Outbound `proxy` host=ELF matches on `tools/rebuild-proxy-diff.sh`. listen+`proxy_reply` GET `/proxy` is still empty HTTP natively (not the WS refuse root cause).
 - Guest reply headers other than Set-Cookie, Location, WWW-Authenticate, and Cache-Control are dropped on host and native. Host still emits Connection / nosniff / default Cache-Control: no-store. `tools/rebuild-header-diff.sh` proves Cookie/Set-Cookie/Location host-vs-native on this SHA.
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
@@ -288,6 +288,7 @@ bash tools/rebuild-portal-diff.sh
 bash tools/rebuild-header-diff.sh
 bash tools/rebuild-listen-ws-diff.sh
 bash tools/rebuild-listen-wss-diff.sh
+bash tools/ws-refuse-proof.sh
 bash tools/rebuild-fcgbds-heartbeat-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
