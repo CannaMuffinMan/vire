@@ -161,3 +161,4 @@ try {
 }
 
 Write-Host "Windows PE rebuild fcgcpa + unauth sidecar + landing-go steps completed on this CouchStation. Linux is not PE proof."
+& (Join-Path $PSScriptRoot "native-json-parse-windows.ps1")
