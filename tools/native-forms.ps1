@@ -1,5 +1,6 @@
 # Native try/miss and for. Compiles the two programs under data/native-forms
 # with compile-native.vire, runs the exe, and matches the interpreter.
+# TODO(VIRE-FINISH-NOW): add tracked data/native-forms try-miss.vire and for-list.vire fixtures
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
