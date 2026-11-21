@@ -1,0 +1,14 @@
+~ FAIL_BEFORE guest: wrong health body, no bot-defense routes.
+
+define route with method, path, body
+  if method == "GET"
+    if path == "/health"
+      return "{\"ok\":true}"
+    end
+  end
+  return "{\"ok\":false}"
+end
+
+define main
+  listen with 0
+end

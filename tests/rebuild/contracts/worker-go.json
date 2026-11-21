@@ -1,0 +1,48 @@
+{
+  "id": "worker-go",
+  "source": "Derived from source, not live: worker-go/main.go and jobs.go. No HTTP. Env names only.",
+  "stream_note": "Go writes these lines to stderr. Vire say writes stdout. The harness concatenates stdout+stderr and compares lines.",
+  "env_note": "Native guests have no getenv. Cases pass KEY=VALUE argv. Same argv is used on the host interpreter so host vs native match.",
+  "cases": [
+    {
+      "name": "payments_truthy",
+      "args": ["PAYMENTS_ENABLED=1"],
+      "exit": 1,
+      "stderr_lines": ["PAYMENTS_ENABLED must stay false"]
+    },
+    {
+      "name": "default_disabled",
+      "args": [],
+      "exit": 0,
+      "stderr_lines": [
+        "worker-go registered jobs disabled",
+        "registered aggregation disabled",
+        "registered security-monitoring disabled",
+        "registered fcgbds-cleanup disabled",
+        "registered bds-auto-ingest disabled",
+        "registered governance-timer disabled",
+        "registered archiver disabled",
+        "registered backups disabled",
+        "registered blockchain-node disabled",
+        "disabled"
+      ]
+    },
+    {
+      "name": "skeleton_refusal",
+      "args": ["FCG_WORKER_ENABLED=1", "FCG_JOB_AGGREGATION=1"],
+      "exit": 0,
+      "stderr_lines": [
+        "worker-go registered jobs disabled",
+        "registered aggregation disabled",
+        "registered security-monitoring disabled",
+        "registered fcgbds-cleanup disabled",
+        "registered bds-auto-ingest disabled",
+        "registered governance-timer disabled",
+        "registered archiver disabled",
+        "registered backups disabled",
+        "registered blockchain-node disabled",
+        "refusing to start jobs: skeleton only"
+      ]
+    }
+  ]
+}
