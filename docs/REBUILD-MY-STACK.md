@@ -97,7 +97,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 - **Property:** `sop_issue` / `sop_verify` HMAC-SHA256 over `v1.<exp>`; `ct_eq` on the 32-byte MAC; missing, tampered, and expired cookies deny. Cookie name `fcg_sop_authenticated`. Secret is a harness-generated hex fixture, never a production env value.
 - **Proxy routes:** landing-go `/api/upstream/*` and `/api/gateway-down` (502); dev-portal-go goldens (`dist_missing`, `not_configured`) plus `/fcg-api/` prefix strip; edge-go `/healthz` plus loopback proxy when the process host-arg is `www` or `dev`, else 404.
 - **Regression:** `tests/rebuild/guests/landing-sop.vire`, `dev-portal-go.vire`, `edge-go.vire` + `tools/rebuild-sop-proxy-diff.sh`.
-- **Residual:** No TLS, DNS, public bind, railway.internal, Shopify/media-lab, or real `FCG_AUTH_COOKIE_SECRET`. Listen ctx/recv-buf are parked across route HMAC allocs. Native Cookie/Set-Cookie/Location are proven on `tools/rebuild-header-diff.sh`. Heap texts returned as `route` `head` are still empty after compact unless copied into the `.data` holds. listen+`proxy_reply` SEGV is not re-proven on this SHA.
+- **Residual:** No TLS, DNS, public bind, railway.internal, Shopify/media-lab, or real `FCG_AUTH_COOKIE_SECRET`. Listen ctx/recv-buf are parked across route HMAC allocs. Native Cookie/Set-Cookie/Location are proven on `tools/rebuild-header-diff.sh`. Heap texts returned as `route` `head` are still empty after compact unless copied into the `.data` holds. GET nobody still stores integer 1 at ctx+0x40 in the blob; pushroute maps that non-pointer to `txt_empty` so `length`/`proxy_reply` do not SEGV. POST heap bodies (pointers >> 12) are unchanged.
 
 ### Rank 6b reverse-proxy primitive (this PR)
 
@@ -212,7 +212,7 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Remaining sidecar routes beyond the five GET goldens
 - `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Listen `route` may take `head` with Cookie/Host/Authorization. HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
 - Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
-- Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native listen + `proxy_reply` SEGV is not re-proven here (CLI `proxy` still matches).
+- Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, dashboard `/obs` `"status":307`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native `rt_net_find` refuses a needle longer than the haystack (unsigned wrap used to scan `.data` and 500 `/obs`). listen+`proxy_reply` is proven on `tools/rebuild-proxy-diff.sh`.
 - Guest reply headers other than Set-Cookie, Location, WWW-Authenticate, and Cache-Control are dropped on host and native. Host still emits Connection / nosniff / default Cache-Control: no-store. `tools/rebuild-header-diff.sh` proves Cookie/Set-Cookie/Location host-vs-native on this SHA.
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`

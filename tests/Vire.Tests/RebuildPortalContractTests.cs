@@ -35,6 +35,8 @@ public class RebuildPortalContractTests
         string dash = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "fcgbds-dashboard-go.vire"));
         Assert.Contains("fcgbds-dashboard", dash);
         Assert.Contains("/obs", dash);
+        string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
+        Assert.Contains("Unsigned sub of needle_len", net);
 
         using (JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "rpc-portal-go.json"))))
         {

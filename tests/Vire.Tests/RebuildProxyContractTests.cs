@@ -31,6 +31,10 @@ public class RebuildProxyContractTests
         Assert.DoesNotContain("LoadLibraryA", http);
         Assert.Contains("use \"http-client.vire\"", guest);
         Assert.Contains("client-get", guest);
+        Assert.Contains("path == \"/proxy\"", guest);
+        Assert.Contains("proxy_reply", guest);
+        Assert.Contains("pr_body_ok", net);
+        Assert.Contains("Unsigned sub of needle_len", net);
         Assert.DoesNotContain("define http with spec", fail);
         Assert.DoesNotContain("LANDING_UPSTREAM", guest);
         Assert.DoesNotContain("fcgcpa-prod", guest);
