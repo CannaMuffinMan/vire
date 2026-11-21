@@ -109,8 +109,8 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 
 ### Rank 6b reverse-proxy primitive (this PR)
 
-- **Property:** guests may `use "src/http-client.vire"` and call `http` / `proxy` / `proxy_reply`. Outbound is `connect` to `127.0.0.1` only (same private-network refuse as TCP client). GET/POST with Content-Length. Response parse is fail-closed on CL+TE, duplicate CL, Transfer-Encoding/chunked, oversize (>1_000_000 or header block >16_384), and timeout. `proxy` strips hop-by-hop headers, sets `X-Forwarded-For/Host/Proto`, rewrites `Location` with a prefix, and returns 502 `{"error":"bad gateway"}` on upstream failure. Native connect sets 5s `SO_RCVTIMEO`/`SO_SNDTIMEO` (PE DWORD; ELF stub maps to `timeval`). Listen JSON `"status":502` maps to HTTP 502 (`StatusOf` + `rt_net_statusof` wrapper).
-- **Regression:** `tests/rebuild/guests/proxy-http.vire` + `tools/rebuild-proxy-diff.sh`.
+- **Property:** guests may `use "src/http-client.vire"` and call `http` / `proxy` / `proxy_reply`. Outbound is `connect` to `127.0.0.1` only (same private-network refuse as TCP client). GET/POST with Content-Length. Response parse is fail-closed on CL+TE, duplicate CL, Transfer-Encoding/chunked, oversize (>1_000_000 or header block >16_384), and timeout. `proxy` strips hop-by-hop headers, sets `X-Forwarded-For/Host/Proto`, rewrites `Location` with a prefix, and returns 502 `{"error":"bad gateway"}` on upstream failure. A valid RFC 6455 upgrade (GET, `Connection: Upgrade`, `Upgrade: websocket`, `Sec-WebSocket-Key` 24-char standard base64, `Sec-WebSocket-Version: 13`) keeps those hop-by-hop headers, relays a 101, then copies bounded bytes until either side closes (tunnel cap 65536). Malformed upgrade is 400; upstream non-101 is passed through; connect/parse failure is 502. Native connect sets 5s `SO_RCVTIMEO`/`SO_SNDTIMEO` (PE DWORD; ELF stub maps to `timeval`). Listen JSON `"status":502` maps to HTTP 502 (`StatusOf` + `rt_net_statusof` wrapper).
+- **Regression:** `tests/rebuild/guests/proxy-http.vire` + `tools/rebuild-proxy-diff.sh` + `tools/rebuild-proxy-ws-diff.sh`.
 - **Platforms:** ELF proven here. PE codegen is the same `rt_connect`/`emitTcpClient`/`stub_ss` path; CouchStation runs `tools/rebuild-proxy-windows.ps1`.
 
 ### Rank 4–5 security property (body/token, prior PR on this stack)
@@ -137,7 +137,7 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | Schema check | **Present** (guest Vire, host+PE prove) | `src/rt-schema.vire`, `schema_health` |
 | TCP client | **Present** loopback only | `tests/native/tcp-client.vire` |
 | HTTP/1.1 client (loopback) | **Present** PE + ELF | `src/http-client.vire` via `connect`/`send`/`recv`; 5s socket timeouts |
-| Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}` |
+| Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}`; RFC 6455 upgrade tunnel |
 | HMAC-SHA256 / Cookie / JWT HS256 | **Present** | `hmac` builtin + `src/rt-crypto.vire` (PR #105). SOP gate in `src/sop-cookie.vire`. Portal JWT in `src/portal-jwt.vire` |
 | SOP HMAC cookie gate | **Present** (fixture secret) | issue/verify, `ct_eq` MAC, missing/tamper/expired deny |
 | Portal JWT cookie gates | **Present** (fixture secret) | HS256 `role=dev` / `type=dev_session`; listen Cookie is allowlisted `route` `head` |
@@ -174,7 +174,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
 | 6 | `landing-go` unauth fixtures (healthz, JSON APIs, 307s, held-503, fixture HTML) | HTTP, JSON, text/html, Location / WWW-Authenticate | Present on this PR (Linux ELF harness) | **This PR.** Rank 6 static HTML is in-tree strings. Host vs native `tools/rebuild-landing-diff.sh`. |
 | 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | **This PR.** Fixture secret; `ct_eq` MAC. Native listen can see Cookie / emit Set-Cookie (`rebuild-header-diff.sh`). Full landing-sop guest vs host is a follow-on if HMAC listen+`proxy_reply` still faults. |
-| 6b | reverse-proxy primitive (shared by landing-go / dev-portal-go / edge-go / api-go) | outbound HTTP/1.1, hop-by-hop strip, X-Forwarded-*, Location prefix, 502 | Primitive in PR #107. |
+| 6b | reverse-proxy primitive (shared by landing-go / dev-portal-go / edge-go / api-go) | outbound HTTP/1.1, hop-by-hop strip, X-Forwarded-*, Location prefix, 502, RFC 6455 upgrade tunnel | Primitive in PR #107; WS tunnel in PR #125. |
 | 6b-r | landing-go / dev-portal-go / edge-go **loopback** proxy routes | `proxy_reply` to `127.0.0.1` | **This PR.** `LANDING_API_UPSTREAM` as `/api/upstream/*`; `/fcg-api/` strip; edge Host via process args (`www`/`dev`/`unknown`). |
 | 6c | `landing-go` Shopify / media-lab APIs | held 503 in Go; out of scope here | — | **Blocked.** No stubs. |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
@@ -184,7 +184,7 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 8d | Shared dist static + 405 mapping | sandbox `read`, `"status":405` | **This PR.** `dist-static.vire`; host+native 405. Path-traversal stays inside `data/`. |
 | 8e | Rest of Go `api-go` / `cpa-go` | JWT session cookies, TLS proxy, remaining routes | Health GETs only | Remaining routes **Blocked** (no TLS/DNS/public upstream stubs). |
 | 9 | Loopback Postgres/Redis if those Go services use them | DB client, no TLS | Clients exist; not wired to FCG | After a recorded SQL/RESP contract |
-| 10 | WebSocket chat / live | WS, maybe TLS | Fixture only | Blocked |
+| 10 | WebSocket chat / live | WS, maybe TLS | Proxy can tunnel RFC 6455 to loopback; native listen terminate is a separate lane | Chat/live service routes still not ported |
 | 11 | Public TLS terminator | TLS | Missing | Reverse proxy in front of loopback, or a later TLS lane. Not a stub. |
 | 12 | Skinned browser, Proof of Rot miner, shop, OAuth clients | unknown | none | Blocked on missing source (PR39) |
 
@@ -252,6 +252,7 @@ bash tools/rebuild-unauth-sidecar-diff.sh
 bash tools/rebuild-chain-diff.sh
 bash tools/rebuild-landing-diff.sh
 bash tools/rebuild-proxy-diff.sh
+bash tools/rebuild-proxy-ws-diff.sh
 bash tools/rebuild-sop-proxy-diff.sh
 bash tools/rebuild-chain-tamper.sh
 bash tools/rebuild-portal-diff.sh
