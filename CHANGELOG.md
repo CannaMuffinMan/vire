@@ -2,7 +2,11 @@
 
 ## WebSocket refuse fail-closed (this branch)
 
-- Packed native `listen` no longer overwrites HTTP `rt_listen` with an auto-101 dispatcher. RFC 6455 101 is emitted only when the route returns `"status":101`. GET `/ws/refuse` is 403 on host and ELF (`tools/ws-refuse-proof.sh`). With `"port"` both splice (host `TryWsHijack` / packed `land_ws_send`). CouchStation: `tools/ws-refuse-windows.ps1` (PE not executed here). Residual: listen+`proxy_reply` GET `/proxy` still empty HTTP natively; native 101 without `"port"` is JSON HTTP 101 (in-process echo stays on the host). Those are not the refuse bug. Caps unchanged.
+- Packed native `listen` no longer overwrites HTTP `rt_listen` with an auto-101 dispatcher. RFC 6455 101 is emitted only when the route returns `"status":101`. GET `/ws/refuse` is 403 on host and ELF (`tools/ws-refuse-proof.sh`). With `"port"` both splice (host `TryWsHijack` / packed `land_ws_send`). CouchStation: `tools/ws-refuse-windows.ps1` (PE not executed here). Residual: native 101 without `"port"` is JSON HTTP 101 (in-process echo stays on the host). Caps unchanged.
+
+## Packed listen + proxy_reply (this branch)
+
+- Packed 3-param `listen` parks the route `body` as `lea rdx,[rip+txt_empty]` (in-place blob+2728, reloc `txt_empty`) so GET/HEAD nobody is a heap text, not integer 1. FAIL_BEFORE `962be3ac`: native empty HTTP / SEGV `rdx=1` vs host `200 up-ok`. Extra Vire trampoline statements overflowed list cap 100000 on self-host; this patch does not grow `emitLandingHttp`. `tools/proxy-reply-proof.sh`. CouchStation: `tools/proxy-reply-windows.ps1` (PE not executed here). Residual: packed POST body is also `txt_empty` on this 24-byte site; `land_st_405` still dropped (list cap 100000, not raised). Caps unchanged.
 
 ## Native Postgres / Redis TLS on PE SChannel (this branch)
 

@@ -41,6 +41,8 @@ public class RebuildProxyContractTests
         Assert.DoesNotContain("define http with spec", fail);
         Assert.DoesNotContain("LANDING_UPSTREAM", guest);
         Assert.DoesNotContain("fcgcpa-prod", guest);
+        Assert.True(File.Exists(Path.Combine(root, "tools", "proxy-reply-proof.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "proxy-reply-windows.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-windows.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-proxy-ws-diff.sh")));
