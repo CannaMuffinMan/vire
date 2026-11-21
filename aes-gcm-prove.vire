@@ -151,7 +151,16 @@ define main
   else
     say "CT eq diff PASS"
   end
-  say "AES-GCM residual: S-box table lookup, GHASH bit skip; tag walk is not a CPU timing barrier"
+  let s0 be aesSboxByte with 0
+  let s1 be aesSboxByte with 1
+  let s255 be aesSboxByte with 255
+  let nfail be proveLine with "SBOX 0", (text with s0), "99"
+  let fails be fails + nfail
+  let nfail be proveLine with "SBOX 1", (text with s1), "124"
+  let fails be fails + nfail
+  let nfail be proveLine with "SBOX 255", (text with s255), "22"
+  let fails be fails + nfail
+  say "AES-GCM residual: source has no secret S-box index / GHASH bit skip; tag walk is not a CPU timing barrier"
 
   if fails == 0
     say "AES-GCM PROVE pass"

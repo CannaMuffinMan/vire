@@ -10,7 +10,8 @@ Caps are unchanged: arena 32MB, list 100000, steps 5M. Sandbox is not weakened.
 | Nonce length 12 bytes | yes | 11- and 13-byte nonce REJECT |
 | Tag 16 bytes; truncated tag refused | yes | Wycheproof-style truncated-tag REJECT |
 | Auth failure returns error, never plaintext | yes | tag-tamper and AAD-tamper REJECT; return length 2 (`bad`, reason) |
-| Constant-time *tag walk* | partial | `gcm_ct_eq` visits every byte; not a CPU timing barrier |
+| Constant-time *S-box / xtime / GHASH* | source-level | no `sbox at`, no `xtime` high-bit branch, no GHASH bit skip; `AesGcmKatTests.GuestAes256GcmSourceHasNoSecretDependentSboxOrGhashSkip` |
+| Constant-time *tag walk* | source-level | `gcm_ct_eq` XORs every byte with no value early-exit; not a CPU timing barrier |
 | Host = native ELF stdout | Linux | `tools/aes-gcm-linux.sh` / `AesGcmKatTests.GuestAes256GcmHostMatchesNativeElfOnLinux` |
 | Host = native PE stdout | Windows only | `tools/aes-gcm-windows.ps1` for Couchy/CouchStation; **not run in this Linux agent** |
 | Compiler/runtime blob (`src/rt.vire`, `compile-native.vire`) | unchanged | AES is a guest library file |
@@ -19,21 +20,21 @@ Caps are unchanged: arena 32MB, list 100000, steps 5M. Sandbox is not weakened.
 
 | Surface | What it is | Residual |
 |---|---|---|
-| AES S-box | 256-byte table lookup `sbox at (s at i)` | Cache-timing / table-lookup leakage of round state. Not bitsliced, not T-table-free, not hardware AES-NI. |
-| MixColumns `xtime` | data-dependent branch `if d >= 256` | Timing may correlate with high bit of bytes. |
-| GHASH | skips `xor` when the multiplier bit is 0 | Operand-dependent GHASH timing. |
-| `gcm_ct_eq` | walks `max(len(left), len(right))` and ORs diffs | Length mismatch still distinguishable; byte values are not early-exited. **Not** a CPU constant-time barrier (interpreter / native IR still branch on `if a != b` to set the flag). |
+| AES S-box | Boyar–Peralta bit circuit via `aesBitAnd` / `aesBitXor` / `aesBitOr` / `aesBitNot` (no `sbox at secret`) | Source-level: no secret-dependent list index. Vire `*` `/` `%` and native emit are not a CPU/cache barrier. Compiler and CPU may still leak. |
+| MixColumns `xtime` | `hi = idiv b, 128`; reduce with `27 * hi` (no `if d >= 256`) | Branch-free at source. Interpreter/CPU residual remains. |
+| GHASH | every multiplier bit: always `gcmXorMasked` then `gcmShr1`; reduction `225 * lsb` | No data-dependent skip/early-exit in the mul loop. Operand values still flow through arithmetic. |
+| `gcm_ct_eq` | walks `max(len(left), len(right))`; accumulates XOR of bytes | Length mismatch still distinguishable (length is public for 16-byte tags). Final `if d == 0` is one data-dependent branch on the OR of diffs. **Not** a CPU constant-time barrier. |
 | Failed open | does not return plaintext | Ciphertext is still decrypted into a local list after a successful tag check only. Failed tag returns `["bad", "authentication failed"]` without a payload slot. Guest GC does not wipe the computed tag. |
 
-This is a correctness primitive for fixture KATs, not a hardened vault against microarchitectural attackers.
+"Constant-time" here means: Vire source for S-box, `xtime`, GHASH mul, and tag walk uses **fixed iteration counts** and **no secret-dependent `at` index or skipped XOR**. It does **not** mean the host interpreter, gen1 native ELF/PE, or the CPU execute those ops in data-independent wall-clock time. Residual: compiler, GC, cache, bignum/`idiv` of secret bytes, and microarchitecture. This is not a lab-measured (TVLA) primitive.
 
 ## What this PR does not prove
 
 - Windows PE execute of `aes-gcm-prove` (script exists; this agent is Linux).
 - AES-128-GCM, AES-192-GCM, non-96-bit IVs, truncated tags as an *allowed* mode.
 - Key wrapping, password KDF binding, disk vault format, or `.vc` seal replacement.
-- Constant-time AES (no table lookups).
-- Side-channel lab measurements (cache, PMU, or TVLA).
+- CPU / cache / TVLA measurements of the bitsliced S-box (source-level only).
+- Hardware AES-NI or a verified constant-time compiler.
 - Production keys, deployment, payments, or network other than loopback.
 - GitHub Actions (account billing-locked; failures there are not code failures).
 - gen1=gen2 compiler SHA (runtime blob was not modified; self-host hashes are unchanged by this library).

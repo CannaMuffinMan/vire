@@ -8,15 +8,24 @@ export PATH="${HOME}/.dotnet:${PATH:-}"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export VIRE_HEADLESS=1
 export VIRE_BUDGET=5000000
-BASE_SHA="${AES_GCM_BASE_SHA:-$(git merge-base HEAD origin/native-compiler 2>/dev/null || git rev-parse HEAD^)}"
+TABLE_SHA="${AES_GCM_FAIL_BEFORE_SHA:-04ea5186c6ed3ce35451df318e29a1db9b9eabe8}"
 AFTER_SHA="$(git rev-parse HEAD)"
-echo "fail_before_sha $BASE_SHA"
+echo "fail_before_sha $TABLE_SHA"
 echo "pass_after_sha $AFTER_SHA"
-if git cat-file -e "${BASE_SHA}:src/rt-aes.vire" 2>/dev/null; then
-  echo "base already has src/rt-aes.vire"
+BEFORE_SRC="$(git show "${TABLE_SHA}:src/rt-aes.vire")"
+if [[ "$BEFORE_SRC" != *"sbox at"* ]]; then
+  echo "FAIL_BEFORE expected table lookup at $TABLE_SHA"
   exit 1
 fi
-echo "FAIL_BEFORE at $BASE_SHA: src/rt-aes.vire absent (no guest AES-256-GCM)"
+if [[ "$BEFORE_SRC" != *"if d >= 256"* ]]; then
+  echo "FAIL_BEFORE expected xtime branch at $TABLE_SHA"
+  exit 1
+fi
+if [[ "$BEFORE_SRC" != *"if flag == 1"* ]]; then
+  echo "FAIL_BEFORE expected GHASH bit skip at $TABLE_SHA"
+  exit 1
+fi
+echo "FAIL_BEFORE at $TABLE_SHA: S-box table lookup, xtime branch, GHASH bit skip present"
 
 hex_to_bin() {
   python3 - "$1" "$2" <<'PY'
@@ -74,5 +83,14 @@ if [[ "$HOST_NORM" != "$ELF_NORM" ]]; then
   echo "HOST_ELF_MISMATCH"
   exit 1
 fi
-echo "PASS_AFTER at $AFTER_SHA host and gen1 ELF AES-GCM outputs identical"
+AFTER_SRC="$(cat src/rt-aes.vire)"
+if [[ "$AFTER_SRC" == *"sbox at"* ]]; then
+  echo "PASS_AFTER still has sbox at"
+  exit 1
+fi
+if [[ "$AFTER_SRC" == *"if flag == 1"* ]]; then
+  echo "PASS_AFTER still has GHASH skip"
+  exit 1
+fi
+echo "PASS_AFTER at $AFTER_SHA host and gen1 ELF AES-GCM outputs identical; no secret sbox index / GHASH skip in source"
 echo "aes gcm linux prove ok"

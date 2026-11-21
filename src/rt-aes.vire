@@ -1,87 +1,211 @@
 ~ Guest AES-256-GCM (NIST SP 800-38D, 96-bit nonce, 128-bit tag).
-~ S-box and MixColumns use table lookups / data-dependent GHASH bit skips.
-~ Tag compare walks every byte (not a CPU timing barrier).
+~ S-box is Boyar-Peralta bits (arithmetic AND/XOR/OR/NOT), not a table lookup.
+~ xtime and GHASH mul have fixed control flow (no secret bit skips).
+~ Tag compare walks every byte (Vire IR / CPU still not a timing barrier).
+
+define aesBitXor with a, b
+  let t be a * b
+  let t be t + t
+  return (a + b) - t
+end
+
+define aesBitAnd with a, b
+  return a * b
+end
+
+define aesBitOr with a, b
+  return (a + b) - (a * b)
+end
+
+define aesBitNot with a
+  return 1 - a
+end
 
 define aesXor8 with a, b
   let r be 0
   let p be 1
   let x be a
   let y be b
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
-  end
-  let x be idiv with x, 2
-  let y be idiv with y, 2
-  let p be p + p
-  let xb be x % 2
-  let yb be y % 2
-  if xb != yb
-    let r be r + p
+  let i be 0
+  while i < 8
+    let xb be x % 2
+    let yb be y % 2
+    let t be xb * yb
+    let t be t + t
+    let d be (xb + yb) - t
+    let r be r + (p * d)
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
   end
   return r
 end
 
 define aesXtime with b
-  let d be b + b
-  if d >= 256
-    let d be d - 256
-    return aesXor8 with d, 27
-  end
-  return d
+  let hi be idiv with b, 128
+  let d be (b % 128) * 2
+  return aesXor8 with d, (27 * hi)
 end
 
-define aesSbox
-  return [99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192, 183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113, 216, 49, 21, 4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235, 39, 178, 117, 9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214, 179, 41, 227, 47, 132, 83, 209, 0, 237, 32, 252, 177, 91, 106, 203, 190, 57, 74, 76, 88, 207, 208, 239, 170, 251, 67, 77, 51, 133, 69, 249, 2, 127, 80, 60, 159, 168, 81, 163, 64, 143, 146, 157, 56, 245, 188, 182, 218, 33, 16, 255, 243, 210, 205, 12, 19, 236, 95, 151, 68, 23, 196, 167, 126, 61, 100, 93, 25, 115, 96, 129, 79, 220, 34, 42, 144, 136, 70, 238, 184, 20, 222, 94, 11, 219, 224, 50, 58, 10, 73, 6, 36, 92, 194, 211, 172, 98, 145, 149, 228, 121, 231, 200, 55, 109, 141, 213, 78, 169, 108, 86, 244, 234, 101, 122, 174, 8, 186, 120, 37, 46, 28, 166, 180, 198, 232, 221, 116, 31, 75, 189, 139, 138, 112, 62, 181, 102, 72, 3, 246, 14, 97, 53, 87, 185, 134, 193, 29, 158, 225, 248, 152, 17, 105, 217, 142, 148, 155, 30, 135, 233, 206, 85, 40, 223, 140, 161, 137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187, 22]
+define aesSboxByte with x
+  let u7 be x % 2
+  let x be idiv with x, 2
+  let u6 be x % 2
+  let x be idiv with x, 2
+  let u5 be x % 2
+  let x be idiv with x, 2
+  let u4 be x % 2
+  let x be idiv with x, 2
+  let u3 be x % 2
+  let x be idiv with x, 2
+  let u2 be x % 2
+  let x be idiv with x, 2
+  let u1 be x % 2
+  let u0 be idiv with x, 2
+  let t1 be aesBitXor with u0, u3
+  let t2 be aesBitXor with u0, u5
+  let t3 be aesBitXor with u0, u6
+  let t4 be aesBitXor with u3, u5
+  let t5 be aesBitXor with u4, u6
+  let t6 be aesBitXor with t1, t5
+  let t7 be aesBitXor with u1, u2
+  let t8 be aesBitXor with u7, t6
+  let t9 be aesBitXor with u7, t7
+  let t10 be aesBitXor with t6, t7
+  let t11 be aesBitXor with u1, u5
+  let t12 be aesBitXor with u2, u5
+  let t13 be aesBitXor with t3, t4
+  let t14 be aesBitXor with t6, t11
+  let t15 be aesBitXor with t5, t11
+  let t16 be aesBitXor with t5, t12
+  let t17 be aesBitXor with t9, t16
+  let t18 be aesBitXor with u3, u7
+  let t19 be aesBitXor with t7, t18
+  let t20 be aesBitXor with t1, t19
+  let t21 be aesBitXor with u6, u7
+  let t22 be aesBitXor with t7, t21
+  let t23 be aesBitXor with t2, t22
+  let t24 be aesBitXor with t2, t10
+  let t25 be aesBitXor with t20, t17
+  let t26 be aesBitXor with t3, t16
+  let t27 be aesBitXor with t1, t12
+  let d be u7
+  let m1 be aesBitAnd with t13, t6
+  let m6 be aesBitAnd with t3, t16
+  let m11 be aesBitAnd with t1, t15
+  let w30 be aesBitAnd with t4, t27
+  let m13 be aesBitXor with w30, m11
+  let w32 be aesBitAnd with t2, t10
+  let m15 be aesBitXor with w32, m11
+  let w34 be aesBitAnd with t23, t8
+  let w35 be aesBitXor with t14, m1
+  let w36 be aesBitXor with w35, w34
+  let m20 be aesBitXor with w36, m13
+  let w38 be aesBitAnd with t19, d
+  let w39 be aesBitXor with w38, m1
+  let w40 be aesBitXor with w39, t24
+  let m21 be aesBitXor with w40, m15
+  let w42 be aesBitAnd with t22, t9
+  let w43 be aesBitXor with t26, m6
+  let w44 be aesBitXor with w43, w42
+  let m22 be aesBitXor with w44, m13
+  let w46 be aesBitAnd with t20, t17
+  let w47 be aesBitXor with w46, m6
+  let w48 be aesBitXor with w47, m15
+  let m23 be aesBitXor with w48, t25
+  let m25 be aesBitAnd with m22, m20
+  let w51 be aesBitXor with m20, m21
+  let w52 be aesBitXor with m23, m25
+  let w53 be aesBitAnd with w51, w52
+  let m37 be aesBitXor with m21, w53
+  let w55 be aesBitAnd with m20, m23
+  let w56 be aesBitOr with m21, w55
+  let w57 be aesBitXor with m20, m25
+  let m38 be aesBitXor with w57, w56
+  let w59 be aesBitXor with m22, m23
+  let w60 be aesBitXor with m21, m25
+  let w61 be aesBitAnd with w59, w60
+  let m39 be aesBitXor with m23, w61
+  let w63 be aesBitAnd with m21, m22
+  let w64 be aesBitOr with m23, w63
+  let w65 be aesBitXor with m22, m25
+  let m40 be aesBitXor with w65, w64
+  let m41 be aesBitXor with m38, m40
+  let m42 be aesBitXor with m37, m39
+  let m43 be aesBitXor with m37, m38
+  let m44 be aesBitXor with m39, m40
+  let m45 be aesBitXor with m42, m41
+  let m46 be aesBitAnd with m44, t6
+  let m47 be aesBitAnd with m40, t8
+  let m48 be aesBitAnd with m39, d
+  let m49 be aesBitAnd with m43, t16
+  let m50 be aesBitAnd with m38, t9
+  let m51 be aesBitAnd with m37, t17
+  let m52 be aesBitAnd with m42, t15
+  let m53 be aesBitAnd with m45, t27
+  let m54 be aesBitAnd with m41, t10
+  let m55 be aesBitAnd with m44, t13
+  let m56 be aesBitAnd with m40, t23
+  let m57 be aesBitAnd with m39, t19
+  let m58 be aesBitAnd with m43, t3
+  let m59 be aesBitAnd with m38, t22
+  let m60 be aesBitAnd with m37, t20
+  let m61 be aesBitAnd with m42, t1
+  let m62 be aesBitAnd with m45, t4
+  let m63 be aesBitAnd with m41, t2
+  let l0 be aesBitXor with m61, m62
+  let l1 be aesBitXor with m50, m56
+  let l2 be aesBitXor with m46, m48
+  let l3 be aesBitXor with m47, m55
+  let l4 be aesBitXor with m54, m58
+  let l5 be aesBitXor with m49, m61
+  let l6 be aesBitXor with m62, l5
+  let l7 be aesBitXor with m46, l3
+  let l8 be aesBitXor with m51, m59
+  let l9 be aesBitXor with m52, m53
+  let l10 be aesBitXor with m53, l4
+  let l11 be aesBitXor with m60, l2
+  let l12 be aesBitXor with m48, m51
+  let l13 be aesBitXor with m50, l0
+  let l14 be aesBitXor with m52, m61
+  let l15 be aesBitXor with m55, l1
+  let l16 be aesBitXor with m56, l0
+  let l17 be aesBitXor with m57, l1
+  let l18 be aesBitXor with m58, l8
+  let l19 be aesBitXor with m63, l4
+  let l20 be aesBitXor with l0, l1
+  let l21 be aesBitXor with l1, l7
+  let l22 be aesBitXor with l3, l12
+  let l23 be aesBitXor with l18, l2
+  let l24 be aesBitXor with l15, l9
+  let l25 be aesBitXor with l6, l10
+  let l26 be aesBitXor with l7, l9
+  let l27 be aesBitXor with l8, l10
+  let l28 be aesBitXor with l11, l14
+  let l29 be aesBitXor with l11, l17
+  let sl7 be aesBitXor with l6, l24
+  let w121 be aesBitXor with l16, l26
+  let sl6 be aesBitNot with w121
+  let w123 be aesBitXor with l19, l28
+  let sl5 be aesBitNot with w123
+  let sl4 be aesBitXor with l6, l21
+  let sl3 be aesBitXor with l20, l22
+  let sl2 be aesBitXor with l25, l29
+  let w128 be aesBitXor with l13, l27
+  let sl1 be aesBitNot with w128
+  let w130 be aesBitXor with l6, l23
+  let sl0 be aesBitNot with w130
+
+  let r be sl0
+  let r be r + (sl1 * 2)
+  let r be r + (sl2 * 4)
+  let r be r + (sl3 * 8)
+  let r be r + (sl4 * 16)
+  let r be r + (sl5 * 32)
+  let r be r + (sl6 * 64)
+  let r be r + (sl7 * 128)
+  return r
 end
 
 define aesRcon with i
@@ -133,6 +257,15 @@ define aesXor16into with z, v
   return z
 end
 
+define gcmXorMasked with z, v, flag
+  let i be 0
+  while i < 16
+    put (aesXor8 with (z at i), ((v at i) * flag)) into z at i
+    let i be i + 1
+  end
+  return z
+end
+
 define aesAddRound with s, rk, off
   let i be 0
   while i < 16
@@ -143,10 +276,10 @@ define aesAddRound with s, rk, off
   return s
 end
 
-define aesSubBytes with s, sbox
+define aesSubBytes with s
   let i be 0
   while i < 16
-    put (sbox at (s at i)) into s at i
+    put (aesSboxByte with (s at i)) into s at i
     let i be i + 1
   end
   return s
@@ -223,7 +356,7 @@ define aesMixColumns with s
   return s
 end
 
-define aesKeyExpand with key, sbox
+define aesKeyExpand with key
   let rk be aesCopyN with key
   let n be 32
   while n < 240
@@ -234,18 +367,18 @@ define aesKeyExpand with key, sbox
     let t3 be rk at (n - 1)
     let r be wi % 8
     if r == 0
-      let a be sbox at t1
+      let a be aesSboxByte with t1
       let rc be aesRcon with (idiv with wi, 8)
       let t0 be aesXor8 with a, rc
-      let t1 be sbox at t2
-      let t2 be sbox at t3
-      let t3 be sbox at (rk at (n - 4))
+      let t1 be aesSboxByte with t2
+      let t2 be aesSboxByte with t3
+      let t3 be aesSboxByte with (rk at (n - 4))
     end
     if r == 4
-      let t0 be sbox at t0
-      let t1 be sbox at t1
-      let t2 be sbox at t2
-      let t3 be sbox at t3
+      let t0 be aesSboxByte with t0
+      let t1 be aesSboxByte with t1
+      let t2 be aesSboxByte with t2
+      let t3 be aesSboxByte with t3
     end
     let b be n - 32
     push with rk, (aesXor8 with (rk at b), t0)
@@ -257,18 +390,18 @@ define aesKeyExpand with key, sbox
   return rk
 end
 
-define aesEncryptBlock with rk, sbox, block
+define aesEncryptBlock with rk, block
   let s be aesCopy16 with block
   aesAddRound with s, rk, 0
   let r be 1
   while r < 14
-    aesSubBytes with s, sbox
+    aesSubBytes with s
     aesShiftRows with s
     aesMixColumns with s
     aesAddRound with s, rk, (r * 16)
     let r be r + 1
   end
-  aesSubBytes with s, sbox
+  aesSubBytes with s
   aesShiftRows with s
   aesAddRound with s, rk, 224
   return s
@@ -286,9 +419,7 @@ define gcmShr1 with v
     let i be i - 1
   end
   put (idiv with (v at 0), 2) into v at 0
-  if lsb == 1
-    put (aesXor8 with (v at 0), 225) into v at 0
-  end
+  put (aesXor8 with (v at 0), (225 * lsb)) into v at 0
   return v
 end
 
@@ -298,52 +429,16 @@ define gcmMul with x, y
   let bi be 0
   while bi < 16
     let q be x at bi
-    let flag be idiv with q, 128
-    if flag == 1
-      aesXor16into with z, v
+    let pwr be 128
+    let k be 0
+    while k < 8
+      let flag be idiv with q, pwr
+      let flag be flag % 2
+      gcmXorMasked with z, v, flag
+      gcmShr1 with v
+      let pwr be idiv with pwr, 2
+      let k be k + 1
     end
-    gcmShr1 with v
-    let flag be idiv with q, 64
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be idiv with q, 32
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be idiv with q, 16
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be idiv with q, 8
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be idiv with q, 4
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be idiv with q, 2
-    let flag be flag % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
-    let flag be q % 2
-    if flag == 1
-      aesXor16into with z, v
-    end
-    gcmShr1 with v
     let bi be bi + 1
   end
   return z
@@ -412,9 +507,7 @@ define gcmInc32 with block
   let n be n + ((out at 14) * 256)
   let n be n + (out at 15)
   let n be n + 1
-  if n >= 4294967296
-    let n be n - 4294967296
-  end
+  let n be n % 4294967296
   put (idiv with n, 16777216) into out at 12
   let n be n % 16777216
   put (idiv with n, 65536) into out at 13
@@ -424,13 +517,13 @@ define gcmInc32 with block
   return out
 end
 
-define gcmCtr with rk, sbox, j0, data
+define gcmCtr with rk, j0, data
   let out be []
   let ctr be gcmInc32 with j0
   let i be 0
   let n be length with data
   while i < n
-    let ks be aesEncryptBlock with rk, sbox, ctr
+    let ks be aesEncryptBlock with rk, ctr
     let k be 0
     while k < 16
       if i < n
@@ -465,9 +558,8 @@ define gcm_ct_eq with left, right
     if i < m
       let b be right at i
     end
-    if a != b
-      let d be 1
-    end
+    let t be aesXor8 with a, b
+    let d be d + t
     let i be i + 1
   end
   if d == 0
@@ -483,16 +575,15 @@ define aes_gcm_prepare with key, nonce
   if (length with nonce) != 12
     return ["bad", "nonce must be 12 bytes"]
   end
-  let sbox be aesSbox
-  let rk be aesKeyExpand with key, sbox
+  let rk be aesKeyExpand with key
   let zeros be [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  let h be aesEncryptBlock with rk, sbox, zeros
+  let h be aesEncryptBlock with rk, zeros
   let j0 be aesCopyN with nonce
   push with j0, 0
   push with j0, 0
   push with j0, 0
   push with j0, 1
-  return ["ok", rk, sbox, h, j0]
+  return ["ok", rk, h, j0]
 end
 
 define aes_gcm_seal with key, nonce, pt, aad
@@ -501,12 +592,11 @@ define aes_gcm_seal with key, nonce, pt, aad
     return prep
   end
   let rk be prep at 1
-  let sbox be prep at 2
-  let h be prep at 3
-  let j0 be prep at 4
-  let ct be gcmCtr with rk, sbox, j0, pt
+  let h be prep at 2
+  let j0 be prep at 3
+  let ct be gcmCtr with rk, j0, pt
   let s be gcmHash with h, aad, ct
-  let tblock be aesEncryptBlock with rk, sbox, j0
+  let tblock be aesEncryptBlock with rk, j0
   aesXor16into with tblock, s
   return ["ok", ct, tblock]
 end
@@ -520,15 +610,14 @@ define aes_gcm_open with key, nonce, ct, aad, tag
     return ["bad", "tag must be 16 bytes"]
   end
   let rk be prep at 1
-  let sbox be prep at 2
-  let h be prep at 3
-  let j0 be prep at 4
+  let h be prep at 2
+  let j0 be prep at 3
   let s be gcmHash with h, aad, ct
-  let tblock be aesEncryptBlock with rk, sbox, j0
+  let tblock be aesEncryptBlock with rk, j0
   aesXor16into with tblock, s
   if not (gcm_ct_eq with tag, tblock)
     return ["bad", "authentication failed"]
   end
-  let pt be gcmCtr with rk, sbox, j0, ct
+  let pt be gcmCtr with rk, j0, ct
   return ["ok", pt]
 end

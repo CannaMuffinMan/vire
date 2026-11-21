@@ -38,8 +38,27 @@ public class AesGcmKatTests
         Assert.Contains("WYCHEPROOF truncated-tag REJECT", norm);
         Assert.Contains("NONCE 11 REJECT", norm);
         Assert.Contains("NONCE 13 REJECT", norm);
+        Assert.Contains("SBOX 0 PASS 99", norm);
+        Assert.Contains("SBOX 1 PASS 124", norm);
+        Assert.Contains("SBOX 255 PASS 22", norm);
         Assert.Contains("not a CPU timing barrier", norm);
         Assert.Contains("AES-GCM PROVE pass", norm);
+    }
+
+    [Fact]
+    public void GuestAes256GcmSourceHasNoSecretDependentSboxOrGhashSkip()
+    {
+        string root = DualMode.FindRoot();
+        string src = File.ReadAllText(Path.Combine(root, "src", "rt-aes.vire"));
+        Assert.DoesNotContain("sbox at", src, StringComparison.Ordinal);
+        Assert.DoesNotContain("if d >= 256", src, StringComparison.Ordinal);
+        Assert.DoesNotContain("if flag == 1", src, StringComparison.Ordinal);
+        Assert.DoesNotContain("if lsb == 1", src, StringComparison.Ordinal);
+        Assert.DoesNotContain("if a != b", src, StringComparison.Ordinal);
+        Assert.Contains("aesSboxByte", src, StringComparison.Ordinal);
+        Assert.Contains("gcmXorMasked", src, StringComparison.Ordinal);
+        Assert.Contains("aesBitXor", src, StringComparison.Ordinal);
+        Assert.Contains("not a timing barrier", src, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
