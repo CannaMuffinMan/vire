@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 
@@ -14,6 +15,11 @@ static class VireListen
 
     public static void WithCancel(int port, int line, string root, RouteCall route, Func<object, string> show, Action<int> setPort)
     {
+        WithCancel(port, line, root, route, show, setPort, null);
+    }
+
+    public static void WithCancel(int port, int line, string root, RouteCall route, Func<object, string> show, Action<int> setPort, X509Certificate2 tlsCert)
+    {
         using (CancellationTokenSource cts = new CancellationTokenSource())
         {
             ConsoleCancelEventHandler onCancel = delegate (object sender, ConsoleCancelEventArgs e)
@@ -22,12 +28,17 @@ static class VireListen
                 cts.Cancel();
             };
             Console.CancelKeyPress += onCancel;
-            try { Run(port, line, cts.Token, root, route, show, setPort); }
+            try { Run(port, line, cts.Token, root, route, show, setPort, tlsCert); }
             finally { Console.CancelKeyPress -= onCancel; }
         }
     }
 
     public static void Run(int port, int line, CancellationToken stop, string root, RouteCall route, Func<object, string> show, Action<int> setPort)
+    {
+        Run(port, line, stop, root, route, show, setPort, null);
+    }
+
+    public static void Run(int port, int line, CancellationToken stop, string root, RouteCall route, Func<object, string> show, Action<int> setPort, X509Certificate2 tlsCert)
     {
         string envPort = Environment.GetEnvironmentVariable("PORT");
         if (!string.IsNullOrWhiteSpace(envPort)) port = Machine.RequirePort(envPort.Trim(), line);
@@ -83,7 +94,7 @@ static class VireListen
                 ThreadPool.QueueUserWorkItem(delegate (object state)
                 {
                     TcpClient held = (TcpClient)state;
-                    try { AnswerApi(held, line, token, publish, stop, root, route, show); }
+                    try { AnswerApi(held, line, token, publish, stop, root, route, show, tlsCert); }
                     catch (IOException)
                     {
                         Console.Error.WriteLine("vire: internal error (IOException)");
@@ -133,7 +144,7 @@ static class VireListen
         return HttpWire.HeaderEnd(buffer, got);
     }
 
-    static bool ReadTimed(NetworkStream stream, byte[] buffer, ref int got, int want, DateTime deadline)
+    static bool ReadTimed(Stream stream, byte[] buffer, ref int got, int want, DateTime deadline)
     {
         while (got < want)
         {
@@ -149,7 +160,7 @@ static class VireListen
         return true;
     }
 
-    static bool ReadOnce(NetworkStream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
+    static bool ReadOnce(Stream stream, byte[] buffer, ref int got, int maxGot, DateTime deadline)
     {
         if (got >= maxGot) return false;
         int remain = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
@@ -163,9 +174,11 @@ static class VireListen
         return true;
     }
 
-    static void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show)
+    static void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show, X509Certificate2 tlsCert)
     {
-        NetworkStream stream = client.GetStream();
+        Stream stream = client.GetStream();
+        if (tlsCert != null)
+            stream = VireTls.WrapServer(stream, tlsCert, line);
         DateTime headerDead = DateTime.UtcNow.AddSeconds(5);
         byte[] buffer = new byte[HttpWire.MaxHeaderBlock + HttpWire.MaxRequestBody + 16];
         int got = 0;
@@ -438,7 +451,7 @@ static class VireListen
         return "OK";
     }
 
-    static void SendParseFail(NetworkStream stream, int status, HttpWire.Result parsed)
+    static void SendParseFail(Stream stream, int status, HttpWire.Result parsed)
     {
         if (status == 404)
             SendSiteEmpty(stream, 404, "text/plain; charset=utf-8", "not found");
@@ -446,7 +459,7 @@ static class VireListen
             SendApi(stream, status, parsed != null && parsed.ErrorJson != null ? parsed.ErrorJson : "{\"error\":\"bad request\"}", null);
     }
 
-    static void SendApi(NetworkStream stream, int code, string body, string extra)
+    static void SendApi(Stream stream, int code, string body, string extra)
     {
         byte[] data = Encoding.UTF8.GetBytes(body ?? "");
         string extraSafe = HeaderField(extra);
@@ -469,7 +482,7 @@ static class VireListen
         if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static bool TrySite(NetworkStream stream, string method, string url, string head, int line, string root)
+    static bool TrySite(Stream stream, string method, string url, string head, int line, string root)
     {
         string site = Path.Combine(root, "site");
         if (!Directory.Exists(site)) return false;
@@ -617,7 +630,7 @@ static class VireListen
         return 206;
     }
 
-    static void SendSiteEmpty(NetworkStream stream, int code, string type, string body)
+    static void SendSiteEmpty(Stream stream, int code, string type, string body)
     {
         byte[] data = Encoding.UTF8.GetBytes(body ?? "");
         string head = SiteHead(code, type, data.Length, "", false);
@@ -626,7 +639,7 @@ static class VireListen
         if (data.Length > 0) stream.Write(data, 0, data.Length);
     }
 
-    static void SendSiteRangeFail(NetworkStream stream, string type, long total)
+    static void SendSiteRangeFail(Stream stream, string type, long total)
     {
         string extra = "Content-Range: bytes */" + total + "\r\n";
         string head = SiteHead(416, type, 0, extra, true);
@@ -634,7 +647,7 @@ static class VireListen
         stream.Write(prefix, 0, prefix.Length);
     }
 
-    static void SendSiteFile(NetworkStream stream, int code, string type, Stream file, long start, long count, long writeCount, bool partial, long total, bool video)
+    static void SendSiteFile(Stream stream, int code, string type, Stream file, long start, long count, long writeCount, bool partial, long total, bool video)
     {
         string extra = "";
         if (partial) extra += "Content-Range: bytes " + start + "-" + (start + count - 1) + "/" + total + "\r\n";

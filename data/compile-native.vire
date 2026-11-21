@@ -4,6 +4,7 @@ use "src/pe.vire"
 use "src/elf.vire"
 use "src/rt-net.vire"
 use "src/rt-ws.vire"
+use "src/rt-tls.vire"
 
 define isLetter with ch
   let letters be "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
@@ -694,6 +695,26 @@ define noteNeed with state, nm
   if nm == "close"
     put true into state at "needNet"
   end
+  if nm == "tls_connect"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
+  if nm == "tls_listen"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
+  if nm == "tls_send"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
+  if nm == "tls_recv"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
+  if nm == "tls_close"
+    put true into state at "needNet"
+    put true into state at "needTls"
+  end
   if nm == "json"
     put true into state at "needJson"
   end
@@ -704,7 +725,7 @@ define noteNeed with state, nm
 end
 
 define parseProgram with scanned
-  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false, "needWs": false}
+  let state be {"ks": scanned at "ks", "ss": scanned at "ss", "ns": scanned at "ns", "i": 0, "bad": false, "why": "", "needNet": false, "needJson": false, "needWs": false, "needTls": false}
   let funcs be []
   let uses be []
   let needs be []
@@ -750,7 +771,7 @@ define parseProgram with scanned
       push with funcs, func
     end
   end
-  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson", "needWs": state at "needWs"}
+  return {"bad": state at "bad", "why": state at "why", "funcs": funcs, "uses": uses, "needs": needs, "needNet": state at "needNet", "needJson": state at "needJson", "needWs": state at "needWs", "needTls": state at "needTls"}
 end
 
 define normPath with path
@@ -989,7 +1010,7 @@ define loadUnit with path, folder, seen
     let missing be true
   end
   if missing
-    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false, "needWs": false}
+    return {"bad": true, "why": ("could not read " + (baseName with path)), "funcs": [], "needNet": false, "needJson": false, "needWs": false, "needTls": false}
   end
   return loadText with path, source, folder, seen
 end
@@ -1020,6 +1041,7 @@ define loadText with path, source, folder, seen
   let needNet be parsed at "needNet"
   let needJson be parsed at "needJson"
   let needWs be parsed at "needWs"
+  let needTls be parsed at "needTls"
   let ui be 0
   while ui < (length with uses)
     let rel be uses at ui
@@ -1052,6 +1074,9 @@ define loadText with path, source, folder, seen
     end
     if extra at "needWs"
       let needWs be true
+    end
+    if extra at "needTls"
+      let needTls be true
     end
     let ui be ui + 1
   end
@@ -1117,10 +1142,13 @@ define loadText with path, source, folder, seen
     if extra at "needWs"
       let needWs be true
     end
+    if extra at "needTls"
+      let needTls be true
+    end
     let ni be ni + 1
   end
   put 0 into seen at key
-  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson, "needWs": needWs}
+  return {"bad": false, "why": "", "funcs": funcs, "needNet": needNet, "needJson": needJson, "needWs": needWs, "needTls": needTls}
 end
 
 define emitOp with gen, bytes
@@ -1140,6 +1168,9 @@ define emitFix with gen, name
     let later be true
   end
   if begins with name, "rt_ws"
+    let later be true
+  end
+  if begins with name, "rt_tls"
     let later be true
   end
   if name == "rt_listen" or name == "rt_connect" or name == "rt_send" or name == "rt_recv" or name == "rt_close" or name == "rt_parse" or name == "rt_ws_listen"
@@ -1256,7 +1287,7 @@ define builtinArity with nm
   if nm == "length" or nm == "text" or nm == "number" or nm == "halt" or nm == "read" or nm == "lower" or nm == "keys" or nm == "drop" or nm == "hash" or nm == "hex" or nm == "shl8" or nm == "chr" or nm == "json" or nm == "parse" or nm == "listen"
     return 1
   end
-  if nm == "close"
+  if nm == "close" or nm == "tls_close"
     return 1
   end
   if nm == "ws_listen"
@@ -1265,11 +1296,14 @@ define builtinArity with nm
   if nm == "push" or nm == "find" or nm == "has" or nm == "write" or nm == "begins" or nm == "ends" or nm == "split" or nm == "idiv" or nm == "join" or nm == "extend"
     return 2
   end
-  if nm == "connect" or nm == "send" or nm == "recv"
+  if nm == "connect" or nm == "send" or nm == "recv" or nm == "tls_send" or nm == "tls_recv"
     return 2
   end
-  if nm == "slice" or nm == "replace"
+  if nm == "slice" or nm == "replace" or nm == "tls_listen"
     return 3
+  end
+  if nm == "tls_connect"
+    return 4
   end
   return -1
 end
@@ -1838,7 +1872,7 @@ define main
     say "compile failed"
     halt with 1
   end
-  let hits be {"net": loaded at "needNet", "json": loaded at "needJson", "ws": loaded at "needWs"}
+  let hits be {"net": loaded at "needNet", "json": loaded at "needJson", "ws": loaded at "needWs", "tls": loaded at "needTls"}
   say "needs-ok"
   let wantElf be linux
   if (length with files) > 2
@@ -1857,6 +1891,12 @@ define main
     let opened be openNetImage
     if wantElf
       let opened be openElfNetImage
+    end
+  end
+  if hits at "tls"
+    let opened be openNetImage
+    if wantElf
+      let opened be openElfTlsImage
     end
   end
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": "", "byName": byName}
@@ -1892,6 +1932,9 @@ define main
   if hits at "ws"
     put (emitWsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels")) into gen at "image"
   end
+  if hits at "tls"
+    put (emitTlsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), wantElf) into gen at "image"
+  end
   put (parkRuntime with (gen at "image"), (gen at "labels")) into gen at "image"
   ~ Pool strings must follow frame_base so they land in RW .data, not RX .text.
   put (parkPool with (gen at "image"), (gen at "labels"), (gen at "pool")) into gen at "image"
@@ -1901,8 +1944,18 @@ define main
   if hits at "ws"
     put (parkWs with (gen at "image"), (gen at "labels")) into gen at "image"
   end
+  if hits at "tls"
+    put (parkTls with (gen at "image"), (gen at "labels")) into gen at "image"
+  end
   put (parkCounters with (gen at "image"), (gen at "labels"), (gen at "counters")) into gen at "image"
   if wantElf
+    if hits at "tls"
+      put (finishElfTlsImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
+      let exe be buildElfTls with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base"), (gen at "labels")
+      write with (files at 1), (hex with exe)
+      say "compiled"
+      return none
+    end
     put (finishElfImage with (gen at "image"), (gen at "labels"), (gen at "fixes"), (opened at "iats")) into gen at "image"
     let exe be buildElf with (gen at "image"), ((gen at "labels") at "linux_start"), ((gen at "labels") at "frame_base")
     write with (files at 1), (hex with exe)
