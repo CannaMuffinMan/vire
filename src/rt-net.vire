@@ -354,16 +354,8 @@ define emitLandingHttp with image, fixes, labels, base
   emitRel with image, fixes, "txt_st307"
   emitCallTo with image, fixes, "rt_net_has"
   emitList with image, [133, 192]
-  emitJcc with image, fixes, 132, "land_st_405"
-  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 51, 1, 0, 0]
-  emitEpi with image
-  pin with labels, "land_st_405", image
-  emitList with image, [72, 139, 77, 240, 72, 141, 21]
-  emitRel with image, fixes, "txt_st405"
-  emitCallTo with image, fixes, "rt_net_has"
-  emitList with image, [133, 192]
   emitJcc with image, fixes, 132, "land_st_101"
-  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 149, 1, 0, 0]
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 51, 1, 0, 0]
   emitEpi with image
   pin with labels, "land_st_101", image
   emitList with image, [72, 139, 77, 240, 72, 141, 21]
