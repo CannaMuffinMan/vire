@@ -158,6 +158,11 @@ Run-Proof "redis-tls-prove-windows" { Run-Script "tools/redis-tls-prove-windows.
 Run-Proof "aes-gcm-windows" { Run-Script "tools/aes-gcm-windows.ps1" }
 Run-Proof "rebuild-headers-windows" { Run-Script "tools/rebuild-headers-windows.ps1" }
 Run-Proof "tls-server-windows" { Run-Script "tools/tls-server-windows.ps1" }
+Run-Proof "pbkdf2-windows" {
+    $p = Join-Path $Root "tools/pbkdf2-windows.ps1"
+    if (Test-Path $p) { Run-Script "tools/pbkdf2-windows.ps1" }
+    else { Log "skip pbkdf2-windows (script not in tree yet)" }
+}
 
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"

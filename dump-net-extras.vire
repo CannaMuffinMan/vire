@@ -1,0 +1,91 @@
+~ Interpret-only packer for net+dns+tcp+landing. Do not native-compile this file.
+
+use "src/pe.vire"
+use "src/elf.vire"
+use "src/rt-net-unpacked.vire"
+
+define hex8 with n
+  let digits be "0123456789abcdef"
+  let x be n
+  if x < 0
+    let x be 0
+  end
+  let out be ""
+  let i be 0
+  while i < 8
+    let d be x % 16
+    let out be (slice with digits, d, (d + 1)) + out
+    let x be idiv with x, 16
+    let i be i + 1
+  end
+  return out
+end
+
+define hex4 with n
+  let digits be "0123456789abcdef"
+  let x be n
+  if x < 0
+    let x be 0
+  end
+  let out be ""
+  let i be 0
+  while i < 4
+    let d be x % 16
+    let out be (slice with digits, d, (d + 1)) + out
+    let x be idiv with x, 16
+    let i be i + 1
+  end
+  return out
+end
+
+define packOne with nparams, tag
+  let image be bytes
+  let labels be {}
+  let fixes be []
+  let image be emitNetRuntime with image, fixes, labels, true, true, nparams
+  write with ("data/src/rt-net-full-" + tag + "-blob.txt"), (hex with image)
+  let names be keys with labels
+  let pinRaw be ""
+  let i be 0
+  let n be length with names
+  let nameText be ""
+  while i < n
+    let nm be names at i
+    let nameText be nameText + nm + "\n"
+    let off be labels at nm
+    let pinRaw be pinRaw + (hex8 with off) + (hex4 with i)
+    let i be i + 1
+  end
+  write with ("data/src/rt-net-full-" + tag + "-names.txt"), nameText
+  write with ("data/src/rt-net-full-" + tag + "-pins.txt"), pinRaw
+  let nameIx be {}
+  let i be 0
+  while i < n
+    put i into nameIx at (names at i)
+    let i be i + 1
+  end
+  let fixRaw be ""
+  let fi be 0
+  let fn be length with fixes
+  while fi < fn
+    let item be fixes at fi
+    let to be item at "to"
+    let id be 0
+    if has with nameIx, to
+      let id be nameIx at to
+    end
+    let fixRaw be fixRaw + (hex8 with (item at "at")) + (hex4 with id)
+    let fi be fi + 1
+  end
+  write with ("data/src/rt-net-full-" + tag + "-fixes.txt"), fixRaw
+  say tag
+  say (length with image)
+  say n
+  say fn
+  return true
+end
+
+define main
+  packOne with 3, "r3"
+  packOne with 4, "r4"
+end
