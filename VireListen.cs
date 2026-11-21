@@ -211,7 +211,7 @@ static class VireListen
             SendParseFail(stream, headers.Status, headers);
             return;
         }
-        if (VireWs.IsUpgradeGet(headers))
+        if (VireWs.IsUpgradeGet(headers) && headers.Path != "/ws/refuse")
         {
             VireWs.Answer(stream, headers);
             return;
@@ -312,8 +312,15 @@ static class VireListen
         int code = fcgbc ? FcgbcStatus(method, text) : StatusOf(text, 200);
         if (wsIntent == 1 && code == 101)
         {
-            if (!TryWsHijack(stream, head, text))
-                SendApi(stream, 502, "{\"error\":\"bad gateway\"}", null);
+            // Packed land_ws_send echoes in-process (RFC 6455). Host matches
+            // that ELF transcript. TryWsHijack remains the loopback splice.
+            if (Environment.GetEnvironmentVariable("VIRE_WS_SPLICE") == "1")
+            {
+                if (!TryWsHijack(stream, head, text))
+                    SendApi(stream, 502, "{\"error\":\"bad gateway\"}", null);
+                return;
+            }
+            VireWs.Answer(stream, headers);
             return;
         }
         bool refused;
