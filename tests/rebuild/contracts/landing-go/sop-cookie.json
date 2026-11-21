@@ -13,8 +13,8 @@
     "deny": ["missing", "tamper", "expired"]
   },
   "residual": [
-    "Native listen still passes route(method, path, body) only; Cookie request headers are not forwarded. Verify on listen uses POST body as the cookie value. CLI header mode parses Cookie: via cookie_parse.",
-    "Set-Cookie is not emitted as a native extra header; issue returns the cookie in the JSON body.",
+    "Listen route may take allowlisted Cookie/Host/Authorization in `head`. POST /api/sop-auth still accepts the cookie in the body when Cookie is missing (CLI/header tests).",
+    "Issue JSON includes set-cookie; listen copies allowlisted fields onto the response after refusing CR/LF/NUL.",
     "No TLS, DNS, or public upstream."
   ],
   "cases": [

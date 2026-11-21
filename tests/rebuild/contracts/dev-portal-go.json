@@ -1,11 +1,12 @@
 {
   "id": "dev-portal-go-loopback",
-  "source": "fcgcpa-prod PR #147 dev-portal-go.json goldens plus /fcg-api/ prefix proxy onto loopback. JWT Set-Cookie session and public HTTPS target stay blocked.",
+  "source": "fcgcpa-prod PR #147 dev-portal-go.json goldens plus /fcg-api/ prefix proxy onto loopback. JWT session uses the Cookie request header. Public HTTPS target stays blocked.",
   "headers_that_matter": [
     "content-type",
     "connection",
     "x-content-type-options",
-    "cache-control"
+    "cache-control",
+    "location"
   ],
   "cases": [
     {
@@ -30,9 +31,10 @@
         "content-type": "application/json",
         "connection": "close",
         "x-content-type-options": "nosniff",
-        "cache-control": "no-store"
+        "cache-control": "no-store",
+        "location": "/login"
       },
-      "body": "{\"status\":307}"
+      "body": "{\"status\":307,\"location\":\"/login\"}"
     },
     {
       "name": "fcg_api_proxy",

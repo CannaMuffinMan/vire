@@ -17,6 +17,8 @@ public class RebuildSopProxyContractTests
 
         string guest = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "landing-sop.vire"));
         Assert.Contains("sop_verify", guest);
+        Assert.Contains("method, path, body, head", guest);
+        Assert.Contains("sop_from_header", guest);
         Assert.DoesNotContain("forevercouchgang", guest);
         string landingProxy = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "landing-proxy.vire"));
         Assert.Contains("/api/upstream/echo", landingProxy);

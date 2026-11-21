@@ -1091,7 +1091,7 @@ sealed class CompiledMachine
         throw new VireError("compiled builtin missing: " + name, line, col);
     }
 
-    object DispatchRoute(string method, string path, string body, int line, out int maxOutput)
+    object DispatchRoute(string method, string path, string body, string head, int line, out int maxOutput)
     {
         CompiledMachine worker = new CompiledMachine(funcs, root, programArgs, Budget.ForRequest(budget));
         maxOutput = worker.budget.MaxOutput;
@@ -1099,6 +1099,10 @@ sealed class CompiledMachine
         call.Add(method);
         call.Add(path);
         call.Add(body);
+        Dictionary<string, object> routeFn = (Dictionary<string, object>)funcs["route"];
+        List<object> names = (List<object>)routeFn["params"];
+        if (names.Count >= 4)
+            call.Add(head ?? "");
         object result = worker.Call("route", call, line, 1);
         string text = result as string;
         if (text == null) text = Show(result);

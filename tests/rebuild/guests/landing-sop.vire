@@ -22,22 +22,28 @@ define deny_json with reason
   return "{\"ok\":false,\"status\":401,\"error\":\"" + reason + "\"}"
 end
 
-define route with method, path, body
+define route with method, path, body, head
   if path == "/healthz"
     return "ok"
   end
   if path == "/api/sop-auth"
-    if method == "GET"
+    let cookie be sop_from_header with head
+    if cookie == ""
+      if method == "POST"
+        if body != ""
+          let cookie be body
+        end
+      end
+    end
+    if cookie == ""
       return deny_json with "missing"
     end
-    if method == "POST"
-      let clock be number with (args at 2)
-      let v be sop_verify with (secret_of), body, clock
-      if (v at 0) != "ok"
-        return deny_json with (v at 1)
-      end
-      return "{\"ok\":true}"
+    let clock be number with (args at 2)
+    let v be sop_verify with (secret_of), cookie, clock
+    if (v at 0) != "ok"
+      return deny_json with (v at 1)
     end
+    return "{\"ok\":true}"
   end
   if path == "/api/sop-issue"
     if method == "POST"
@@ -46,7 +52,8 @@ define route with method, path, body
       if (issued at 0) != "ok"
         return deny_json with (issued at 1)
       end
-      return "{\"ok\":true,\"cookie\":\"" + (issued at 1) + "\"}"
+      let val be issued at 1
+      return "{\"ok\":true,\"cookie\":\"" + val + "\",\"set-cookie\":\"" + (sop_cookie_name) + "=" + val + "; Path=/; HttpOnly\"}"
     end
   end
   return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"

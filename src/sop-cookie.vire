@@ -1,8 +1,8 @@
 ~ landing-go SOP HMAC cookie gate (fixture secret only).
 ~ Cookie value: v1.<unixExp>.<hmac_sha256_hex(secret, "v1.<unixExp>")>
 ~ Name: fcg_sop_authenticated. MAC compare is ct_eq on the 32-byte digest.
-~ Tamper, expired, and missing cookies deny. Residual: listen does not
-~ forward the Cookie request header, so HTTP verify uses POST body.
+~ Tamper, expired, and missing cookies deny. Listen may pass an allowlisted
+~ Cookie header as route `head` (CR/LF/NUL already refused on the wire).
 use "rt-crypto.vire"
 
 define sop_cookie_name

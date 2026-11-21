@@ -1,7 +1,7 @@
 {
   "id": "dev-portal-go-auth",
-  "source": "fcgcpa-prod PR #147 dev-portal-go: page-gate 307, JWT session, 405, dist. HTTPS API target blocked. Listen does not forward Cookie; cookie is a process arg.",
-  "headers_that_matter": ["content-type", "connection", "x-content-type-options", "cache-control"],
+  "source": "fcgcpa-prod PR #147 dev-portal-go: page-gate 307, JWT session, 405, dist. HTTPS API target blocked. Listen Cookie is an allowlisted route header; 307 emits Location.",
+  "headers_that_matter": ["content-type", "connection", "x-content-type-options", "cache-control", "location"],
   "cases": [
     {
       "name": "dist_missing",
@@ -15,7 +15,10 @@
       "method": "GET",
       "path": "/api/auth/session",
       "status": 307,
-      "body": "{\"status\":307}"
+      "headers": {
+        "location": "/login"
+      },
+      "body": "{\"status\":307,\"location\":\"/login\"}"
     },
     {
       "name": "login_static_missing",

@@ -7,7 +7,7 @@ using System.Threading;
 
 static class VireListen
 {
-    public delegate object RouteCall(string method, string path, string body, int line, out int maxOutput);
+    public delegate object RouteCall(string method, string path, string body, string head, int line, out int maxOutput);
 
     const int ListenSlotsMax = 64;
     static readonly SemaphoreSlim ListenSlots = new SemaphoreSlim(ListenSlotsMax, ListenSlotsMax);
@@ -245,7 +245,7 @@ static class VireListen
         {
             if (ListenHooks.RouteException != null && path == "/boom")
                 throw ListenHooks.RouteException;
-            result = route(method, path, body, line, out maxOutput);
+            result = route(method, path, body, HttpWire.AllowlistedRequestHead(head), line, out maxOutput);
         }
         catch (VireError err)
         {
@@ -282,7 +282,12 @@ static class VireListen
         if (text == null) text = "null";
         if (text.Length > maxOutput) text = "{\"error\":\"response too large\"}";
         int code = StatusOf(text, 200);
-        SendApi(stream, code, text, ExtraHeadersOf(text));
+        bool refused;
+        string extra = ExtraHeadersOf(text, out refused);
+        if (refused)
+            SendApi(stream, 500, "{\"error\":\"route failed\"}", "");
+        else
+            SendApi(stream, code, text, extra);
     }
 
     static bool IsRequestBudget(VireError err)
@@ -327,10 +332,12 @@ static class VireListen
         return fallback;
     }
 
-    static string ExtraHeadersOf(string text)
+    static string ExtraHeadersOf(string text, out bool refused)
     {
+        refused = false;
         if (text == null) return "";
-        string extra = "";
+        string extra = HttpWire.AllowlistedReplyHeaders(text, out refused);
+        if (refused) return "";
         int i = 0;
         while (i < text.Length)
         {
@@ -343,12 +350,6 @@ static class VireListen
             if (c == '<') extra += "X-Payments-Enabled: off\r\n";
             break;
         }
-        if (text.IndexOf("\"location\":\"/sop/access?next=/sop/media-lab\"", StringComparison.Ordinal) >= 0)
-            extra += "Location: /sop/access?next=/sop/media-lab\r\n";
-        else if (text.IndexOf("\"location\":\"/partners\"", StringComparison.Ordinal) >= 0)
-            extra += "Location: /partners\r\n";
-        else if (text.IndexOf("\"location\":\"/sop\"}", StringComparison.Ordinal) >= 0)
-            extra += "Location: /sop\r\n";
         if (text == "Authentication required.")
             extra += "WWW-Authenticate: Basic realm=\"Protected\"\r\n";
         if (text.IndexOf("\"adsenseClientId\"", StringComparison.Ordinal) >= 0)

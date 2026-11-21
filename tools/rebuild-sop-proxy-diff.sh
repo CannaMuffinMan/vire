@@ -184,9 +184,11 @@ secret = sys.argv[5] if len(sys.argv) > 5 else ""
 cookie = sys.argv[6] if len(sys.argv) > 6 else ""
 mismatches = []
 
-def http_req(port, method, path, body):
+def http_req(port, method, path, body, cookie=""):
     payload = body.encode("utf-8") if body else b""
     req = f"{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n"
+    if cookie:
+        req += f"Cookie: {cookie}\r\n"
     if method == "POST":
         req += f"Content-Length: {len(payload)}\r\n"
     req += "\r\n"
@@ -220,7 +222,7 @@ def check(port, cases, label):
         method = c.get("method", "GET")
         path = c["path"]
         body = c.get("req_body", c.get("post_body", ""))
-        st, hdrs, b = http_req(port, method, path, body)
+        st, hdrs, b = http_req(port, method, path, body, c.get("cookie", ""))
         want_st = c["status"]
         want_b = c["body"]
         if st != want_st or b != want_b:
@@ -233,6 +235,9 @@ def check(port, cases, label):
 
 if kind == "cookie":
     extra = [
+        {"name": "cookie_ok", "method": "GET", "path": "/api/sop-auth", "cookie": "fcg_sop_authenticated=" + cookie, "status": 200,
+         "headers": {"content-type": "application/json", "connection": "close", "x-content-type-options": "nosniff", "cache-control": "no-store"},
+         "body": "{\"ok\":true}"},
         {"name": "post_ok", "method": "POST", "path": "/api/sop-auth", "req_body": cookie, "status": 200,
          "headers": {"content-type": "application/json", "connection": "close", "x-content-type-options": "nosniff", "cache-control": "no-store"},
          "body": "{\"ok\":true}"},
@@ -249,8 +254,8 @@ if kind == "cookie":
     check(host_port, cases, "host")
     check(nat_port, cases, "native")
     for c in cases:
-        hs, hh, hb = http_req(host_port, c.get("method", "GET"), c["path"], c.get("req_body", ""))
-        ns, nh, nb = http_req(nat_port, c.get("method", "GET"), c["path"], c.get("req_body", ""))
+        hs, hh, hb = http_req(host_port, c.get("method", "GET"), c["path"], c.get("req_body", ""), c.get("cookie", ""))
+        ns, nh, nb = http_req(nat_port, c.get("method", "GET"), c["path"], c.get("req_body", ""), c.get("cookie", ""))
         if hs != ns or hb != nb:
             mismatches.append(f"host-vs-native {c['name']} {hs}/{hb!r} vs {ns}/{nb!r}")
             continue
