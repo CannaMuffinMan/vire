@@ -56,7 +56,12 @@ public class TlsTests
         string root = DualMode.FindRoot();
         string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
         Assert.Contains("tls_connect", native);
+        Assert.Contains("tls_wrap", native);
         Assert.Contains("rt_tls_connect", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
+        Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
+        Assert.Contains("openPeTlsImage", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("secur32.dll", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
+        Assert.Contains("InitializeSecurityContextA", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("SSL_VERIFY", File.ReadAllText(Path.Combine(root, "docs", "native-tls.md")));
         Assert.DoesNotContain("SSL_VERIFY_NONE", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
     }

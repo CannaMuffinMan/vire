@@ -383,7 +383,7 @@ sealed class Machine
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "digest", "hmac", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close",
-        "tls_connect", "tls_listen", "tls_send", "tls_recv", "tls_close",
+        "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close",
         "start", "wait", "result", "linux"
     });
 
@@ -621,7 +621,7 @@ sealed class Machine
         }
         if (name == "push" || name == "write" || name == "has" || name == "join" || name == "min" || name == "max" || name == "split" || name == "find" || name == "span" || name == "button" || name == "place" || name == "sheet" || name == "begins" || name == "ends" || name == "copy" || name == "append" || name == "post" || name == "build" || name == "idiv" || name == "extend" || name == "connect" || name == "send" || name == "recv" || name == "tls_send" || name == "tls_recv" || name == "hmac") need = 2;
         if (name == "tls_listen") need = 3;
-        if (name == "tls_connect") need = 4;
+        if (name == "tls_connect" || name == "tls_wrap") need = 4;
         if (name == "foreign") need = args.Count >= 2 && args.Count <= 7 ? args.Count : 2;
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
@@ -744,6 +744,13 @@ sealed class Machine
             if (ca == null) throw new VireError("tls_connect needs a host, a port, a name, and a ca file", line, col);
             if (ca.Length > 0) ca = SafePath(ca, line, col);
             return VireTls.Connect(args[0] as string, args[1], args[2] as string, ca, tcp, root, line, col);
+        }
+        if (name == "tls_wrap")
+        {
+            string wrapCa = args[2] as string;
+            if (wrapCa == null) throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, col);
+            if (wrapCa.Length > 0) wrapCa = SafePath(wrapCa, line, col);
+            return VireTls.Wrap(args[0], args[1] as string, wrapCa, args[3], tcp, line, col);
         }
         if (name == "tls_listen")
         {

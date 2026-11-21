@@ -1,8 +1,10 @@
 ~ Guest PostgreSQL frontend/backend protocol v3 on loopback TCP.
-~ No TLS (depends on the separate native TLS lane). No DNS.
+~ TLS: SSLRequest then tls_wrap (sslmode require / verify-full). No DNS.
 ~ Auth: AuthenticationOk (trust), cleartext PasswordMessage, SCRAM-SHA-256
 ~ (HMAC-SHA-256 via native `hash` / Latin-1 guest bytes; PBKDF2 iteration
 ~ cap 8192 so a hostile server cannot burn the 5M step budget).
+~ Channel binding SCRAM-SHA-256-PLUS is residual (tls-unique / server-end-point
+~ export is not on the guest TLS API).
 ~ Prove scripts set scram_iterations=32; default 4096 is the same
 ~ protocol and stays under the cap if the guest xor loop is later nativized.
 ~ Caps stay 32MB / 100000 / 5M. Recv cap 1000000. Message length fail-closed.
@@ -89,6 +91,38 @@ define pg_max_iter
   return 8192
 end
 
+define pg_io_send with conn, raw
+  let h be conn at "h"
+  if (conn at "tls") == 1
+    tls_send with h, raw
+    return none
+  end
+  send with h, raw
+  return none
+end
+
+define pg_io_recv with conn, n
+  let h be conn at "h"
+  if (conn at "tls") == 1
+    return tls_recv with h, n
+  end
+  return recv with h, n
+end
+
+define pg_io_close with conn
+  let h be conn at "h"
+  if (conn at "tls") == 1
+    tls_close with h
+    return none
+  end
+  close with h
+  return none
+end
+
+define pg_ssl_request
+  return (pg_be32 with 8) + (pg_be32 with 80877103)
+end
+
 define pg_fill with conn, want
   if want < 0
     put "bad length" into conn at "why"
@@ -102,7 +136,7 @@ define pg_fill with conn, want
   let h be conn at "h"
   while (length with buf) < want
     try
-      let chunk be recv with h, 4096
+      let chunk be pg_io_recv with conn, 4096
     miss problem
       put "timeout" into conn at "why"
       return false
@@ -612,7 +646,7 @@ define pg_auth with conn, secret, user
       if kind == 3
         let method be "cleartext"
         let pw be secret + (chr with 0)
-        send with h, (pg_msg with "p", pw)
+        pg_io_send with conn, (pg_msg with "p", pw)
         let handled be 1
       end
       if kind == 10
@@ -621,7 +655,7 @@ define pg_auth with conn, secret, user
           return "unsupported SASL"
         end
         let clientNonce be pg_scram_nonce with user, (conn at "db")
-        send with h, (pg_sasl_init with user, clientNonce)
+        pg_io_send with conn, (pg_sasl_init with user, clientNonce)
         let method be "scram-sha-256"
         let handled be 1
       end
@@ -632,7 +666,7 @@ define pg_auth with conn, secret, user
           return fin at "why"
         end
         let scramWant be fin at "v"
-        send with h, (pg_msg with "p", (fin at "msg"))
+        pg_io_send with conn, (pg_msg with "p", (fin at "msg"))
         let handled be 1
       end
       if kind == 12
@@ -659,16 +693,50 @@ define pg_auth with conn, secret, user
 end
 
 define pg_open with host, port, user, db, secret
+  return pg_open_ssl with host, port, user, db, secret, "disable", "", ""
+end
+
+define pg_open_ssl with host, port, user, db, secret, mode, name, ca
   try
     let h be connect with host, port
   miss problem
     return {"ok": false, "why": problem}
   end
-  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none", "why": "", "db": db, "types": []}
-  send with h, (pg_startup with user, db)
+  let tls be 0
+  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none", "why": "", "db": db, "types": [], "tls": 0}
+  if (mode == "require") or (mode == "verify-full")
+    send with h, (pg_ssl_request)
+    try
+      let reply be recv with h, 1
+    miss problem
+      close with h
+      return {"ok": false, "why": "ssl timeout"}
+    end
+    if reply == "N"
+      close with h
+      return {"ok": false, "why": "ssl refused"}
+    end
+    if reply != "S"
+      close with h
+      return {"ok": false, "why": "ssl reply"}
+    end
+    let check be 0
+    if mode == "verify-full"
+      let check be 1
+    end
+    try
+      tls_wrap with h, name, ca, check
+    miss problem
+      close with h
+      return {"ok": false, "why": problem}
+    end
+    put 1 into conn at "tls"
+    let tls be 1
+  end
+  pg_io_send with conn, (pg_startup with user, db)
   let why be pg_auth with conn, secret, user
   if why != "ok"
-    close with h
+    pg_io_close with conn
     return {"ok": false, "why": why}
   end
   return {"ok": true, "conn": conn}
@@ -849,8 +917,7 @@ define pg_wait_ready with conn
 end
 
 define pg_query with conn, sql
-  let h be conn at "h"
-  send with h, (pg_msg with "Q", (sql + (chr with 0)))
+  pg_io_send with conn, (pg_msg with "Q", (sql + (chr with 0)))
   return pg_wait_ready with conn
 end
 
@@ -879,8 +946,7 @@ define pg_bind_body with sql, args
 end
 
 define pg_exec_param with conn, sql, args
-  let h be conn at "h"
-  send with h, (pg_bind_body with sql, args)
+  pg_io_send with conn, (pg_bind_body with sql, args)
   return pg_wait_ready with conn
 end
 
@@ -897,8 +963,10 @@ define pg_rollback with conn
 end
 
 define pg_close with conn
-  let h be conn at "h"
-  send with h, (pg_msg with "X", "")
-  close with h
+  try
+    pg_io_send with conn, (pg_msg with "X", "")
+  miss problem
+  end
+  pg_io_close with conn
   return none
 end

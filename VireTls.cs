@@ -57,11 +57,44 @@ static class VireTls
         if (name.Length < 1)
             throw new VireError("tls_connect needs a server name", line, column);
         int sock = VireNet.ConnectHost(host, portObj, table, line, column);
-        Socket socket = table.Need(sock, line, column);
         try
         {
-            NetworkStream inner = new NetworkStream(socket, false);
-            SslStream ssl = new SslStream(inner, false, null, null);
+            Handshake(sock, name, caPath, 1, table, line, column);
+            return sock;
+        }
+        catch
+        {
+            try { table.Close(sock, line, column); } catch (Exception) { }
+            throw;
+        }
+    }
+
+    internal static int Wrap(object handle, string name, string caPath, object checkHostObj, VireTcpTable table, int line, int column)
+    {
+        if (!(handle is int))
+            throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, column);
+        if (name == null || caPath == null)
+            throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, column);
+        if (name.Length < 1)
+            throw new VireError("tls_connect needs a server name", line, column);
+        int checkHost = 1;
+        if (checkHostObj is int)
+            checkHost = (int)checkHostObj;
+        if (checkHost != 0 && checkHost != 1)
+            throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, column);
+        int sock = (int)handle;
+        table.Need(sock, line, column);
+        Handshake(sock, name, caPath, checkHost, table, line, column);
+        return sock;
+    }
+
+    static void Handshake(int sock, string name, string caPath, int checkHost, VireTcpTable table, int line, int column)
+    {
+        Socket socket = table.Need(sock, line, column);
+        NetworkStream inner = new NetworkStream(socket, false);
+        SslStream ssl = new SslStream(inner, false, null, null);
+        try
+        {
             SslClientAuthenticationOptions opts = new SslClientAuthenticationOptions
             {
                 TargetHost = name,
@@ -85,18 +118,24 @@ static class VireTls
                 opts.CertificateChainPolicy = policy;
                 opts.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
             }
+            if (checkHost == 0)
+            {
+                opts.RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
+                {
+                    return (errors & ~SslPolicyErrors.RemoteCertificateNameMismatch) == SslPolicyErrors.None;
+                };
+            }
             ssl.AuthenticateAsClient(opts);
             table.AttachTls(sock, ssl);
-            return sock;
         }
         catch (VireError)
         {
-            table.Close(sock, line, column);
+            try { ssl.Dispose(); } catch (Exception) { }
             throw;
         }
         catch (Exception)
         {
-            try { table.Close(sock, line, column); } catch (Exception) { }
+            try { ssl.Dispose(); } catch (Exception) { }
             throw new VireError("tls handshake failed", line, column);
         }
     }

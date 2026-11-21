@@ -1018,6 +1018,14 @@ sealed class CompiledMachine
             if (ca.Length > 0) ca = Safe(ca, line, col);
             return VireTls.Connect(args[0] as string, args[1], args[2] as string, ca, tcp, root, line, col);
         }
+        if (name == "tls_wrap")
+        {
+            if (args.Count != 4) throw new VireError("tls_wrap takes 4 values, got " + args.Count, line, col);
+            string wrapCa = args[2] as string;
+            if (wrapCa == null) throw new VireError("tls_wrap needs a connection, a name, a ca file, and a host check", line, col);
+            if (wrapCa.Length > 0) wrapCa = Safe(wrapCa, line, col);
+            return VireTls.Wrap(args[0], args[1] as string, wrapCa, args[3], tcp, line, col);
+        }
         if (name == "tls_listen")
         {
             if (args.Count != 3) throw new VireError("tls_listen takes 3 values, got " + args.Count, line, col);
