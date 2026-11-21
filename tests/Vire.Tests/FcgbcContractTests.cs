@@ -20,7 +20,8 @@ public class FcgbcContractTests
         Assert.Contains("Content-Type: application/json\\r\\nContent-Length:", net);
         Assert.DoesNotContain("application/json; charset=utf-8", net);
         string listen = File.ReadAllText(Path.Combine(root, "VireListen.cs"));
-        Assert.Contains("Content-Type: application/json\\r\\n", listen);
+        Assert.Contains("Content-Type: \" + ContentTypeOf(body)", listen);
+        Assert.Contains("static string ContentTypeOf", listen);
         int jsonCases = 0;
         foreach (JsonElement c in doc.RootElement.GetProperty("cases").EnumerateArray())
         {
