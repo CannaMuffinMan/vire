@@ -102,7 +102,6 @@ foreach ($leaf in @(
     "rt-tls-pe-blob.txt", "rt-tls-pe-pins.txt", "rt-tls-pe-fixes.txt",
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt",
-    "rt-net-r3-blob.txt", "rt-net-r3-pins.txt", "rt-net-r3-fixes.txt",
     "rt-net-r4-blob.txt", "rt-net-r4-pins.txt", "rt-net-r4-fixes.txt"
 )) {
     Copy-Item (Join-Path $Root "src/$leaf") (Join-Path $Src $leaf) -Force
@@ -131,9 +130,6 @@ $pairs = @(
     @("src/rt-net-json-blob.txt", "data/src/rt-net-json-blob.txt"),
     @("src/rt-net-json-pins.txt", "data/src/rt-net-json-pins.txt"),
     @("src/rt-net-json-fixes.txt", "data/src/rt-net-json-fixes.txt"),
-    @("src/rt-net-r3-blob.txt", "data/src/rt-net-r3-blob.txt"),
-    @("src/rt-net-r3-pins.txt", "data/src/rt-net-r3-pins.txt"),
-    @("src/rt-net-r3-fixes.txt", "data/src/rt-net-r3-fixes.txt"),
     @("src/rt-net-r4-blob.txt", "data/src/rt-net-r4-blob.txt"),
     @("src/rt-net-r4-pins.txt", "data/src/rt-net-r4-pins.txt"),
     @("src/rt-net-r4-fixes.txt", "data/src/rt-net-r4-fixes.txt")

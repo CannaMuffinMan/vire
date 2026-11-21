@@ -28,9 +28,6 @@ public class CompilerStageTests
         AssertSame(root, Path.Combine("src", "rt-net-json-blob.txt"), Path.Combine("data", "src", "rt-net-json-blob.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-json-pins.txt"), Path.Combine("data", "src", "rt-net-json-pins.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-json-fixes.txt"), Path.Combine("data", "src", "rt-net-json-fixes.txt"));
-        AssertSame(root, Path.Combine("src", "rt-net-r3-blob.txt"), Path.Combine("data", "src", "rt-net-r3-blob.txt"));
-        AssertSame(root, Path.Combine("src", "rt-net-r3-pins.txt"), Path.Combine("data", "src", "rt-net-r3-pins.txt"));
-        AssertSame(root, Path.Combine("src", "rt-net-r3-fixes.txt"), Path.Combine("data", "src", "rt-net-r3-fixes.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-r4-blob.txt"), Path.Combine("data", "src", "rt-net-r4-blob.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-r4-pins.txt"), Path.Combine("data", "src", "rt-net-r4-pins.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-r4-fixes.txt"), Path.Combine("data", "src", "rt-net-r4-fixes.txt"));

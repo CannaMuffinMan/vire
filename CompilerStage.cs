@@ -26,9 +26,6 @@ static class CompilerStage
         "src/rt-net-json-blob.txt",
         "src/rt-net-json-pins.txt",
         "src/rt-net-json-fixes.txt",
-        "src/rt-net-r3-blob.txt",
-        "src/rt-net-r3-pins.txt",
-        "src/rt-net-r3-fixes.txt",
         "src/rt-net-r4-blob.txt",
         "src/rt-net-r4-pins.txt",
         "src/rt-net-r4-fixes.txt"

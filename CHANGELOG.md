@@ -4,7 +4,7 @@
 
 - Root emit/compile probe programs (`probe-*.vire`), unused `dump-net-extras.vire`, superseded `make-hello.vire`, and unreferenced `guest-empty.vire` removed. Live guests, samples, and xUnit fixtures were not deleted.
 - Obsolete handoff/phase/perf/audit notes (`PHASE0-DONE.md`, `PHASE0-FUZZ.md`, `LOCAL-CLI-HANDOFF.md`, `INTEGRATE-38.md`, `COMPILE-EXTEND.md`, `COMPILE-PERF.md`, `EMIT-PERF.md`, `SELFHOST.md`, `SECURITY-AUDIT.md`, and the Nov 5 `NATIVE-COMPILER.md` work log) folded into `docs/history.md`. `NATIVE-COMPILER.md` keeps current self-host status only.
-- Unfinished rebuild sidecars stay as `TODO(VIRE-FINISH-NOW)` lines in their `BLOCKED.md` files and `docs/finish-list/tests-docs.md`. Caps unchanged.
+- Unfinished rebuild sidecars stay as `TODO(VIRE-FINISH-NOW)` lines in their `BLOCKED.md` files and `docs/FINISH-LIST.md`. Caps unchanged.
 
 ## WebSocket refuse fail-closed (this branch)
 

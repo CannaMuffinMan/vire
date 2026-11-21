@@ -73,50 +73,12 @@ define emitLinuxStart with image, fixes, labels
 end
 
 define emitIatThunk with image, fixes, labels, thunk, stub
+  ~ Used by src/rt-tls.vire TLS PLT thunks. ELF kernel32 IAT slots poke stub_*
+  ~ addresses in finishElfImage; they do not go through these push/call wrappers.
   pin with labels, thunk, image
   let image be emitHex with image, "53e8"
   let image be emitRel with image, fixes, stub
   let image be emitHex with image, "5bc3"
-  return image
-end
-
-define emitLinuxThunks with image, fixes, labels
-  let image be emitIatThunk with image, fixes, labels, "thunk_gs", "stub_gs"
-  let image be emitIatThunk with image, fixes, labels, "thunk_wf", "stub_wf"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ep", "stub_ep"
-  let image be emitIatThunk with image, fixes, labels, "thunk_va", "stub_va"
-  let image be emitIatThunk with image, fixes, labels, "thunk_cf", "stub_cf"
-  let image be emitIatThunk with image, fixes, labels, "thunk_rf", "stub_rf"
-  let image be emitIatThunk with image, fixes, labels, "thunk_sz", "stub_sz"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ch", "stub_ch"
-  let image be emitIatThunk with image, fixes, labels, "thunk_cl", "stub_cl"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ga", "stub_ga"
-  let image be emitIatThunk with image, fixes, labels, "thunk_fi", "stub_fi"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ue", "stub_ue"
-  let image be emitIatThunk with image, fixes, labels, "thunk_vh", "stub_vh"
-  let image be emitIatThunk with image, fixes, labels, "thunk_sp", "stub_sp"
-  let image be emitIatThunk with image, fixes, labels, "thunk_se", "stub_se"
-  let image be emitIatThunk with image, fixes, labels, "thunk_fp", "stub_fp"
-  let image be emitIatThunk with image, fixes, labels, "thunk_vq", "stub_vq"
-  let image be emitIatThunk with image, fixes, labels, "thunk_mv", "stub_mv"
-  return image
-end
-
-define emitLinuxNetThunks with image, fixes, labels
-  let image be emitLinuxThunks with image, fixes, labels
-  let image be emitIatThunk with image, fixes, labels, "thunk_gt", "stub_gt"
-  let image be emitIatThunk with image, fixes, labels, "thunk_wsa", "stub_wsa"
-  let image be emitIatThunk with image, fixes, labels, "thunk_sk", "stub_sk"
-  let image be emitIatThunk with image, fixes, labels, "thunk_bd", "stub_bd"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ln", "stub_ln"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ac", "stub_ac"
-  let image be emitIatThunk with image, fixes, labels, "thunk_rv", "stub_rv"
-  let image be emitIatThunk with image, fixes, labels, "thunk_sd", "stub_sd"
-  let image be emitIatThunk with image, fixes, labels, "thunk_cs", "stub_cs"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ss", "stub_ss"
-  let image be emitIatThunk with image, fixes, labels, "thunk_gn", "stub_gn"
-  let image be emitIatThunk with image, fixes, labels, "thunk_cn", "stub_cn"
-  let image be emitIatThunk with image, fixes, labels, "thunk_ev", "stub_ev"
   return image
 end
 
