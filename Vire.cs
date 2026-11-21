@@ -1429,7 +1429,7 @@ sealed class Machine
         VireListen.Run(port, line, stop, root, DispatchRoute, Show, p => ListenPort = p);
     }
 
-    object DispatchRoute(string method, string path, string body, int line, out int maxOutput)
+    object DispatchRoute(string method, string path, string body, string head, int line, out int maxOutput)
     {
         Machine worker = ForkRequest();
         maxOutput = worker.budget.MaxOutput;
@@ -1437,6 +1437,8 @@ sealed class Machine
         call.Add(method);
         call.Add(path);
         call.Add(body);
+        if (funcs["route"].Params.Count >= 4)
+            call.Add(head ?? "");
         object result = worker.Call("route", call, line);
         string text = result as string;
         if (text == null) text = Show(result);
@@ -2658,7 +2660,113 @@ internal static class HttpWire
         return -1;
     }
 
-    public static bool HeaderBytesUnsafe(byte[] buffer, int headerEnd)
+        static readonly string[] RequestHeaderAllow = { "Cookie", "Host", "Authorization" };
+        static readonly string[] ReplyHeaderAllow = { "set-cookie", "location", "www-authenticate", "cache-control" };
+
+        public static string AllowlistedRequestHead(string head)
+        {
+            if (string.IsNullOrEmpty(head)) return "";
+            StringBuilder built = new StringBuilder();
+            string[] lines = head.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            for (int a = 0; a < RequestHeaderAllow.Length; a++)
+            {
+                string want = RequestHeaderAllow[a];
+                string chosen = null;
+                for (int i = 1; i < lines.Length; i++)
+                {
+                    string line = lines[i];
+                    int colon = line.IndexOf(':');
+                    if (colon <= 0) continue;
+                    string name = line.Substring(0, colon).Trim(' ', '\t');
+                    if (!string.Equals(name, want, StringComparison.OrdinalIgnoreCase)) continue;
+                    string value = line.Substring(colon + 1).Trim(' ', '\t');
+                    if (!HeaderValueSafe(value)) return "";
+                    chosen = value;
+                }
+                if (chosen == null) continue;
+                if (built.Length + want.Length + chosen.Length + 4 > MaxHeaderBlock) return "";
+                built.Append(want);
+                built.Append(": ");
+                built.Append(chosen);
+                built.Append("\r\n");
+            }
+            return built.ToString();
+        }
+
+        public static bool HeaderValueSafe(string value)
+        {
+            if (value == null) return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (ch == '\0' || ch == '\r' || ch == '\n') return false;
+            }
+            return true;
+        }
+
+        public static bool TryJsonHeaderField(string text, string key, out string value, out bool unsafeValue)
+        {
+            value = null;
+            unsafeValue = false;
+            if (text == null || key == null) return false;
+            string needle = "\"" + key + "\":\"";
+            int at = text.IndexOf(needle, StringComparison.Ordinal);
+            if (at < 0) return false;
+            int i = at + needle.Length;
+            int start = i;
+            while (i < text.Length)
+            {
+                char ch = text[i];
+                if (ch == '"')
+                {
+                    value = text.Substring(start, i - start);
+                    if (!HeaderValueSafe(value))
+                    {
+                        unsafeValue = true;
+                        value = null;
+                    }
+                    return true;
+                }
+                if (ch == '\\' || ch == '\0' || ch == '\r' || ch == '\n' || ch < 32)
+                {
+                    unsafeValue = true;
+                    return true;
+                }
+                i++;
+            }
+            unsafeValue = true;
+            return true;
+        }
+
+        public static string AllowlistedReplyHeaders(string text, out bool refused)
+        {
+            refused = false;
+            if (text == null) return "";
+            StringBuilder extra = new StringBuilder();
+            for (int a = 0; a < ReplyHeaderAllow.Length; a++)
+            {
+                string key = ReplyHeaderAllow[a];
+                string field;
+                bool bad;
+                if (!TryJsonHeaderField(text, key, out field, out bad)) continue;
+                if (bad)
+                {
+                    refused = true;
+                    return "";
+                }
+                string name = key == "set-cookie" ? "Set-Cookie"
+                    : key == "location" ? "Location"
+                    : key == "www-authenticate" ? "WWW-Authenticate"
+                    : "Cache-Control";
+                extra.Append(name);
+                extra.Append(": ");
+                extra.Append(field);
+                extra.Append("\r\n");
+            }
+            return extra.ToString();
+        }
+
+        public static bool HeaderBytesUnsafe(byte[] buffer, int headerEnd)
     {
         if (buffer == null || headerEnd < 0) return true;
         if (headerEnd > buffer.Length) headerEnd = buffer.Length;

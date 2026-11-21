@@ -69,7 +69,7 @@ A slice is proven when:
 - pass-after matches on the ported cases (including `GET /nope` HTTP 404)
 - host vs native match on status, key headers, and body
 - existing tests still run (none skipped or deleted)
-- compiler sources (`compile-native.vire` / emitters) were not edited in this lane; gen1 = gen2 is unchanged from the last closed proof. Re-run `tools/native-elf-selfhost.sh` only if those files change.
+- `compile-native.vire` and `src/rt-net.vire` changed (4-param route overlay). Re-run `tools/native-elf-selfhost.sh` (gen1=gen2 SHA-256 ×3) on this SHA.
 
 ### 6. Human-review flags
 
@@ -86,18 +86,18 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 ### Rank 8a–8d portal JWT / 307 / 405 / dist static (this PR)
 
 - **JWT:** fixture HS256 only. rpc-portal `role=dev` cookie name `dev_session`. dev-portal `type=dev_session` cookie name `fcg_dev_portal_session`. Page gate uses a non-empty `fcg_dev_portal_auth` process arg (Go never Set-Cookies that name).
-- **307:** JSON `"status":307` (login/obs). Residual: no `Location` header (native 307 header picker is landing-go paths only).
+- **307:** Host listen copies allowlisted JSON `location` to HTTP `Location` (dev-portal `/login`). Guest-supplied CR/LF/NUL in that value is HTTP 500, not a split header. Native ELF still emits JSON `"status":307` without a `Location` header (reqhead/guestextra trampolines are stubbed; enabling them SEGVs).
 - **405:** `"status":405` mapped on host and native.
 - **Static:** `data/rebuild-dist` HTML fixtures; `..` / backslash / NUL refused before `read`.
-- **Regression:** `tools/rebuild-portal-diff.sh` + `tools/rebuild-sop-proxy-diff.sh` (dev-portal session without page cookie is now 307).
-- **Blocked:** AES-GCM vault, FCGBC HTTPS fan-out, admin password/wallet/passphrase login, public API proxy target, listen Cookie/Set-Cookie headers.
+- **Regression:** `tools/rebuild-portal-diff.sh` + `tools/rebuild-sop-proxy-diff.sh` + `tools/rebuild-header-diff.sh` (Cookie on the wire; CRLF Set-Cookie/Location refused).
+- **Blocked:** AES-GCM vault, FCGBC HTTPS fan-out, admin password/wallet/passphrase login, public API proxy target.
 
 ### Rank 6a SOP HMAC cookie + 6b-r loopback proxy routes (this PR)
 
 - **Property:** `sop_issue` / `sop_verify` HMAC-SHA256 over `v1.<exp>`; `ct_eq` on the 32-byte MAC; missing, tampered, and expired cookies deny. Cookie name `fcg_sop_authenticated`. Secret is a harness-generated hex fixture, never a production env value.
 - **Proxy routes:** landing-go `/api/upstream/*` and `/api/gateway-down` (502); dev-portal-go goldens (`dist_missing`, `not_configured`) plus `/fcg-api/` prefix strip; edge-go `/healthz` plus loopback proxy when the process host-arg is `www` or `dev`, else 404.
 - **Regression:** `tests/rebuild/guests/landing-sop.vire`, `dev-portal-go.vire`, `edge-go.vire` + `tools/rebuild-sop-proxy-diff.sh`.
-- **Residual:** Cookie request header is not a listen `route` argument (CLI `header` mode parses it). No TLS, DNS, public bind, railway.internal, Shopify/media-lab, or real `FCG_AUTH_COOKIE_SECRET`. After merging native HMAC into `rt-more.vire`, **listen + `proxy_reply` segfaults** on Linux ELF (connect/`proxy` from `main` still matches). Proxy route proof is host listen vs native `proxy` CLI. Cookie listen host-vs-native still matches.
+- **Residual:** No TLS, DNS, public bind, railway.internal, Shopify/media-lab, or real `FCG_AUTH_COOKIE_SECRET`. After merging native HMAC into `rt-more.vire`, **listen + `proxy_reply` segfaults** on Linux ELF (connect/`proxy` from `main` still matches). Proxy route proof is host listen vs native `proxy` CLI. Host Cookie listen uses allowlisted `head` (Cookie/Host/Authorization). Native 4-param `route` overlay is present but `rt_net_reqhead` / `rt_net_guestextra` currently return empty (mktext/find on the listen ctx SEGVs); native SOP/JWT still cannot see the Cookie header.
 
 ### Rank 6b reverse-proxy primitive (this PR)
 
@@ -132,7 +132,9 @@ HTTP status from JSON `"status":N` is implemented on native (`rt_net_statusof`, 
 | Reverse-proxy helper | **Present** loopback upstream | `proxy` / `proxy_reply` in `src/http-client.vire`; 502 `{"error":"bad gateway"}` |
 | HMAC-SHA256 / Cookie / JWT HS256 | **Present** | `hmac` builtin + `src/rt-crypto.vire` (PR #105). SOP gate in `src/sop-cookie.vire`. Portal JWT in `src/portal-jwt.vire` |
 | SOP HMAC cookie gate | **Present** (fixture secret) | issue/verify, `ct_eq` MAC, missing/tamper/expired deny |
-| Portal JWT cookie gates | **Present** (fixture secret) | HS256 `role=dev` / `type=dev_session`; listen Cookie is a process arg |
+| Portal JWT cookie gates | **Present** (fixture secret) | HS256 `role=dev` / `type=dev_session`; listen Cookie is allowlisted `route` `head` |
+| Listen request headers | **Host present; native stub** | Host: Cookie, Host, Authorization only; CR/LF/NUL/obs-fold still 400 on the wire. Native 4th `head` arg is empty (overlay SEGVs if mktext is enabled). |
+| Listen reply headers | **Host present; native stub** | Host: guest JSON `set-cookie` / `location` / `www-authenticate` / `cache-control` only; CR/LF/NUL refused (500). Native does not yet copy those JSON fields onto the wire. |
 | HTTP 405 from JSON `"status":405` | **Present** | `StatusOf` + `rt_net_statusof` (same needle) |
 | Dist static (sandbox) | **Present** | `src/dist-static.vire`; `data/` only; `..` / `\\` / NUL refused |
 | Files `data/` / `site/` | **Present** | `rt_read` / `rt_write`; Linux `openat` + `O_NOFOLLOW` |
@@ -163,13 +165,13 @@ Sources: in-tree `api/`, `sites/`, `guest-health.vire`, PR39 inventory, L5 note 
 | 4 | `GET /chain`, `POST /block` | HTTP, JSON, `data/` files, `hash` | GET + POST + rotate/507/503/migrate/aliases/concurrent on native ELF | **Done (this PR remainder).** Host vs native vs `tests/rebuild/contracts/fcg-chain.json` and `fcg-chain-remainder.json`. PE rotate/507 unproven. |
 | 5 | `FCG_API_TOKEN` on non-health paths | HTTP, constant-time header compare | Host `VireListen` and native guest | **Done (this PR).** Native `X-FCG-Token` vs env `FCG_API_TOKEN` (16+ chars); GET/HEAD `/health` exempt; 401 `{"error":"unauthorized"}`. Fixture token only. |
 | 6 | `landing-go` unauth fixtures (healthz, JSON APIs, 307s, held-503, fixture HTML) | HTTP, JSON, text/html, Location / WWW-Authenticate | Present on this PR (Linux ELF harness) | **This PR.** Rank 6 static HTML is in-tree strings. Host vs native `tools/rebuild-landing-diff.sh`. |
-| 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | **This PR.** Fixture secret; `ct_eq` MAC; missing/tamper/expired deny. Listen does not forward `Cookie` (POST body / CLI header). |
+| 6a | `landing-go` SOP HMAC cookie auth | cookies, HMAC-SHA256 | **This PR (host).** Fixture secret; `ct_eq` MAC; missing/tamper/expired deny. Host listen `head` carries Cookie; issue JSON `set-cookie` becomes `Set-Cookie`. Native Cookie/Set-Cookie still empty. |
 | 6b | reverse-proxy primitive (shared by landing-go / dev-portal-go / edge-go / api-go) | outbound HTTP/1.1, hop-by-hop strip, X-Forwarded-*, Location prefix, 502 | Primitive in PR #107. |
 | 6b-r | landing-go / dev-portal-go / edge-go **loopback** proxy routes | `proxy_reply` to `127.0.0.1` | **This PR.** `LANDING_API_UPSTREAM` as `/api/upstream/*`; `/fcg-api/` strip; edge Host via process args (`www`/`dev`/`unknown`). |
 | 6c | `landing-go` Shopify / media-lab APIs | held 503 in Go; out of scope here | — | **Blocked.** No stubs. |
 | 7 | Node landing/API from `fcgcpa-prod` | HTTP, JSON, likely TLS, likely more routes | TLS missing; prod unread here | Blocked on recorded contracts from a local-only read |
 | 8a | `rpc-portal-go` JWT cookie + unauth rest | JWT HS256, 405, dist static | **This PR.** Health/capabilities/`{"enabled":false}` RPC; GET `/api/dev/auth` fixture JWT; dist under `data/rebuild-dist`. AES-GCM vault, node fan-out, admin password login **Blocked**. |
-| 8b | `dev-portal-go` page-gate 307 + JWT session | cookies, JWT, 307, 405, static | **This PR.** Missing page cookie → HTTP 307; session GET/POST fixture JWT; `/fcg-api/` still CLI proxy. HTTPS API target **Blocked**. Listen does not emit `Set-Cookie` / `Location`. |
+| 8b | `dev-portal-go` page-gate 307 + JWT session | cookies, JWT, 307, 405, static | **This PR (host).** Missing page cookie → HTTP 307 `Location: /login`; session GET uses Cookie header; `/fcg-api/` still CLI proxy. Native 307 is still JSON status without Location. HTTPS API target **Blocked**. |
 | 8c | `fcgbds-dashboard-go` fallbacks + static | 405, 307 `/obs`, dist | **This PR.** Health/challenge/stream-wall goldens; events 502; tilt 502; Upstream nil. |
 | 8d | Shared dist static + 405 mapping | sandbox `read`, `"status":405` | **This PR.** `dist-static.vire`; host+native 405. Path-traversal stays inside `data/`. |
 | 8e | Rest of Go `api-go` / `cpa-go` | JWT session cookies, TLS proxy, remaining routes | Health GETs only | Remaining routes **Blocked** (no TLS/DNS/public upstream stubs). |
@@ -221,9 +223,10 @@ Harnesses: `tools/rebuild-health-diff.sh`, `tools/rebuild-sidecar-diff.sh`, `too
 - Remaining sidecar routes beyond the five GET goldens plus unauth rpc-portal-go / edge-go / dev-portal-go / fcgbds-dashboard-go JSON (JWT, reverse-proxy, static files, holdings outbound still blocked)
 - Native listen does not emit Go extra security headers (`X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) or per-route Cache-Control / charset=utf-8; contracts match the native header set (`application/json` without charset, `nosniff`, `no-store`)
 - HTTP 405 and 502: `StatusOf` / `rt_net_statusof` needles do not include those codes. Guest JSON may still carry `"status":405` / `"status":502` at HTTP 200.
-- `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Residual: listen `route` still sees `method, path, body` only (no Cookie header); HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
+- `landing-go` Shopify/media-lab still **Blocked**. SOP HMAC cookie gate is ported with a **fixture** secret (`src/sop-cookie.vire`). Listen `route` may take `head` with Cookie/Host/Authorization. HTTPS `LANDING_UPSTREAM` and `*.railway.internal` Host maps stay **Blocked**.
 - Reverse-proxy **primitive** is in `src/http-client.vire`. Loopback route ports: landing `/api/upstream/*`, dev-portal `/fcg-api/`, edge-go Host-arg `www`/`dev`.
-- Rank 8a–8d: portal JWT cookie gates, 307 login/obs, 405, sandbox dist. Residual: listen `route` still sees `method, path, body` only (Cookie is a process arg). `Set-Cookie` and `Location: /login` headers are not emitted (307 is JSON `"status":307`). AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native listen + `proxy_reply` still SEGV (CLI `proxy` matches).
+- Rank 8a–8d: portal JWT cookie gates, 307 login with `Location: /login`, 405, sandbox dist. AES-GCM vault, FCGBC node fan-out, admin password compare, HTTPS `DEV_PORTAL_API_PROXY_TARGET` stay **Blocked**. Native listen + `proxy_reply` still SEGV (CLI `proxy` matches). PR #113's listen+parse / `rt_buf_finish` fix is a **different stack** and is not merged here; that crash is json/parse leftovers, not Cookie headers.
+- Guest reply headers other than Set-Cookie, Location, WWW-Authenticate, and Cache-Control are dropped on **host**. Native listen does not yet emit those extras (guestextra trampoline SEGVs if enabled). Host still emits Connection / nosniff / default Cache-Control: no-store. `tools/rebuild-header-diff.sh` is host-vs-native; native extra/Cookie equality is **not** proven on this SHA.
 - Go `Cache-Control: public` on `/api/capabilities` (Vire listen stays `no-store`)
 - `api-go GET /api/health` (`status`/`version`/`ready`) — keep separate from Node/fcgcpa health and from `/healthz`
 - Guest clock / RFC3339 `ts` on `fcgbds-go` health
@@ -244,10 +247,11 @@ bash tools/rebuild-proxy-diff.sh
 bash tools/rebuild-sop-proxy-diff.sh
 bash tools/rebuild-chain-tamper.sh
 bash tools/rebuild-portal-diff.sh
+bash tools/rebuild-header-diff.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
-Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. This Linux lane does not replace that proof.
+Windows PE health remains `tools/native-net-windows.ps1` (needs gen1 PE). Rank 3e/4 PE steps are `tools/rebuild-fcgcpa-windows.ps1`. Rank 8a–8d PE: `tools/rebuild-portal-windows.ps1`. Header allowlist PE: `tools/rebuild-headers-windows.ps1`. This Linux lane does not replace that proof.
 
 ## Rank 9 Redis TLS (`rediss://`)
 

@@ -24,7 +24,11 @@ define clock_now
   return number with raw
 end
 
-define session_token
+define session_token with head
+  let fromHead be cookie_named with head, "dev_session"
+  if fromHead != ""
+    return fromHead
+  end
   return cookie_named with (arg_at with 4), "dev_session"
 end
 
@@ -36,7 +40,7 @@ define method_not_allowed
   return "{\"error\":\"method_not_allowed\",\"status\":405}"
 end
 
-define route with method, path, body
+define route with method, path, body, head
   let port be number with (arg_at with 0)
   if path == "/api/health"
     if method != "GET"
@@ -59,7 +63,7 @@ define route with method, path, body
   if path == "/api/dev/auth"
     if method == "GET"
       let sec be jwt_sec
-      let tok be session_token
+      let tok be session_token with head
       let ok be portal_jwt_ok with tok, sec, (clock_now), "role", "dev"
       if ok != "ok"
         return "{\"ok\":false,\"status\":401}"
@@ -73,7 +77,7 @@ define route with method, path, body
   end
   if path == "/api/dev/breach-status"
     let sec be jwt_sec
-    let tok be session_token
+    let tok be session_token with head
     let ok be portal_jwt_ok with tok, sec, (clock_now), "role", "dev"
     if ok != "ok"
       return "{\"error\":\"Unauthorized\",\"status\":401}"

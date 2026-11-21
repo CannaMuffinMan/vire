@@ -23,7 +23,11 @@ define clock_now
   return number with raw
 end
 
-define session_token
+define session_token with head
+  let fromHead be cookie_named with head, "fcg_dev_portal_session"
+  if fromHead != ""
+    return fromHead
+  end
   return cookie_named with (arg_at with 4), "fcg_dev_portal_session"
 end
 
@@ -74,14 +78,14 @@ define page_gate_applies with path
 end
 
 define redir_login
-  return "{\"status\":307}"
+  return "{\"status\":307,\"location\":\"/login\"}"
 end
 
 define method_not_allowed
   return "{\"error\":\"method_not_allowed\",\"status\":405}"
 end
 
-define route with method, path, body
+define route with method, path, body, head
   let port be number with (arg_at with 0)
   if path == "/"
     let root be dist_root
@@ -106,7 +110,7 @@ define route with method, path, body
       if sec == none
         return "{\"ok\":false,\"error\":\"not_configured\",\"status\":503}"
       end
-      let tok be session_token
+      let tok be session_token with head
       let ok be portal_jwt_ok with tok, sec, (clock_now), "type", "dev_session"
       if ok != "ok"
         return "{\"ok\":false,\"status\":401}"

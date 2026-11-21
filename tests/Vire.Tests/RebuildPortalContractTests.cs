@@ -29,6 +29,8 @@ public class RebuildPortalContractTests
         string portal = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "dev-portal-go.vire"));
         Assert.Contains("dev_session", portal);
         Assert.Contains("redir_login", portal);
+        Assert.Contains("/login", portal);
+        Assert.Contains("method, path, body, head", portal);
 
         string dash = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "guests", "fcgbds-dashboard-go.vire"));
         Assert.Contains("fcgbds-dashboard", dash);

@@ -125,6 +125,10 @@ def check(port, label):
         st, hdrs, b = http_req(port, c.get("method", "GET"), c["path"], c.get("req_body", ""))
         if st != c["status"] or b != c["body"]:
             mismatches.append(f"{label} {c['name']} got {st} {b!r} want {c['status']} {c['body']!r}")
+            continue
+        for hk, hv in c.get("headers", {}).items():
+            if hdrs.get(hk.lower()) != hv:
+                mismatches.append(f"{label} {c['name']} header {hk} got {hdrs.get(hk.lower())!r} want {hv!r}")
 
 check(host_port, "host")
 check(nat_port, "native")
@@ -133,6 +137,10 @@ for c in doc["cases"]:
     ns, nh, nb = http_req(nat_port, c.get("method", "GET"), c["path"], c.get("req_body", ""))
     if hs != ns or hb != nb:
         mismatches.append(f"host-vs-native {c['name']} {hs}/{hb!r} vs {ns}/{nb!r}")
+        continue
+    for hk in c.get("headers", {}):
+        if hh.get(hk.lower()) != nh.get(hk.lower()):
+            mismatches.append(f"host-vs-native {c['name']} header {hk}")
 if mismatches:
     print("\n".join(mismatches))
     sys.exit(1)
@@ -247,13 +255,12 @@ dotnet exec "$VIRE_DLL" "$STAGE/rpc-portal-go.vire" "9" jwt-verify "$SECRET" "$N
 "$STAGE/rpc-portal-go.elf" "9" jwt-verify "$SECRET" "$NOW" "-" "-" "$TOK" >"$STAGE/nat_rpc_v.txt"
 cmp -s "$STAGE/host_rpc_v.txt" "$STAGE/nat_rpc_v.txt"
 grep -q "^ok" "$STAGE/nat_rpc_v.txt"
-HDR="Cookie:dev_session=${TOK}"
-read HOST_PID HOST_PORT < <(run_listen rpc-ok-host dotnet exec "$VIRE_DLL" "$STAGE/rpc-portal-go.vire" "9" listen "$SECRET" "$NOW" "$HDR" "-")
-read NAT_PID NAT_PORT < <(run_listen rpc-ok-nat "$STAGE/rpc-portal-go.elf" "9" listen "$SECRET" "$NOW" "$HDR" "-")
-python3 - "$HOST_PORT" "$NAT_PORT" <<'PY'
+read HOST_PID HOST_PORT < <(run_listen rpc-ok-host dotnet exec "$VIRE_DLL" "$STAGE/rpc-portal-go.vire" "9" listen "$SECRET" "$NOW" "-" "-")
+read NAT_PID NAT_PORT < <(run_listen rpc-ok-nat "$STAGE/rpc-portal-go.elf" "9" listen "$SECRET" "$NOW" "-" "-")
+python3 - "$HOST_PORT" "$NAT_PORT" "$TOK" <<'PY'
 import socket, sys
-def get(port, path):
-    req = f"GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n".encode()
+def get(port, path, cookie):
+    req = f"GET {path} HTTP/1.1\r\nHost: x\r\nCookie: dev_session={cookie}\r\nConnection: close\r\n\r\n".encode()
     s = socket.create_connection(("127.0.0.1", int(port)), 3)
     s.sendall(req); s.settimeout(3)
     data = b""
@@ -268,8 +275,9 @@ def get(port, path):
     s.close()
     raw = data.decode()
     return int(raw.split(" ")[1]), raw.split("\r\n\r\n", 1)[1]
-hs, hb = get(sys.argv[1], "/api/dev/auth")
-ns, nb = get(sys.argv[2], "/api/dev/auth")
+tok = sys.argv[3]
+hs, hb = get(sys.argv[1], "/api/dev/auth", tok)
+ns, nb = get(sys.argv[2], "/api/dev/auth", tok)
 if hs != 200 or ns != 200 or hb != '{"ok":true}' or nb != hb:
     raise SystemExit(f"rpc jwt gate {hs}/{hb!r} {ns}/{nb!r}")
 print("rpc JWT cookie gate host-vs-native match")
@@ -345,15 +353,15 @@ dotnet exec "$VIRE_DLL" "$STAGE/dev-portal-go.vire" "9" jwt-sign "$SECRET" "$NOW
 cmp -s "$STAGE/host_dev_jwt.txt" "$STAGE/nat_dev_jwt.txt"
 DTOK="$(awk 'NR==2 {print}' "$STAGE/host_dev_jwt.txt")"
 test -n "$DTOK"
-DHDR="Cookie:fcg_dev_portal_session=${DTOK}"
-read HOST_PID HOST_PORT < <(run_listen dev-ok-host dotnet exec "$VIRE_DLL" "$STAGE/dev-portal-go.vire" "9" listen "$SECRET" "$NOW" "$DHDR" "-" "1")
-read NAT_PID NAT_PORT < <(run_listen dev-ok-nat "$STAGE/dev-portal-go.elf" "9" listen "$SECRET" "$NOW" "$DHDR" "-" "1")
+read HOST_PID HOST_PORT < <(run_listen dev-ok-host dotnet exec "$VIRE_DLL" "$STAGE/dev-portal-go.vire" "9" listen "$SECRET" "$NOW" "-" "-" "1")
+read NAT_PID NAT_PORT < <(run_listen dev-ok-nat "$STAGE/dev-portal-go.elf" "9" listen "$SECRET" "$NOW" "-" "-" "1")
 python3 - "$HOST_PORT" "$NAT_PORT" "$DTOK" <<'PY'
 import socket, sys
-def req(port, method, path, body=""):
+def req(port, method, path, body="", cookie=""):
     payload = body.encode()
     extra = f"Content-Length: {len(payload)}\r\n" if method == "POST" else ""
-    rawreq = f"{method} {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n{extra}\r\n".encode() + payload
+    ck = f"Cookie: fcg_dev_portal_session={cookie}\r\n" if cookie else ""
+    rawreq = f"{method} {path} HTTP/1.1\r\nHost: x\r\n{ck}Connection: close\r\n{extra}\r\n".encode() + payload
     s = socket.create_connection(("127.0.0.1", int(port)), 3)
     s.sendall(rawreq); s.settimeout(3)
     data = b""
@@ -368,11 +376,11 @@ def req(port, method, path, body=""):
     s.close()
     raw = data.decode()
     return int(raw.split(" ")[1]), raw.split("\r\n\r\n", 1)[1]
-hs, hb = req(sys.argv[1], "GET", "/api/auth/session")
-ns, nb = req(sys.argv[2], "GET", "/api/auth/session")
+tok = sys.argv[3]
+hs, hb = req(sys.argv[1], "GET", "/api/auth/session", cookie=tok)
+ns, nb = req(sys.argv[2], "GET", "/api/auth/session", cookie=tok)
 if hs != 200 or ns != 200 or hb != '{"ok":true}' or nb != hb:
     raise SystemExit(f"dev session get {hs}/{hb!r} {ns}/{nb!r}")
-tok = sys.argv[3]
 body = '{"token":"' + tok + '"}'
 hs, hb = req(sys.argv[1], "POST", "/api/auth/session", body)
 ns, nb = req(sys.argv[2], "POST", "/api/auth/session", body)
@@ -415,4 +423,4 @@ stop_guest "$NAT_PID"
 
 echo "PASS_AFTER at $AFTER_SHA"
 echo "JWT cookie gates, 307, 405, dist static proven host-vs-native"
-echo "blocked: AES-GCM vault, FCGBC fan-out, HTTPS API, listen Set-Cookie/Location headers, listen+proxy_reply SEGV"
+echo "blocked: AES-GCM vault, FCGBC fan-out, HTTPS API, listen+proxy_reply SEGV"

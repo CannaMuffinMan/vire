@@ -1913,11 +1913,17 @@ define main
   let gen be {"image": opened at "image", "labels": opened at "labels", "fixes": opened at "fixes", "pool": [], "j": 0, "s": 0, "breaks": [], "counters": [], "c": 0, "bad": false, "why": "", "byName": byName}
   let i be 0
   let hasRoute be false
+  let routeNparams be 0
   while i < (length with funcs)
     emitFunc with gen, funcs, (funcs at i)
     if ((funcs at i) at "name") == "route"
       if ((funcs at i) at "nparams") == 3
         let hasRoute be true
+        let routeNparams be 3
+      end
+      if ((funcs at i) at "nparams") == 4
+        let hasRoute be true
+        let routeNparams be 4
       end
     end
     let i be i + 1
@@ -1938,7 +1944,7 @@ define main
     halt with 1
   end
   if (hits at "net") or (hits at "json") or (hits at "ws")
-    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, ((hits at "net") or (hits at "ws"))) into gen at "image"
+    put (emitNetRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels"), hasRoute, ((hits at "net") or (hits at "ws")), routeNparams) into gen at "image"
   end
   if hits at "ws"
     put (emitWsRuntime with (gen at "image"), (gen at "fixes"), (gen at "labels")) into gen at "image"

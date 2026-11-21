@@ -1,0 +1,20 @@
+~ Isolated listen header allowlist + CRLF refusal (host and native).
+define route with method, path, body, head
+  if path == "/echo-head"
+    return head
+  end
+  if path == "/set-ok"
+    return "{\"ok\":true,\"set-cookie\":\"sid=safe; Path=/\",\"location\":\"/next\"}"
+  end
+  if path == "/inject-location"
+    return "{\"status\":307,\"location\":\"/x" + (chr with 13) + (chr with 10) + "Set-Cookie: stolen=1\"}"
+  end
+  if path == "/inject-cookie"
+    return "{\"ok\":true,\"set-cookie\":\"sid=1" + (chr with 13) + (chr with 10) + "Location: /evil\"}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

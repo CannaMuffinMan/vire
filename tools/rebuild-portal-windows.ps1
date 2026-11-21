@@ -23,6 +23,7 @@ Write-Host "7. Host vs PE CLI: jwt-sign / jwt-verify for role=dev and type=dev_s
 Write-Host "8. Host vs PE listen (dist '-'): tests/rebuild/contracts/rpc-portal-go.json,"
 Write-Host "   fcgbds-dashboard-go.json, dev-portal-go-auth.json. Match status and body."
 Write-Host "9. With data/rebuild-dist: GET / and GET /about HTML match. GET /escape..path is 404."
-Write-Host "10. Cookie header is a process arg (listen does not parse Cookie). Caps 32MB / 100000 / 5M."
+Write-Host "10. Cookie is the HTTP Cookie request header (allowlisted into route head). 307 emits Location: /login. Caps 32MB / 100000 / 5M."
+Write-Host "11. CRLF in guest Set-Cookie/Location must be HTTP 500 (tools/rebuild-headers-windows.ps1)."
 Write-Host "11. Do not skip tests. Do not connect off-box. Do not use production hosts."
 exit 1
