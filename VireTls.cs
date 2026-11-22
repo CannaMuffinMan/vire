@@ -19,16 +19,11 @@ static class VireTls
         {
             string certPem = File.ReadAllText(certPath);
             string keyPem = File.ReadAllText(keyPath);
-            using (RSA rsa = RSA.Create())
+            using (X509Certificate2 loaded = X509Certificate2.CreateFromPem(certPem, keyPem))
             {
-                rsa.ImportFromPem(keyPem);
-                using (X509Certificate2 certOnly = X509CertificateLoader.LoadCertificate(PemToDer(certPem, line, column)))
-                using (X509Certificate2 withKey = certOnly.CopyWithPrivateKey(rsa))
-                {
-                    byte[] pfx = withKey.Export(X509ContentType.Pfx);
-                    return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
-                        X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-                }
+                byte[] pfx = loaded.Export(X509ContentType.Pfx);
+                return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
             }
         }
         catch (VireError) { throw; }

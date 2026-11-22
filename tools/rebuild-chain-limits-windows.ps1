@@ -47,7 +47,7 @@ function Wait-Listen([string]$OutPath) {
     $until = (Get-Date).AddSeconds(20)
     while ((Get-Date) -lt $until) {
         if (Test-Path $OutPath) {
-            $text = Get-Content -Raw $OutPath
+            $text = Read-SharedText $OutPath
             if ($text -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
         }
         Start-Sleep -Milliseconds 50

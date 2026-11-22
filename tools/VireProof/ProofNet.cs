@@ -15,24 +15,34 @@ static class ProofNet
         using (UdpClient udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
         {
             int port = ((IPEndPoint)udp.Client.LocalEndPoint).Port;
-            File.WriteAllText(mapPath, "127.0.0.1 " + port + "\n");
-            Console.WriteLine("dns_stub 127.0.0.1:" + port);
-            Console.Out.Flush();
-            while (true)
+            byte[] map = Encoding.ASCII.GetBytes("127.0.0.1 " + port + "\n");
+            using (FileStream created = new FileStream(mapPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
             {
-                IPEndPoint ep = new IPEndPoint(IPAddress.Any, 0);
-                byte[] req;
-                try { req = udp.Receive(ref ep); }
-                catch (SocketException) { break; }
-                if (req == null || req.Length < 12) continue;
-                byte[] ans = new byte[req.Length + 16];
-                Buffer.BlockCopy(req, 0, ans, 0, req.Length);
-                ans[2] = 0x81;
-                ans[3] = 0x80;
-                ans[7] = 1;
-                byte[] rr = new byte[] { 0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4, 127, 0, 0, 1 };
-                Buffer.BlockCopy(rr, 0, ans, req.Length, rr.Length);
-                udp.Send(ans, ans.Length, ep);
+                created.Write(map, 0, map.Length);
+                created.Flush(true);
+            }
+            // Keep a shared read handle (not write) so PE CreateFileA FILE_SHARE_READ
+            // can still open data/vire-dns and exercise dns_ns_scan / rbx.
+            using (FileStream hold = new FileStream(mapPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                Console.WriteLine("dns_stub 127.0.0.1:" + port);
+                Console.Out.Flush();
+                while (true)
+                {
+                    IPEndPoint ep = new IPEndPoint(IPAddress.Any, 0);
+                    byte[] req;
+                    try { req = udp.Receive(ref ep); }
+                    catch (SocketException) { break; }
+                    if (req == null || req.Length < 12) continue;
+                    byte[] ans = new byte[req.Length + 16];
+                    Buffer.BlockCopy(req, 0, ans, 0, req.Length);
+                    ans[2] = 0x81;
+                    ans[3] = 0x80;
+                    ans[7] = 1;
+                    byte[] rr = new byte[] { 0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4, 127, 0, 0, 1 };
+                    Buffer.BlockCopy(rr, 0, ans, req.Length, rr.Length);
+                    udp.Send(ans, ans.Length, ep);
+                }
             }
         }
         return 0;

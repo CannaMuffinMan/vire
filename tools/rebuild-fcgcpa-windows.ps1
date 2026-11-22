@@ -40,34 +40,7 @@ function Compile-Guest([string]$Src, [string]$Stem) {
 }
 
 function Read-Http([int]$Port, [string]$Method, [string]$Path, [string]$Send) {
-    $payload = if ($null -eq $Send) { [byte[]]@() } else { [System.Text.Encoding]::UTF8.GetBytes($Send) }
-    $sb = New-Object System.Text.StringBuilder
-    [void]$sb.Append("$Method $Path HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n")
-    if ($Method -eq "POST") {
-        [void]$sb.Append("Content-Type: application/json`r`nContent-Length: $($payload.Length)`r`n")
-    }
-    [void]$sb.Append("`r`n")
-    $head = [System.Text.Encoding]::ASCII.GetBytes($sb.ToString())
-    $tcp = New-Object System.Net.Sockets.TcpClient
-    $tcp.Connect("127.0.0.1", $Port)
-    $stream = $tcp.GetStream()
-    $stream.Write($head, 0, $head.Length)
-    if ($payload.Length -gt 0) { $stream.Write($payload, 0, $payload.Length) }
-    $ms = New-Object System.IO.MemoryStream
-    $buf = New-Object byte[] 4096
-    try {
-        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
-    } catch {
-        if ($ms.Length -eq 0 -and -not (Test-VireRstException $_.Exception)) { throw }
-    }
-    $tcp.Close()
-    $raw = $ms.ToArray()
-    $text = [System.Text.Encoding]::UTF8.GetString($raw)
-    $split = $text.IndexOf("`r`n`r`n")
-    $start = $text.Substring(0, $split)
-    $body = $text.Substring($split + 4)
-    $status = [int]($start.Split(" ")[1])
-    return @{ Status = $status; Body = $body }
+    return Invoke-VireHttpRequest -Port $Port -Method $Method -Path $Path -Send $Send
 }
 
 function Assert-Case($got, $wantStatus, $wantBody, $name) {

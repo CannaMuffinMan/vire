@@ -363,7 +363,9 @@ define emitDnsNs with image, fixes, labels
   emitRel with image, fixes, "dns_path_fix"
   emitList with image, [186]
   emitU32 with image, 2147483648
-  emitList with image, [65, 184, 1, 0, 0, 0, 69, 49, 201, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40, 128, 0, 32, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
+  ~ dwShareMode FILE_SHARE_READ|WRITE|DELETE (7) so a harness that still holds
+  ~ data/vire-dns with a shared handle does not fail CreateFileA exclusive.
+  emitList with image, [65, 184, 7, 0, 0, 0, 69, 49, 201, 199, 68, 36, 32, 3, 0, 0, 0, 199, 68, 36, 40, 128, 0, 32, 0, 72, 199, 68, 36, 48, 0, 0, 0, 0]
   emitIat with image, fixes, "iat_cf"
   emitList with image, [72, 131, 248, 255, 15, 132]
   emitRel with image, fixes, "dns_ns_etc"

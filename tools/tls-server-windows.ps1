@@ -32,12 +32,11 @@ $keyPath = Join-Path $Data "tls-health-key.pem"
 & dotnet exec $ProofDll write-pem $certPath $keyPath
 if ($LASTEXITCODE -ne 0) { throw "write-pem failed" }
 
-$src = Join-Path $Data "guest-health-tls.vire"
-Copy-Item -Force (Join-Path $Root "guest-health-tls.vire") $src
 $contract = Get-Content -Raw (Join-Path $Root "tests/rebuild/contracts/health.json")
 if ($contract -notmatch '"service":\s*"fcgcpa"') { throw "health contract missing fcgcpa" }
 
-$proc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "data/guest-health-tls.vire") -WorkingDirectory $Root
+# Program folder must be the repo root so "data/tls-health-*.pem" is not data/data/.
+$proc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "guest-health-tls.vire") -WorkingDirectory $Root
 $port = Get-ListenPort -Proc $proc -Seconds 15
 Write-Output "tls_host_listen 127.0.0.1:$port"
 

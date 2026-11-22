@@ -60,7 +60,7 @@ $until = (Get-Date).AddSeconds(8)
 while ((Get-Date) -lt $until) {
     if ($dnsProc.HasExited) { throw "dns-stub exited $($dnsProc.ExitCode)" }
     if (Test-Path -LiteralPath $map) {
-        $line = ([IO.File]::ReadAllText($map)).Trim()
+        $line = (Read-SharedText $map).Trim()
         if ($line -match "^127\.0\.0\.1 (\d+)$") { $port = [int]$Matches[1]; break }
     }
     Start-Sleep -Milliseconds 50

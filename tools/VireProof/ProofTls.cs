@@ -34,8 +34,8 @@ static class ProofTls
         using (X509Certificate2 cert = MakeCert(rsa))
         {
             Encoding utf8 = new UTF8Encoding(false);
-            File.WriteAllText(certPath, Pem("CERTIFICATE", cert.Export(X509ContentType.Cert)), utf8);
-            File.WriteAllText(keyPath, Pem("PRIVATE KEY", rsa.ExportPkcs8PrivateKey()), utf8);
+            File.WriteAllText(certPath, cert.ExportCertificatePem(), utf8);
+            File.WriteAllText(keyPath, rsa.ExportRSAPrivateKeyPem(), utf8);
         }
     }
 

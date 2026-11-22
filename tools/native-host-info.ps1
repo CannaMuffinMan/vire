@@ -68,6 +68,55 @@ function Test-VireRstException($err) {
     return $false
 }
 
+function Invoke-VireHttpRequest {
+    param(
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][string]$Method,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Send
+    )
+    $payload = if ($null -eq $Send) { [byte[]]@() } else { [Text.Encoding]::UTF8.GetBytes($Send) }
+    $sb = New-Object Text.StringBuilder
+    [void]$sb.Append("$Method $Path HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n")
+    if ($Method -eq "POST") {
+        [void]$sb.Append("Content-Type: application/json`r`nContent-Length: $($payload.Length)`r`n")
+    }
+    [void]$sb.Append("`r`n")
+    $head = [Text.Encoding]::ASCII.GetBytes($sb.ToString())
+    $req = New-Object byte[] ($head.Length + $payload.Length)
+    [Array]::Copy($head, 0, $req, 0, $head.Length)
+    if ($payload.Length -gt 0) { [Array]::Copy($payload, 0, $req, $head.Length, $payload.Length) }
+    $last = $null
+    $i = 0
+    while ($i -lt 8) {
+        $i = $i + 1
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $tcp.ReceiveTimeout = 20000
+            $tcp.SendTimeout = 20000
+            $tcp.Connect("127.0.0.1", $Port)
+            $st = $tcp.GetStream()
+            $st.Write($req, 0, $req.Length)
+            $st.Flush()
+            $raw = Read-VireHttpStream $st
+            $tcp.Close()
+            $text = [Text.Encoding]::UTF8.GetString($raw)
+            $split = $text.IndexOf("`r`n`r`n")
+            $add = 4
+            if ($split -lt 0) { $split = $text.IndexOf("`n`n"); $add = 2 }
+            if ($split -lt 0) { throw "missing header terminator: $text" }
+            $start = $text.Substring(0, $split)
+            $body = $text.Substring($split + $add)
+            $status = [int]($start.Split(" ")[1])
+            return @{ Status = $status; Body = $body }
+        } catch {
+            $last = $_
+            Start-Sleep -Milliseconds (40 * $i)
+        }
+    }
+    throw $last
+}
+
 function Read-VireHttpStream([System.Net.Sockets.NetworkStream]$Stream) {
     $ms = New-Object System.IO.MemoryStream
     $buf = New-Object byte[] 4096

@@ -58,23 +58,8 @@ $lout = Get-Content -Raw $outFile
 if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { if (-not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }; throw "listen-parse PE did not listen" }
 $port = [int]$Matches[1]
 try {
-    $tcp = New-Object System.Net.Sockets.TcpClient
-    $tcp.Connect("127.0.0.1", $port)
-    $payload = [Text.Encoding]::UTF8.GetBytes('{"a":1}')
-    $req = [Text.Encoding]::ASCII.GetBytes("POST /p HTTP/1.1`r`nHost: x`r`nContent-Length: $($payload.Length)`r`nConnection: close`r`n`r`n")
-    $st = $tcp.GetStream()
-    $st.Write($req, 0, $req.Length)
-    $st.Write($payload, 0, $payload.Length)
-    $ms = New-Object IO.MemoryStream
-    $buf = New-Object byte[] 4096
-    try {
-        while (($n = $st.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
-    } catch {
-        if ($ms.Length -eq 0 -and -not (Test-VireRstException $_.Exception)) { throw }
-    }
-    $tcp.Close()
-    $got = [Text.Encoding]::UTF8.GetString($ms.ToArray())
-    if ($got -notmatch '"a":\s*1') { throw "listen-parse POST PE $got" }
+    $got = Invoke-VireHttpRequest -Port $port -Method "POST" -Path "/p" -Send '{"a":1}'
+    if ("$($got.Body)" -notmatch '"a":\s*1') { throw "listen-parse POST PE $($got.Body)" }
     Write-Host "listen_parse_pe_ok"
 } finally {
     if ($proc -and -not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }

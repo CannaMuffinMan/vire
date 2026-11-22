@@ -201,6 +201,7 @@ public class HarnessTests
         string hostInfo = File.ReadAllText(Path.Combine(root, "tools", "native-host-info.ps1"));
         Assert.Contains("ConvertTo-ProcessArguments", hostInfo);
         Assert.Contains("Get-ListenPort", hostInfo);
+        Assert.Contains("Invoke-VireHttpRequest", hostInfo);
         Assert.Contains("WaitForExit", all);
         Assert.Contains("wall timeout", all);
         Assert.Contains("g1.exe", all);

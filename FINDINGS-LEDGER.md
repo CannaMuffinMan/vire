@@ -26,7 +26,7 @@ No CVE IDs. Caps/sandbox/Defender unchanged.
 | F12 | yes | Unicorn EXIT 1 numbers message | — |
 | F13 | yes | forbids 32MB at PE 224 **and** 240; planted 240 write must fail; CI `native-arena-check.sh` | — |
 | walk-then-open | yes | Unicorn + Windows Sleep-widener job `129796755075` vuln `outside_hits=1` / fixed `0` | host C# TOCTOU is a separate gate |
-| host TOCTOU | yes | `HostCheckThenOpenToctouFailBeforePassAfter`: `File.AppendAllText` after swap writes outside; `AppendAllTextInside` file-id refuses | Windows job filter on `native-windows` |
+| host TOCTOU | yes | `HostCheckThenOpenToctouFailBeforePassAfter`: `File.AppendAllText` after swap writes outside; `AppendAllTextInside` file-id refuses. Windows junction setup uses `mklink /J` with full paths; teardown uses `rmdir` on the reparse point only (does not follow). Property: after a parent-directory swap, host `AppendAllTextInside` must not write `PWN` into the outside tree. Residual: replace-`data`-with-junction *after* CreateFile handle bind is still a handle-vs-path class; fail-closed on final-path check. | Windows PE unproven until CouchStation `tools/couchstation-windows-all.ps1`; GitHub Actions billing-locked |
 | Linux case | yes | `LinuxWritableZoneCompareIsCaseSensitive`; `use Data/` is not `data/` | — |
 | trailing dots | yes | emu `payload.bat.` CREATE []; Windows `native_trailing_dot refused`; Win32 `WriteAllText` strips to `payload.bat` (fail-before) | — |
 | F8 wrap | yes | host+Unicorn `[0, 0, 1]`; compile-native `72, 185` imm64 | 7c7c8ea native wrap mismatch in emu-check |

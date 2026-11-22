@@ -50,51 +50,88 @@ static class ProofRemainder
         }
         lines.Append("\r\n");
         byte[] head = Encoding.ASCII.GetBytes(lines.ToString());
-        using (TcpClient tcp = new TcpClient())
+        byte[] req = new byte[head.Length + payload.Length];
+        Buffer.BlockCopy(head, 0, req, 0, head.Length);
+        if (payload.Length > 0) Buffer.BlockCopy(payload, 0, req, head.Length, payload.Length);
+        Exception last = null;
+        for (int attempt = 0; attempt < 8; attempt++)
         {
-            tcp.ReceiveTimeout = timeout * 1000;
-            tcp.SendTimeout = timeout * 1000;
-            tcp.Connect("127.0.0.1", port);
-            NetworkStream stream = tcp.GetStream();
-            stream.Write(head, 0, head.Length);
-            if (payload.Length > 0) stream.Write(payload, 0, payload.Length);
-            MemoryStream ms = new MemoryStream();
-            byte[] buf = new byte[65536];
             try
             {
-                int n;
-                while ((n = stream.Read(buf, 0, buf.Length)) > 0) ms.Write(buf, 0, n);
+                using (TcpClient tcp = new TcpClient())
+                {
+                    tcp.ReceiveTimeout = timeout * 1000;
+                    tcp.SendTimeout = timeout * 1000;
+                    tcp.Connect("127.0.0.1", port);
+                    NetworkStream stream = tcp.GetStream();
+                    stream.Write(req, 0, req.Length);
+                    MemoryStream ms = new MemoryStream();
+                    byte[] buf = new byte[65536];
+                    try
+                    {
+                        int n;
+                        while ((n = stream.Read(buf, 0, buf.Length)) > 0) ms.Write(buf, 0, n);
+                    }
+                    catch (IOException) { }
+                    catch (SocketException) { }
+                    byte[] raw = ms.ToArray();
+                    string text = Encoding.UTF8.GetString(raw);
+                    int split = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                    int add = 4;
+                    if (split < 0)
+                    {
+                        split = text.IndexOf("\n\n", StringComparison.Ordinal);
+                        add = 2;
+                    }
+                    if (split < 0)
+                    {
+                        Console.Error.WriteLine("remainder_http_raw " + text.Replace("\r", "\\r").Replace("\n", "\\n"));
+                        return (0, new Dictionary<string, string>(), text);
+                    }
+                    string headText = text.Substring(0, split);
+                    string body = text.Substring(split + add);
+                    string[] hl = headText.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+                    int status = int.Parse(hl[0].Split(' ')[1]);
+                    Dictionary<string, string> headers = new Dictionary<string, string>();
+                    for (int i = 1; i < hl.Length; i++)
+                    {
+                        int c = hl[i].IndexOf(':');
+                        if (c < 0) continue;
+                        headers[hl[i].Substring(0, c).Trim().ToLowerInvariant()] = hl[i].Substring(c + 1).Trim();
+                    }
+                    return (status, headers, body);
+                }
             }
-            catch (IOException) { }
-            catch (SocketException) { }
-            catch (Exception) { }
-            byte[] raw = ms.ToArray();
-            string text = Encoding.UTF8.GetString(raw);
-            int split = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-            if (split < 0) split = text.IndexOf("\n\n", StringComparison.Ordinal);
-            if (split < 0)
+            catch (SocketException ex)
             {
-                Console.Error.WriteLine("remainder_http_raw " + text.Replace("\r", "\\r").Replace("\n", "\\n"));
-                return (0, new Dictionary<string, string>(), text);
+                last = ex;
+                Thread.Sleep(40 * (attempt + 1));
             }
-            string headText = text.Substring(0, split);
-            string body = text.Substring(split + 4);
-            string[] hl = headText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-            int status = int.Parse(hl[0].Split(' ')[1]);
-            Dictionary<string, string> headers = new Dictionary<string, string>();
-            for (int i = 1; i < hl.Length; i++)
-            {
-                int c = hl[i].IndexOf(':');
-                if (c < 0) continue;
-                headers[hl[i].Substring(0, c).Trim().ToLowerInvariant()] = hl[i].Substring(c + 1).Trim();
-            }
-            return (status, headers, body);
         }
+        throw last ?? new IOException("remainder connect failed");
+    }
+
+    static readonly UTF8Encoding Utf8 = new UTF8Encoding(false);
+
+    static void WriteUtf8(string path, string text)
+    {
+        File.WriteAllBytes(path, Utf8.GetBytes(text ?? ""));
     }
 
     static void RestoreGenesis(string fixSrc, string fixDst)
     {
-        if (Directory.Exists(fixDst)) Directory.Delete(fixDst, true);
+        for (int i = 0; i < 12; i++)
+        {
+            try
+            {
+                if (Directory.Exists(fixDst)) Directory.Delete(fixDst, true);
+                break;
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(40);
+            }
+        }
         Directory.CreateDirectory(fixDst);
         foreach (string name in new string[] { "head.json", "000001.json", "blocks.json" })
         {
@@ -114,12 +151,12 @@ static class ProofRemainder
             sb.Append(blocks[i]);
         }
         sb.Append("]}");
-        File.WriteAllText(Path.Combine(dir, n.ToString("000000") + ".json"), sb.ToString());
+        WriteUtf8(Path.Combine(dir, n.ToString("000000") + ".json"), sb.ToString());
     }
 
     static void WriteHead(string dir, int segment, int index, string proof)
     {
-        File.WriteAllText(Path.Combine(dir, "head.json"),
+        WriteUtf8(Path.Combine(dir, "head.json"),
             "{\"segment\":" + segment + ",\"index\":" + index + ",\"proof\":" + Js(proof) + "}");
     }
 
@@ -134,7 +171,8 @@ static class ProofRemainder
         while (true)
         {
             int extra = ExtraLen(index, previous, chunk);
-            int raw = Encoding.UTF8.GetByteCount("{\"link\":" + Js(link) + ",\"blocks\":[" + string.Join(",", blocks) + "]}");
+            WriteSeg(dir, 1, link, blocks);
+            int raw = (int)new FileInfo(Path.Combine(dir, "000001.json")).Length;
             if (raw + extra + 2 > 524288) break;
             string b = BlockJson(index, previous, chunk);
             blocks.Add(b);
@@ -204,10 +242,10 @@ static class ProofRemainder
         {
             if (first.Status != 200) mismatches.Add("tamper setup post got " + first.Status + " " + first.Body);
             if (!raw.Contains("keep")) mismatches.Add("tamper setup missing keep in segment");
-            else File.WriteAllText(seg, raw.Replace("keep", "tamper"));
+            else WriteUtf8(seg, raw.Replace("keep", "tamper"));
         }
-        else if (raw.Contains("keep")) File.WriteAllText(seg, raw.Replace("keep", "tamper"));
-        else if (File.Exists(seg)) File.WriteAllText(seg, raw.Replace("\"text\":\"\"", "\"text\":\"tamper\"", StringComparison.Ordinal));
+        else if (raw.Contains("keep")) WriteUtf8(seg, raw.Replace("keep", "tamper"));
+        else if (File.Exists(seg)) WriteUtf8(seg, raw.Replace("\"text\":\"\"", "\"text\":\"tamper\"", StringComparison.Ordinal));
         var tamp = HttpReq(port, "POST", "/block", "{\"text\":\"more\"}");
         string want = "{\"ok\":false,\"status\":503,\"error\":\"chain invalid\"}";
         if (mode == "fail-before")
@@ -278,7 +316,7 @@ static class ProofRemainder
         Directory.CreateDirectory(fixDst);
         string old = "[{\"index\":0,\"previousHash\":\"0\",\"text\":\"\"},{\"index\":1,\"previousHash\":" + Js(ProofOf(0, "0", "")) + ",\"text\":\"migrated\"}]";
         Directory.CreateDirectory("data");
-        File.WriteAllText("data/chain.json", old);
+        WriteUtf8("data/chain.json", old);
         var mig = HttpReq(port, "GET", "/chain", null);
         string b0 = BlockJson(0, "0", "");
         string b1 = BlockJson(1, ProofOf(0, "0", ""), "migrated");
@@ -376,7 +414,7 @@ static class ProofRemainder
             if (Directory.Exists(fixDst)) Directory.Delete(fixDst, true);
             Directory.CreateDirectory(fixDst);
             string old = "[{\"index\":0,\"previousHash\":\"0\",\"text\":\"\"},{\"index\":1,\"previousHash\":" + Js(ProofOf(0, "0", "")) + ",\"text\":\"migrated\"}]";
-            File.WriteAllText("data/chain.json", old);
+            WriteUtf8("data/chain.json", old);
         };
         mig();
         hs = HttpReq(hostPort, "GET", "/chain", null);
@@ -388,12 +426,12 @@ static class ProofRemainder
         RestoreGenesis(fixSrc, fixDst);
         HttpReq(hostPort, "POST", "/block", "{\"text\":\"keep\"}");
         string raw = File.ReadAllText(Path.Combine(fixDst, "000001.json"));
-        File.WriteAllText(Path.Combine(fixDst, "000001.json"), raw.Replace("keep", "tamper"));
+        WriteUtf8(Path.Combine(fixDst, "000001.json"), raw.Replace("keep", "tamper"));
         hs = HttpReq(hostPort, "POST", "/block", "{\"text\":\"more\"}");
         RestoreGenesis(fixSrc, fixDst);
         HttpReq(nativePort, "POST", "/block", "{\"text\":\"keep\"}");
         raw = File.ReadAllText(Path.Combine(fixDst, "000001.json"));
-        File.WriteAllText(Path.Combine(fixDst, "000001.json"), raw.Replace("keep", "tamper"));
+        WriteUtf8(Path.Combine(fixDst, "000001.json"), raw.Replace("keep", "tamper"));
         ns = HttpReq(nativePort, "POST", "/block", "{\"text\":\"more\"}");
         if (hs.Status != ns.Status || hs.Body != ns.Body) mismatches.Add("tamper host " + hs.Status + " " + hs.Body + " native " + ns.Status + " " + ns.Body);
         else Console.WriteLine("pair remainder tamper host " + hs.Status + " native " + ns.Status);

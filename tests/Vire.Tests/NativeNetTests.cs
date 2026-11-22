@@ -130,6 +130,7 @@ public class NativeNetTests
             Assert.Contains("102, 137, 69, 178", dns);
             Assert.Contains("137, 69, 180", dns);
             Assert.Contains("Preserve rbx: octet index is ebx", dns);
+            Assert.Contains("65, 184, 7, 0, 0, 0", dns);
         }
         finally
         {
