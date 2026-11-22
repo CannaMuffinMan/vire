@@ -1,4 +1,4 @@
-# TODO(VIRE-FINISH-NOW): CouchStation 56be312f PE tls_wrap ping missing PONG vs tls-echo. Host linger added; packed PE wrap still needs Windows re-prove.
+# TODO(VIRE-FINISH-NOW): CouchStation 50f01259 PE tls_wrap ping missing PONG. Packed PE tls_wrap (pre-cleanup c813695).
 # Native PE Postgres/Redis TLS through SChannel for CouchStation.
 # Loopback 127.0.0.1 only. Throwaway test CA. Caps 32MB / 100000 / 5M.
 # Linux agents cannot execute PE; this script is the Windows execute proof.
@@ -116,6 +116,7 @@ $cer = Join-Path $Data "pg-redis-tls.pem"
 & dotnet exec $ProofDll write-pfx $pfx $cer "x"
 if ($LASTEXITCODE -ne 0) { throw "write-pfx failed" }
 $echoProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "tls-echo", $pfx, "x") -WorkingDirectory $Root
+try {
 $port = Get-ListenPort $echoProc
 Write-Output "tls_loopback_listen 127.0.0.1:$port"
 
@@ -174,6 +175,13 @@ try { $uo = & (Join-Path $Data "pg-redis-wrap-untrusted.exe") 2>&1 | Out-String 
 if ($LASTEXITCODE -eq 0) { throw "untrusted CA must fail closed" }
 Write-Output "pe_untrusted_ca_fail_closed"
 
-try { if ($echoProc -and -not $echoProc.HasExited) { $echoProc.Kill() } } catch { }
+} finally {
+    try {
+        if ($echoProc -and -not $echoProc.HasExited) {
+            try { & taskkill.exe /PID $echoProc.Id /T /F | Out-Null } catch { }
+            try { $echoProc.Kill() } catch { }
+        }
+    } catch { }
+}
 Write-Output "PASS_AFTER at $AfterSha PE wrap/pg/redis import SChannel; wrap ping; hostname mismatch and untrusted CA fail closed"
 Write-Output "pg_redis_tls_windows ok"

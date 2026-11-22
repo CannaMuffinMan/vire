@@ -70,7 +70,7 @@ try {
     try {
         while (($n = $st.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
     } catch {
-        if ($ms.Length -eq 0) { throw }
+        if ($ms.Length -eq 0 -and -not (Test-VireRstException $_.Exception)) { throw }
     }
     $tcp.Close()
     $got = [Text.Encoding]::UTF8.GetString($ms.ToArray())

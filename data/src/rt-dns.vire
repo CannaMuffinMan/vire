@@ -64,6 +64,8 @@ end
 define emitDnsHostOk with image, fixes, labels
   pin with labels, "dns_hostok", image
   emitPro with image
+  ~ Win64: rbx is non-volatile. Label-length counter lives in ebx.
+  emitList with image, [83]
   emitList with image, [72, 137, 77, 248, 72, 139, 1, 72, 133, 192, 15, 132]
   emitRel with image, fixes, "dns_hk_no"
   emitList with image, [72, 137, 193, 72, 129, 249]
@@ -100,10 +102,10 @@ define emitDnsHostOk with image, fixes, labels
   pin with labels, "dns_hk_end", image
   emitList with image, [133, 219, 15, 132]
   emitRel with image, fixes, "dns_hk_no"
-  emitList with image, [184, 1, 0, 0, 0]
+  emitList with image, [184, 1, 0, 0, 0, 91]
   emitEpi with image
   pin with labels, "dns_hk_no", image
-  emitList with image, [49, 192]
+  emitList with image, [49, 192, 91]
   emitEpi with image
   return image
 end
@@ -111,6 +113,8 @@ end
 define emitDnsFmtA with image, fixes, labels
   pin with labels, "dns_fmta", image
   emitPro with image
+  ~ Preserve rbx: octet index is ebx; dns_parse keeps the answer index in ebx across this call.
+  emitList with image, [83]
   emitList with image, [72, 137, 77, 248, 185, 32, 0, 0, 0]
   emitCallTo with image, fixes, "rt_alloc"
   emitLeaf with image
@@ -150,7 +154,7 @@ define emitDnsFmtA with image, fixes, labels
   emitList with image, [139, 69, 216, 4, 48, 72, 139, 77, 232, 72, 139, 85, 224, 136, 68, 10, 8, 72, 255, 69, 224, 255, 195]
   emitJmpTo with image, fixes, "dns_fa_oct"
   pin with labels, "dns_fa_done", image
-  emitList with image, [72, 139, 69, 232, 72, 139, 77, 224, 72, 137, 8, 198, 68, 8, 8, 0, 72, 137, 194]
+  emitList with image, [72, 139, 69, 232, 72, 139, 77, 224, 72, 137, 8, 198, 68, 8, 8, 0, 72, 137, 194, 91]
   emitEpi with image
   return image
 end
@@ -210,6 +214,7 @@ end
 define emitDnsParse with image, fixes, labels
   pin with labels, "dns_parse", image
   emitPro with image
+  emitList with image, [83]
   emitList with image, [72, 137, 77, 248, 137, 85, 240, 68, 137, 69, 232, 68, 137, 77, 224, 131, 125, 240, 12, 15, 130]
   emitRel with image, fixes, "dns_p_no"
   emitList with image, [129, 125, 240]
@@ -268,15 +273,18 @@ define emitDnsParse with image, fixes, labels
   emitList with image, [139, 69, 208, 131, 192, 10, 3, 69, 192, 137, 69, 208, 255, 195]
   emitJmpTo with image, fixes, "dns_p_an"
   pin with labels, "dns_p_yes", image
-  emitList with image, [184, 1, 0, 0, 0]
+  emitList with image, [184, 1, 0, 0, 0, 91]
   emitEpi with image
   pin with labels, "dns_p_no", image
-  emitList with image, [49, 192]
+  emitList with image, [49, 192, 91]
   emitEpi with image
   return image
 end
 
 define emitDnsUdp with image, fixes, labels
+  ~ Win64 sockaddr_in: sin_family +0, sin_port +2, sin_addr +4, 16 bytes.
+  ~ Win64 addrinfo (unused here; UDP stub not GetAddrInfo): ai_flags 0, ai_family 4,
+  ~ ai_socktype 8, ai_protocol 12, ai_addrlen 16, ai_canonname 24, ai_addr 32, ai_next 40.
   pin with labels, "dns_udp", image
   emitPro with image
   emitList with image, [72, 129, 236, 0, 1, 0, 0, 72, 137, 77, 248, 137, 85, 240, 76, 137, 69, 232, 68, 137, 77, 224, 139, 69, 48, 137, 69, 216]
@@ -330,6 +338,7 @@ define emitDnsNs with image, fixes, labels
   ~ eax=ipv4 (LE 127.0.0.1), edx=port. Prefers data/vire-dns "127.0.0.1 PORT".
   pin with labels, "dns_ns", image
   emitPro with image
+  emitList with image, [83]
   emitList with image, [72, 139, 5]
   emitRel with image, fixes, "linux_flag"
   emitList with image, [72, 133, 192, 15, 132]
@@ -393,7 +402,7 @@ define emitDnsNs with image, fixes, labels
   emitList with image, [129, 249]
   emitU32 with image, 65535
   emitJcc with image, fixes, 135, "dns_ns_etc"
-  emitList with image, [184, 127, 0, 0, 1, 137, 202, 201, 195]
+  emitList with image, [184, 127, 0, 0, 1, 137, 202, 91, 201, 195]
   pin with labels, "dns_ns_etc", image
   emitList with image, [72, 139, 5]
   emitRel with image, fixes, "linux_flag"
@@ -410,9 +419,9 @@ define emitDnsNs with image, fixes, labels
   emitSys with image, 0
   emitList with image, [90, 80, 72, 137, 199]
   emitSys with image, 3
-  emitList with image, [88, 184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 201, 195]
+  emitList with image, [88, 184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 91, 201, 195]
   pin with labels, "dns_ns_win", image
-  emitList with image, [184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 201, 195]
+  emitList with image, [184, 127, 0, 0, 1, 186, 53, 0, 0, 0, 91, 201, 195]
   return image
 end
 

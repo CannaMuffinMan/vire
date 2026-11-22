@@ -58,7 +58,7 @@ function Read-Http([int]$Port, [string]$Method, [string]$Path, [string]$Send) {
     try {
         while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
     } catch {
-        if ($ms.Length -eq 0) { throw }
+        if ($ms.Length -eq 0 -and -not (Test-VireRstException $_.Exception)) { throw }
     }
     $tcp.Close()
     $raw = $ms.ToArray()

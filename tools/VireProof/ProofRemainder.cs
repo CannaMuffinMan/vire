@@ -54,7 +54,6 @@ static class ProofRemainder
         {
             tcp.ReceiveTimeout = timeout * 1000;
             tcp.SendTimeout = timeout * 1000;
-            tcp.Client.LingerState = new LingerOption(true, 2);
             tcp.Connect("127.0.0.1", port);
             NetworkStream stream = tcp.GetStream();
             stream.Write(head, 0, head.Length);
@@ -76,7 +75,7 @@ static class ProofRemainder
             if (split < 0)
             {
                 Console.Error.WriteLine("remainder_http_raw " + text.Replace("\r", "\\r").Replace("\n", "\\n"));
-                throw new IOException("missing header terminator");
+                return (0, new Dictionary<string, string>(), text);
             }
             string headText = text.Substring(0, split);
             string body = text.Substring(split + 4);

@@ -118,7 +118,13 @@ static class VireListen
                             held.Client.NoDelay = true;
                             held.Client.LingerState = new LingerOption(true, 2);
                             held.Client.Shutdown(SocketShutdown.Send);
-                            Thread.Sleep(20);
+                            held.Client.ReceiveTimeout = 50;
+                            byte[] drain = new byte[256];
+                            try
+                            {
+                                while (held.Client.Receive(drain) > 0) { }
+                            }
+                            catch (Exception) { }
                         }
                         catch (Exception) { }
                         try { held.Close(); } catch (Exception) { }

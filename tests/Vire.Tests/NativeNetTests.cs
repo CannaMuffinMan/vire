@@ -122,6 +122,14 @@ public class NativeNetTests
             Assert.Contains("data/vire-dns", ascii);
             Assert.Contains("that name is not valid", ascii);
             Assert.DoesNotContain("GetAddrInfo", ascii);
+            Assert.DoesNotContain("getaddrinfo", ascii);
+            string dns = File.ReadAllText(Path.Combine(root, "src", "rt-dns.vire"));
+            Assert.Contains("sin_family +0, sin_port +2, sin_addr +4", dns);
+            Assert.Contains("ai_addr 32, ai_next 40", dns);
+            Assert.Contains("198, 69, 176, 2", dns);
+            Assert.Contains("102, 137, 69, 178", dns);
+            Assert.Contains("137, 69, 180", dns);
+            Assert.Contains("Preserve rbx: octet index is ebx", dns);
         }
         finally
         {

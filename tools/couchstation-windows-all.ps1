@@ -83,15 +83,28 @@ function Run-Script([string]$Rel, [int]$TimeoutSec = 0) {
         throw "$Rel wall timeout ${TimeoutSec}s"
     }
     $p.WaitForExit()
-    Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
-    Get-Content -ErrorAction SilentlyContinue $errLog | ForEach-Object { Write-Host $_ }
+    $outText = ""
+    $errText = ""
+    $fsOut = $null
+    try {
+        if (Test-Path -LiteralPath $outLog) {
+            $fsOut = [IO.File]::Open($outLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            $outText = (New-Object IO.StreamReader($fsOut)).ReadToEnd()
+        }
+    } finally { if ($fsOut) { $fsOut.Dispose() } }
+    try {
+        if (Test-Path -LiteralPath $errLog) {
+            $fsErr = [IO.File]::Open($errLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            try { $errText = (New-Object IO.StreamReader($fsErr)).ReadToEnd() } finally { $fsErr.Dispose() }
+        }
+    } catch { }
+    if ($outText) { Write-Host $outText }
+    if ($errText) { Write-Host $errText }
     if (-not $p.HasExited) { throw "$Rel ERROR process still running after WaitForExit" }
     $codeObj = $p.ExitCode
     if ($null -eq $codeObj) { throw "$Rel ERROR unknown exit code" }
     $code = [int]$codeObj
-    $combined = ""
-    if (Test-Path -LiteralPath $outLog) { $combined += [IO.File]::ReadAllText($outLog) }
-    if (Test-Path -LiteralPath $errLog) { $combined += "`n" + [IO.File]::ReadAllText($errLog) }
+    $combined = $outText + "`n" + $errText
     if ($code -ne 0) { throw "$Rel exit $code" }
     if ($combined -notmatch "PASS_AFTER|HOST_NATIVE_MATCH|\bPASS\b") {
         throw "$Rel exit 0 missing PASS/FAIL marker"

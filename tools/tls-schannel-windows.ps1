@@ -1,4 +1,4 @@
-# TODO(VIRE-FINISH-NOW): CouchStation 56be312f PE tls_listen exited 1 (SChannel PFX load/handshake). PKCS8/password fixed here; packed PE tls still needs Windows re-prove.
+# TODO(VIRE-FINISH-NOW): CouchStation 50f01259 PE tls_listen exited 1. Packed PE SChannel tls_listen (pre-cleanup c813695).
 # Native PE SChannel TLS proof for CouchStation.
 # Loopback 127.0.0.1 only. Test CA / PFX generated here. Caps unchanged.
 # Does not claim success unless this script runs on Windows.

@@ -339,11 +339,14 @@ public class PathSsrfTests
             string checkedPath = VirePaths.DataOrSite(dir, rel, line);
             Thread.Sleep(20);
             SwapWritableParent(dir, data, outside);
-            File.AppendAllText(checkedPath, "PWN");
+            string live = Path.GetFullPath(Path.Combine(data, "note.txt"));
+            if (!File.Exists(live))
+                throw new IOException("junction did not expose " + live);
+            File.AppendAllText(live, "PWN");
             Assert.True(
-                File.Exists(Path.Combine(Path.GetDirectoryName(checkedPath), "marker-outside-only")),
+                File.Exists(Path.Combine(data, "marker-outside-only")),
                 "fail-before must follow the swapped parent");
-            Assert.Contains("PWN", File.ReadAllText(checkedPath));
+            Assert.Contains("PWN", File.ReadAllText(live));
             Console.WriteLine("host_toctou_linux_fail_before outside_has_PWN=true");
             RestoreWritableParent(dir, data, outside);
             File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
@@ -435,24 +438,75 @@ public class PathSsrfTests
             if (Directory.Exists(data) && !Directory.Exists(real))
             {
                 Directory.Move(data, real);
-                ProcessStartInfo info = new ProcessStartInfo
+                string linkDir = Path.GetDirectoryName(data);
+                string linkName = Path.GetFileName(data);
+                try
                 {
-                    FileName = "cmd.exe",
-                    Arguments = "/c mklink /J \"" + data + "\" \"" + outside + "\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
-                if (p == null)
-                {
-                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
-                    throw new IOException("mklink process missing");
+                    Directory.CreateSymbolicLink(data, outside);
                 }
-                p.WaitForExit(5000);
-                if (p.ExitCode != 0 || !Directory.Exists(data))
+                catch (Exception)
                 {
+                    ProcessStartInfo info = new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = "/c mklink /J \"" + linkName + "\" \"" + outside + "\"",
+                        WorkingDirectory = linkDir,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+                    if (p == null)
+                    {
+                        if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                        throw new IOException("mklink process missing");
+                    }
+                    _ = p.Handle;
+                    if (!p.WaitForExit(10000))
+                    {
+                        try { p.Kill(); } catch (Exception) { }
+                        if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                        throw new IOException("mklink /J wait timeout");
+                    }
+                    p.WaitForExit();
+                    if (p.ExitCode != 0)
+                    {
+                        string err = "";
+                        try { err = p.StandardError.ReadToEnd(); } catch (Exception) { }
+                        if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                        throw new IOException("mklink /J failed exit " + p.ExitCode + " " + err);
+                    }
+                }
+                DateTime until = DateTime.UtcNow.AddSeconds(2);
+                while (DateTime.UtcNow < until)
+                {
+                    if (Directory.Exists(data) && File.Exists(Path.Combine(data, "note.txt")) &&
+                        File.Exists(Path.Combine(data, "marker-outside-only")))
+                        return;
+                    Thread.Sleep(20);
+                }
+                if (Directory.Exists(real) && !File.Exists(Path.Combine(data, "marker-outside-only")))
+                {
+                    try
+                    {
+                        FileSystemInfo item = new DirectoryInfo(data);
+                        if (Directory.Exists(data) && (item.Attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            ProcessStartInfo rm = new ProcessStartInfo
+                            {
+                                FileName = "cmd.exe",
+                                Arguments = "/c rmdir \"" + data + "\"",
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            };
+                            System.Diagnostics.Process rp = System.Diagnostics.Process.Start(rm);
+                            if (rp != null) rp.WaitForExit(5000);
+                        }
+                    }
+                    catch (Exception) { }
                     if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
-                    throw new IOException("mklink /J failed exit " + p.ExitCode);
+                    throw new IOException("junction did not expose outside files under " + data);
                 }
             }
         }

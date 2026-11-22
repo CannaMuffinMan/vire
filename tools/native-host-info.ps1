@@ -44,6 +44,41 @@ function ConvertTo-ProcessArguments([string[]]$Argv) {
     return ($parts -join ' ')
 }
 
+function Read-SharedText([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return "" }
+    $fs = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    try {
+        $sr = New-Object IO.StreamReader($fs)
+        return $sr.ReadToEnd()
+    } finally {
+        $fs.Dispose()
+    }
+}
+
+function Test-VireRstException($err) {
+    $cur = $err
+    while ($null -ne $cur) {
+        $msg = ""
+        try { $msg = "$($cur.Message)" } catch { }
+        if ($msg -match "forcibly closed|10054|WSAECONNRESET|connection reset") { return $true }
+        if ($cur -is [System.IO.IOException]) { return $true }
+        if ($cur -is [System.Net.Sockets.SocketException]) { return $true }
+        try { $cur = $cur.InnerException } catch { break }
+    }
+    return $false
+}
+
+function Read-VireHttpStream([System.Net.Sockets.NetworkStream]$Stream) {
+    $ms = New-Object System.IO.MemoryStream
+    $buf = New-Object byte[] 4096
+    try {
+        while (($n = $Stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    } catch {
+        if ($ms.Length -eq 0 -and -not (Test-VireRstException $_.Exception)) { throw }
+    }
+    return $ms.ToArray()
+}
+
 function Get-ChildExitCode {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Proc,
