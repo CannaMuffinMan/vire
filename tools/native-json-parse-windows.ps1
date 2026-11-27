@@ -50,6 +50,45 @@ $arrNorm = (($arrOut | Out-String) -replace '\s', '').Trim()
 if ($arrNorm -ne '[1,true,null]') { throw "parse-round PE got $arrOut" }
 Write-Host "parse_round_pe_ok $arrOut"
 
+$objSrc = Join-Path $Data "parse-obj-pe.vire"
+Set-Content -LiteralPath $objSrc -Value @'
+define main
+  say (json with (parse with "{\"a\":1}"))
+end
+'@
+$objExe = Compile-Native $objSrc "parse-obj-pe"
+$objOut = & $objExe
+if ($LASTEXITCODE -ne 0) { throw "parse-obj PE exit $LASTEXITCODE" }
+$objNorm = (($objOut | Out-String) -replace '\s', '').Trim()
+if ($objNorm -ne '{"a":1}') { throw "parse-obj PE got $objOut" }
+Write-Host "parse_obj_pe_ok $objOut"
+
+$escSrc = Join-Path $Data "parse-esc-pe.vire"
+Set-Content -LiteralPath $escSrc -Value @'
+define main
+  say (json with (parse with "\"hi\\n\""))
+end
+'@
+$escExe = Compile-Native $escSrc "parse-esc-pe"
+$escOut = & $escExe
+if ($LASTEXITCODE -ne 0) { throw "parse-esc PE exit $LASTEXITCODE" }
+$escNorm = (($escOut | Out-String) -replace '\s', '').Trim()
+if ($escNorm -ne '"hi\n"') { throw "parse-esc PE got $escOut" }
+Write-Host "parse_esc_pe_ok $escOut"
+
+$nestSrc = Join-Path $Data "parse-nest-pe.vire"
+Set-Content -LiteralPath $nestSrc -Value @'
+define main
+  say (json with (parse with "{\"n\":{\"x\":[1,2]}}"))
+end
+'@
+$nestExe = Compile-Native $nestSrc "parse-nest-pe"
+$nestOut = & $nestExe
+if ($LASTEXITCODE -ne 0) { throw "parse-nest PE exit $LASTEXITCODE" }
+$nestNorm = (($nestOut | Out-String) -replace '\s', '').Trim()
+if ($nestNorm -ne '{"n":{"x":[1,2]}}') { throw "parse-nest PE got $nestOut" }
+Write-Host "parse_nest_pe_ok $nestOut"
+
 $listenExe = Compile-Native (Join-Path $Root "tests/rebuild/guests/listen-parse.vire") "listen-parse-pe"
 $outFile = Join-Path $Data "listen-parse-pe.out"
 $proc = Start-Process -FilePath $listenExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput $outFile -PassThru
