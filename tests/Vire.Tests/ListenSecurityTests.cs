@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using Xunit;
 
+[Collection("listen")]
 public class ListenSecurityTests
 {
     [Fact]
