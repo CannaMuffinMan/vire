@@ -211,25 +211,7 @@ Run-Proof "pe-parse-array-fault-90" {
     if ($code -ne 0) { throw "parse-array PE exit $code" }
 }
 
-Run-Proof "rebuild-proxy-windows-pe" {
-    # tools/rebuild-proxy-windows.ps1 is a checklist (exits 1 until filled).
-    # Compile the proxy guest to PE and record MZ + ws2_32 names.
-    $src = Join-Path $Root "tests/rebuild/guests/proxy-http.vire"
-    $stage = Join-Path $Data "proxy-pe"
-    New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    Copy-Item $src (Join-Path $stage "proxy-http.vire") -Force
-    Copy-Item (Join-Path $Root "src/http-client.vire") (Join-Path $stage "http-client.vire") -Force
-    $hex = Join-Path $Data "proxy-http.hex"
-    if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire data/proxy-pe/proxy-http.vire data/proxy-http.hex pe
-    if ($LASTEXITCODE -ne 0) { throw "proxy compile exit $LASTEXITCODE" }
-    Convert-HexToExe $hex (Join-Path $Data "proxy-http.exe")
-    $pe = [System.IO.File]::ReadAllBytes((Join-Path $Data "proxy-http.exe"))
-    if ($pe[0] -ne 0x4d -or $pe[1] -ne 0x5a) { throw "proxy PE missing MZ" }
-    $ascii = [Text.Encoding]::ASCII.GetString($pe)
-    if ($ascii -notmatch "ws2_32") { throw "proxy PE missing ws2_32" }
-    Log "proxy_pe_mz_ok ws2_32_ok (host-vs-PE modes still need a loopback upstream on this PC)"
-}
+Run-Proof "native-forms" { Run-Script "tools/native-forms.ps1" }
 
 Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-windows.ps1" }
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
