@@ -243,7 +243,7 @@ static class VirePaths
     }
 
     // Tests set this. Product OpenFile does not read process environment.
-    internal static int TestToctouDelayMs;
+    internal static int TestToctouDelayMs = 0;
 
     static FileStream OpenFile(string path, FileMode mode, FileAccess access, string root, int line, int column)
     {
