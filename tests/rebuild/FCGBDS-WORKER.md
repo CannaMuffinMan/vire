@@ -12,6 +12,8 @@ Harness `tools/rebuild-fcgbds-worker-diff.sh` drops JSON keys `ts`, `generatedAt
 
 Go `WriteHeader(503|400)` with bodies that omit `"status"`. Vire maps status from JSON `"status":N`. Refused and 400 heartbeat bodies therefore include `"status"` so the status line matches. Field match is still `ok`/`error`.
 
+TODO(VIRE-FINISH-NOW): close remaining host/native gaps listed below (POST body, reviewer TTL, bind, PE proof) without raising caps.
+
 ## Remaining gaps
 
 - Native compiled guests SEGV if `route` reads the POST `body` value; heartbeat uses Go's query `sessionId=` instead of JSON body. Host can read the body; this lane does not, so host vs native stay aligned.

@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Net.Http;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -69,11 +67,6 @@ sealed class Env
     public bool Has(string name)
     {
         return Values.ContainsKey(name);
-    }
-
-    public object Get(string name, int line)
-    {
-        return Get(name, line, 1);
     }
 
     public object Get(string name, int line, int column)
@@ -321,6 +314,7 @@ static class ListenHooks
     internal static bool OverrideEnv;
     internal static string BindMode;
     internal static string Token;
+    internal static string BlockToken;
 
     internal static void Reset()
     {
@@ -328,6 +322,7 @@ static class ListenHooks
         OverrideEnv = false;
         BindMode = null;
         Token = null;
+        BlockToken = null;
     }
 }
 
@@ -592,11 +587,6 @@ sealed class Machine
         }
         catch (IOException) { traceStopped = true; }
         catch (UnauthorizedAccessException) { traceStopped = true; }
-    }
-
-    object Builtin(string name, List<object> args, int line)
-    {
-        return Builtin(name, args, line, 1);
     }
 
     // TickCount64 can exceed int. Saturate so ticks stays a positive whole number and does not wrap backwards.
@@ -904,6 +894,7 @@ sealed class Machine
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
         if (name == "serve")
+            // TODO(VIRE-FINISH-NOW): drop the serve name from Builtins once guests no longer call it
             throw new VireError("serve was removed; use listen", line, col);
         if (name == "files")
         {
@@ -1812,11 +1803,6 @@ sealed class Machine
         if (value is bool || !(value is int)) throw new VireError("slice bounds must be whole numbers", line);
         return (int)value;
     }
-    static int IndexOf(object value, int line, int size)
-    {
-        return IndexOf(value, line, size, 1);
-    }
-
     static int IndexOf(object value, int line, int size, int col)
     {
         if (value is bool || !(value is int)) throw new VireError("an index must be a whole number", line, col);
@@ -1941,7 +1927,6 @@ sealed class Parser
     int i;
     int nest;
     int blockNest;
-    static readonly HashSet<string> Stoppers = new HashSet<string>(new string[] { "end", "else", "miss", "eof" });
 
     public Parser(List<Token> tokens) { this.tokens = tokens; }
 
@@ -3136,11 +3121,6 @@ sealed class Program
         return Environment.GetEnvironmentVariable("VIRE_HEADLESS") == "1";
     }
 
-    public static void RunFile(string program, string folder)
-    {
-        RunFile(program, folder, null);
-    }
-
     public static void RunFile(string program, string folder, Budget budget)
     {
         Dictionary<string, Func> funcs = Load(program, folder, new HashSet<string>());
@@ -3260,6 +3240,16 @@ sealed class Program
 
     public static bool HeaderTokenMatches(string head, string expected)
     {
+        return HeaderSecretMatches(head, "X-FCG-Token", null, expected);
+    }
+
+    public static bool HeaderBearerMatches(string head, string expected)
+    {
+        return HeaderSecretMatches(head, "Authorization", "Bearer", expected);
+    }
+
+    public static bool HeaderSecretMatches(string head, string headerName, string scheme, string expected)
+    {
         if (string.IsNullOrEmpty(expected) || expected.Length < 16) return false;
         string provided = "";
         int hits = 0;
@@ -3270,9 +3260,17 @@ sealed class Program
             int colon = line.IndexOf(':');
             if (colon <= 0) continue;
             string name = line.Substring(0, colon).Trim(' ', '\t');
-            if (!string.Equals(name, "X-FCG-Token", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(name, headerName, StringComparison.OrdinalIgnoreCase)) continue;
             hits++;
-            provided = line.Substring(colon + 1).Trim(' ', '\t');
+            string raw = line.Substring(colon + 1).Trim(' ', '\t');
+            if (scheme == null)
+                provided = raw;
+            else if (raw.Length > scheme.Length
+                && raw.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)
+                && (raw[scheme.Length] == ' ' || raw[scheme.Length] == '\t'))
+                provided = raw.Substring(scheme.Length).Trim(' ', '\t');
+            else
+                provided = "";
         }
         byte[] left = new byte[256];
         byte[] right = new byte[256];

@@ -173,6 +173,9 @@ public class TlsServerTests : IDisposable
         Assert.DoesNotContain("native tls_listen is fail-closed", tls);
         Assert.Contains("\"/health\"", File.ReadAllText(Path.Combine(root, "guest-health-tls.vire")));
         Assert.Contains("fcgcpa", File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "health.json")));
+        string win = File.ReadAllText(Path.Combine(root, "tools", "tls-server-windows.ps1"));
+        Assert.Contains("guest-health-tls.vire", win);
+        Assert.DoesNotContain("data/guest-health-tls.vire", win);
     }
 
     HttpClient Https()

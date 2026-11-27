@@ -26,8 +26,9 @@ function Compile-Native([string]$Src, [string]$Stem) {
     $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw "gen1 $Stem compile exit $($p.ExitCode)" }
+    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -PassThru
+    $code = Get-ChildExitCode $p
+    if ($code -ne 0) { throw "gen1 $Stem compile exit $code" }
     Convert-HexToExe $hex $exe
     return $exe
 }
@@ -54,24 +55,13 @@ $outFile = Join-Path $Data "listen-parse-pe.out"
 $proc = Start-Process -FilePath $listenExe -WorkingDirectory $Root -NoNewWindow -RedirectStandardOutput $outFile -PassThru
 Start-Sleep -Milliseconds 400
 $lout = Get-Content -Raw $outFile
-if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { Stop-Process -Id $proc.Id -Force; throw "listen-parse PE did not listen" }
+if ($lout -notmatch "listening on 127.0.0.1:(\d+)") { if (-not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }; throw "listen-parse PE did not listen" }
 $port = [int]$Matches[1]
 try {
-    $tcp = New-Object System.Net.Sockets.TcpClient
-    $tcp.Connect("127.0.0.1", $port)
-    $payload = [Text.Encoding]::UTF8.GetBytes('{"a":1}')
-    $req = [Text.Encoding]::ASCII.GetBytes("POST /p HTTP/1.1`r`nHost: x`r`nContent-Length: $($payload.Length)`r`nConnection: close`r`n`r`n")
-    $st = $tcp.GetStream()
-    $st.Write($req, 0, $req.Length)
-    $st.Write($payload, 0, $payload.Length)
-    $ms = New-Object IO.MemoryStream
-    $buf = New-Object byte[] 4096
-    while (($n = $st.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
-    $tcp.Close()
-    $got = [Text.Encoding]::UTF8.GetString($ms.ToArray())
-    if ($got -notmatch '"a":\s*1') { throw "listen-parse POST PE $got" }
+    $got = Invoke-VireHttpRequest -Port $port -Method "POST" -Path "/p" -Send '{"a":1}'
+    if ("$($got.Body)" -notmatch '"a":\s*1') { throw "listen-parse POST PE $($got.Body)" }
     Write-Host "listen_parse_pe_ok"
 } finally {
-    Stop-Process -Id $proc.Id -Force
+    if ($proc -and -not $proc.HasExited) { Stop-Process -ErrorAction SilentlyContinue -Id $proc.Id -Force }
 }
-Write-Host "Windows PE json/parse and listen+parse completed on this CouchStation. Linux is not PE proof."
+Write-Host "PASS_AFTER Windows PE json/parse and listen+parse completed on this CouchStation. Linux is not PE proof."

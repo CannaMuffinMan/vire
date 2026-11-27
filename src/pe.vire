@@ -547,10 +547,6 @@ define finishImage with image, labels, fixes, hints, ilts, iats
   return image
 end
 
-define buildExe with image, entry, imp, dataOff
-  return buildPe with image, entry, imp, dataOff, 40
-end
-
 define buildPe with image, entry, imp, dataOff, impSize
   ~ Well-formed PE32+: W^X .text/.data, checksum, nonzero timestamp, linker 14.40,
   ~ OS/subsystem 6.0, 1MB stack/heap reserve (arena stays VirtualAlloc 32MB),

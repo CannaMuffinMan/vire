@@ -1,0 +1,50 @@
+~ fcgbds-go POST /api/bot-defense/reviewers/heartbeat JSON body sessionId.
+~ Fixture only. Query nil. Payments stay off. Loopback listen 0.
+~ Rank 3 remainder: read the leaf POST body (no query-on-path workaround).
+
+define session_id with body
+  if body == none
+    return none
+  end
+  if body == ""
+    return none
+  end
+  let needle be "\"sessionId\":\""
+  let pos be find with body, needle
+  if pos < 0
+    return none
+  end
+  let fromp be pos + (length with needle)
+  let n be length with body
+  let i be fromp
+  while i < n
+    if (body at i) == "\""
+      stop
+    end
+    let i be i + 1
+  end
+  if i <= fromp
+    return none
+  end
+  if i >= n
+    return none
+  end
+  return slice with body, fromp, i
+end
+
+define route with method, path, body, head
+  if method == "POST"
+    if path == "/api/bot-defense/reviewers/heartbeat"
+      let sid be session_id with body
+      if sid == none
+        return "{\"error\":\"sessionId is required\",\"status\":400}"
+      end
+      return "{\"ok\":true,\"reviewers\":{\"live\":1,\"reviewers\":[{\"lastSeenAt\":\"now\",\"name\":\"reviewer\",\"source\":\"obs\"}],\"ttlSeconds\":90}}"
+    end
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

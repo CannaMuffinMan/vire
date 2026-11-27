@@ -14,6 +14,8 @@ Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
 $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
 New-Item -ItemType Directory -Force -Path $Data | Out-Null
+Get-ChildItem -LiteralPath $Root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '^\.(exe|dll|pdb)$' } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+Remove-Item -ErrorAction SilentlyContinue -Force (Join-Path $Root "g1.exe")
 $Log = Join-Path $Data "couchstation-windows-all.log"
 $Head = (git rev-parse HEAD).Trim()
 $Stamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
@@ -62,14 +64,74 @@ function Require-Script([string]$Rel) {
     $path = Join-Path $Root $Rel
     if (-not (Test-Path $path)) { throw "missing required $Rel (must not skip)" }
 }
-function Run-Script([string]$Rel) {
+function Stop-ProcessTree([int]$Id) {
+    try { & taskkill.exe /PID $Id /T /F | Out-Null } catch { }
+    try { Stop-Process -ErrorAction SilentlyContinue -Id $Id -Force } catch { }
+}
+function Run-Script([string]$Rel, [int]$TimeoutSec = 0) {
     $path = Join-Path $Root $Rel
     Require-Script $Rel
+    if ($TimeoutSec -le 0) {
+        if ($Rel -match "selfhost") { $TimeoutSec = 2400 } else { $TimeoutSec = 900 }
+    }
     $outLog = Join-Path $Data ("couchstation-" + $script:CurrentProof + "-child.log")
-    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
-    Get-Content -ErrorAction SilentlyContinue $outLog | ForEach-Object { Write-Host $_ }
-    Get-Content -ErrorAction SilentlyContinue ($outLog + ".err") | ForEach-Object { Write-Host $_ }
-    if ($p.ExitCode -ne 0) { throw "$Rel exit $($p.ExitCode)" }
+    $errLog = $outLog + ".err"
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$path) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+    $null = $p.Handle
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+        Stop-ProcessTree $p.Id
+        throw "$Rel wall timeout ${TimeoutSec}s"
+    }
+    $p.WaitForExit()
+    $outText = ""
+    $errText = ""
+    $fsOut = $null
+    try {
+        if (Test-Path -LiteralPath $outLog) {
+            $fsOut = [IO.File]::Open($outLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            $outText = (New-Object IO.StreamReader($fsOut)).ReadToEnd()
+        }
+    } finally { if ($fsOut) { $fsOut.Dispose() } }
+    try {
+        if (Test-Path -LiteralPath $errLog) {
+            $fsErr = [IO.File]::Open($errLog, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            try { $errText = (New-Object IO.StreamReader($fsErr)).ReadToEnd() } finally { $fsErr.Dispose() }
+        }
+    } catch { }
+    if ($outText) { Write-Host $outText }
+    if ($errText) { Write-Host $errText }
+    if (-not $p.HasExited) { throw "$Rel ERROR process still running after WaitForExit" }
+    $codeObj = $p.ExitCode
+    if ($null -eq $codeObj) { throw "$Rel ERROR unknown exit code" }
+    $code = [int]$codeObj
+    $combined = $outText + "`n" + $errText
+    if ($code -ne 0) { throw "$Rel exit $code" }
+    if ($combined -notmatch "PASS_AFTER|HOST_NATIVE_MATCH|\bPASS\b") {
+        throw "$Rel exit 0 missing PASS/FAIL marker"
+    }
+}
+
+function Test-HarnessExitGuard {
+    $probe = Join-Path $Data "harness-nopass.ps1"
+    Set-Content -LiteralPath $probe -Value "Write-Host silent-ok`nexit 0"
+    $p = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-File",$probe) -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $Data "harness-nopass.out") -RedirectStandardError (Join-Path $Data "harness-nopass.err")
+    $null = $p.Handle
+    if (-not $p.WaitForExit(15000)) { Stop-ProcessTree $p.Id; throw "harness probe wall timeout" }
+    $p.WaitForExit()
+    if ($null -eq $p.ExitCode) { throw "ERROR unknown exit code" }
+    $text = ""
+    if (Test-Path (Join-Path $Data "harness-nopass.out")) { $text = [IO.File]::ReadAllText((Join-Path $Data "harness-nopass.out")) }
+    if ($p.ExitCode -eq 0 -and $text -notmatch "PASS_AFTER|HOST_NATIVE_MATCH|\bPASS\b") {
+        Log "harness_guard: null-safe ExitCode=$($p.ExitCode); missing PASS marker treated as FAIL"
+    } else {
+        throw "harness guard expected missing PASS marker"
+    }
+    $caught = $false
+    try { Run-Script "data/harness-nopass.ps1" } catch {
+        if ("$($_.Exception.Message)" -match "missing PASS/FAIL marker") { $caught = $true } else { throw }
+    }
+    if (-not $caught) { throw "Run-Script must FAIL scripts that exit 0 with no PASS/FAIL marker" }
+    Log "harness_exit_guard_ok Handle+WaitForExit+unknown-null+PASS marker"
 }
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -81,10 +143,14 @@ function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     [System.IO.File]::WriteAllBytes($ExePath, $bytes)
 }
 
+Run-Proof "harness-exit-guard" { Test-HarnessExitGuard }
+
 Run-Proof "dotnet-build" {
     dotnet build (Join-Path $Root "vire.csproj") -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
     if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
+    dotnet build (Join-Path $Root "tools/VireProof/VireProof.csproj") -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw "vire-proof build failed" }
 }
 
 Run-Proof "dotnet-test" {
@@ -169,6 +235,9 @@ Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-wind
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
+Run-Proof "post-block-auth-windows" { Run-Script "tools/post-block-auth-windows.ps1" }
+Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
 Run-Proof "redis-tls-prove-windows" { Run-Script "tools/redis-tls-prove-windows.ps1" }
 Run-Proof "aes-gcm-windows" { Run-Script "tools/aes-gcm-windows.ps1" }
 Run-Proof "rebuild-headers-windows" { Run-Script "tools/rebuild-headers-windows.ps1" }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 static class VireTls
@@ -16,8 +17,14 @@ static class VireTls
             throw new VireError("tls_listen needs a certificate file and a key file", line, column);
         try
         {
-            X509Certificate2 pem = X509Certificate2.CreateFromPemFile(certPath, keyPath);
-            return X509CertificateLoader.LoadPkcs12(pem.Export(X509ContentType.Pfx), (string)null);
+            string certPem = File.ReadAllText(certPath);
+            string keyPem = File.ReadAllText(keyPath);
+            using (X509Certificate2 loaded = X509Certificate2.CreateFromPem(certPem, keyPem))
+            {
+                byte[] pfx = loaded.Export(X509ContentType.Pfx);
+                return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+            }
         }
         catch (VireError) { throw; }
         catch (Exception)

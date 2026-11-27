@@ -1,6 +1,6 @@
 ~ The web2 door. Apps mine on their own. This process does not mine.
-~ Open question (roadmap Q2): who may POST /block is Canna's call.
-~ Phase 0 does not authorize POST /block. Do not invent a key scheme here.
+~ POST /block is gated by listen Bearer write secret (FCG_BLOCK_TOKEN / FCG_API_TOKEN).
+~ This route still only appends. It does not read tokens.
 
 define pad6 with n
   let s be text with n

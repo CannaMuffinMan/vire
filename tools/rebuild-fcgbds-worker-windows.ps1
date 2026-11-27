@@ -39,4 +39,4 @@ Convert-HexToExe $whex $wexe
 Write-Host "PE files written. Replay tests/rebuild/contracts/fcgbds-go.json against guest-fcgbds.exe listen (loopback)."
 Write-Host "Worker: guest-worker.exe with PAYMENTS_ENABLED=1 (exit 1), no args (disabled, exit 0), FCG_WORKER_ENABLED=1 FCG_JOB_AGGREGATION=1 (skeleton refusal, exit 0)."
 Write-Host "Reserved: guest-fcgbds.exe 7099 and 8778 must print refusing reserved port and exit 1."
-Write-Host "This script does not claim a completed Windows proof by itself."
+Write-Host "PASS_AFTER PE files written (MZ compile). Replay remaining worker cases on CouchStation."

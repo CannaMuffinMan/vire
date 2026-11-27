@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -120,6 +121,15 @@ public class DnsTests
             Assert.True(run.Matched, Diff(run));
             Assert.True(run.InterpCode == 0, Diff(run));
             Assert.Equal("127.0.0.1\n", DualMode.Norm(run.InterpOut));
+
+            DualMode.DualRun guest = DualMode.RunSource(
+                File.ReadAllText(Path.Combine(DualMode.FindRoot(), "tests", "native", "dns-resolve.vire")),
+                null);
+            Assert.True(guest.InterpCode == 0, Diff(guest));
+            string hostOut = DualMode.Norm(guest.InterpOut);
+            Assert.Contains("that name is not valid", hostOut);
+            Assert.Contains("127.0.0.1", hostOut);
+            Assert.DoesNotContain("invalid-missed", hostOut);
         }
         finally
         {

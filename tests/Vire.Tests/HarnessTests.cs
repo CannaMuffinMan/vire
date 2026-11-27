@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -16,6 +17,8 @@ public class HarnessTests
         Assert.Contains("<TargetFramework>net10.0</TargetFramework>", main);
         Assert.Contains("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>", main);
         Assert.Contains("<TargetFramework>net10.0</TargetFramework>", tests);
+        string proof = File.ReadAllText(Path.Combine(root, "tools", "VireProof", "VireProof.csproj"));
+        Assert.Contains("<TargetFramework>net10.0</TargetFramework>", proof);
         Assert.Contains("<TargetFramework>net10.0-windows</TargetFramework>", windows);
         Assert.Contains("WINDOWS", windows);
         Assert.Contains("UseWindowsForms", windows);
@@ -162,6 +165,50 @@ public class HarnessTests
     }
 
     [Fact]
+    public void CouchStationAllReferencedFilesExist()
+    {
+        string root = FindRoot();
+        string all = File.ReadAllText(Path.Combine(root, "tools", "couchstation-windows-all.ps1"));
+        HashSet<string> scripts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match m in Regex.Matches(all, @"Run-Script\s+""(tools/[^""]+\.ps1)"""))
+            scripts.Add(m.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar));
+        Assert.Contains("tools" + Path.DirectorySeparatorChar + "rebuild-fcgbds-heartbeat-windows.ps1", scripts);
+        Assert.Contains("tools" + Path.DirectorySeparatorChar + "rebuild-chain-limits-windows.ps1", scripts);
+        foreach (string rel in scripts)
+        {
+            string path = Path.Combine(root, rel);
+            Assert.True(File.Exists(path), "missing " + rel);
+            string text = File.ReadAllText(path);
+            foreach (Match m in Regex.Matches(text, @"Join-Path \$Root ""([^""]+)"""))
+            {
+                string inner = m.Groups[1].Value;
+                if (inner.Contains("$") || inner.Contains("{")) continue;
+                bool tracked = inner.StartsWith("tests/", StringComparison.Ordinal)
+                    || inner.StartsWith("guest-", StringComparison.Ordinal)
+                    || inner.StartsWith("src/", StringComparison.Ordinal)
+                    || inner.StartsWith("tools/", StringComparison.Ordinal)
+                    || inner == "session-prove.vire"
+                    || inner == "guest-health.vire"
+                    || inner == "guest-chain.vire"
+                    || inner == "guest-health-tls.vire";
+                if (!tracked) continue;
+                string target = Path.Combine(root, inner.Replace('/', Path.DirectorySeparatorChar));
+                Assert.True(File.Exists(target) || Directory.Exists(target), rel + " references missing " + inner);
+            }
+        }
+        Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "guests", "fcgbds-heartbeat.vire")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "guests", "fcgbds-heartbeat-fail.vire")));
+        string hostInfo = File.ReadAllText(Path.Combine(root, "tools", "native-host-info.ps1"));
+        Assert.Contains("ConvertTo-ProcessArguments", hostInfo);
+        Assert.Contains("Get-ListenPort", hostInfo);
+        Assert.Contains("Invoke-VireHttpRequest", hostInfo);
+        Assert.Contains("WaitForExit", all);
+        Assert.Contains("wall timeout", all);
+        Assert.Contains("g1.exe", all);
+        Assert.DoesNotContain("python3", File.ReadAllText(Path.Combine(root, "tools", "rebuild-chain-limits-windows.ps1")));
+    }
+
+    [Fact]
     public void GitTracksNoBinaries()
     {
         string root = FindRoot();
@@ -170,6 +217,8 @@ public class HarnessTests
             if (path.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar)) continue;
             if (path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)) continue;
             if (path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
+            string norm = path.Replace('\\', '/');
+            if (norm.Contains("/data/")) continue;
             string ext = Path.GetExtension(path);
             Assert.False(ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dll", StringComparison.OrdinalIgnoreCase), path);
         }

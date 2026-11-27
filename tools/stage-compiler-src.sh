@@ -8,7 +8,6 @@ cp "$ROOT/src/asm.vire" "$ROOT/src/pe.vire" "$ROOT/src/rt.vire" "$ROOT/src/rt-mo
   "$ROOT/src/rt-tls-pe-blob.txt" "$ROOT/src/rt-tls-pe-pins.txt" "$ROOT/src/rt-tls-pe-fixes.txt" "$ROOT/src/rt-crypto.vire" \
   "$ROOT/src/rt-net-blob.txt" "$ROOT/src/rt-net-pins.txt" "$ROOT/src/rt-net-fixes.txt" \
   "$ROOT/src/rt-net-json-blob.txt" "$ROOT/src/rt-net-json-pins.txt" "$ROOT/src/rt-net-json-fixes.txt" \
-  "$ROOT/src/rt-net-r3-blob.txt" "$ROOT/src/rt-net-r3-pins.txt" "$ROOT/src/rt-net-r3-fixes.txt" \
   "$ROOT/src/rt-net-r4-blob.txt" "$ROOT/src/rt-net-r4-pins.txt" "$ROOT/src/rt-net-r4-fixes.txt" \
   "$ROOT/data/src/"
 python3 - <<PY
@@ -37,9 +36,6 @@ pairs = [
     ("src/rt-net-json-blob.txt", "data/src/rt-net-json-blob.txt"),
     ("src/rt-net-json-pins.txt", "data/src/rt-net-json-pins.txt"),
     ("src/rt-net-json-fixes.txt", "data/src/rt-net-json-fixes.txt"),
-    ("src/rt-net-r3-blob.txt", "data/src/rt-net-r3-blob.txt"),
-    ("src/rt-net-r3-pins.txt", "data/src/rt-net-r3-pins.txt"),
-    ("src/rt-net-r3-fixes.txt", "data/src/rt-net-r3-fixes.txt"),
     ("src/rt-net-r4-blob.txt", "data/src/rt-net-r4-blob.txt"),
     ("src/rt-net-r4-pins.txt", "data/src/rt-net-r4-pins.txt"),
     ("src/rt-net-r4-fixes.txt", "data/src/rt-net-r4-fixes.txt"),

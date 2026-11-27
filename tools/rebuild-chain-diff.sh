@@ -9,6 +9,7 @@ export PATH="${HOME}/.dotnet:${PATH:-}"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export VIRE_HEADLESS=1
 unset VIRE_BUDGET || true
+export FCG_BLOCK_TOKEN="${FCG_BLOCK_TOKEN:-test-block-token1}"
 
 AFTER_SHA="$(git rev-parse HEAD)"
 BASE_SHA="$(git rev-parse df58afd1d401c67bf8b086f447399162b3cc8b78 2>/dev/null || git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
@@ -131,6 +132,9 @@ def http_req(method, path, body_send):
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
+        tok = __import__("os").environ.get("FCG_BLOCK_TOKEN") or ""
+        if len(tok) >= 16:
+            lines.append("Authorization: Bearer " + tok)
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)
@@ -219,6 +223,9 @@ def http_req(port, method, path, body_send):
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
+        tok = __import__("os").environ.get("FCG_BLOCK_TOKEN") or ""
+        if len(tok) >= 16:
+            lines.append("Authorization: Bearer " + tok)
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), 3)
     s.sendall(req)

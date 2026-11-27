@@ -102,7 +102,6 @@ foreach ($leaf in @(
     "rt-tls-pe-blob.txt", "rt-tls-pe-pins.txt", "rt-tls-pe-fixes.txt",
     "rt-net-blob.txt", "rt-net-pins.txt", "rt-net-fixes.txt",
     "rt-net-json-blob.txt", "rt-net-json-pins.txt", "rt-net-json-fixes.txt",
-    "rt-net-r3-blob.txt", "rt-net-r3-pins.txt", "rt-net-r3-fixes.txt",
     "rt-net-r4-blob.txt", "rt-net-r4-pins.txt", "rt-net-r4-fixes.txt"
 )) {
     Copy-Item (Join-Path $Root "src/$leaf") (Join-Path $Src $leaf) -Force
@@ -131,9 +130,6 @@ $pairs = @(
     @("src/rt-net-json-blob.txt", "data/src/rt-net-json-blob.txt"),
     @("src/rt-net-json-pins.txt", "data/src/rt-net-json-pins.txt"),
     @("src/rt-net-json-fixes.txt", "data/src/rt-net-json-fixes.txt"),
-    @("src/rt-net-r3-blob.txt", "data/src/rt-net-r3-blob.txt"),
-    @("src/rt-net-r3-pins.txt", "data/src/rt-net-r3-pins.txt"),
-    @("src/rt-net-r3-fixes.txt", "data/src/rt-net-r3-fixes.txt"),
     @("src/rt-net-r4-blob.txt", "data/src/rt-net-r4-blob.txt"),
     @("src/rt-net-r4-pins.txt", "data/src/rt-net-r4-pins.txt"),
     @("src/rt-net-r4-fixes.txt", "data/src/rt-net-r4-fixes.txt")
@@ -178,8 +174,11 @@ try {
 }
 Write-Output "step_gen1_host ok"
 
-$g1 = Join-Path $Root "g1.exe"
+$ProofOut = Join-Path ([IO.Path]::GetTempPath()) ("vire-proof-" + [IO.Path]::GetRandomFileName())
+New-Item -ItemType Directory -Force -Path $ProofOut | Out-Null
+$g1 = Join-Path $ProofOut "g1.exe"
 Copy-Item $gen1Exe $g1 -Force
+Write-Output "g1_copy $g1"
 $gen1HelloHex = Join-Path $Data "gen1-hello.hex"
 $gen1HelloExe = Join-Path $Data "gen1-hello.exe"
 if (Test-Path $gen1HelloHex) { Remove-Item -Force $gen1HelloHex }
@@ -220,4 +219,4 @@ if ($h1 -ne $h2) {
     }
     throw "gen1/gen2 SHA-256 differ"
 }
-Write-Output "native selfhost handoff ok"
+Write-Output "PASS_AFTER native selfhost handoff ok"

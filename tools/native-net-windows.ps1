@@ -352,4 +352,4 @@ if ($kids.Count -gt 0) {
 }
 
 try { $server.Kill() } catch { }
-Write-Output "native net windows ok"
+Write-Output "PASS_AFTER native net windows ok"

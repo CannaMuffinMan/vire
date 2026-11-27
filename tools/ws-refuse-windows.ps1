@@ -3,6 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_HEADLESS = "1"
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
@@ -46,17 +47,6 @@ $pe = [System.IO.File]::ReadAllBytes($exe)
 if ($pe[0] -ne 0x4d -or $pe[1] -ne 0x5a) { throw "missing MZ" }
 Write-Host "pe_mz_ok"
 
-function Get-ListenPort([System.Diagnostics.Process]$proc) {
-    $deadline = (Get-Date).AddSeconds(12)
-    $buf = ""
-    while ((Get-Date) -lt $deadline) {
-        $line = $proc.StandardOutput.ReadLine()
-        if ($null -eq $line) { break }
-        $buf += $line
-        if ($line -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
-    }
-    throw "no listen port: $buf"
-}
 
 function Probe-Refuse([int]$Port) {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -76,24 +66,12 @@ function Probe-Refuse([int]$Port) {
     return $line
 }
 
-$psiH = New-Object System.Diagnostics.ProcessStartInfo
-$psiH.FileName = "dotnet"
-$psiH.Arguments = "exec `"$VireDll`" data/native-ws-refuse/listen-ws.vire 18080"
-$psiH.WorkingDirectory = $Root
-$psiH.RedirectStandardOutput = $true
-$psiH.UseShellExecute = $false
-$hostProc = [System.Diagnostics.Process]::Start($psiH)
+$hostProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "data/native-ws-refuse/listen-ws.vire", "18080") -WorkingDirectory $Root
 $hport = Get-ListenPort $hostProc
 $hostLine = Probe-Refuse $hport
 $hostProc.Kill()
 
-$psiN = New-Object System.Diagnostics.ProcessStartInfo
-$psiN.FileName = $exe
-$psiN.Arguments = "18080"
-$psiN.WorkingDirectory = $Root
-$psiN.RedirectStandardOutput = $true
-$psiN.UseShellExecute = $false
-$natProc = [System.Diagnostics.Process]::Start($psiN)
+$natProc = Start-VireProcess -FilePath $exe -ArgumentList @("18080") -WorkingDirectory $Root
 $nport = Get-ListenPort $natProc
 $natLine = Probe-Refuse $nport
 $natProc.Kill()

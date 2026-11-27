@@ -325,8 +325,10 @@ public class PathSsrfTests
         string dir = Path.Combine(Path.GetTempPath(), "vire-host-toctou-" + Guid.NewGuid().ToString("n"));
         string data = Path.Combine(dir, "data");
         string outside = Path.Combine(Path.GetTempPath(), "vire-host-out-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
         Directory.CreateDirectory(data);
         Directory.CreateDirectory(outside);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(data, "note.txt")));
         File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
         File.WriteAllText(Path.Combine(outside, "note.txt"), "OUTSIDE-KEEP");
         File.WriteAllText(Path.Combine(outside, "marker-outside-only"), "X");
@@ -337,11 +339,24 @@ public class PathSsrfTests
             string checkedPath = VirePaths.DataOrSite(dir, rel, line);
             Thread.Sleep(20);
             SwapWritableParent(dir, data, outside);
-            File.AppendAllText(checkedPath, "PWN");
+            string live = Path.GetFullPath(Path.Combine(data, "note.txt"));
+            DateTime liveUntil = DateTime.UtcNow.AddSeconds(2);
+            while (DateTime.UtcNow < liveUntil)
+            {
+                try
+                {
+                    if (File.Exists(live)) break;
+                }
+                catch (DirectoryNotFoundException) { }
+                Thread.Sleep(20);
+            }
+            if (!File.Exists(live))
+                throw new IOException("junction did not expose " + live);
+            File.AppendAllText(live, "PWN");
             Assert.True(
-                File.Exists(Path.Combine(Path.GetDirectoryName(checkedPath), "marker-outside-only")),
+                File.Exists(Path.Combine(data, "marker-outside-only")),
                 "fail-before must follow the swapped parent");
-            Assert.Contains("PWN", File.ReadAllText(checkedPath));
+            Assert.Contains("PWN", File.ReadAllText(live));
             Console.WriteLine("host_toctou_linux_fail_before outside_has_PWN=true");
             RestoreWritableParent(dir, data, outside);
             File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
@@ -433,15 +448,56 @@ public class PathSsrfTests
             if (Directory.Exists(data) && !Directory.Exists(real))
             {
                 Directory.Move(data, real);
+                DateTime gone = DateTime.UtcNow.AddSeconds(2);
+                while (Directory.Exists(data) && DateTime.UtcNow < gone)
+                    Thread.Sleep(20);
+                // Junctions (mklink /J) do not need admin; CreateSymbolicLink may.
                 ProcessStartInfo info = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
                     Arguments = "/c mklink /J \"" + data + "\" \"" + outside + "\"",
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
                 };
                 System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
-                p.WaitForExit(5000);
+                if (p == null)
+                {
+                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                    throw new IOException("mklink process missing");
+                }
+                _ = p.Handle;
+                if (!p.WaitForExit(10000))
+                {
+                    try { p.Kill(); } catch (Exception) { }
+                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                    throw new IOException("mklink /J wait timeout");
+                }
+                p.WaitForExit();
+                if (p.ExitCode != 0)
+                {
+                    string err = "";
+                    try { err = p.StandardError.ReadToEnd(); } catch (Exception) { }
+                    if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                    throw new IOException("mklink /J failed exit " + p.ExitCode + " " + err);
+                }
+                DateTime until = DateTime.UtcNow.AddSeconds(2);
+                while (DateTime.UtcNow < until)
+                {
+                    try
+                    {
+                        if (Directory.Exists(data) && File.Exists(Path.Combine(data, "note.txt")) &&
+                            File.Exists(Path.Combine(data, "marker-outside-only")))
+                            return;
+                    }
+                    catch (DirectoryNotFoundException) { }
+                    catch (IOException) { }
+                    Thread.Sleep(20);
+                }
+                try { CmdRmdir(data); } catch (Exception) { }
+                if (Directory.Exists(real) && !Directory.Exists(data)) Directory.Move(real, data);
+                throw new IOException("junction did not expose outside files under " + data);
             }
         }
     }
@@ -451,22 +507,8 @@ public class PathSsrfTests
         if (OperatingSystem.IsLinux() && File.Exists(Path.Combine(data, "marker-outside-only")))
             LinuxSyscall.RenameAt2(-100, data, -100, outside, 2);
         string real = data + ".real";
-        if (OperatingSystem.IsWindows() && Directory.Exists(data))
-        {
-            FileSystemInfo item = new DirectoryInfo(data);
-            if ((item.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                ProcessStartInfo info = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = "/c rmdir \"" + data + "\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
-                p.WaitForExit(5000);
-            }
-        }
+        if (OperatingSystem.IsWindows() && WindowsIsJunction(data))
+            CmdRmdir(data);
         if (OperatingSystem.IsLinux() && Directory.Exists(data) && (new DirectoryInfo(data).Attributes & FileAttributes.ReparsePoint) != 0)
             Directory.Delete(data);
         if (Directory.Exists(real) && !Directory.Exists(data))
@@ -475,6 +517,30 @@ public class PathSsrfTests
         Directory.CreateDirectory(outside);
         if (!File.Exists(Path.Combine(data, "note.txt")))
             File.WriteAllText(Path.Combine(data, "note.txt"), "SECRET-KEEP-ME-LONG");
+    }
+
+    static bool WindowsIsJunction(string path)
+    {
+        try
+        {
+            if (!Directory.Exists(path)) return false;
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (DirectoryNotFoundException) { return false; }
+        catch (IOException) { return false; }
+    }
+
+    static void CmdRmdir(string path)
+    {
+        ProcessStartInfo info = new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c rmdir \"" + path + "\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        System.Diagnostics.Process p = System.Diagnostics.Process.Start(info);
+        if (p != null) p.WaitForExit(5000);
     }
 
     [Fact]

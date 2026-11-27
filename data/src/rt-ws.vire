@@ -43,12 +43,6 @@ define parkWs with image, labels
   return image
 end
 
-define emitWsIat with image, fixes, name
-  let image be emitList with image, [255, 21]
-  let image be emitRel with image, fixes, name
-  return image
-end
-
 define emitSha1Native with image, fixes, labels
   ~ rcx = src, rdx = len, r8 = 20-byte digest. Win64. No heap.
   pin with labels, "rt_sha1", image

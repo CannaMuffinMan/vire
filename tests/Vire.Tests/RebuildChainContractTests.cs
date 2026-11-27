@@ -64,6 +64,9 @@ public class RebuildChainContractTests
         }
         Assert.True(n >= 9);
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-diff.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "post-block-auth-native.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "post-block-auth-windows.ps1")));
+        Assert.Contains("cl_blockgate", File.ReadAllText(Path.Combine(root, "src", "rt-net.vire")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-tamper.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-chain-remainder.py")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgcpa-windows.ps1")));

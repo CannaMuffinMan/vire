@@ -3,6 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+. (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_HEADLESS = "1"
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
@@ -51,83 +52,10 @@ if (-not $OnWindows) {
     exit 0
 }
 
-Add-Type -TypeDefinition @"
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
-public static class VireListenWsFix {
-    const string Guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    public static TcpListener Listen(out int port) {
-        TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-        l.Start();
-        port = ((IPEndPoint)l.LocalEndpoint).Port;
-        Thread t = new Thread(() => {
-            try {
-                while (true) {
-                    TcpClient c = l.AcceptTcpClient();
-                    Thread inner = new Thread(() => Serve(c));
-                    inner.IsBackground = true;
-                    inner.Start();
-                }
-            } catch { }
-        });
-        t.IsBackground = true;
-        t.Start();
-        return l;
-    }
-    static void Serve(TcpClient c) {
-        try {
-            using (c) {
-                NetworkStream s = c.GetStream();
-                s.ReadTimeout = 5000;
-                byte[] buf = new byte[16384];
-                int n = s.Read(buf, 0, buf.Length);
-                string text = Encoding.ASCII.GetString(buf, 0, n);
-                if (text.Contains("/ws/refuse")) {
-                    byte[] body = Encoding.ASCII.GetBytes("forbidden");
-                    byte[] resp = Encoding.ASCII.GetBytes("HTTP/1.1 403 Forbidden\r\nContent-Length: " + body.Length + "\r\nConnection: close\r\n\r\n");
-                    s.Write(resp, 0, resp.Length);
-                    s.Write(body, 0, body.Length);
-                    return;
-                }
-                if (!text.Contains("Upgrade: websocket")) {
-                    byte[] bad = Encoding.ASCII.GetBytes("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                    s.Write(bad, 0, bad.Length);
-                    return;
-                }
-                string key = "";
-                foreach (string line in text.Split(new string[] { "\r\n" }, StringSplitOptions.None)) {
-                    if (line.StartsWith("Sec-WebSocket-Key:", StringComparison.OrdinalIgnoreCase))
-                        key = line.Substring(18).Trim();
-                }
-                byte[] acc = SHA1.HashData(Encoding.ASCII.GetBytes(key + Guid));
-                string accept = Convert.ToBase64String(acc);
-                byte[] ok = Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
-                s.Write(ok, 0, ok.Length);
-            }
-        } catch { }
-    }
-}
-"@
-
-$upPort = 0
-$listener = [VireListenWsFix]::Listen([ref]$upPort)
+$ProofDll = Get-VireProofDll
+$upProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "ws-upstream") -WorkingDirectory $Root
+$upPort = Get-ListenPort $upProc
 Write-Host "upstream 127.0.0.1:$upPort"
-
-function Get-ListenPort([System.Diagnostics.Process]$proc) {
-    $deadline = (Get-Date).AddSeconds(12)
-    $buf = ""
-    while ((Get-Date) -lt $deadline) {
-        $line = $proc.StandardOutput.ReadLine()
-        if ($null -eq $line) { break }
-        $buf += $line
-        if ($line -match "listening on 127.0.0.1:(\d+)") { return [int]$Matches[1] }
-    }
-    throw "no listen port: $buf"
-}
 
 function Probe([int]$Port, [string]$Req) {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -138,9 +66,14 @@ function Probe([int]$Port, [string]$Req) {
     $bytes = [Text.Encoding]::ASCII.GetBytes($Req)
     $stream.Write($bytes, 0, $bytes.Length)
     $buf = New-Object byte[] 4096
-    $n = $stream.Read($buf, 0, $buf.Length)
+    $ms = New-Object IO.MemoryStream
+    try {
+        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) { $ms.Write($buf, 0, $n) }
+    } catch {
+        if ($ms.Length -eq 0) { throw }
+    }
     $tcp.Close()
-    return [Text.Encoding]::ASCII.GetString($buf, 0, $n)
+    return [Text.Encoding]::ASCII.GetString($ms.ToArray())
 }
 
 function Transcript([int]$Port) {
@@ -155,28 +88,25 @@ function Transcript([int]$Port) {
     return "bad=$bad`nref=$ref`nok=$ok"
 }
 
-function Start-Bin([string]$File, [string]$Args) {
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $File
-    $psi.Arguments = $Args
-    $psi.WorkingDirectory = $Root
-    $psi.RedirectStandardOutput = $true
-    $psi.UseShellExecute = $false
-    return [System.Diagnostics.Process]::Start($psi)
-}
-
-$hostProc = Start-Bin "dotnet" "exec `"$VireDll`" data/native-listen-ws/listen-ws.vire $upPort"
+$hostProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $VireDll, "data/native-listen-ws/listen-ws.vire", "$upPort") -WorkingDirectory $Root
 $hport = Get-ListenPort $hostProc
 $hostT = Transcript $hport
 $hostProc.Kill()
 
-$natProc = Start-Bin $exe "$upPort"
+$natProc = Start-VireProcess -FilePath $exe -ArgumentList @("$upPort") -WorkingDirectory $Root
 $nport = Get-ListenPort $natProc
 $natT = Transcript $nport
 $natProc.Kill()
-try { $listener.Stop() } catch { }
+try { if (-not $upProc.HasExited) { $upProc.Kill() } } catch { }
 
-if ($hostT -ne $natT) { throw "HOST_NATIVE_MISMATCH" }
+if ($hostT -ne $natT) {
+    Write-Host "HOST_NATIVE_MISMATCH host_transcript<<<"
+    Write-Host $hostT
+    Write-Host ">>> native_transcript<<<"
+    Write-Host $natT
+    Write-Host ">>>"
+    throw "HOST_NATIVE_MISMATCH"
+}
 Write-Host "HOST_NATIVE_MATCH listen-ws"
 Write-Host ("PASS_AFTER at " + $AfterSha)
 exit 0
