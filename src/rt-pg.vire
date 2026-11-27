@@ -1,11 +1,13 @@
 ~ Guest PostgreSQL frontend/backend protocol v3 on loopback TCP.
 ~ TLS: SSLRequest then tls_wrap (sslmode require / verify-full). No DNS.
 ~ Auth: AuthenticationOk (trust), cleartext PasswordMessage, SCRAM-SHA-256
-~ (HMAC-SHA-256 via native `hash` / Latin-1 guest bytes; PBKDF2 iteration
-~ cap 8192 so a hostile server cannot burn the 5M step budget).
-~ Channel binding SCRAM-SHA-256-PLUS is residual (tls-unique / server-end-point
-~ export is not on the guest TLS API).
-~ TODO(VIRE-FINISH-NOW): guest SCRAM-SHA-256-PLUS using tls-unique / server-end-point.
+~ and SCRAM-SHA-256-PLUS (RFC 5802 gs2 / RFC 7677 / RFC 5929).
+~ HMAC-SHA-256 via native `hash` / Latin-1 guest bytes; PBKDF2 iteration
+~ cap 8192 so a hostile server cannot burn the 5M step budget.
+~ On TLS, PLUS uses tls-server-end-point (SHA-256 of the leaf DER). tls-unique
+~ is used only when conn.cbind_name is already set. No rt-net/rt-crypto edits;
+~ leaf PEM hashing lives here. No silent downgrade: PLUS-only without bind
+~ data, or a server-final e= channel-binding error, fails closed.
 ~ Prove scripts set scram_iterations=32; default 4096 is the same
 ~ protocol and stays under the cap if the guest xor loop is later nativized.
 ~ Caps stay 32MB / 100000 / 5M. Recv cap 1000000. Message length fail-closed.
@@ -503,9 +505,37 @@ define pg_scram_nonce with user, db
   return slice with hx, 0, 24
 end
 
-define pg_scram_client_first with user, nonce
+define pg_scram_client_first with user, nonce, gs2
   let bare be "n=" + (pg_scram_escape with user) + ",r=" + nonce
-  return ["n,," + bare, bare]
+  return [gs2 + bare, bare]
+end
+
+define pg_scram_gs2 with name
+  if name == "tls-unique"
+    return "p=tls-unique,,"
+  end
+  return "p=tls-server-end-point,,"
+end
+
+define pg_scram_select with tls, scram, plus, haveBind, bindName
+  if plus == 1
+    if (tls == 1) and (haveBind == 1)
+      return {"ok": true, "why": "", "mech": "SCRAM-SHA-256-PLUS", "gs2": (pg_scram_gs2 with bindName), "plus": 1}
+    end
+    if scram != 1
+      return {"ok": false, "why": "channel binding", "mech": "", "gs2": "", "plus": 0}
+    end
+    if tls == 1
+      if haveBind != 1
+        return {"ok": true, "why": "", "mech": "SCRAM-SHA-256", "gs2": "n,,", "plus": 0}
+      end
+    end
+    return {"ok": true, "why": "", "mech": "SCRAM-SHA-256", "gs2": "n,,", "plus": 0}
+  end
+  if scram != 1
+    return {"ok": false, "why": "unsupported SASL", "mech": "", "gs2": "", "plus": 0}
+  end
+  return {"ok": true, "why": "", "mech": "SCRAM-SHA-256", "gs2": "n,,", "plus": 0}
 end
 
 define pg_scram_parse_server_first with payload, clientNonce
@@ -544,7 +574,7 @@ define pg_scram_parse_server_first with payload, clientNonce
   return {"ok": true, "why": "", "r": r, "s": s, "i": rounds}
 end
 
-define pg_scram_final with secret, user, clientNonce, serverFirst, tab
+define pg_scram_final with secret, user, clientNonce, serverFirst, tab, gs2, cbind
   let parsed be pg_scram_parse_server_first with serverFirst, clientNonce
   if (parsed at "ok") == false
     return parsed
@@ -557,9 +587,10 @@ define pg_scram_final with secret, user, clientNonce, serverFirst, tab
   if salted == none
     return {"ok": false, "why": "SCRAM kdf"}
   end
-  let first be pg_scram_client_first with user, clientNonce
+  let first be pg_scram_client_first with user, clientNonce, gs2
   let bare be first at 1
-  let withoutProof be "c=biws,r=" + (parsed at "r")
+  let cbindInput be gs2 + cbind
+  let withoutProof be "c=" + (pg_b64enc with cbindInput, tab) + ",r=" + (parsed at "r")
   let authMsg be bare + "," + serverFirst + "," + withoutProof
   let clientKey be pg_hmac with salted, "Client Key", tab
   let storedKey be pg_sha with clientKey
@@ -571,7 +602,7 @@ define pg_scram_final with secret, user, clientNonce, serverFirst, tab
   let serverKey be pg_hmac with salted, "Server Key", tab
   let serverSig be pg_hmac with serverKey, authMsg, tab
   let msg be withoutProof + ",p=" + (pg_b64enc with proof, tab)
-  return {"ok": true, "why": "", "msg": msg, "v": (pg_b64enc with serverSig, tab)}
+  return {"ok": true, "why": "", "msg": msg, "v": (pg_b64enc with serverSig, tab), "c": (pg_b64enc with cbindInput, tab)}
 end
 
 define pg_sasl_mechs with payload
@@ -599,11 +630,57 @@ define pg_sasl_mechs with payload
   return {"scram": found, "plus": plus}
 end
 
-define pg_sasl_init with user, nonce
-  let first be pg_scram_client_first with user, nonce
+define pg_sasl_init with user, nonce, mech, gs2
+  let first be pg_scram_client_first with user, nonce, gs2
   let z be chr with 0
-  let body be "SCRAM-SHA-256" + z + (pg_be32 with (length with (first at 0))) + (first at 0)
+  let body be mech + z + (pg_be32 with (length with (first at 0))) + (first at 0)
   return pg_msg with "p", body
+end
+
+define pg_b64keep with ch
+  let table be (pg_b64tab) + "="
+  if (find with table, ch) < 0
+    return 0
+  end
+  return 1
+end
+
+define pg_pem_der with pem, tab
+  let begin be "-----BEGIN CERTIFICATE-----"
+  let endm be "-----END CERTIFICATE-----"
+  let a be find with pem, begin
+  let b be find with pem, endm
+  if a < 0
+    return none
+  end
+  if b < 0
+    return none
+  end
+  if b <= a
+    return none
+  end
+  let mid be slice with pem, (a + (length with begin)), b
+  let raw be ""
+  let i be 0
+  let n be length with mid
+  while i < n
+    let ch be mid at i
+    if (pg_b64keep with ch) == 1
+      let raw be raw + ch
+    end
+    let i be i + 1
+  end
+  return pg_b64dec with raw, tab
+end
+
+define pg_cbind_endpoint with der, tab
+  if der == none
+    return none
+  end
+  if (length with der) < 1
+    return none
+  end
+  return pg_sha with der
 end
 
 define pg_auth with conn, secret, user
@@ -652,17 +729,26 @@ define pg_auth with conn, secret, user
       end
       if kind == 10
         let mechs be pg_sasl_mechs with (slice with (m at "p"), 4, (length with (m at "p")))
-        if (mechs at "scram") != 1
-          return "unsupported SASL"
+        let haveBind be 0
+        if (length with (conn at "cbind")) > 0
+          let haveBind be 1
+        end
+        let pick be pg_scram_select with (conn at "tls"), (mechs at "scram"), (mechs at "plus"), haveBind, (conn at "cbind_name")
+        if (pick at "ok") == false
+          return pick at "why"
         end
         let clientNonce be pg_scram_nonce with user, (conn at "db")
-        pg_io_send with conn, (pg_sasl_init with user, clientNonce)
+        put (pick at "gs2") into conn at "gs2"
+        pg_io_send with conn, (pg_sasl_init with user, clientNonce, (pick at "mech"), (pick at "gs2"))
         let method be "scram-sha-256"
+        if (pick at "plus") == 1
+          let method be "scram-sha-256-plus"
+        end
         let handled be 1
       end
       if kind == 11
         let serverFirst be slice with (m at "p"), 4, (length with (m at "p"))
-        let fin be pg_scram_final with secret, user, clientNonce, serverFirst, tab
+        let fin be pg_scram_final with secret, user, clientNonce, serverFirst, tab, (conn at "gs2"), (conn at "cbind")
         if (fin at "ok") == false
           return fin at "why"
         end
@@ -672,6 +758,10 @@ define pg_auth with conn, secret, user
       end
       if kind == 12
         let final be slice with (m at "p"), 4, (length with (m at "p"))
+        let e be pg_scram_attr with final, "e"
+        if e != none
+          return e
+        end
         let v be pg_scram_attr with final, "v"
         if v == none
           return "malformed SASL"
@@ -694,17 +784,21 @@ define pg_auth with conn, secret, user
 end
 
 define pg_open with host, port, user, db, secret
-  return pg_open_ssl with host, port, user, db, secret, "disable", "", ""
+  return pg_open_ssl_cbind with host, port, user, db, secret, "disable", "", "", ""
 end
 
 define pg_open_ssl with host, port, user, db, secret, mode, name, ca
+  return pg_open_ssl_cbind with host, port, user, db, secret, mode, name, ca, ""
+end
+
+define pg_open_ssl_cbind with host, port, user, db, secret, mode, name, ca, leaf
   try
     let h be connect with host, port
   miss problem
     return {"ok": false, "why": problem}
   end
   let tls be 0
-  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none", "why": "", "db": db, "types": [], "tls": 0}
+  let conn be {"h": h, "tab": (pg_tab), "buf": "", "auth": "none", "why": "", "db": db, "types": [], "tls": 0, "cbind": "", "cbind_name": "", "gs2": "n,,"}
   if (mode == "require") or (mode == "verify-full")
     send with h, (pg_ssl_request)
     try
@@ -733,6 +827,22 @@ define pg_open_ssl with host, port, user, db, secret, mode, name, ca
     end
     put 1 into conn at "tls"
     let tls be 1
+    if leaf != ""
+      try
+        let pem be read with leaf
+        let der be pg_pem_der with pem, (conn at "tab")
+        let ep be pg_cbind_endpoint with der, (conn at "tab")
+        if ep == none
+          close with h
+          return {"ok": false, "why": "channel binding"}
+        end
+        put ep into conn at "cbind"
+        put "tls-server-end-point" into conn at "cbind_name"
+      miss problem
+        close with h
+        return {"ok": false, "why": "channel binding"}
+      end
+    end
   end
   pg_io_send with conn, (pg_startup with user, db)
   let why be pg_auth with conn, secret, user
