@@ -320,6 +320,7 @@ static class ListenHooks
     internal static bool OverrideEnv;
     internal static string BindMode;
     internal static string Token;
+    internal static string BlockToken;
 
     internal static void Reset()
     {
@@ -327,6 +328,7 @@ static class ListenHooks
         OverrideEnv = false;
         BindMode = null;
         Token = null;
+        BlockToken = null;
     }
 }
 
@@ -3068,6 +3070,16 @@ sealed class Program
 
     public static bool HeaderTokenMatches(string head, string expected)
     {
+        return HeaderSecretMatches(head, "X-FCG-Token", null, expected);
+    }
+
+    public static bool HeaderBearerMatches(string head, string expected)
+    {
+        return HeaderSecretMatches(head, "Authorization", "Bearer", expected);
+    }
+
+    public static bool HeaderSecretMatches(string head, string headerName, string scheme, string expected)
+    {
         if (string.IsNullOrEmpty(expected) || expected.Length < 16) return false;
         string provided = "";
         int hits = 0;
@@ -3078,9 +3090,17 @@ sealed class Program
             int colon = line.IndexOf(':');
             if (colon <= 0) continue;
             string name = line.Substring(0, colon).Trim(' ', '\t');
-            if (!string.Equals(name, "X-FCG-Token", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(name, headerName, StringComparison.OrdinalIgnoreCase)) continue;
             hits++;
-            provided = line.Substring(colon + 1).Trim(' ', '\t');
+            string raw = line.Substring(colon + 1).Trim(' ', '\t');
+            if (scheme == null)
+                provided = raw;
+            else if (raw.Length > scheme.Length
+                && raw.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)
+                && (raw[scheme.Length] == ' ' || raw[scheme.Length] == '\t'))
+                provided = raw.Substring(scheme.Length).Trim(' ', '\t');
+            else
+                provided = "";
         }
         byte[] left = new byte[256];
         byte[] right = new byte[256];

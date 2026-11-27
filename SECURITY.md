@@ -2,9 +2,22 @@
 
 ## Reporting a vulnerability
 
-Use GitHub private vulnerability reporting: on this repository, open **Security → Report a vulnerability**. Do not open a public issue for a security report.
+Report privately. Do not open a public GitHub issue for a security report.
 
-This file does not list an email contact. Whether one should be added is Canna's call.
+1. Prefer GitHub private vulnerability reporting: on this repository, open **Security → Report a vulnerability**.
+2. Or email **ogstonergrim420@gmail.com** with a description, affected version or commit, and steps to reproduce.
+
+Do not include secrets, chain data, or personal information beyond what is needed to reproduce.
+
+### Scope
+
+In scope: this repository's runner, `listen` HTTP, `POST /block` authorization, path sandbox, seals, and native compiler outputs built from this tree.
+
+Out of scope: third-party sites, social-engineering, denial of service, and issues that need a misconfigured host (for example a publicly bound listener with a leaked write token).
+
+### Expected response
+
+We will acknowledge a private report and say whether it is in scope. If we confirm it, we will work on a fix on a private or coordinated branch before any public write-up. There is no bounty program.
 
 ## Supported version
 
@@ -31,7 +44,7 @@ Native Windows x64 PE (this tree, proven in `native-security.yml` / Windows jobs
 
 ## Non-guarantees
 
-- There is no TLS server, no authorization on `POST /block`, and no public internet hardening beyond loopback-by-default plus an optional token when `VIRE_BIND` is `public`.
+- There is no TLS server and no public internet hardening beyond loopback-by-default. `POST /block` is deny-by-default: it needs `Authorization: Bearer` matching `FCG_BLOCK_TOKEN` (or `FCG_API_TOKEN` if the block token is unset), length at least 16. A missing or short write secret returns 401 and does not append. `GET /health`, `GET /info`, and `GET /chain` stay unauthenticated. `VIRE_BIND=public` still needs `FCG_API_TOKEN` of at least 16 characters for other paths.
 - A person who has the runner and the seal key can still read a compiled program. The seal stops casual reading and casual patches. It does not stop every attack.
 - Windows desktop, the native compiler, and live network samples are outside this guarantee list.
 - Caps stop runaway programs; they do not make a program safe to expose to the internet.

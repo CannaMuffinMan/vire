@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
+[Collection("listen")]
 public class ListenTests : IDisposable
 {
     ListenHost host;

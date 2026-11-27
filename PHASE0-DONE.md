@@ -16,5 +16,5 @@ Sealed `.vc` envelopes use a random AES-256-GCM nonce, so two seals of the same 
 ## What this close-out does not claim
 
 - Stage-1 and stage-2 **sealed files** on disk are not byte-identical: GCM nonces are random by design (`SealTests.RoundTripAndNonceDiffer`). The **payload** is identical.
-- Authorization for `POST /block` is still open (C7 carry-forward).
+- `POST /block` authorization is deny-by-default Bearer (`BlockAuthTests`). Native listen on unmerged #102 / #142 still needs the same write-path gate.
 - No FCGBC/testnet code was added here.
