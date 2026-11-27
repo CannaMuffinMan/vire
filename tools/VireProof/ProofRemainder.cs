@@ -47,6 +47,9 @@ static class ProofRemainder
         if (method == "POST")
         {
             lines.Append("Content-Type: application/json\r\nContent-Length: ").Append(payload.Length).Append("\r\n");
+            string tok = Environment.GetEnvironmentVariable("FCG_BLOCK_TOKEN");
+            if (!string.IsNullOrEmpty(tok) && tok.Length >= 16)
+                lines.Append("Authorization: Bearer ").Append(tok).Append("\r\n");
         }
         lines.Append("\r\n");
         byte[] head = Encoding.ASCII.GetBytes(lines.ToString());

@@ -44,6 +44,8 @@ static class VireListen
         if (!string.IsNullOrWhiteSpace(envPort)) port = Machine.RequirePort(envPort.Trim(), line);
         string bindMode = ListenHooks.OverrideEnv ? ListenHooks.BindMode : Environment.GetEnvironmentVariable("VIRE_BIND");
         string token = ListenHooks.OverrideEnv ? ListenHooks.Token : Environment.GetEnvironmentVariable("FCG_API_TOKEN");
+        string blockToken = ListenHooks.OverrideEnv ? ListenHooks.BlockToken : Environment.GetEnvironmentVariable("FCG_BLOCK_TOKEN");
+        string writeSecret = WriteSecret(blockToken, token);
         bool publish = string.Equals(bindMode, "public", StringComparison.Ordinal);
         if (publish && (string.IsNullOrEmpty(token) || token.Length < 16))
             throw new VireError("a public listener needs FCG_API_TOKEN of at least 16 characters", line);
@@ -103,7 +105,7 @@ static class VireListen
                     try
                     {
                         held.NoDelay = true;
-                        AnswerApi(held, line, token, publish, stop, root, route, show, tlsCert);
+                        AnswerApi(held, line, token, writeSecret, publish, stop, root, route, show, tlsCert);
                     }
                     catch (IOException) { }
                     catch (SocketException) { }
@@ -191,7 +193,22 @@ static class VireListen
         return true;
     }
 
-    static void AnswerApi(TcpClient client, int line, string token, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show, X509Certificate2 tlsCert)
+    static string WriteSecret(string blockToken, string apiToken)
+    {
+        if (!string.IsNullOrEmpty(blockToken))
+            return blockToken.Length >= 16 ? blockToken : null;
+        if (!string.IsNullOrEmpty(apiToken) && apiToken.Length >= 16)
+            return apiToken;
+        return null;
+    }
+
+    static bool IsPublicRead(string method, string path)
+    {
+        if (method != "GET" && method != "HEAD") return false;
+        return path == "/health" || path == "/info" || path == "/chain";
+    }
+
+    static void AnswerApi(TcpClient client, int line, string token, string writeSecret, bool publish, CancellationToken stop, string root, RouteCall route, Func<object, string> show, X509Certificate2 tlsCert)
     {
         Stream stream = client.GetStream();
         if (tlsCert != null)
@@ -256,14 +273,23 @@ static class VireListen
         string path = parsed.Path;
         string head = parsed.Head;
         string body = parsed.Body;
-        bool health = path == "/health" && (method == "GET" || method == "HEAD");
+        bool publicRead = IsPublicRead(method, path);
+        bool writeBlock = method == "POST" && path == "/block";
         bool tokenOn = !string.IsNullOrEmpty(token) && token.Length >= 16;
-        if (!health && tokenOn && !Program.HeaderTokenMatches(head, token))
+        if (writeBlock)
+        {
+            if (string.IsNullOrEmpty(writeSecret) || writeSecret.Length < 16 || !Program.HeaderBearerMatches(head, writeSecret))
+            {
+                SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
+                return;
+            }
+        }
+        else if (!publicRead && tokenOn && !Program.HeaderTokenMatches(head, token))
         {
             SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;
         }
-        if (!health && publish && !tokenOn)
+        else if (!publicRead && publish && !tokenOn)
         {
             SendApi(stream, 401, "{\"error\":\"unauthorized\"}", null);
             return;

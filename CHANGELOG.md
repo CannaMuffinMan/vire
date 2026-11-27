@@ -40,7 +40,7 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - C4. Shared `SafeName`, write-then-run refused, SSRF connect-to-checked-IP with an allowlisted public-address set.
 - C5. XOR `VIRE1` seals removed. `VC2` AES-256-GCM, required key, `vire keygen`.
 - C6. `listen`: per-request budget and 5 s deadline, 64 slots, header/body limits, `Connection: close`.
-- C7. `POST /block` server-computed index/previous/proof, segmented chain ≤ 512 KB, 503 on a broken chain, 507 when full. Authorization left open.
+- C7. `POST /block` server-computed index/previous/proof, segmented chain ≤ 512 KB, 503 on a broken chain, 507 when full. Write path later required a Bearer secret (`FCG_BLOCK_TOKEN` / `FCG_API_TOKEN`), deny-by-default.
 - C8. `serve` removed. `listen` GET/HEAD of `site/` with SafePath, no listing, 404 on traversal, symlink, and `.vire`.
 - C9. `SECURITY.md`, GUIDE limits/seal/`listen`/paths/.NET 10, this changelog.
 
@@ -49,7 +49,7 @@ Hardening of the local runner on .NET 10. Commits C0–C9, in order.
 - Track D fuzz. Seeded in-process fuzz (`FuzzTests`) for lexer/parser, `.vc` loader, JSON, and `listen` request parse. Nightly/`workflow_dispatch` job `fuzz.yml`. Parser block-depth cap, JSON size cap, fail-closed compiled loader. Track D finding table archived in `docs/history.md`.
 - Fuzz campaign (`FUZZ-CAMPAIGN.md`): grammar-aware frontend, builtins, GC/list-cap, path bind, Unicorn + Windows PE jobs. Nightly stays off the PR `check.yml` path. Caps unchanged.
 
-Open questions carried forward: who may `POST /block`; whether blocks should keep a `por` field.
+Open questions carried forward: whether blocks should keep a `por` field.
 
 ## Phase 3A (compiler grammar, first cut)
 

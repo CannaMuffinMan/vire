@@ -29,6 +29,9 @@ def http_req(port, method, path, body_send, timeout=30):
     if method == "POST":
         lines.append("Content-Type: application/json")
         lines.append("Content-Length: %d" % len(payload))
+        tok = os.environ.get("FCG_BLOCK_TOKEN") or ""
+        if len(tok) >= 16:
+            lines.append("Authorization: Bearer " + tok)
     req = ("\r\n".join(lines) + "\r\n\r\n").encode("ascii") + payload
     s = socket.create_connection(("127.0.0.1", port), timeout)
     s.sendall(req)

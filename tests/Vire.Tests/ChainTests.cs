@@ -7,14 +7,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
+[Collection("listen")]
 public class ChainTests : IDisposable
 {
     ListenHost host;
     string folder;
 
+    const string WriteToken = "test-block-token1";
+
     public ChainTests()
     {
         ListenHooks.Reset();
+        ListenHooks.OverrideEnv = true;
+        ListenHooks.BlockToken = WriteToken;
         string root = FindRoot();
         string source = File.ReadAllText(Path.Combine(root, "api", "fcgcpa.vire"));
         host = ListenHost.Start(source);
@@ -102,6 +107,8 @@ public class ChainTests : IDisposable
         Directory.CreateDirectory(Path.Combine(work, "data", "chain"));
         WriteFullChain(Path.Combine(work, "data", "chain"));
         File.WriteAllText(Path.Combine(work, "listen.vire"), source);
+        ListenHooks.OverrideEnv = true;
+        ListenHooks.BlockToken = WriteToken;
         Dictionary<string, Func> funcs = Program.Load(Path.Combine(work, "listen.vire"), work, new HashSet<string>());
         Machine machine = new Machine(funcs, work);
         machine.UseBudget(5000000);
@@ -118,8 +125,10 @@ public class ChainTests : IDisposable
             using (HttpClient client = new HttpClient())
             {
                 client.Timeout = TimeSpan.FromSeconds(30);
-                HttpResponseMessage res = client.PostAsync("http://127.0.0.1:" + port + "/block",
-                    new StringContent("{\"text\":\"overflow\"}", Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+                HttpRequestMessage overflow = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:" + port + "/block");
+                overflow.Headers.TryAddWithoutValidation("Authorization", "Bearer " + WriteToken);
+                overflow.Content = new StringContent("{\"text\":\"overflow\"}", Encoding.UTF8, "application/json");
+                HttpResponseMessage res = client.SendAsync(overflow).GetAwaiter().GetResult();
                 string reply = res.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 Assert.True((int)res.StatusCode == 507, "got " + (int)res.StatusCode + " " + reply);
             }
@@ -143,8 +152,10 @@ public class ChainTests : IDisposable
                 int n = i;
                 jobs[i] = Task.Run(() =>
                 {
-                    HttpResponseMessage res = client.PostAsync("http://127.0.0.1:" + host.Port + "/block",
-                        new StringContent("{\"text\":\"c" + n + "\"}", Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+                    HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:" + host.Port + "/block");
+                    req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + WriteToken);
+                    req.Content = new StringContent("{\"text\":\"c" + n + "\"}", Encoding.UTF8, "application/json");
+                    HttpResponseMessage res = client.SendAsync(req).GetAwaiter().GetResult();
                     Assert.Equal(200, (int)res.StatusCode);
                     string body = res.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                     int at = body.IndexOf("\"index\":", StringComparison.Ordinal);
@@ -183,8 +194,10 @@ public class ChainTests : IDisposable
 
     HttpResponseMessage Post(HttpClient client, string json)
     {
-        return client.PostAsync("http://127.0.0.1:" + host.Port + "/block",
-            new StringContent(json, Encoding.UTF8, "application/json")).GetAwaiter().GetResult();
+        HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:" + host.Port + "/block");
+        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + WriteToken);
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        return client.SendAsync(req).GetAwaiter().GetResult();
     }
 
     static string ProofOf(int index, string previous, string text)

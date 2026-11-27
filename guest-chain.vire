@@ -1,5 +1,6 @@
 ~ Native FCG GET /chain + POST /block. Same rules as api/fcgcpa.vire.
 ~ POST /block parses the request body with builtin parse (listen+parse is fixed).
+~ Write auth is packed listen Bearer (FCG_BLOCK_TOKEN / FCG_API_TOKEN), not this route.
 ~ Segment files still use find/slice: native parse of ~16KB+ string payload
 ~ is not valid yet, and 64×512KB would exceed the 32MB arena.
 ~ Proof = hash of "[" + text(index) + "," + json(previous) + "," + json(text) + "]"
