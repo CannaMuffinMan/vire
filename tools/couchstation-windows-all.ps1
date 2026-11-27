@@ -153,6 +153,8 @@ Run-Proof "dotnet-build" {
     if ($LASTEXITCODE -ne 0) { throw "vire-proof build failed" }
 }
 
+Run-Proof "windows-host-csproj" { Run-Script "tools/windows-host-csproj-windows.ps1" }
+
 Run-Proof "dotnet-test" {
     Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
     dotnet test (Join-Path $Root "tests/Vire.Tests/Vire.Tests.csproj") -c Release --nologo
