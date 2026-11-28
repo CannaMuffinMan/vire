@@ -35,6 +35,7 @@ define main
   end
   let conn be opened at "conn"
   say "auth " + (conn at "auth")
+  say "cbind " + (conn at "cbind_name")
   let one be pg_query with conn, "SELECT 1"
   if (one at "ok") == false
     fail with (one at "why")
