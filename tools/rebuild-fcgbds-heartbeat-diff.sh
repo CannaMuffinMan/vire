@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# FAIL_BEFORE / PASS_AFTER for fcgbds-go JSON heartbeat sessionId (sidecar guest).
-# guest-fcgbds.vire is proven by tools/rebuild-fcgbds-worker-diff.sh.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
