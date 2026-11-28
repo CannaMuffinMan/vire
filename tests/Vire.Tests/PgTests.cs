@@ -47,7 +47,8 @@ public class PgTests
         Assert.Contains("VIRE_BUDGET", ps);
         Assert.Contains("5000000", ps);
         Assert.Contains("127.0.0.1", ps);
-        Assert.Contains("ThrowawayVireCi1", ps);
+        Assert.Contains("pg-stub", ps);
+        Assert.DoesNotContain("choco install", ps);
         Assert.Contains("worktree add", ps);
         Assert.Contains("FAIL_BEFORE at", ps);
         Assert.Contains("5b10ea5fa5eea46859f17a52b36037d9d088c01d", ps);
