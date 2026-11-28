@@ -369,8 +369,16 @@ define emitLandingHttp with image, fixes, labels, base
   emitRel with image, fixes, "txt_st101"
   emitCallTo with image, fixes, "rt_net_has"
   emitList with image, [133, 192]
-  emitJcc with image, fixes, 132, "land_st_502"
+  emitJcc with image, fixes, 132, "land_st_405"
   emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 101, 0, 0, 0]
+  emitEpi with image
+  pin with labels, "land_st_405", image
+  emitList with image, [72, 139, 77, 240, 72, 141, 21]
+  emitRel with image, fixes, "txt_st405"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_st_502"
+  emitList with image, [72, 139, 77, 248, 76, 139, 69, 240, 186, 149, 1, 0, 0]
   emitEpi with image
   pin with labels, "land_st_502", image
   emitList with image, [72, 139, 77, 240, 72, 141, 21]
@@ -470,6 +478,67 @@ define emitLandingHttp with image, fixes, labels, base
   push with fixes, {"at": (base + 6919), "to": "rt_net_ctype_land"}
   push with fixes, {"at": (base + 2800), "to": "rt_net_statusof"}
   push with fixes, {"at": (base + 2805), "to": "land_ws_send"}
+  ~ Packed 3-param used to lea txt_empty at blob+2728 (GET nobody). POST heap
+  ~ bodies were dropped. Overlay a jmp to a trampoline that keeps GET empty
+  ~ and forwards POST/PUT heap texts (pointer >> 12). Caps unchanged.
+  put (base + 2752) into labels at "pr_body_back"
+  pin with labels, "pr_body_fix", image
+  emitList with image, [72, 139, 77, 248, 72, 139, 81, 64, 72, 137, 208, 72, 193, 232, 12]
+  emitJcc with image, fixes, 133, "pr_body_ok"
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_empty"
+  pin with labels, "pr_body_ok", image
+  emitList with image, [73, 199, 69, 0, 2, 0, 0, 0, 73, 137, 85, 8, 73, 131, 197, 16]
+  emitJmpTo with image, fixes, "pr_body_back"
+  put 233 into image at (base + 2728)
+  push with fixes, {"at": (base + 2729), "to": "pr_body_fix"}
+  ~ Packed land_ws_send maps 101 then sendhttp JSON when JSON has no "port".
+  ~ Host VireWs.Answer echos in-process. Overlay the no-port jz (blob+8216).
+  pin with labels, "land_ws_echo", image
+  emitList with image, [72, 139, 77, 232]
+  emitList with image, [72, 141, 21]
+  emitRel with image, fixes, "txt_portk"
+  emitCallTo with image, fixes, "rt_net_has"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 133, "land_ws_port_resume"
+  emitList with image, [72, 139, 69, 224]
+  emitList with image, [72, 139, 8]
+  emitList with image, [72, 137, 13]
+  emitRel with image, fixes, "ws_cli"
+  emitList with image, [72, 139, 69, 224]
+  emitList with image, [72, 139, 80, 8]
+  emitList with image, [72, 137, 85, 216]
+  emitList with image, [72, 139, 69, 224]
+  emitList with image, [76, 139, 64, 24]
+  emitList with image, [76, 137, 69, 208]
+  emitList with image, [185]
+  emitU32 with image, 8210
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 141, 72, 8]
+  emitList with image, [72, 137, 13]
+  emitRel with image, fixes, "ws_hbuf"
+  emitList with image, [76, 139, 69, 208]
+  emitList with image, [76, 137, 5]
+  emitRel with image, fixes, "ws_hlen"
+  emitList with image, [72, 139, 85, 216]
+  emitCallTo with image, fixes, "rt_memcpy"
+  emitCallTo with image, fixes, "ws_upok"
+  emitList with image, [133, 192]
+  emitJcc with image, fixes, 132, "land_ws_http"
+  emitCallTo with image, fixes, "ws_echo"
+  emitList with image, [201, 195]
+  pin with labels, "land_ws_http", image
+  emitJmpTo with image, fixes, "land_ws_sendhttp"
+  pin with labels, "land_ws_port_resume", image
+  emitList with image, [72, 139, 69, 224, 72, 139, 72, 40]
+  emitJmpTo with image, fixes, "land_ws_port_cont"
+  put (base + 8199) into labels at "land_ws_port_cont"
+  put (base + 9046) into labels at "land_ws_sendhttp"
+  put 233 into image at (base + 8191)
+  push with fixes, {"at": (base + 8192), "to": "land_ws_echo"}
+  push with fixes, {"at": (base + 8216), "to": "land_ws_echo"}
+  push with fixes, {"at": (base + 8229), "to": "land_ws_echo"}
   return image
 end
 
