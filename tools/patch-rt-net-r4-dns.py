@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Patch packed r4 DNS so PE resolve matches src/rt-dns.vire rbx/share-mode.
-
-Inserting unpacked emitDnsRuntime into compile-native blows the 100000 list cap
-on gen1. Same-length share7 and +1 push/pop rbx keep the packed shape.
-"""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -114,7 +109,6 @@ def main():
     before_leave("dns_ns_win", bytes([0xB8, 0x7F, 0, 0, 1, 0xBA, 0x35, 0, 0, 0]))
 
     push_sites = {pro_after("dns_hostok"), pro_after("dns_fmta"), pro_after("dns_parse"), pro_after("dns_ns")}
-    # Recompute after share7 (no length change). Apply inserts high to low.
     for off in sorted(set(inserts), reverse=True):
         b = bytes([0x53]) if off in push_sites else bytes([0x5B])
         if off in push_sites:

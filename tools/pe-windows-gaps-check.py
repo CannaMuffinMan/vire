@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""FAIL_BEFORE / PASS_AFTER lever for CouchStation PE gaps at 6693e0e5.
-
-Linux ELF is not PE proof. This script checks PE bytes and Unicorn PE emu.
-Caps stay arena 33554432 / list 100000 / steps 5000000.
-
-Exit 2 = FAIL_BEFORE (expected at 6693e0e5).
-Exit 0 = PASS_AFTER.
-Exit 1 = harness error.
-"""
 from pathlib import Path
-import struct
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
