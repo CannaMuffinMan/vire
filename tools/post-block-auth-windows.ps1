@@ -39,7 +39,7 @@ $port = 0
 $deadline = (Get-Date).AddSeconds(15)
 while ((Get-Date) -lt $deadline) {
     if (Test-Path $outLog) {
-        $t = [IO.File]::ReadAllText($outLog)
+        $t = Read-SharedText $outLog
         if ($t -match "listening on 127.0.0.1:(\d+)") { $port = [int]$Matches[1]; break }
     }
     if ($proc.HasExited) { throw "PE guest exited early" }
