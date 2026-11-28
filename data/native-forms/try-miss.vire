@@ -1,0 +1,8 @@
+define main
+  try
+    say number with "nope"
+    say "missed"
+  miss problem
+    say problem
+  end
+end
