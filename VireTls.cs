@@ -22,8 +22,12 @@ static class VireTls
             using (X509Certificate2 loaded = X509Certificate2.CreateFromPem(certPem, keyPem))
             {
                 byte[] pfx = loaded.Export(X509ContentType.Pfx);
-                return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
-                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+                X509KeyStorageFlags flags = X509KeyStorageFlags.Exportable;
+                if (OperatingSystem.IsWindows())
+                    flags |= X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.PersistKeySet;
+                else
+                    flags |= X509KeyStorageFlags.EphemeralKeySet;
+                return X509CertificateLoader.LoadPkcs12(pfx, (string)null, flags);
             }
         }
         catch (VireError) { throw; }

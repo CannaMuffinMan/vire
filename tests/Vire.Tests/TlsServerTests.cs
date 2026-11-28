@@ -171,6 +171,13 @@ public class TlsServerTests : IDisposable
         Assert.Contains("iat_sslacc", tls);
         Assert.Contains("rt_listen", tls);
         Assert.DoesNotContain("native tls_listen is fail-closed", tls);
+        string hostTls = File.ReadAllText(Path.Combine(root, "VireTls.cs"));
+        Assert.Contains("UserKeySet", hostTls);
+        Assert.Contains("IsWindows", hostTls);
+        Assert.Contains("PersistKeySet", hostTls);
+        string auth = File.ReadAllText(Path.Combine(root, "tools", "post-block-auth-windows.ps1"));
+        Assert.Contains("Read-SharedText", auth);
+        Assert.DoesNotContain("ReadAllText($outLog)", auth);
         Assert.Contains("\"/health\"", File.ReadAllText(Path.Combine(root, "guest-health-tls.vire")));
         Assert.Contains("fcgcpa", File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "health.json")));
         string win = File.ReadAllText(Path.Combine(root, "tools", "tls-server-windows.ps1"));
