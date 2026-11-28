@@ -90,6 +90,21 @@ dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 
 #151 keeps POST bodies on packed 3-param listen. #153 heartbeat uses 4-param `route`. Re-run both FCGBDS scripts after both PRs are in.
 
+## Proof on tip `4ea94564` (Linux agent)
+
+Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
+
+- `python3 tools/pe-windows-gaps-check.py` PASS (r4 rbx, share-7, json map).
+- `bash tools/native-forms-linux.sh` PASS. Host==native `try-miss` and `for-list` (6).
+- ServeTests + NativeFormsTests: 5 passed, 0 skipped.
+- `bash tools/pg-scram-plus-prove.sh` PASS at `73ad94ab` fold (`plus-only no bind REJECT`, `tls plus no bind REJECT`).
+- `bash tools/windows-tls-lane-check.sh` PASS (no PersistKeySet). Linux ELF is not PE proof.
+- `bash tools/native-405-proxy-ws-check.sh` PASS (host/native 405, POST `from-listen`, apigo-ws).
+- Aggregated dashboard GET 405: `tools/rebuild-portal-diff.sh` `== dashboard (no dist) == match fcgbds-dashboard-go.json` (GET `/api/challenge-verify` and `/api/reviewers-heartbeat` HTTP 405 on host and native). #156's own base still 200; this tip includes #151 packed `"status":405` overlay.
+- `bash tools/rebuild-unauth-sidecar-diff.sh` FAIL_BEFORE rpcportal ok; PASS_AFTER native rpc-portal `missing header terminator`. Same class of residual as FCGBDS worker/heartbeat native HTTP on this packed listen. Do not skip. Linux ELF is not PE proof.
+
+Still required for the proof bar: `bash tools/native-elf-selfhost.sh` gen1=gen2 x3 (hash moves with #155 `rt_for_more`) and full xUnit (0 skipped; env-only named Android/C-compiler).
+
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
 ## Env-only xUnit failures (this Linux agent)
