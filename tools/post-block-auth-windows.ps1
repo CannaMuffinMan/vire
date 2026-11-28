@@ -31,6 +31,14 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Data "chain") | Out-Null
 Copy-Item (Join-Path $Root "data/rebuild/chain/head.json") (Join-Path $Data "chain/head.json") -Force
 Copy-Item (Join-Path $Root "data/rebuild/chain/000001.json") (Join-Path $Data "chain/000001.json") -Force
 Copy-Item (Join-Path $Root "data/rebuild/chain/blocks.json") (Join-Path $Data "chain/blocks.json") -Force
+function Stop-StartedPid {
+    param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Proc)
+    $id = $Proc.Id
+    if ($id -le 0) { return }
+    try { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue } catch { }
+    try { $null = $Proc.WaitForExit(15000) } catch { }
+}
+
 $env:FCG_API_TOKEN = "short-token"
 $outLog = Join-Path $Data "block-auth-pe.log"
 $proc = Start-Process -FilePath $exe -WorkingDirectory $Root -NoNewWindow -PassThru -RedirectStandardOutput $outLog -RedirectStandardError ($outLog + ".err")
@@ -70,7 +78,7 @@ $after = Invoke-Raw $port "GET /chain HTTP/1.1`r`nHost: x`r`nConnection: close`r
 $bbody = if ($before.Contains("`r`n`r`n")) { $before.Substring($before.IndexOf("`r`n`r`n") + 4) } else { $before }
 $abody = if ($after.Contains("`r`n`r`n")) { $after.Substring($after.IndexOf("`r`n`r`n") + 4) } else { $after }
 if ($bbody -ne $abody) { throw "PE chain changed after 401" }
-try { Stop-Process -Id $proc.Id -Force } catch { }
+Stop-StartedPid $proc
 Write-Host "PASS_AFTER PE short configured secret 401 chain unchanged"
 
 Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
@@ -83,7 +91,7 @@ $port2 = 0
 $deadline2 = (Get-Date).AddSeconds(15)
 while ((Get-Date) -lt $deadline2) {
     if (Test-Path $outLog2) {
-        $t2 = [IO.File]::ReadAllText($outLog2)
+        $t2 = Read-SharedText $outLog2
         if ($t2 -match "listening on 127.0.0.1:(\d+)") { $port2 = [int]$Matches[1]; break }
     }
     if ($proc2.HasExited) { throw "PE api-token guest exited early" }
@@ -95,6 +103,7 @@ Write-Host ("POST api-token no-bearer " + ($none.Split("`r`n")[0]))
 if ($none -notmatch "401") { throw "PE FCG_API_TOKEN write path expected 401 without Bearer" }
 $wrong = Invoke-Raw $port2 "POST /block HTTP/1.1`r`nHost: x`r`nAuthorization: Bearer wrong-token-16x`r`nContent-Length: 16`r`nConnection: close`r`n`r`n{`"text`":`"wrong`"}"
 if ($wrong -notmatch "401") { throw "PE FCG_API_TOKEN wrong Bearer expected 401" }
-try { Stop-Process -Id $proc2.Id -Force } catch { }
+Stop-StartedPid $proc2
+$null = Read-SharedText $outLog2
 Write-Host "PASS_AFTER PE FCG_API_TOKEN deny-by-default 401 (CouchStation execute, not claimed from Linux)"
 Write-Host "post-block-auth windows ok"

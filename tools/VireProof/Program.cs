@@ -6,7 +6,7 @@ static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|write-pfx-expired|https-health|tls10-fail|tls-echo|pg-tls-stub|pg-tls-n|redis-tls-stub|remainder-run|remainder-pair|dns-stub|http-upok|http-echo|ws-upstream|ws-prove> ...");
+            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|write-pfx-expired|https-health|tls10-fail|tls-echo|pg-tls-stub|pg-tls-n|pg-stub|redis-tls-stub|remainder-run|remainder-pair|dns-stub|http-upok|http-echo|ws-upstream|ws-prove> ...");
             return 2;
         }
         try
@@ -20,6 +20,7 @@ static class Program
             if (cmd == "tls-echo") return ProofTls.TlsEcho(args[1], args.Length > 2 ? args[2] : "");
             if (cmd == "pg-tls-stub") return ProofPg.TlsStub(args[1], args.Length > 2 ? args[2] : "", args.Length > 3 ? args[3] : "honest");
             if (cmd == "pg-tls-n") return ProofPg.PlainN();
+            if (cmd == "pg-stub") return ProofPg.Stub(args.Length > 1 ? args[1] : "x");
             if (cmd == "redis-tls-stub") return ProofRedis.TlsStub(args[1], args[2], args[3], args.Length > 4 ? args[4] : "");
             if (cmd == "remainder-run") return ProofRemainder.Run(int.Parse(args[1]), args[2], args[3], args[4]);
             if (cmd == "remainder-pair") return ProofRemainder.Pair(int.Parse(args[1]), int.Parse(args[2]), args[3], args[4]);

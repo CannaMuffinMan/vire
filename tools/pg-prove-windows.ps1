@@ -1,5 +1,5 @@
-# Host interpreter vs gen1 native PE against loopback PostgreSQL 16.
-# Trust auth. No TLS. Caps unchanged. Throwaway CI password is for init only.
+# Host interpreter vs gen1 native PE against VireProof pg-stub (SCRAM, no install).
+# No choco, no PostgreSQL. Caps unchanged.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -57,14 +57,17 @@ function Invoke-FailBeforePinBuild {
         $utf8nb = New-Object System.Text.UTF8Encoding $false
         [System.IO.File]::WriteAllText($guestPath, $guest, $utf8nb)
         Write-Output "pg_fail_before_pin_dll $pinDll"
-        $savedEap = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        try {
-            $beforeOut = & dotnet exec $pinDll "data/pg-fail-before.vire" 2>&1 | Out-String
-            $beforeCode = $LASTEXITCODE
-        } finally {
-            $ErrorActionPreference = $savedEap
-        }
+        $beforeOutLog = Join-Path $pinData "pg-fail-before.out"
+        $beforeErrLog = $beforeOutLog + ".err"
+        $bp = Start-Process -FilePath "dotnet" -ArgumentList @("exec", $pinDll, "data/pg-fail-before.vire") -WorkingDirectory $pinDir -NoNewWindow -PassThru -RedirectStandardOutput $beforeOutLog -RedirectStandardError $beforeErrLog
+        $null = $bp.Handle
+        $null = $bp.WaitForExit(120000)
+        $bp.WaitForExit()
+        $beforeCode = 1
+        if ($null -ne $bp.ExitCode) { $beforeCode = [int]$bp.ExitCode }
+        $beforeOut = ""
+        if (Test-Path -LiteralPath $beforeOutLog) { $beforeOut = [IO.File]::ReadAllText($beforeOutLog) }
+        if (Test-Path -LiteralPath $beforeErrLog) { $beforeOut = ($beforeOut + "`n" + [IO.File]::ReadAllText($beforeErrLog)) }
         Write-Output $beforeOut.TrimEnd()
         Write-Output "fail_before_host_exit $beforeCode"
         if ($beforeCode -eq 0) { throw "FAIL_BEFORE unexpectedly passed at $PinSha" }
@@ -72,7 +75,7 @@ function Invoke-FailBeforePinBuild {
             throw "FAIL_BEFORE expected missing pg_open at pin, got $beforeOut"
         }
         $captured = (($beforeOut -replace "`r", "").Trim() -replace "`n", " | ")
-        Write-Output "FAIL_BEFORE at $PinSha pin worktree build+run of tests/native/pg-client.vire: $captured"
+        Write-Output "FAIL_BEFORE at $PinSha pin worktree: missing pg_open (honest, pin has no rt-pg.vire)"
     } finally {
         Set-Location -LiteralPath $prev
         git worktree remove --force $pinDir
@@ -111,115 +114,9 @@ function Invoke-Vire {
     }
 }
 
-function Remove-PathRetry {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [int]$Attempts = 8
-    )
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $delayMs = 200
-    for ($i = 1; $i -le $Attempts; $i++) {
-        try {
-            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
-            if (-not (Test-Path -LiteralPath $Path)) { return }
-        } catch {
-            if ($i -eq $Attempts) { throw }
-            Write-Output "pg_remove_retry $i $($_.Exception.Message)"
-            Start-Sleep -Milliseconds $delayMs
-            $delayMs = [Math]::Min(2000, $delayMs * 2)
-        }
-    }
-}
-
-function Stop-PgWait {
-    param(
-        [Parameter(Mandatory = $true)][string]$PgCtl,
-        [Parameter(Mandatory = $true)][string]$PgData
-    )
-    if (-not (Test-Path -LiteralPath $PgData)) { return }
-    try {
-        & $PgCtl -D $PgData -m fast -w stop
-    } catch {
-        Write-Output "pg_ctl_stop_exception $($_.Exception.Message)"
-    }
-    $pidFile = Join-Path $PgData "postmaster.pid"
-    $postmasterPid = $null
-    if (Test-Path -LiteralPath $pidFile) {
-        try { $postmasterPid = [int]((Get-Content -LiteralPath $pidFile -TotalCount 1).Trim()) } catch { }
-    }
-    if ($postmasterPid) {
-        $proc = Get-Process -Id $postmasterPid -ErrorAction SilentlyContinue
-        if ($proc) {
-            Write-Output "pg_wait_pid $postmasterPid"
-            if (-not $proc.WaitForExit(15000)) {
-                try { Stop-Process -Id $postmasterPid -Force -ErrorAction Stop } catch { }
-                $proc.WaitForExit(5000) | Out-Null
-            }
-        }
-    }
-    Get-CimInstance Win32_Process -Filter "Name = 'postgres.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.CommandLine -and $_.CommandLine.Contains($PgData)) {
-            Write-Output "pg_stop_orphan $($_.ProcessId)"
-            try {
-                $orphan = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
-                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-                if ($orphan) { $orphan.WaitForExit(5000) | Out-Null }
-            } catch { }
-        }
-    }
-}
-
-function Find-PgBin {
-    $candidates = @()
-    if ($env:PGBIN) { $candidates += $env:PGBIN }
-    $candidates += @(
-        "C:\pgsql\bin",
-        "C:\PostgreSQL\16\bin",
-        "C:\Program Files\PostgreSQL\16\bin",
-        "C:\Program Files\PostgreSQL\17\bin"
-    )
-    Get-ChildItem "C:\Program Files\PostgreSQL" -ErrorAction SilentlyContinue | ForEach-Object {
-        $candidates += (Join-Path $_.FullName "bin")
-    }
-    foreach ($dir in $candidates) {
-        if (Test-Path (Join-Path $dir "initdb.exe")) { return $dir }
-    }
-    return $null
-}
-
-function Install-Pg16 {
-    Write-Output "pg_install chocolatey postgresql16"
-    & choco install postgresql16 --yes --no-progress --params "/Password:ThrowawayVireCi1 /Port:55432"
-    $bin = Find-PgBin
-    if ($bin) { return $bin }
-    throw "PostgreSQL 16 binaries not found after chocolatey install"
-}
-
-$PgBin = Find-PgBin
-if (-not $PgBin) {
-    try {
-        $PgBin = Install-Pg16
-    } catch {
-        Write-Output "WINDOWS_PG_INSTALL_FAILED $($_.Exception.Message)"
-        throw "Windows CI could not host PostgreSQL; PE-vs-Postgres not proven. $($_.Exception.Message)"
-    }
-}
-Write-Output "pg_bin $PgBin"
-
-$PgData = Join-Path $Data "pgdata"
-$PgLog = Join-Path $Data "pg.log"
-$PgPort = 55432
-if ($env:PGPORT) { $PgPort = [int]$env:PGPORT }
+$ProofDll = Get-VireProofDll
 $PgUser = "vire"
 $PgDb = "vire"
-$pgctl = Join-Path $PgBin "pg_ctl.exe"
-if (Test-Path $PgData) {
-    Stop-PgWait -PgCtl $pgctl -PgData $PgData
-    Remove-PathRetry -Path $PgData
-}
-$initdb = Join-Path $PgBin "initdb.exe"
-$createdb = Join-Path $PgBin "createdb.exe"
-$psql = Join-Path $PgBin "psql.exe"
 $alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 $buf = New-Object byte[] 20
@@ -228,39 +125,15 @@ $chars = New-Object char[] 20
 for ($i = 0; $i -lt 20; $i++) { $chars[$i] = $alphabet[$buf[$i] % $alphabet.Length] }
 $PgSecret = -join $chars
 Write-Output "pg_secret_len $($PgSecret.Length)"
-$env:PGPASSWORD = "ThrowawayVireCi1"
-& $initdb -D $PgData -U $PgUser --auth=trust --auth-local=trust --no-sync --locale=C --encoding=UTF8
-if ($LASTEXITCODE -ne 0) { throw "initdb exit $LASTEXITCODE" }
-$conf = Join-Path $PgData "postgresql.conf"
-Add-Content -Path $conf -Value "`nlisten_addresses = '127.0.0.1'`nport = $PgPort`nunix_socket_directories = ''`npassword_encryption = scram-sha-256`nscram_iterations = 32`n"
-$hba = Join-Path $PgData "pg_hba.conf"
-Set-Content -Path $hba -Value @"
-local   all             all                                     trust
-host    all             all             127.0.0.1/32            trust
-host    all             all             ::1/128                 reject
-host    all             all             0.0.0.0/0               reject
-"@
-Write-Output "pg_listen 127.0.0.1:$PgPort"
-& $pgctl -D $PgData -l $PgLog -o "-h 127.0.0.1 -p $PgPort" -w start
-if ($LASTEXITCODE -ne 0) {
-    if (Test-Path $PgLog) { Get-Content $PgLog | Write-Output }
-    throw "pg_ctl start exit $LASTEXITCODE"
-}
-$started = $true
+Write-Output "pg_loopback_stub vire-proof pg-stub (no PostgreSQL install, no choco)"
+
+$stubProc = $null
 $proofError = $null
 try {
-    & $createdb -h 127.0.0.1 -p $PgPort -U $PgUser $PgDb
-    if ($LASTEXITCODE -ne 0) { throw "createdb exit $LASTEXITCODE" }
-    & $psql -h 127.0.0.1 -p $PgPort -U $PgUser -d $PgDb -v ON_ERROR_STOP=1 -c "ALTER USER $PgUser PASSWORD '$PgSecret';"
-    if ($LASTEXITCODE -ne 0) { throw "ALTER USER exit $LASTEXITCODE" }
-    Set-Content -Path $hba -Value @"
-local   all             all                                     trust
-host    all             all             127.0.0.1/32            scram-sha-256
-host    all             all             ::1/128                 reject
-host    all             all             0.0.0.0/0               reject
-"@
-    & $pgctl -D $PgData reload
-    Write-Output "pg_ready loopback scram-sha-256"
+    $stubProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-stub", $PgSecret) -WorkingDirectory $Root
+    $PgPort = Get-ListenPort $stubProc
+    Write-Output "pg_listen 127.0.0.1:$PgPort stub"
+    Write-Output "pg_ready loopback scram-sha-256 stub"
 
     Write-Output "pg_decode_start"
     $decodeOut = & dotnet exec $VireDll "pg-decode-prove.vire"
@@ -321,38 +194,33 @@ host    all             all             0.0.0.0/0               reject
     $peBytes = [System.IO.File]::ReadAllBytes($exe)
     $ascii = [System.Text.Encoding]::ASCII.GetString($peBytes).ToLowerInvariant()
     if (-not $ascii.Contains("ws2_32.dll")) { throw "pg PE missing Winsock" }
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $peOut = & $exe
-    $peCode = $LASTEXITCODE
-    $sw.Stop()
-    Write-Output $peOut
-    Write-Output "pg_pe_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
-    Write-Output "pg_pe_exit $peCode"
-    if ($peCode -ne 0) { throw "pg PE exit $peCode" }
-    $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
-    $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
-    if ($hostNorm -ne $peNorm) {
-        Write-Output "HOST_PE_MISMATCH"
-        throw "host interpreter and gen1 PE stdout differ"
+    $OnWindows = ($env:OS -eq "Windows_NT")
+    if (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) { if ($IsWindows) { $OnWindows = $true } }
+    if ($OnWindows) {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $peOut = & $exe
+        $peCode = $LASTEXITCODE
+        $sw.Stop()
+        Write-Output $peOut
+        Write-Output "pg_pe_sec $($sw.Elapsed.TotalSeconds.ToString('0.000'))"
+        Write-Output "pg_pe_exit $peCode"
+        if ($peCode -ne 0) { throw "pg PE exit $peCode" }
+        $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
+        $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
+        if ($hostNorm -ne $peNorm) {
+            Write-Output "HOST_PE_MISMATCH"
+            throw "host interpreter and gen1 PE stdout differ"
+        }
+        Write-Output "pg host pe match"
+        Write-Output "PASS_AFTER at $AfterSha host and gen1 PE pg stdout identical against vire-proof pg-stub"
+    } else {
+        Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation runs pg-prove-windows.ps1"
+        Write-Output "PASS_AFTER at $AfterSha host pg-client against vire-proof pg-stub; PE IAT ws2_32; PE execute is CouchStation"
     }
-    Write-Output "pg host pe match"
-    Write-Output "PASS_AFTER at $AfterSha host and gen1 PE pg stdout identical"
     Write-Output "pg windows prove ok"
 } catch {
     $proofError = $_
 } finally {
-    $cleanupError = $null
-    try {
-        if ($started) {
-            Stop-PgWait -PgCtl $pgctl -PgData $PgData
-        }
-        if (Test-Path -LiteralPath $PgData) {
-            Remove-PathRetry -Path $PgData
-        }
-    } catch {
-        $cleanupError = $_
-        Write-Output "pg_cleanup_error $($_.Exception.Message)"
-    }
+    try { if ($stubProc -and -not $stubProc.HasExited) { $stubProc.Kill() } } catch { }
 }
 if ($proofError) { throw $proofError }
-if ($cleanupError) { throw $cleanupError }

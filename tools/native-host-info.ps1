@@ -73,11 +73,13 @@ function Invoke-VireHttpRequest {
         [Parameter(Mandatory = $true)][int]$Port,
         [Parameter(Mandatory = $true)][string]$Method,
         [Parameter(Mandatory = $true)][string]$Path,
-        [string]$Send
+        [string]$Send,
+        [string]$Authorization
     )
     $payload = if ($null -eq $Send) { [byte[]]@() } else { [Text.Encoding]::UTF8.GetBytes($Send) }
     $sb = New-Object Text.StringBuilder
     [void]$sb.Append("$Method $Path HTTP/1.1`r`nHost: 127.0.0.1`r`nConnection: close`r`n")
+    if ($Authorization) { [void]$sb.Append("Authorization: $Authorization`r`n") }
     if ($Method -eq "POST") {
         [void]$sb.Append("Content-Type: application/json`r`nContent-Length: $($payload.Length)`r`n")
     }

@@ -36,9 +36,10 @@ function Convert-VireHexToFile([string]$HexPath, [string]$OutPath) {
     if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { throw "bad hex $HexPath" }
     $bytes = New-Object byte[] ($hex.Length / 2)
     for ($i = 0; $i -lt $bytes.Length; $i++) {
-        $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)
+        [void]($bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16))
     }
     [IO.File]::WriteAllBytes($OutPath, $bytes)
+    return
 }
 
 function Stop-OwnedProcessTree([int]$Id) {
@@ -143,23 +144,25 @@ function Compile-VireNative {
         [Parameter(Mandatory = $true)][string]$OutPath,
         [switch]$Pe
     )
-    New-Item -ItemType Directory -Force -Path (Join-Path $Root "data") | Out-Null
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $Root "data")
     if (Test-Path (Join-Path $Root $HexRel)) { Remove-Item -Force (Join-Path $Root $HexRel) }
-    $args = New-Object System.Collections.Generic.List[string]
-    [void]$args.Add("exec"); [void]$args.Add($VireDll); [void]$args.Add("--compiler")
-    [void]$args.Add("compile-native.vire"); [void]$args.Add($SrcRel); [void]$args.Add($HexRel)
-    if ($Pe) { [void]$args.Add("pe") }
+    $compileArgs = New-Object System.Collections.Generic.List[string]
+    [void]$compileArgs.Add("exec"); [void]$compileArgs.Add($VireDll); [void]$compileArgs.Add("--compiler")
+    [void]$compileArgs.Add("compile-native.vire"); [void]$compileArgs.Add($SrcRel); [void]$compileArgs.Add($HexRel)
+    if ($Pe) { [void]$compileArgs.Add("pe") }
     $stamp = [Guid]::NewGuid().ToString("N")
     $outLog = Join-Path $Root ("data/compile-" + $stamp + ".out")
     $errLog = $outLog + ".err"
-    $p = Start-OwnedProcess -FilePath "dotnet" -ArgumentList $args.ToArray() -WorkingDirectory $Root -OutLog $outLog -ErrLog $errLog
+    $p = Start-OwnedProcess -FilePath "dotnet" -ArgumentList $compileArgs.ToArray() -WorkingDirectory $Root -OutLog $outLog -ErrLog $errLog
     $code = Get-OwnedExitCode $p
+    $compOut = Read-OwnedLog $outLog
+    $compErr = Read-OwnedLog $errLog
+    if ($compOut) { Write-Host $compOut }
+    if ($compErr) { Write-Host $compErr }
     if ($code -ne 0) {
-        Write-Host (Read-OwnedLog $outLog)
-        Write-Host (Read-OwnedLog $errLog)
         throw "compile exit $code $SrcRel"
     }
-    Convert-VireHexToFile (Join-Path $Root $HexRel) $OutPath
+    $null = Convert-VireHexToFile (Join-Path $Root $HexRel) $OutPath
     if ($Pe) {
         $pe = [IO.File]::ReadAllBytes($OutPath)
         if ($pe[0] -ne 0x4d -or $pe[1] -ne 0x5a) { throw "PE missing MZ $OutPath" }
@@ -168,8 +171,9 @@ function Compile-VireNative {
         if ($elf.Length -lt 4 -or $elf[0] -ne 0x7f -or $elf[1] -ne 0x45 -or $elf[2] -ne 0x4c -or $elf[3] -ne 0x46) {
             throw "ELF missing magic $OutPath"
         }
-        try { & chmod +x $OutPath } catch { }
+        try { $null = & chmod +x $OutPath } catch { }
     }
+    return $OutPath
 }
 
 function Invoke-LoopHttp {

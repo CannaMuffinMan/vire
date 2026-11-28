@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 . (Join-Path $PSScriptRoot "native-host-info.ps1")
+. (Join-Path $PSScriptRoot "native-loopback-proof.ps1")
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
 $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
@@ -18,25 +19,10 @@ if ($LASTEXITCODE -eq 0) {
 }
 Write-Host "FAIL_BEFORE json blob moved past $FailBlob"
 
-function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
-    $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
-    if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { throw "bad hex $HexPath" }
-    $bytes = New-Object byte[] ($hex.Length / 2)
-    for ($i = 0; $i -lt $bytes.Length; $i++) {
-        $bytes[$i] = [Convert]::ToByte($hex.Substring($i * 2, 2), 16)
-    }
-    [System.IO.File]::WriteAllBytes($ExePath, $bytes)
-}
-
 function Compile-Native([string]$Src, [string]$Stem) {
     Copy-Item -LiteralPath $Src -Destination (Join-Path $Data "$Stem.vire") -Force
-    $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
-    if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire "data/$Stem.vire" "data/$Stem.hex" pe
-    if ($LASTEXITCODE -ne 0) { throw "compile-native $Stem exit $LASTEXITCODE" }
-    Convert-HexToExe $hex $exe
-    return $exe
+    return (Compile-VireNative -Root $Root -VireDll $VireDll -SrcRel "data/$Stem.vire" -HexRel "data/$Stem.hex" -OutPath $exe -Pe)
 }
 
 Write-Host "CouchStation PE json/parse"
