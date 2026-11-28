@@ -19,40 +19,40 @@ end
 
 define route with method, path, body
   if path == "/api/health"
-    return "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}"
+    return "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}\n"
   end
   if path == "/api/challenge"
-    return "{\"unavailable\":true,\"caption\":\"Visitor check is unavailable. You were not blocked.\"}"
+    return "{\"caption\":\"Visitor check is unavailable. You were not blocked.\",\"unavailable\":true}\n"
   end
   if path == "/api/challenge-verify"
     if method != "POST"
       return "{\"error\":\"Method not allowed\",\"status\":405}"
     end
-    return "{\"ok\":false,\"outcome\":\"unavailable\",\"caption\":\"Visitor check could not be scored. You were not blocked.\"}"
+    return "{\"caption\":\"Visitor check could not be scored. You were not blocked.\",\"ok\":false,\"outcome\":\"unavailable\"}\n"
   end
   if path == "/api/events"
-    return "{\"error\":\"Failed to fetch events\",\"details\":\"All upstream attempts failed\",\"status\":502}"
+    return "{\"details\":\"All upstream attempts failed\",\"error\":\"Failed to fetch events\",\"status\":502}\n"
   end
   if path == "/api/events-detailed"
-    return "{\"error\":\"Detailed events unavailable\",\"status\":503}"
+    return "{\"error\":\"Detailed events unavailable\",\"status\":503}\n"
   end
   if path == "/api/stats"
-    return "{\"gated\":true,\"streamUnlocked\":false,\"publicWallEnabled\":false,\"statsAvailable\":false}"
+    return "{\"gated\":true,\"publicWallEnabled\":false,\"statsAvailable\":false,\"streamUnlocked\":false}\n"
   end
   if path == "/api/stats-detailed"
-    return "{\"error\":\"Detailed stats unavailable\",\"statsAvailable\":false,\"status\":503}"
+    return "{\"error\":\"Detailed stats unavailable\",\"statsAvailable\":false,\"status\":503}\n"
   end
   if path == "/api/reviewers-heartbeat"
     if method != "POST"
       return "{\"error\":\"Method not allowed\",\"status\":405}"
     end
-    return "{\"ok\":false,\"fallback\":true,\"fallbackReason\":\"upstream_blocked_or_unavailable\",\"reviewers\":{\"live\":0}}"
+    return "{\"fallback\":true,\"fallbackReason\":\"upstream_blocked_or_unavailable\",\"ok\":false,\"reviewers\":{\"live\":0}}\n"
   end
   if path == "/api/stream-wall/status"
     if method != "GET"
       return "{\"error\":\"method_not_allowed\",\"status\":405}"
     end
-    return "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}"
+    return "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}\n"
   end
   if path == "/api/stream-wall/tilt"
     if method != "GET"
@@ -60,11 +60,11 @@ define route with method, path, body
         return "{\"error\":\"method_not_allowed\",\"status\":405}"
       end
     end
-    return "{\"error\":\"tilt_upstream_unavailable\",\"status\":502}"
+    return "{\"error\":\"tilt_upstream_unavailable\",\"status\":502}\n"
   end
   if (length with path) >= 5
     if (slice with path, 0, 5) == "/api/"
-      return "{\"error\":\"not_found\",\"status\":404}"
+      return "{\"error\":\"not_found\",\"status\":404}\n"
     end
   end
   if path == "/obs"
@@ -76,10 +76,10 @@ define route with method, path, body
   if path == "/defense-reports"
     let root be dist_root
     if root == none
-      return "{\"reason\":\"dist_missing\",\"status\":503}"
+      return "{\"reason\":\"dist_missing\",\"status\":503}\n"
     end
     if root == "-"
-      return "{\"reason\":\"dist_missing\",\"status\":503}"
+      return "{\"reason\":\"dist_missing\",\"status\":503}\n"
     end
     let file be dist_path with root, path
     if file == none
@@ -94,10 +94,10 @@ define route with method, path, body
   end
   let root be dist_root
   if root == none
-    return "{\"reason\":\"dist_missing\",\"status\":503}"
+    return "{\"reason\":\"dist_missing\",\"status\":503}\n"
   end
   if root == "-"
-    return "{\"reason\":\"dist_missing\",\"status\":503}"
+    return "{\"reason\":\"dist_missing\",\"status\":503}\n"
   end
   let file be dist_path with root, path
   if file == none

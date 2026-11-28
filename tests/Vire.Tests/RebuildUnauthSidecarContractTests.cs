@@ -17,6 +17,15 @@ public class RebuildUnauthSidecarContractTests
         Check(root, "fcgbds-dashboard-go", "fcgbds-dashboard-go.vire", "fcgbds-dashboard-go-fail.vire", "/api/health", "fcgbds-dashboard");
         Check(root, "fcgbds-dashboard-go", "fcgbds-dashboard-go.vire", "fcgbds-dashboard-go-fail.vire", "/api/stream-wall/status", "scheduledUnlockAt");
         Check(root, "fcgbds-dashboard-go", "fcgbds-dashboard-go.vire", "fcgbds-dashboard-go-fail.vire", "/api/events-detailed", "Detailed events unavailable");
+        Check(root, "fcgbds-dashboard-go", "fcgbds-dashboard-go.vire", "fcgbds-dashboard-go-fail.vire", "/api/events", "Failed to fetch events");
+        Check(root, "fcgbds-dashboard-go", "fcgbds-dashboard-go.vire", "fcgbds-dashboard-go-fail.vire", "/api/stream-wall/tilt", "tilt_upstream_unavailable");
+
+        string sidecar = File.ReadAllText(Path.Combine(root, "tools", "rebuild-unauth-sidecar-diff.sh"));
+        Assert.Contains("method-not-allowed.json", sidecar);
+        Assert.Contains("api-events.json", sidecar);
+        Assert.Contains("api-stream-wall-tilt.json", sidecar);
+        Assert.True(File.Exists(Path.Combine(root, "docs", "fcg-contracts-missing.md")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "prove-fcg-portal-contracts.sh")));
 
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-unauth-sidecar-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "rpc-portal-go", "BLOCKED.md")));
@@ -24,8 +33,8 @@ public class RebuildUnauthSidecarContractTests
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "dev-portal-go", "BLOCKED.md")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "rebuild", "contracts", "fcgbds-dashboard-go", "BLOCKED.md")));
 
-        string sidecar = File.ReadAllText(Path.Combine(root, "tools", "rebuild-sidecar-diff.sh"));
-        Assert.Contains("rebuild-unauth-sidecar-diff.sh", sidecar);
+        string sidecarIndex = File.ReadAllText(Path.Combine(root, "tools", "rebuild-sidecar-diff.sh"));
+        Assert.Contains("rebuild-unauth-sidecar-diff.sh", sidecarIndex);
 
         string health = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "rpc-portal-go", "api-health.json"));
         using JsonDocument doc = JsonDocument.Parse(health);

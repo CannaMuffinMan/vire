@@ -86,7 +86,6 @@ define method_not_allowed
 end
 
 define route with method, path, body, head
-  let port be number with (arg_at with 0)
   if path == "/"
     let root be dist_root
     if root == none
@@ -139,6 +138,11 @@ define route with method, path, body, head
   end
   if (length with path) >= 9
     if (slice with path, 0, 9) == "/fcg-api/"
+      let raw be arg_at with 0
+      let port be 0
+      if raw != none
+        let port be number with raw
+      end
       return proxy_reply with {"method": method, "port": port, "path": "/up", "body": body, "head": "", "prefix": "/fcg-api"}
     end
   end
@@ -162,9 +166,9 @@ define route with method, path, body, head
 end
 
 define main
-  let port be number with (arg_at with 0)
   let mode be arg_at with 1
   if mode == "proxy-echo"
+    let port be number with (arg_at with 0)
     let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": "/fcg-api"}
     say (got at "status")
     say (got at "body")
