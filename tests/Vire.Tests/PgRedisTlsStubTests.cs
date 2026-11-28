@@ -57,7 +57,7 @@ public class PgRedisTlsStubTests
             File.Copy(src, Path.Combine(root, "pg-tls-run.vire"), true);
             DualMode.Proc host = DualMode.RunVire(root, new string[] { "pg-tls-run.vire" }, root);
             Assert.True(host.Code == 0, DualMode.Norm(host.Out + " " + host.Err));
-            Assert.Contains("auth trust", DualMode.Norm(host.Out));
+            Assert.Contains("auth scram-sha-256-plus", DualMode.Norm(host.Out));
             Assert.Contains("PG TLS PROVE pass", DualMode.Norm(host.Out));
             string peRel = Rel(root, Path.Combine(work, "run.pe.hex"));
             DualMode.Proc pe = DualMode.RunVire(

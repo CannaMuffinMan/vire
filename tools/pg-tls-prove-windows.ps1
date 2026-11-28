@@ -131,7 +131,7 @@ try {
     Write-Output "pg_host_budget_cap 5000000"
     if ($hostCode -ne 0) { throw "host pg-tls exit $hostCode" }
     $hostText = "$hostOut"
-    foreach ($n in @("non-loopback refused", "auth trust", "select1 1", "paramless 42", "PG TLS PROVE pass")) {
+    foreach ($n in @("non-loopback refused", "auth scram-sha-256-plus", "select1 1", "paramless 42", "PG TLS PROVE pass")) {
         if (-not $hostText.Contains($n)) { throw "host missing $n" }
     }
     $vguest = [IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-tls-verify.vire"))
