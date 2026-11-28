@@ -141,6 +141,7 @@ static class VireListen
         finally
         {
             try { listener.Stop(); } catch (Exception) { }
+            try { if (tlsCert != null) tlsCert.Dispose(); } catch (Exception) { }
         }
     }
 
