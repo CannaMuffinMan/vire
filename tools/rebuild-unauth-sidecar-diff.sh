@@ -292,7 +292,7 @@ run_slice() {
 
   echo "=== slice $id PASS_AFTER ==="
   compile_listen_guest "$good_src" "unauth-good-$id"
-  ids="$(run_cmd "unauth-good-$id" "./data/unauth-good-${id}.elf" 0)"
+  ids="$(run_cmd "unauth-good-$id" "./data/unauth-good-${id}.elf")"
   local gpid="${ids%% *}"
   local gport="${ids##* }"
   echo "native_listen 127.0.0.1:$gport"
@@ -321,6 +321,7 @@ rpc_contracts=(
   "$CONTRACT_ROOT/rpc-portal-go/api-transfer.json"
   "$CONTRACT_ROOT/rpc-portal-go/dist-missing.json"
   "$CONTRACT_ROOT/rpc-portal-go/not-found.json"
+  "$CONTRACT_ROOT/rpc-portal-go/method-not-allowed.json"
 )
 run_slice rpcportal "$GUEST_DIR/rpc-portal-go-fail.vire" "$GUEST_DIR/rpc-portal-go.vire" "${rpc_contracts[@]}"
 
@@ -344,11 +345,13 @@ dash_contracts=(
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-health.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-challenge.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-challenge-verify.json"
+  "$CONTRACT_ROOT/fcgbds-dashboard-go/api-events.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-events-detailed.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-stats.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-stats-detailed.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-reviewers-heartbeat.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/api-stream-wall-status.json"
+  "$CONTRACT_ROOT/fcgbds-dashboard-go/api-stream-wall-tilt.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/dist-missing.json"
   "$CONTRACT_ROOT/fcgbds-dashboard-go/not-found.json"
 )

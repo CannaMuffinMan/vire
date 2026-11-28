@@ -37,7 +37,7 @@ define dist_root
 end
 
 define method_not_allowed
-  return "{\"error\":\"method_not_allowed\",\"status\":405}"
+  return "{\"error\":\"method not allowed\",\"status\":405}"
 end
 
 define route with method, path, body, head
