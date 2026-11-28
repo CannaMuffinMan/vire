@@ -19,6 +19,21 @@ public class HeaderSecretCompareTests
     }
 
     [Fact]
+    public void LongSecretsDifferingAfter4096MustNotMatch()
+    {
+        string a = new string('A', 4096) + new string('B', 904);
+        string b = new string('A', 4096) + new string('C', 904);
+        Assert.Equal(5000, a.Length);
+        Assert.Equal(5000, b.Length);
+        Assert.False(Program.HeaderTokenMatches(
+            "GET /x HTTP/1.1\r\nX-FCG-Token: " + a + "\r\n\r\n", b));
+        Assert.False(Program.HeaderBearerMatches(
+            "POST /block HTTP/1.1\r\nAuthorization: Bearer " + a + "\r\n\r\n", b));
+        Assert.True(Program.HeaderBearerMatches(
+            "POST /block HTTP/1.1\r\nAuthorization: Bearer " + a + "\r\n\r\n", a));
+    }
+
+    [Fact]
     public void LengthMismatchDoesNotMatch()
     {
         string want = new string('A', 32);

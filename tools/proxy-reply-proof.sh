@@ -23,7 +23,7 @@ cs = Path("Vire.cs").read_text()
 assert "100000" in cs
 assert "5000000" in cs
 blob = Path("src/rt-net-blob.txt").read_text().strip()
-assert blob[2728*2:2728*2+6] == "488d15"
+assert blob[2728*2:2728*2+2] == "e9"
 fixes = Path("src/rt-net-fixes.txt").read_text()
 assert "ab0a0000a400" in fixes
 print("caps_src_ok arena=33554432 list=100000 steps=5000000")

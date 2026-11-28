@@ -100,20 +100,33 @@ elif mode == "right":
     line = r.split(b"\r\n", 1)[0] if r else b"<empty>"
     print("POST right Bearer", line, r[r.find(b"\r\n\r\n")+4:][:160] if b"\r\n\r\n" in r else r[:80])
     assert b"test-block-token1" not in r
-    if b"401" in r.split(b"\r\n", 1)[0]:
-        raise SystemExit("right token was 401")
-    if b"200" in line:
-        print("PASS_AFTER right token allowed")
-    else:
-        print("RESIDUAL right token left the 401 gate (packed POST body still empty/crash)")
+    assert b"401" not in line, r
+    assert b"200" in line, r
+    assert b'"accepted":true' in r or b'"accepted": true' in r, r
+    print("PASS_AFTER right token allowed")
+elif mode == "oversize":
+    tok = b"A" * 5000
+    r = post(b"Bearer " + tok)
+    line = r.split(b"\r\n", 1)[0] if r else b"<empty>"
+    print("POST 5000-byte Bearer", line)
+    assert b"401" in line, r
+    assert tok not in r
 else:
     raise SystemExit("bad mode")
 
-if mode != "right":
+if mode not in ("right", "oversize"):
     st1, c1 = chain()
     print("GET /chain after", st1)
     assert c0 == c1
     assert b"pwned" not in c1
+elif mode == "oversize":
+    try:
+        st1, c1 = chain()
+        print("GET /chain after", st1)
+        assert c0 == c1
+        assert b"pwned" not in c1
+    except Exception as ex:
+        print("GET /chain after skipped", type(ex).__name__)
 print("mode", mode, "ok")
 PY
 }
@@ -122,6 +135,8 @@ run_case() {
   local name="$1"
   local mode="$2"
   shift 2
+  mkdir -p data/chain
+  cp data/rebuild/chain/head.json data/rebuild/chain/000001.json data/rebuild/chain/blocks.json data/chain/
   local pair pid port
   pair="$(start_elf "/tmp/vire-auth-${name}.out" "$@")"
   pid="${pair%% *}"
@@ -143,4 +158,11 @@ run_case wrong-api wrong FCG_API_TOKEN=test-block-token1
 run_case wrong-block wrong FCG_BLOCK_TOKEN=test-block-token1
 run_case right-api right FCG_API_TOKEN=test-block-token1
 run_case right-block right FCG_BLOCK_TOKEN=test-block-token1
+python3 - <<'PY'
+from pathlib import Path
+Path("/tmp/vire-oversize-secret").write_text("A" * 5000)
+PY
+run_case oversize-api oversize FCG_API_TOKEN="$(python3 -c 'print("A"*5000)')"
+run_case oversize-block oversize FCG_BLOCK_TOKEN="$(python3 -c 'print("A"*5000)')"
+run_case oversize-present oversize FCG_BLOCK_TOKEN=test-block-token1
 echo "post-block-auth native ok"

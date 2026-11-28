@@ -129,6 +129,34 @@ public class BlockAuthTests
     }
 
     [Fact]
+    public void FiveThousandByteSecretsDifferingAfter4096DoNotMatchOnHost()
+    {
+        string a = new string('A', 4096) + new string('B', 904);
+        string b = new string('A', 4096) + new string('C', 904);
+        ListenHooks.Reset();
+        ListenHooks.OverrideEnv = true;
+        ListenHooks.BlockToken = a;
+        try
+        {
+            using (ListenHost host = ListenHost.Start(ChainSource()))
+            {
+                string before = GetChain(host.Port);
+                string miss = ReadAll(host.Port, PostBlock("{\"text\":\"trunc\"}", "Bearer " + b));
+                Assert.StartsWith("HTTP/1.1 401 ", miss);
+                Assert.Equal(before, GetChain(host.Port));
+                string ok = ReadAll(host.Port, PostBlock("{\"text\":\"full5000\"}", "Bearer " + a));
+                Assert.StartsWith("HTTP/1.1 200 ", ok);
+                Assert.Contains("\"accepted\":true", ok);
+                Assert.Contains("full5000", GetChain(host.Port));
+            }
+        }
+        finally
+        {
+            ListenHooks.Reset();
+        }
+    }
+
+    [Fact]
     public void ApiTokenIsWriteSecretWhenBlockTokenUnset()
     {
         ListenHooks.Reset();
