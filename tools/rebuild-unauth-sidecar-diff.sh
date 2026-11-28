@@ -12,7 +12,7 @@ unset VIRE_BUDGET || true
 unset FCG_API_TOKEN || true
 
 AFTER_SHA="$(git rev-parse HEAD)"
-BASE_SHA="a58999b15dc8fc1b2b1fe196dd7a88aa89179630"
+BASE_SHA="6693e0e5"
 VIRE_DLL="$ROOT/bin/Release/net10.0/vire.dll"
 GUEST_DIR="$ROOT/tests/rebuild/guests"
 CONTRACT_ROOT="$ROOT/tests/rebuild/contracts"
