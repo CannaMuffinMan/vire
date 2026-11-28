@@ -30,6 +30,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #161 | `b449ffe7` (`cursor/vire-4h-pe-peercert`) | After #162. PE `tls_peer_cert` DER export; ELF/PE `tls_end_point` SHA-256/384/512 via OID (PE `CryptHashCertificate`). Packed SChannel blob **5161**, changed `[4481,5161)`. Kept #162 i2d length. Kept PE wrap `76,137,13` from #160. Conflicts in VireProof: PLUS/MITM stub from #161 plus expired PFX / redis / `pg-tls-n` / SELECT loop from the rollup. |
 | #163 | `d664343` (`cursor/vire-4h-listen-recv0`) | Fast-forward onto the rollup. Recv0 `je` at 0x5DE → in-blob `leave;ret` (r4 0x36DF / 3-param 0x510). r4 length **18843** (#159), not #150's 18855. `cl_blockgate` e9 already at 0xA78. |
 | #164 | `4f9a337e` (`cursor/vire-4h-selfhost-listcap`) | Normal merge after #163. Packs ELF `emitTlsGuest` into a 2403-byte blob (`src/rt-tls-elf.vire` + `tools/pack-tls-elf.py`). Listen/r4 blobs untouched. |
+| #165 | `49061b7` (`cursor/vire-4h-r4-dns-rbx-1673`) | Normal merge after #164. Re-inserts the 12 #150 `push`/`pop rbx` bytes into #163's 18843 r4 and rewrites crossing baked rel32s (`tools/patch-rt-net-r4-dns.py`). Length **18855**. Recv0 `leave;ret` and `e9`→0xA78 asserted. `FILE_SHARE` 7 kept. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -46,7 +47,7 @@ One implementation each. No double-include.
 Git auto-merged `src/rt-net.vire`. No conflict markers. Byte-range reconcile after folding #159 `9277ce8` (do not take #159's cleanup r4 wholesale):
 
 - **3-param `src/rt-net-blob.txt`:** take #159 (11519 bytes). Cleanup was 11420. Insertion is the body-park jmp at blob+0xAA8 (`e9` to the appended trampoline) plus 99 appended bytes. #151 overlay still jmps 0xAA8 to `pr_body_fix` / `land_st_405` / WS echo; 0xAA8 was already `e9` on #159.
-- **r4 `src/rt-net-r4-blob.txt`:** after #163, length **18843** (#159), not #150's 18855. See #163 12-byte DNS check below. Same-length `FILE_SHARE` `41 b8 01` → `41 b8 07` kept at 0x27AB.
+- **r4 `src/rt-net-r4-blob.txt`:** after #165, length **18855** (#150 DNS rbx + #163 recv0). `FILE_SHARE` `41 b8 07` at 0x27B4. `tools/patch-rt-net-r4-dns.py` inserts the 12 rbx bytes and rewrites only crossing baked `e8`/`e9`/`0f8x` rel32s (`looks_like_disp8` skips ModRM+disp8 false positives).
 - **`src/rt-net-json-blob.txt`:** still #144, not #151.
 - **`guest-chain.vire`:** #159 4-param `route with method, path, body, head` so compile uses r4.
 
@@ -64,16 +65,17 @@ bash tools/post-block-auth-native.sh
 
 - #143 (`51de3c2f`) host/native POST `/block` deny-by-default is already on `6693e0e5`. Do not merge the `native-compiler` branch. It would delete native listen.
 - #148 is `880ec761` on this tip (leaf export + RFC 5929 `tls_end_point`). Re-merge if `cursor/pg-scram-plus-e596` moves again.
-- Packed PE `dns_hostok` `push rbx` (the 12-byte #150 insert). Restoring 18855 SIGSEGVs 4-param listen (empty recv, rc -11) even with #163 recv0 and `cl_blockgate` e9 → 0xA78 or pin `rt_net_pushroute` 0x3F85. Not hidden.
+- Packed PE `dns_hostok` `push rbx` is restored on this tip by #165 (with baked-rel32 rewrite). The naive 18855 restore without that rewrite still SIGSEGVs 4-param listen.
 
 ## CouchStation one-shot (Windows PC only)
 
-Linux ELF is not PE proof. Do not touch Defender. Do not reboot. Unset `VIRE_BUDGET` (the script does this).
+Linux ELF is not PE proof. Do not touch Defender. Do not reboot. Unset `VIRE_BUDGET` and `FCG_API_TOKEN` first (the script also removes both).
 
 ```
 git fetch origin cursor/vire-4h-rollup
 git checkout cursor/vire-4h-rollup
 Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
 $env:VIRE_HEADLESS = "1"
 powershell -NoProfile -File tools/couchstation-windows-all.ps1
 ```
@@ -176,7 +178,7 @@ Diff of #150-era 18855 (`4ac9dc8`) vs #163 18843 (`d664343`) after `dns_hostok` 
 
 Not part of those 12: same-length `FILE_SHARE` `41 B8 01` → `41 B8 07` at 18843 **0x27AB** (18855 0x27B4). Kept on this tip.
 
-Re-adding the 12 bytes (restore 18855, run `tools/patch-rt-net-listen-recv0.py`, `cl_blockgate` e9 at 0xA78, and a second try e9 → `rt_net_pushroute` 0x3F85): packed DNS gaps-check **PASS** (`r4_hostok_push_rbx True`, `r4_file_share_7 True`) but 4-param ELF **GET /api/health SIGSEGV** (`recv b''`, rc -11). Unmodified 18843 (+ share-7 only) **HTTP 200**. #163 dropped the 12 bytes so listen works. The live `push rbx` in `dns_hostok` is therefore **lost** on this tip; do not hide it.
+Naive re-add of the 12 bytes (restore 18855 without rewriting baked rel32s): packed DNS gaps-check **PASS** but 4-param ELF **GET /api/health SIGSEGV**. #165 inserts the same 12 bytes then rewrites crossing baked rel32s so listen and DNS both pass.
 
 ## #163 listen / 401 / POST proofs (18843 + share-7)
 
@@ -192,20 +194,55 @@ Re-adding the 12 bytes (restore 18855, run `tools/patch-rt-net-listen-recv0.py`,
 - **gen1_exe_bytes 966656**. Compiler `itemCap` 1000000. Headroom **33344** bytes (3.3%).
 - `tools/pg-tls-stub-elf.sh` **exit 0**: host+ELF PLUS (`auth scram-sha-256-plus`, `cbind tls-server-end-point`), ELF MITM `PG TLS MITM pass`, redis host+ELF pass.
 
-## Full xUnit on this tip
+## #165 fold proof (packed r4 DNS rbx + listen)
 
-296 executed, **0 skipped**, 290 passed, **6 failed**. Do not skip or xfail.
+`tools/patch-rt-net-r4-dns.py` `looks_like_disp8` skips `e8`/`e9`/`0f8x` that are ModRM+disp8 of a prior insn (example `89 55 e8`). Only width-4 branch displacements are rewritten. **23** crossing rel32s, all real `e9`/`0f84`/`0f83` (0 rel8, 0 non-branch):
 
-Env-only (missing tools on this Linux agent):
+| opcode | site → old tgt (rel) | now site → new tgt (rel) |
+|---|---|---|
+| `e9` | 0x159 → 0x4067 (+16137) | 0x159 → 0x4073 (+16149) |
+| `0f84` | 0x5DE → 0x36DF (+12539) recv0 | 0x5DE → 0x36EB (+12551) `leave;ret` |
+| `e9` ×18 | 0x412C..0x41F8 → 0x179 | 0x4138..0x4204 → 0x179 (rel −12) |
+| `0f83` | 0x48D7 → 0x1BB4 (`cl_401`) | 0x48E3 → 0x1BB4 |
+| `0f83` | 0x4917 → 0x1BB4 (`cl_401`) | 0x4923 → 0x1BB4 |
+| `e9` | 0x4996 → 0xA78 (`cl_blockgate`) | 0x49A2 → 0xA78 |
+
+Independent re-proof on merge tip:
+
+- `python3 tools/pe-windows-gaps-check.py` **PASS_AFTER** (`r4_hostok_push_rbx True` byte 0x53, `r4_file_share_7 True`).
+- `WindowsPeProofTests.PackedR4DnsPreservesRbxAndFileShare` **passed**.
+- `NativeNetTests.DnsResolveGuestPeShapeParksStubAndKeepsLinuxFlagOutsideR4Blob` **passed**.
+- `NativeListenRecv0Tests` 2 **passed**.
+- `tools/post-block-auth-native.sh` **ok** (401 matrix + POST `/block` 200).
+- `tools/rebuild-unauth-sidecar-diff.sh` **ok**.
+- `tools/rebuild-fcgbds-heartbeat-diff.sh` **ok**.
+- `tools/pg-tls-stub-elf.sh` **exit 0** including ELF MITM.
+- `tools/native-elf-selfhost.sh` gen1=gen2 x3 `27dad454a16dc7af47dc28ee121053f57a7e2b0aa8a17aef3141a9643da98661`. gen1 **966656** bytes, itemCap 1000000, headroom **33344**.
+
+## Full xUnit after #165
+
+296 executed, **0 skipped**, 292 passed, **4 failed** (env-only only):
 
 - `ApkTests.PackWritesApkWithManifest` — `ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`; aapt not installed
 - `DriverImageTests.LinkedDriverImageIsPe` — `the C compiler is not installed`
 - `AndroidSoTests.AndroidBuildEmitsElfSharedLibrary` — `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
 - `ToolchainTests.BuildCompilesCAndroidAndDriver` — `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
 
-Real (not missing tools) — #150 packed DNS `push rbx` dropped with #163 18843:
+No real product failures on this Linux agent.
 
-- `WindowsPeProofTests.PackedR4DnsPreservesRbxAndFileShare` — hex missing `5348894df8` (`push rbx; mov [rbp-8],rcx`)
-- `NativeNetTests.DnsResolveGuestPeShapeParksStubAndKeepsLinuxFlagOutsideR4Blob` — `PE dns_hostok must push rbx`
+## Ready for Windows PE
 
-Machines with SDK/NDK and a C compiler must pass the four env tests. Linux ELF is not Windows PE proof. GitHub Actions billing-lock is ignored. Do not merge this rollup to `native-compiler` or `main`.
+Linux ELF is not PE execute. CouchStation is the PE proof:
+
+```
+git fetch origin cursor/vire-4h-rollup
+git checkout cursor/vire-4h-rollup
+Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
+$env:VIRE_HEADLESS = "1"
+powershell -NoProfile -File tools/couchstation-windows-all.ps1
+```
+
+The script also unsets `VIRE_BUDGET` and `FCG_API_TOKEN`. Do not touch Defender. Do not reboot. Results: `data/couchstation-windows-all-results.md` and `data/couchstation-windows-all.log`.
+
+Do not merge this rollup (#158) to `native-compiler` or `main`. GitHub Actions billing-lock is ignored.
