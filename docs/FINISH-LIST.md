@@ -9,7 +9,6 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | tests/rebuild/contracts/edge-go/BLOCKED.md | edge-go contracts | Host-map/maintenance/payments behaviors still blocked | high | tests-docs |
 | tests/rebuild/contracts/dev-portal-go/BLOCKED.md | dev-portal-go contracts | Cookie/JWT/proxy/static routes still blocked | high | tests-docs |
 | tests/rebuild/FCGBDS-WORKER.md | FCGBDS worker | Native POST body, reviewer TTL, bind, PE proof still open | high | tests-docs |
-| src/rt-pg.vire | pg_auth / SCRAM | Guest SCRAM-SHA-256-PLUS using tls-unique / server-end-point | medium | rt-net |
 | tools/tls-schannel-windows.ps1 | PE tls_listen | CouchStation 50f01259 18:11-18:42 ET: `PE tls_listen exited 1`. Packed PE SChannel tls_listen, present at pre-cleanup c813695. Harness now kills tls-echo process trees and reads child logs with FileShare.ReadWrite. | high | tools-ci |
 | tools/pg-redis-tls-windows.ps1 | PE tls_wrap ping | CouchStation 50f01259 18:11-18:42 ET: `PE tls_wrap ping missing PONG`. Packed PE tls_wrap, present at pre-cleanup c813695. Leftover `vire-proof tls-echo` held the child log; finally + FileShare.ReadWrite. | high | tools-ci |
 | Vire.cs | Builtin serve | Drop the serve name from Builtins once guests no longer call it | low | host-cs |

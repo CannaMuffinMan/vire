@@ -182,6 +182,7 @@ Run-Proof "json-prove-windows" { Run-Script "tools/json-prove-windows.ps1" }
 Run-Proof "crypto-prove-windows" { Run-Script "tools/crypto-prove-windows.ps1" }
 Run-Proof "pg-prove-windows" { Run-Script "tools/pg-prove-windows.ps1" }
 Run-Proof "pg-tls-prove-windows" { Run-Script "tools/pg-tls-prove-windows.ps1" }
+Run-Proof "pg-scram-plus-windows" { Run-Script "tools/pg-scram-plus-windows.ps1" }
 Run-Proof "fuzz-windows" { Run-Script "tools/fuzz-windows.ps1" }
 
 Run-Proof "pe-json-map-fault-90" {
