@@ -21,9 +21,10 @@ static class VireTls
             string keyPem = File.ReadAllText(keyPath);
             using (X509Certificate2 loaded = X509Certificate2.CreateFromPem(certPem, keyPem))
             {
-                byte[] pfx = loaded.Export(X509ContentType.Pfx);
-                return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
-                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+                string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+                byte[] pfx = loaded.Export(X509ContentType.Pfx, password);
+                try { return LoadPkcs12ForListen(pfx, password); }
+                finally { CryptographicOperations.ZeroMemory(pfx); }
             }
         }
         catch (VireError) { throw; }
@@ -31,6 +32,39 @@ static class VireTls
         {
             throw new VireError("could not load that tls certificate", line, column);
         }
+    }
+
+    internal static X509Certificate2 LoadPkcs12ForListen(byte[] pfx, string password)
+    {
+        X509Certificate2 loaded = X509CertificateLoader.LoadPkcs12(
+            pfx, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+        if (!OperatingSystem.IsWindows()) return loaded;
+        X509Certificate2 bound = BindWindowsSchannelKey(loaded);
+        if (!object.ReferenceEquals(bound, loaded)) loaded.Dispose();
+        return bound;
+    }
+
+    static X509Certificate2 BindWindowsSchannelKey(X509Certificate2 loaded)
+    {
+        using (RSA rsa = loaded.GetRSAPrivateKey())
+        {
+            if (rsa != null)
+            {
+                RSA eph = RSA.Create();
+                eph.ImportParameters(rsa.ExportParameters(true));
+                return loaded.CopyWithPrivateKey(eph);
+            }
+        }
+        using (ECDsa ecdsa = loaded.GetECDsaPrivateKey())
+        {
+            if (ecdsa != null)
+            {
+                ECDsa eph = ECDsa.Create();
+                eph.ImportParameters(ecdsa.ExportParameters(true));
+                return loaded.CopyWithPrivateKey(eph);
+            }
+        }
+        return loaded;
     }
 
     internal static SslStream WrapServer(Stream inner, X509Certificate2 cert, int line)
@@ -45,7 +79,7 @@ static class VireTls
         {
             SslServerAuthenticationOptions opts = new SslServerAuthenticationOptions
             {
-                ServerCertificate = cert,
+                ServerCertificateContext = SslStreamCertificateContext.Create(cert, additionalCertificates: null, offline: true),
                 EnabledSslProtocols = Tls12Plus,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
                 ClientCertificateRequired = false,
@@ -231,5 +265,63 @@ static class VireTls
     {
         table.CloseTls(handle, line, column);
         return null;
+    }
+
+    internal static string PeerCert(object handle, VireTcpTable table, int line, int column)
+    {
+        SslStream tls = table.NeedTls(handle, line, column);
+        X509Certificate2 cert = tls.RemoteCertificate as X509Certificate2;
+        if (cert == null && tls.RemoteCertificate != null)
+            cert = new X509Certificate2(tls.RemoteCertificate);
+        if (cert == null)
+            throw new VireError("channel binding", line, column);
+        byte[] der = cert.RawData;
+        if (der == null || der.Length < 1)
+            throw new VireError("channel binding", line, column);
+        return VireSeal.FromBytes(der);
+    }
+
+    internal static string EndPoint(object derObj, int line, int column)
+    {
+        string der = derObj as string;
+        if (der == null || der.Length < 1)
+            throw new VireError("channel binding", line, column);
+        byte[] raw;
+        try { raw = VireSeal.ToBytes(der); }
+        catch (VireError) { throw new VireError("channel binding", line, column); }
+        byte[] hashed = Rfc5929EndPoint(raw);
+        if (hashed == null || hashed.Length < 1)
+            throw new VireError("channel binding", line, column);
+        return VireSeal.FromBytes(hashed);
+    }
+
+    internal static byte[] Rfc5929EndPoint(byte[] der)
+    {
+        if (der == null || der.Length < 1) return null;
+        HashAlgorithmName name = HashAlgorithmName.SHA256;
+        try
+        {
+            X509Certificate2 cert = X509CertificateLoader.LoadCertificate(der);
+            name = EndPointHash(cert.SignatureAlgorithm != null ? cert.SignatureAlgorithm.Value : "");
+        }
+        catch (CryptographicException) { }
+        using (HashAlgorithm alg = HashFor(name))
+            return alg.ComputeHash(der);
+    }
+
+    static HashAlgorithmName EndPointHash(string oid)
+    {
+        if (oid == "1.2.840.113549.1.1.12" || oid == "1.2.840.10045.4.3.3" || oid == "2.16.840.1.101.3.4.2.2")
+            return HashAlgorithmName.SHA384;
+        if (oid == "1.2.840.113549.1.1.13" || oid == "1.2.840.10045.4.3.4" || oid == "2.16.840.1.101.3.4.2.3")
+            return HashAlgorithmName.SHA512;
+        return HashAlgorithmName.SHA256;
+    }
+
+    static HashAlgorithm HashFor(HashAlgorithmName name)
+    {
+        if (name == HashAlgorithmName.SHA384) return SHA384.Create();
+        if (name == HashAlgorithmName.SHA512) return SHA512.Create();
+        return SHA256.Create();
     }
 }

@@ -222,19 +222,19 @@ define parkNet with image, labels
   let image be emitU64 with image, 0
   pin with labels, "token_env", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end
   pin with labels, "token_left", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end
   pin with labels, "token_right", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end

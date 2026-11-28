@@ -872,13 +872,15 @@ define emitTlsPeGuest with image, fixes, labels
   emitList with image, [72, 137, 21]
   emitRel with image, fixes, "tls_captr"
   emitPop2 with image
-  ~ rax/rdx = handle, r8/r9 = name
+  ~ rax/rdx = handle, r8/r9 = name box. Store the box at [rbp-48] and the
+  ~ C string at tls_nameptr (pszTargetName). Do not treat [r9] as length
+  ~ before the box is saved: a zero first qword is wrap_bad on interned
+  ~ text that is not empty, which is the PE analog of ELF #160.
   emitList with image, [72, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
   emitList with image, [73, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
-  emitList with image, [73, 139, 1, 73, 133, 192, 15, 132]
-  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 77, 208]
   emitList with image, [73, 141, 65, 8, 72, 137, 5]
   emitRel with image, fixes, "tls_nameptr"
   emitList with image, [72, 137, 85, 224, 72, 137, 21]
@@ -1023,7 +1025,7 @@ define emitTlsPeGuest with image, fixes, labels
   pin with labels, "rt_tls_listen", image
   emitPro with image
   emitPop2 with image
-  emitList with image, [72, 137, 85, 208, 76, 137, 77, 216, 72, 137, 13]
+  emitList with image, [72, 137, 85, 208, 76, 137, 77, 216, 76, 137, 13]
   emitRel with image, fixes, "tls_keyptr"
   emitList with image, [72, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_listen_args"
@@ -1055,6 +1057,199 @@ define emitTlsPeGuest with image, fixes, labels
   emitFail with image, fixes, "msg_tls_listen"
   pin with labels, "tls_cert_fail", image
   emitFail with image, fixes, "msg_tls_cert"
+
+  pin with labels, "rt_tls_peer_cert", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [186]
+  emitU32 with image, 83
+  emitList with image, [76, 141, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  let image be emitIat with image, fixes, "iat_qca"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [139, 80, 16, 133, 210, 15, 132]
+  emitRel with image, fixes, "tls_peer_free"
+  emitList with image, [129, 250]
+  emitU32 with image, 1000000
+  emitList with image, [15, 135]
+  emitRel with image, fixes, "tls_peer_free"
+  emitList with image, [137, 85, 232, 137, 209, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 139, 81, 8, 68, 139, 69, 232, 72, 141, 72, 8]
+  emitCallTo with image, fixes, "tls_copy"
+  emitList with image, [72, 139, 85, 224, 139, 69, 232, 72, 137, 2, 198, 68, 2, 8, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  let image be emitIat with image, fixes, "iat_fct"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_peer_free", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 133, 201, 116]
+  emitU8 with image, 6
+  let image be emitIat with image, fixes, "iat_fct"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  pin with labels, "tls_peer_bad", image
+  emitFail with image, fixes, "msg_tls_peer"
+
+  pin with labels, "tls_read_len", image
+  emitList with image, [72, 57, 193, 15, 131]
+  emitRel with image, fixes, "tls_rl_fail"
+  emitList with image, [15, 182, 17, 72, 255, 193, 246, 194, 128, 15, 132]
+  emitRel with image, fixes, "tls_rl_done"
+  emitList with image, [131, 226, 127, 133, 210, 15, 132]
+  emitRel with image, fixes, "tls_rl_fail"
+  emitList with image, [131, 250, 4, 15, 135]
+  emitRel with image, fixes, "tls_rl_fail"
+  emitList with image, [69, 49, 201]
+  pin with labels, "tls_rl_long", image
+  emitList with image, [72, 57, 193, 15, 131]
+  emitRel with image, fixes, "tls_rl_fail"
+  emitList with image, [65, 193, 225, 8, 68, 15, 182, 25, 72, 255, 193, 69, 1, 217, 255, 202, 15, 133]
+  emitRel with image, fixes, "tls_rl_long"
+  emitList with image, [68, 137, 202]
+  pin with labels, "tls_rl_done", image
+  emitList with image, [195]
+  pin with labels, "tls_rl_fail", image
+  emitList with image, [49, 210, 72, 131, 200, 255, 195]
+
+  pin with labels, "tls_ep_kind", image
+  emitPro with image
+  emitList with image, [72, 137, 77, 248, 72, 141, 4, 17, 72, 137, 69, 240]
+  emitList with image, [72, 139, 85, 248, 72, 131, 194, 2, 72, 59, 85, 240, 15, 135]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 139, 85, 248, 128, 58, 48, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 141, 74, 1, 72, 139, 69, 240]
+  emitCallTo with image, fixes, "tls_read_len"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [128, 57, 48, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 255, 193, 72, 139, 69, 240]
+  emitCallTo with image, fixes, "tls_read_len"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 1, 209, 72, 59, 77, 240, 15, 131]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [128, 57, 48, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 255, 193, 72, 139, 69, 240]
+  emitCallTo with image, fixes, "tls_read_len"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [128, 57, 6, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 255, 193, 72, 139, 69, 240]
+  emitCallTo with image, fixes, "tls_read_len"
+  emitList with image, [72, 131, 248, 255, 15, 132]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 131, 250, 9, 15, 133]
+  emitRel with image, fixes, "tls_ep_try8"
+  emitList with image, [72, 139, 1]
+  emitList with image, [72, 190, 42, 134, 72, 134, 247, 13, 1, 1]
+  emitList with image, [72, 57, 198, 15, 133]
+  emitRel with image, fixes, "tls_ep_nist"
+  emitList with image, [128, 121, 8, 12, 15, 132]
+  emitRel with image, fixes, "tls_ep_384"
+  emitList with image, [128, 121, 8, 13, 15, 132]
+  emitRel with image, fixes, "tls_ep_512"
+  emitJmpTo with image, fixes, "tls_ep_def"
+  pin with labels, "tls_ep_nist", image
+  emitList with image, [72, 190, 96, 134, 72, 1, 101, 3, 4, 2]
+  emitList with image, [72, 57, 198, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [128, 121, 8, 2, 15, 132]
+  emitRel with image, fixes, "tls_ep_384"
+  emitList with image, [128, 121, 8, 3, 15, 132]
+  emitRel with image, fixes, "tls_ep_512"
+  emitJmpTo with image, fixes, "tls_ep_def"
+  pin with labels, "tls_ep_try8", image
+  emitList with image, [72, 131, 250, 8, 15, 133]
+  emitRel with image, fixes, "tls_ep_def"
+  emitList with image, [72, 139, 1]
+  emitList with image, [72, 190, 42, 134, 72, 206, 61, 4, 3, 3]
+  emitList with image, [72, 57, 198, 15, 132]
+  emitRel with image, fixes, "tls_ep_384"
+  emitList with image, [72, 190, 42, 134, 72, 206, 61, 4, 3, 4]
+  emitList with image, [72, 57, 198, 15, 132]
+  emitRel with image, fixes, "tls_ep_512"
+  emitJmpTo with image, fixes, "tls_ep_def"
+  pin with labels, "tls_ep_384", image
+  emitList with image, [184]
+  emitU32 with image, 48
+  emitEpi with image
+  pin with labels, "tls_ep_512", image
+  emitList with image, [184]
+  emitU32 with image, 64
+  emitEpi with image
+  pin with labels, "tls_ep_def", image
+  emitList with image, [184]
+  emitU32 with image, 32
+  emitEpi with image
+
+  pin with labels, "rt_tls_end_point", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 137, 85, 248, 72, 139, 10, 72, 137, 77, 240, 72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 141, 74, 8, 72, 139, 85, 240]
+  emitCallTo with image, fixes, "tls_ep_kind"
+  emitList with image, [72, 137, 69, 216, 72, 137, 193, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 216, 72, 137, 8]
+  emitList with image, [186]
+  emitU32 with image, 32780
+  emitList with image, [72, 131, 125, 216, 48, 15, 132]
+  emitRel with image, fixes, "tls_ep_alg384"
+  emitList with image, [72, 131, 125, 216, 64, 15, 132]
+  emitRel with image, fixes, "tls_ep_alg512"
+  emitJmpTo with image, fixes, "tls_ep_hash"
+  pin with labels, "tls_ep_alg384", image
+  emitList with image, [186]
+  emitU32 with image, 32781
+  emitJmpTo with image, fixes, "tls_ep_hash"
+  pin with labels, "tls_ep_alg512", image
+  emitList with image, [186]
+  emitU32 with image, 32782
+  pin with labels, "tls_ep_hash", image
+  emitList with image, [49, 201, 69, 49, 192, 76, 139, 77, 248, 73, 131, 193, 8]
+  emitList with image, [72, 139, 69, 240, 72, 137, 68, 36, 32]
+  emitList with image, [72, 139, 69, 232, 72, 141, 64, 8, 72, 137, 68, 36, 40]
+  emitList with image, [139, 69, 216, 137, 69, 208, 72, 141, 69, 208, 72, 137, 68, 36, 48]
+  let image be emitIat with image, fixes, "iat_chc"
+  emitList with image, [133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 2
+  emitEpi with image
   return image
 end
 

@@ -1,0 +1,92 @@
+use "src/rt-pg.vire"
+
+define proveOk with tag, cond, box
+  if cond
+    say tag + " PASS"
+  end
+  if not cond
+    say tag + " FAIL"
+    put (1 + (box at 0)) into box at 0
+  end
+  return box
+end
+
+define proveBad with tag, why, needle, box
+  if (find with why, needle) < 0
+    say tag + " FAIL why=" + why + " need " + needle
+    put (1 + (box at 0)) into box at 0
+  end
+  if (find with why, needle) >= 0
+    say tag + " REJECT " + why
+  end
+  return box
+end
+
+define main
+  let box be [1]
+  let tab be pg_tab
+
+  let onlyPlus be pg_scram_select with 0, 0, 1, 0, ""
+  proveBad with "plus-only no tls", (onlyPlus at "why"), "channel binding", box
+
+  let tlsNoBindPlusOnly be pg_scram_select with 1, 0, 1, 0, ""
+  proveBad with "plus-only no bind", (tlsNoBindPlusOnly at "why"), "channel binding", box
+
+  let tlsBothNoBind be pg_scram_select with 1, 1, 1, 0, ""
+  proveBad with "tls plus no bind", (tlsBothNoBind at "why"), "channel binding", box
+
+  let emptyLeaf be pg_cbind_endpoint with "", tab
+  proveOk with "empty leaf der", (emptyLeaf == none), box
+
+  let bothNoTls be pg_scram_select with 0, 1, 1, 0, ""
+  proveOk with "plain when not tls", (((bothNoTls at "mech") == "SCRAM-SHA-256") and ((bothNoTls at "gs2") == "n,,")), box
+
+  let tlsBind be pg_scram_select with 1, 1, 1, 1, "tls-server-end-point"
+  proveOk with "plus when tls bind", (((tlsBind at "mech") == "SCRAM-SHA-256-PLUS") and ((tlsBind at "gs2") == "p=tls-server-end-point,,")), box
+
+  let uniq be pg_scram_select with 1, 1, 1, 1, "tls-unique"
+  proveOk with "tls-unique if present", ((uniq at "gs2") == "p=tls-unique,,"), box
+
+  let noPlus be pg_scram_select with 1, 0, 0, 1, ""
+  proveBad with "no mechs", (noPlus at "why"), "unsupported SASL", box
+
+  let e be pg_scram_attr with "e=server-does-support-channel-binding", "e"
+  proveOk with "server requires cbind", (e == "server-does-support-channel-binding"), box
+
+  let salt be pg_b64dec with "W22ZaJ0SNY7soEsUEjb6gQ==", tab
+  let cn be "rOprNGfwEbeRWgbNEkqO"
+  let sn be "rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0"
+  let sf2 be "r=" + sn + ",s=W22ZaJ0SNY7soEsUEjb6gQ==,i=2"
+
+  let der be "test-leaf-der"
+  let ep be pg_cbind_endpoint with der, tab
+  let plus be pg_scram_final with "pencil", "user", cn, sf2, tab, "p=tls-server-end-point,,", ep
+  proveOk with "PLUS c= endpoint", ((plus at "c") == "cD10bHMtc2VydmVyLWVuZC1wb2ludCws+W9jzQHkRQ71PyGih6QL+qyKQDmfm27GQmpnjiiYQq8="), box
+  proveOk with "PLUS client-final p", ((find with (plus at "msg"), "p=Vpnjt2+Abe/rAhS3tr5js38IyDQA+Bxp2l7VlQi+Ays=") >= 0), box
+  proveOk with "PLUS server-signature", ((plus at "v") == "23s8XLYC7bpEBy4cCCPsjoBLTogzVX5974pzmk5M0S4="), box
+
+  let u be ""
+  let i be 0
+  while i < 32
+    let u be u + (chr with i)
+    let i be i + 1
+  end
+  let tu be pg_scram_final with "pencil", "user", cn, sf2, tab, "p=tls-unique,,", u
+  proveOk with "tls-unique c=", ((tu at "c") == "cD10bHMtdW5pcXVlLCwAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw=="), box
+  proveOk with "tls-unique v", ((tu at "v") == "vLRGSnzxjWpVBYYuy+/vCgxGZqNnwYlUkz2E6QTEusk="), box
+
+  let sf be "r=" + sn + ",s=W22ZaJ0SNY7soEsUEjb6gQ==,i=2"
+  let plain be pg_scram_final with "pencil", "user", cn, sf, tab, "n,,", ""
+  proveOk with "RFC7677 client-final", ((plain at "msg") == "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=+8IuI+Z9YyDzU8xInNL2c22amQl0062aatEYJyAY3k4="), box
+  proveOk with "RFC7677 errata v", ((plain at "v") == "ndAdrh5TECKakHzPBk4un3277PJn0A8uU1LbVR2ya5w="), box
+  proveOk with "RFC7677 c=biws", ((plain at "c") == "biws"), box
+  say "RFC7677 i=4096 published p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ= (guest xor8 cannot run i=4096 under 5M while)"
+
+  if (box at 0) == 1
+    say "PG SCRAM PLUS PROVE pass"
+  end
+  if (box at 0) != 1
+    say "PG SCRAM PLUS PROVE fails " + (text with (box at 0))
+    halt with 1
+  end
+end

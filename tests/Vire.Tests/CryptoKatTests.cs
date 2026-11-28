@@ -7,6 +7,18 @@ using Xunit;
 public class CryptoKatTests
 {
     [Fact]
+    public void GuestSha256DoesNotCallDigestBuiltin()
+    {
+        string src = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "src", "rt-crypto.vire"));
+        int wrap = src.IndexOf("define sha256_bytes with buf", StringComparison.Ordinal);
+        Assert.True(wrap >= 0);
+        string body = src.Substring(wrap, src.IndexOf("define sha256_hex", wrap) - wrap);
+        Assert.Contains("sha_compress", body);
+        Assert.Contains("sha_iv", body);
+        Assert.DoesNotContain("digest with buf", body);
+    }
+
+    [Fact]
     public void GuestSha256AbcMatchesFips1804()
     {
         string root = DualMode.FindRoot();
@@ -31,6 +43,15 @@ public class CryptoKatTests
         DualMode.Proc run = DualMode.RunVire(root, new string[] { "crypto-prove.vire" }, root);
         Assert.True(run.Code == 0, run.Err + run.Out);
         string norm = DualMode.Norm(run.Out);
+        Assert.Contains("FIPS 896 guest PASS", norm);
+        Assert.Contains("FIPS 896 hash PASS", norm);
+        Assert.Contains("boundary 55 PASS", norm);
+        Assert.Contains("boundary 56 PASS", norm);
+        Assert.Contains("boundary 63 PASS", norm);
+        Assert.Contains("boundary 64 PASS", norm);
+        Assert.Contains("boundary 65 PASS", norm);
+        Assert.Contains("largest-fit 448 a PASS", norm);
+        Assert.Contains("FIPS 1M guest skipped", norm);
         Assert.Contains("RFC4231 1 PASS", norm);
         Assert.Contains("RFC4231 2 PASS", norm);
         Assert.Contains("RFC4231 3 PASS", norm);

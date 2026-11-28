@@ -1,5 +1,13 @@
 # Changelog
 
+## Serve builtin drop (this branch)
+
+- Host `serve` is no longer a builtin. Guests already call `listen`. A leftover `serve with …` is the same unknown-name error as any other missing definition. Caps unchanged.
+
+## VireApk host-only close (this branch)
+
+- `VireApk.Pack` is not a guest builtin. APK packing is not a Vire product. SDK lookup honors `ANDROID_SDK_ROOT` / `ANDROID_HOME` before `D:\\Android`. NDK lookup honors `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT` before SDK/`D:\\Android`. Missing tools name those env vars. `ApkTests` / `AndroidSoTests` fail closed without tools and fail the success path with that named env instead of passing. Caps unchanged.
+
 ## Tests/docs dead-code cleanup (this branch)
 
 - Root emit/compile probe programs (`probe-*.vire`), unused `dump-net-extras.vire`, superseded `make-hello.vire`, and unreferenced `guest-empty.vire` removed. Live guests, samples, and xUnit fixtures were not deleted.
@@ -13,6 +21,10 @@
 ## Packed listen + proxy_reply (this branch)
 
 - Packed 3-param `listen` parks the route `body` as `lea rdx,[rip+txt_empty]` (in-place blob+2728, reloc `txt_empty`) so GET/HEAD nobody is a heap text, not integer 1. FAIL_BEFORE `962be3ac`: native empty HTTP / SEGV `rdx=1` vs host `200 up-ok`. Extra Vire trampoline statements overflowed list cap 100000 on self-host; this patch does not grow `emitLandingHttp`. `tools/proxy-reply-proof.sh`. CouchStation: `tools/proxy-reply-windows.ps1` (PE not executed here). Residual: packed POST body is also `txt_empty` on this 24-byte site; `land_st_405` still dropped (list cap 100000, not raised). Caps unchanged.
+
+## Windows PE Postgres/Redis TLS without Postgres 16 or Redis
+
+- `tools/VireProof` `pg-tls-stub` answers SSLRequest with `S`, then TLS 1.2+, trust auth, and `SELECT 1` / `SELECT 42`. `redis-tls-stub` speaks RESP2 AUTH/PING/SET/GET over TLS, plus a plaintext port and an expired-cert port. `tools/pg-tls-prove-windows.ps1` and `tools/redis-tls-prove-windows.ps1` start those stubs (wired in `tools/couchstation-windows-all.ps1`). PE execute stays CouchStation-only. Residual: RESP3, live `postgres`/`redis-server` binaries. SCRAM-SHA-256-PLUS fail-closed stays PR #148 (`73ad94ab`); this PR does not edit `src/rt-pg.vire`.
 
 ## Native Postgres / Redis TLS on PE SChannel (this branch)
 

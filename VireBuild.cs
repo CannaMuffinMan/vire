@@ -203,38 +203,46 @@ static class VireBuild
 
     static string FindClang()
     {
-        string ndkRoot = Environment.GetEnvironmentVariable("ANDROID_NDK_HOME");
-        if (string.IsNullOrEmpty(ndkRoot)) ndkRoot = Environment.GetEnvironmentVariable("ANDROID_NDK_ROOT");
+        string ndkPinned = Environment.GetEnvironmentVariable("ANDROID_NDK_HOME");
+        if (string.IsNullOrEmpty(ndkPinned)) ndkPinned = Environment.GetEnvironmentVariable("ANDROID_NDK_ROOT");
+        if (!string.IsNullOrEmpty(ndkPinned))
+        {
+            string pinned = ClangUnderNdk(ndkPinned);
+            if (pinned != null) return pinned;
+            throw new VireError("the phone SDK is not installed (set ANDROID_NDK_HOME or ANDROID_NDK_ROOT)", 1);
+        }
         string sdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
         if (string.IsNullOrEmpty(sdk)) sdk = Environment.GetEnvironmentVariable("ANDROID_HOME");
         if (string.IsNullOrEmpty(sdk)) sdk = "D:\\Android";
+        string fromSdk = ClangUnderNdk(Path.Combine(sdk, "ndk"));
+        if (fromSdk != null) return fromSdk;
+        throw new VireError("the phone SDK is not installed (set ANDROID_NDK_HOME or ANDROID_NDK_ROOT)", 1);
+    }
+
+    static string ClangUnderNdk(string root)
+    {
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return null;
         string[] prebuilts = OperatingSystem.IsWindows()
             ? new string[] { "windows-x86_64" }
             : new string[] { "linux-x86_64", "linux-aarch64" };
-        string[] search = new string[] { ndkRoot, Path.Combine(sdk, "ndk") };
-        for (int s = 0; s < search.Length; s++)
+        string[] versions;
+        if (Directory.Exists(Path.Combine(root, "toolchains")))
+            versions = new string[] { root };
+        else
         {
-            string root = search[s];
-            if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
-            string[] versions;
-            if (Directory.Exists(Path.Combine(root, "toolchains")))
-                versions = new string[] { root };
-            else
+            versions = Directory.GetDirectories(root);
+            Array.Sort(versions);
+        }
+        for (int i = versions.Length - 1; i >= 0; i--)
+        {
+            for (int p = 0; p < prebuilts.Length; p++)
             {
-                versions = Directory.GetDirectories(root);
-                Array.Sort(versions);
-            }
-            for (int i = versions.Length - 1; i >= 0; i--)
-            {
-                for (int p = 0; p < prebuilts.Length; p++)
-                {
-                    string clang = Path.Combine(versions[i], "toolchains", "llvm", "prebuilt", prebuilts[p], "bin",
-                        OperatingSystem.IsWindows() ? "clang.exe" : "clang");
-                    if (File.Exists(clang)) return clang;
-                }
+                string clang = Path.Combine(versions[i], "toolchains", "llvm", "prebuilt", prebuilts[p], "bin",
+                    OperatingSystem.IsWindows() ? "clang.exe" : "clang");
+                if (File.Exists(clang)) return clang;
             }
         }
-        throw new VireError("the phone SDK is not installed", 1);
+        return null;
     }
 
     static string FindOnPath(string name)

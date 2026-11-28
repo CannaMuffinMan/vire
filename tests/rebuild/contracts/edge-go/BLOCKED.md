@@ -8,3 +8,5 @@ TODO(VIRE-FINISH-NOW): prove remaining edge-go Host-map/maintenance/payments beh
 - `PAYMENTS_ENABLED` startup refuse (process exit, no HTTP body)
 - maintenance HTML, `Retry-After`, `X-Robots-Tag`
 - public `0.0.0.0` bind (Vire is loopback only)
+
+See `docs/fcg-contracts-missing.md`. In-tree JSON: `healthz.json`, `not-found.json`, `maintenance.json`.

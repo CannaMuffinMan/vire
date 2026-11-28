@@ -25,7 +25,18 @@ public class ToolchainTests
             TextWriter previous = Console.Out;
             StringWriter sink = new StringWriter();
             Console.SetOut(sink);
-            try { machine.Call("main", new List<object>(), 1, 1); }
+            try
+            {
+                try { machine.Call("main", new List<object>(), 1, 1); }
+                catch (VireError err)
+                {
+                    if (err.Message.IndexOf("phone SDK is not installed", StringComparison.Ordinal) >= 0)
+                    {
+                        Assert.Fail("env ANDROID_NDK_HOME or ANDROID_NDK_ROOT (NDK clang --target=aarch64-linux-android35) required; " + err.Message);
+                    }
+                    throw;
+                }
+            }
             finally { Console.SetOut(previous); }
             string text = sink.ToString().Replace("\r\n", "\n");
             Assert.Contains("data/hello.exe", text);

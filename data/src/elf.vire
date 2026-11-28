@@ -106,6 +106,8 @@ define openElfTlsImage
   let image be emitU64 with image, 0
   pin with labels, "cmdline_ptr", image
   let image be emitU64 with image, 0
+  pin with labels, "envp_ptr", image
+  let image be emitU64 with image, 0
   pin with labels, "proc_fd", image
   let image be emitU8 with image, 47
   let image be emitU8 with image, 112
@@ -332,7 +334,7 @@ define finishElfTlsImage with image, labels, fixes, iats
   poke64 with image, (dyn + 96), 3
   poke64 with image, (dyn + 104), gotb
   poke64 with image, (dyn + 112), 2
-  poke64 with image, (dyn + 120), 552
+  poke64 with image, (dyn + 120), 696
   poke64 with image, (dyn + 128), 20
   poke64 with image, (dyn + 136), 7
   poke64 with image, (dyn + 144), 23

@@ -1,0 +1,19 @@
+~ ELF-safe single connection: untrusted CA must not complete cbind.
+
+define fail with why
+  say "FAIL " + why
+  halt with 1
+end
+
+define main
+  let port be PORT_PLACEHOLDER
+  let user be "PGUSER_PLACEHOLDER"
+  let db be "PGDB_PLACEHOLDER"
+  let secret be "PGSECRET_PLACEHOLDER"
+  let opened be pg_open_ssl with "127.0.0.1", port, user, db, secret, "verify-full", "localhost", "data/pg-untrusted.pem"
+  if (opened at "ok") == true
+    fail with "MITM cert accepted"
+  end
+  say "mitm-cert " + (opened at "why")
+  say "PG TLS MITM pass"
+end

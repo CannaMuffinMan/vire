@@ -8,7 +8,7 @@ using Xunit;
 public class ServeTests
 {
     [Fact]
-    public void ServeBuiltinIsRemoved()
+    public void ServeIsNotABuiltin()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vire-c8-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -29,7 +29,7 @@ public class ServeTests
                 Console.SetError(previousErr);
             }
             Assert.Equal(1, code);
-            Assert.Contains("serve was removed; use listen", err.ToString());
+            Assert.Contains("there is no definition named serve", err.ToString());
         }
         finally
         {

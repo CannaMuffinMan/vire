@@ -22,6 +22,14 @@ public class HarnessTests
         Assert.Contains("<TargetFramework>net10.0-windows</TargetFramework>", windows);
         Assert.Contains("WINDOWS", windows);
         Assert.Contains("UseWindowsForms", windows);
+        Assert.Contains("<Compile Include=\"..\\*.cs\" />", windows);
+        foreach (string path in Directory.GetFiles(root, "*.cs"))
+        {
+            string name = Path.GetFileName(path);
+            Assert.True(
+                windows.Contains("..\\*.cs") || windows.Contains("..\\" + name),
+                "windows project must compile " + name);
+        }
     }
 
     [Fact]

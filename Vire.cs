@@ -372,13 +372,13 @@ sealed class Machine
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
-        "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
+        "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape",
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "digest", "hmac", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close", "resolve",
-        "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close",
+        "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close", "tls_peer_cert", "tls_end_point",
         "start", "wait", "result", "linux"
     });
 
@@ -616,7 +616,6 @@ sealed class Machine
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
-        if (name == "serve" || name == "escape") need = 1;
         if (name == "slice") need = 3;
         if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "length")
@@ -762,6 +761,8 @@ sealed class Machine
         if (name == "tls_send") return VireTls.SendAll(args[0], args[1], tcp, line, col);
         if (name == "tls_recv") return VireTls.RecvBound(args[0], args[1], tcp, line, col);
         if (name == "tls_close") return VireTls.CloseHandle(args[0], tcp, line, col);
+        if (name == "tls_peer_cert") return VireTls.PeerCert(args[0], tcp, line, col);
+        if (name == "tls_end_point") return VireTls.EndPoint(args[0], line, col);
         if (name == "kind") return KindOf(args[0]);
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
@@ -893,9 +894,6 @@ sealed class Machine
             if (raw == null) raw = Show(args[0]);
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
-        if (name == "serve")
-            // TODO(VIRE-FINISH-NOW): drop the serve name from Builtins once guests no longer call it
-            throw new VireError("serve was removed; use listen", line, col);
         if (name == "files")
         {
             string path = SafePath(args[0], line, col);
@@ -3272,17 +3270,19 @@ sealed class Program
             else
                 provided = "";
         }
-        byte[] left = new byte[256];
-        byte[] right = new byte[256];
         byte[] given = Encoding.UTF8.GetBytes(provided ?? "");
         byte[] want = Encoding.UTF8.GetBytes(expected);
-        int copyGiven = given.Length > left.Length ? left.Length : given.Length;
-        int copyWant = want.Length > right.Length ? right.Length : want.Length;
-        Buffer.BlockCopy(given, 0, left, 0, copyGiven);
-        Buffer.BlockCopy(want, 0, right, 0, copyWant);
+        int n = given.Length;
+        int m = want.Length;
+        int lim = n > m ? n : m;
         int diff = hits == 1 ? 0 : 1;
-        diff |= given.Length ^ want.Length;
-        diff |= CryptographicOperations.FixedTimeEquals(left, right) ? 0 : 1;
+        diff |= n ^ m;
+        for (int i = 0; i < lim; i++)
+        {
+            int a = i < n ? given[i] : 0;
+            int b = i < m ? want[i] : 0;
+            diff |= a ^ b;
+        }
         return diff == 0;
     }
 

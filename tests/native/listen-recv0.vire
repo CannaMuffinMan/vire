@@ -1,0 +1,16 @@
+~ Minimal 4-param listen guest for packed r4 recv/header/route tests.
+~ Loopback only. No secrets.
+
+define route with method, path, body, head
+  if path == "/api/health"
+    if method != "GET"
+      return "{\"error\":\"method not allowed\",\"status\":405}"
+    end
+    return "{\"ok\":true}"
+  end
+  return "{\"ok\":false,\"status\":404,\"error\":\"not found\"}"
+end
+
+define main
+  listen with 0
+end

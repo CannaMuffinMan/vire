@@ -16,7 +16,37 @@ define evidenceBody
   return "{\"drift\":{\"blocked\":0,\"passed\":0,\"sent\":0},\"evidence\":{\"blockRate\":0,\"blocked\":0,\"falsePositives\":0,\"passed\":0,\"reportsIngested\":0,\"sent\":0,\"sources\":{\"fallbackBulkRows\":0,\"rollupRows\":0}},\"generatedAt\":\"now\",\"paymentsEnabled\":false,\"runtime\":{\"blockRate\":0,\"blocked\":0,\"passed\":0,\"sent\":0}}"
 end
 
-define route with method, path, body
+define session_id with body
+  if body == none
+    return none
+  end
+  if body == ""
+    return none
+  end
+  let needle be "\"sessionId\":\""
+  let pos be find with body, needle
+  if pos < 0
+    return none
+  end
+  let fromp be pos + (length with needle)
+  let n be length with body
+  let i be fromp
+  while i < n
+    if (body at i) == "\""
+      stop
+    end
+    let i be i + 1
+  end
+  if i <= fromp
+    return none
+  end
+  if i >= n
+    return none
+  end
+  return slice with body, fromp, i
+end
+
+define route with method, path, body, head
   if method == "GET"
     if path == "/health"
       return "{\"dbConfigured\":false,\"ok\":true,\"paymentsEnabled\":false,\"service\":\"fcgbds-core\",\"ts\":\"now\"}"
@@ -65,10 +95,9 @@ define route with method, path, body
     end
   end
   if method == "POST"
-    if (find with path, "/api/bot-defense/reviewers/heartbeat") == 0
-      ~ Native POST body is not read (rt_net guest body SEGV). Go also accepts
-      ~ sessionId on the query string; that path is what the harness sends.
-      if (find with path, "sessionId=") < 0
+    if path == "/api/bot-defense/reviewers/heartbeat"
+      let sid be session_id with body
+      if sid == none
         return "{\"error\":\"sessionId is required\",\"status\":400}"
       end
       return "{\"ok\":true,\"reviewers\":{\"live\":1,\"reviewers\":[{\"lastSeenAt\":\"now\",\"name\":\"reviewer\",\"source\":\"obs\"}],\"ttlSeconds\":90}}"

@@ -3,9 +3,248 @@ define times4 with n
   return v + v
 end
 
+define sha_mod32 with n
+  return n % 4294967296
+end
+
+define sha_add32 with a, b
+  return sha_mod32 with (a + b)
+end
+
+define sha_pow2 with n
+  let p be 1
+  let i be 0
+  while i < n
+    let p be p + p
+    let i be i + 1
+  end
+  return p
+end
+
+define sha_rotr32 with x, n
+  let p be sha_pow2 with n
+  let q be sha_pow2 with (32 - n)
+  let lo be x % p
+  let hi be idiv with x, p
+  return hi + (lo * q)
+end
+
+define sha_xor_bit with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 32
+    let xb be x % 2
+    let yb be y % 2
+    if xb != yb
+      let r be r + p
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define sha_and_bit with a, b
+  let r be 0
+  let p be 1
+  let x be a
+  let y be b
+  let i be 0
+  while i < 32
+    if (x % 2) == 1
+      if (y % 2) == 1
+        let r be r + p
+      end
+    end
+    let x be idiv with x, 2
+    let y be idiv with y, 2
+    let p be p + p
+    let i be i + 1
+  end
+  return r
+end
+
+define sha_not32 with x
+  return sha_xor_bit with x, 4294967295
+end
+
+define sha_ch with e, f, g
+  return sha_xor_bit with (sha_and_bit with e, f), (sha_and_bit with (sha_not32 with e), g)
+end
+
+define sha_maj with a, b, c
+  let t be sha_xor_bit with (sha_and_bit with a, b), (sha_and_bit with a, c)
+  return sha_xor_bit with t, (sha_and_bit with b, c)
+end
+
+define sha_bsig0 with x
+  let t be sha_xor_bit with (sha_rotr32 with x, 2), (sha_rotr32 with x, 13)
+  return sha_xor_bit with t, (sha_rotr32 with x, 22)
+end
+
+define sha_bsig1 with x
+  let t be sha_xor_bit with (sha_rotr32 with x, 6), (sha_rotr32 with x, 11)
+  return sha_xor_bit with t, (sha_rotr32 with x, 25)
+end
+
+define sha_ssig0 with x
+  let t be sha_xor_bit with (sha_rotr32 with x, 7), (sha_rotr32 with x, 18)
+  return sha_xor_bit with t, (idiv with x, 8)
+end
+
+define sha_ssig1 with x
+  let t be sha_xor_bit with (sha_rotr32 with x, 17), (sha_rotr32 with x, 19)
+  return sha_xor_bit with t, (idiv with x, 1024)
+end
+
+define sha_be32 with buf, i
+  let b0 be buf at i
+  let b1 be buf at (i + 1)
+  let b2 be buf at (i + 2)
+  let b3 be buf at (i + 3)
+  let v be b0 * 16777216
+  let v be v + (b1 * 65536)
+  let v be v + (b2 * 256)
+  return v + b3
+end
+
+define sha_k
+  return [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298]
+end
+
+define sha_iv
+  return [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]
+end
+
+define sha_compress with h, block
+  let w be []
+  let t be 0
+  while t < 16
+    push with w, (sha_be32 with block, (t * 4))
+    let t be t + 1
+  end
+  while t < 64
+    let s0 be sha_ssig0 with (w at (t - 15))
+    let s1 be sha_ssig1 with (w at (t - 2))
+    let wt be sha_add32 with (w at (t - 16)), s0
+    let wt be sha_add32 with wt, (w at (t - 7))
+    let wt be sha_add32 with wt, s1
+    push with w, wt
+    let t be t + 1
+  end
+  let a be h at 0
+  let b be h at 1
+  let c be h at 2
+  let d be h at 3
+  let e be h at 4
+  let f be h at 5
+  let g be h at 6
+  let hh be h at 7
+  let k be sha_k
+  let t be 0
+  while t < 64
+    let t1 be sha_add32 with hh, (sha_bsig1 with e)
+    let t1 be sha_add32 with t1, (sha_ch with e, f, g)
+    let t1 be sha_add32 with t1, (k at t)
+    let t1 be sha_add32 with t1, (w at t)
+    let t2 be sha_add32 with (sha_bsig0 with a), (sha_maj with a, b, c)
+    let hh be g
+    let g be f
+    let f be e
+    let e be sha_add32 with d, t1
+    let d be c
+    let c be b
+    let b be a
+    let a be sha_add32 with t1, t2
+    let t be t + 1
+  end
+  put (sha_add32 with (h at 0), a) into h at 0
+  put (sha_add32 with (h at 1), b) into h at 1
+  put (sha_add32 with (h at 2), c) into h at 2
+  put (sha_add32 with (h at 3), d) into h at 3
+  put (sha_add32 with (h at 4), e) into h at 4
+  put (sha_add32 with (h at 5), f) into h at 5
+  put (sha_add32 with (h at 6), g) into h at 6
+  put (sha_add32 with (h at 7), hh) into h at 7
+  return h
+end
+
+define sha_word_bytes with out, w
+  push with out, (idiv with w, 16777216)
+  let w be w % 16777216
+  push with out, (idiv with w, 65536)
+  let w be w % 65536
+  push with out, (idiv with w, 256)
+  push with out, (w % 256)
+  return out
+end
+
 define sha256_bytes with buf
-  ~ TODO(VIRE-FINISH-NOW): wire guest SHA-256 pad+compress+IV into this wrapper instead of digest
-  return digest with buf
+  let h be sha_iv
+  let n be length with buf
+  let i be 0
+  while (i + 64) <= n
+    let block be []
+    let j be 0
+    while j < 64
+      push with block, (buf at (i + j))
+      let j be j + 1
+    end
+    let h be sha_compress with h, block
+    let i be i + 64
+  end
+  let tail be []
+  while i < n
+    push with tail, (buf at i)
+    let i be i + 1
+  end
+  push with tail, 128
+  while ((length with tail) % 64) != 56
+    push with tail, 0
+  end
+  let bits be n * 8
+  let lenb be []
+  let k be 0
+  while k < 8
+    push with lenb, 0
+    let k be k + 1
+  end
+  let k be 7
+  let x be bits
+  while k >= 0
+    put (x % 256) into lenb at k
+    let x be idiv with x, 256
+    let k be k - 1
+  end
+  let p be 0
+  while p < 8
+    push with tail, (lenb at p)
+    let p be p + 1
+  end
+  let off be 0
+  let tn be length with tail
+  while off < tn
+    let block be []
+    let j be 0
+    while j < 64
+      push with block, (tail at (off + j))
+      let j be j + 1
+    end
+    let h be sha_compress with h, block
+    let off be off + 64
+  end
+  let out be []
+  let q be 0
+  while q < 8
+    let out be sha_word_bytes with out, (h at q)
+    let q be q + 1
+  end
+  return out
 end
 
 define sha256_hex with buf
@@ -463,10 +702,7 @@ end
 define ct_eq with left, right
   let n be length with left
   let m be length with right
-  let d be 0
-  if n != m
-    let d be 1
-  end
+  let d be (n - m) * (n - m)
   let lim be n
   if m > lim
     let lim be m
@@ -481,9 +717,7 @@ define ct_eq with left, right
     if i < m
       let b be right at i
     end
-    if a != b
-      let d be 1
-    end
+    let d be d + (xor8_bit with a, b)
     let i be i + 1
   end
   if d == 0

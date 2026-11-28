@@ -501,7 +501,7 @@ define appendBlock with body
   return reply + ",\"proof\":\"" + proof + "\"}"
 end
 
-define route with method, path, body
+define route with method, path, body, head
   if path == "/chain"
     if not (fileHere with "data/chain/head.json")
       bootChain

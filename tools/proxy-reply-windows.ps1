@@ -18,11 +18,32 @@ if ($rt -notmatch "33554432") { throw "arena cap drifted" }
 $cs = Get-Content -Raw (Join-Path $Root "Vire.cs")
 if ($cs -notmatch "100000") { throw "list cap missing" }
 if ($cs -notmatch "5000000") { throw "step cap missing" }
-$blob = (Get-Content -Raw (Join-Path $Root "src\rt-net-blob.txt")).Trim()
-if ($blob.Substring(2728 * 2, 6) -ne "488d15") { throw "packed GET body park missing lea txt_empty" }
+$blobHex = (Get-Content -Raw (Join-Path $Root "src\rt-net-blob.txt")).Trim()
+$blob = New-Object byte[] ($blobHex.Length / 2)
+for ($i = 0; $i -lt $blob.Length; $i++) {
+    [void]($blob[$i] = [Convert]::ToByte($blobHex.Substring($i * 2, 2), 16))
+}
+if ($blob.Length -lt 2733) { throw "packed net blob too small" }
+if ($blob[2728] -ne 0xe9) { throw "packed GET body park missing jmp to ctx+0x40 stub" }
+$disp = [BitConverter]::ToInt32($blob, 2729)
+$tramp = 2733 + $disp
+if ($tramp -lt 0 -or ($tramp + 16) -gt $blob.Length) { throw "park jmp target out of blob" }
+$lea = -1
+$j = $tramp
+while ($j + 6 -lt $blob.Length) {
+    if ($blob[$j] -eq 0x48 -and $blob[$j + 1] -eq 0x8d -and $blob[$j + 2] -eq 0x15) {
+        $lea = $j
+        break
+    }
+    $j = $j + 1
+}
+if ($lea -lt 0) { throw "txt_empty lea rdx missing after park trampoline" }
+$relocAt = $lea + 3
+$relocHex = ([byte]($relocAt -band 255)).ToString("x2") + ([byte](($relocAt -shr 8) -band 255)).ToString("x2") + ([byte](($relocAt -shr 16) -band 255)).ToString("x2")
 $fixes = Get-Content -Raw (Join-Path $Root "src\rt-net-fixes.txt")
-if ($fixes -notmatch "ab0a0000a400") { throw "txt_empty reloc at blob+2731 missing" }
-Write-Host "caps_src_ok arena=33554432 list=100000 steps=5000000"
+if ($fixes -notmatch $relocHex) { throw "txt_empty reloc at blob+$relocAt missing (computed $relocHex)" }
+if ($relocAt -eq 2731) { throw "txt_empty reloc still pinned at stale blob+2731" }
+Write-Host ("caps_src_ok arena=33554432 list=100000 steps=5000000 reloc_txt_empty=blob+" + $relocAt)
 
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) {

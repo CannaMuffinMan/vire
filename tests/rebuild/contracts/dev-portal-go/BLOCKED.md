@@ -8,3 +8,5 @@ TODO(VIRE-FINISH-NOW): prove remaining dev-portal-go cookie/JWT/proxy/static rou
 - static files when `DEV_PORTAL_DIST` exists
 - GET `/api/auth/session` 503 `not_configured` (needs auth cookie present)
 - static 405 Allow GET, HEAD (only after dist exists)
+
+See `docs/fcg-contracts-missing.md`. In-tree `dist-missing.json` is the proveable fixture.

@@ -17,7 +17,7 @@ define cell0 with got
 end
 
 define main
-  say "pg tls residual no SCRAM-SHA-256-PLUS channel binding"
+  say "pg tls PLUS via handshake leaf (tls_peer_cert / tls-server-end-point)"
   try
     connect with "8.8.8.8", 5432
     fail with "non-loopback missed"
@@ -35,6 +35,7 @@ define main
   end
   let conn be opened at "conn"
   say "auth " + (conn at "auth")
+  say "cbind " + (conn at "cbind_name")
   let one be pg_query with conn, "SELECT 1"
   if (one at "ok") == false
     fail with (one at "why")

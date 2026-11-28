@@ -1,7 +1,3 @@
-# One CouchStation session: every Windows PE proof the integration PRs request.
-# Do not run on Linux. Do not touch Windows Defender. Do not reboot.
-# Unsets VIRE_BUDGET first (inherited 5000000 fails BudgetCapTests).
-# Never prints FCG_API_TOKEN. Loopback only. Caps stay 32MB / 100000 / 5M.
 $ErrorActionPreference = "Stop"
 $env:UseSharedCompilation = "false"
 $env:MSBUILDDISABLENODEREUSE = "1"
@@ -153,6 +149,8 @@ Run-Proof "dotnet-build" {
     if ($LASTEXITCODE -ne 0) { throw "vire-proof build failed" }
 }
 
+Run-Proof "windows-host-csproj" { Run-Script "tools/windows-host-csproj-windows.ps1" }
+
 Run-Proof "dotnet-test" {
     Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
     dotnet test (Join-Path $Root "tests/Vire.Tests/Vire.Tests.csproj") -c Release --nologo
@@ -180,6 +178,8 @@ Run-Proof "json-prove-windows" { Run-Script "tools/json-prove-windows.ps1" }
 Run-Proof "crypto-prove-windows" { Run-Script "tools/crypto-prove-windows.ps1" }
 Run-Proof "pg-prove-windows" { Run-Script "tools/pg-prove-windows.ps1" }
 Run-Proof "pg-tls-prove-windows" { Run-Script "tools/pg-tls-prove-windows.ps1" }
+Run-Proof "pg-scram-plus-windows" { Run-Script "tools/pg-scram-plus-windows.ps1" }
+Run-Proof "pg-peercert-windows" { Run-Script "tools/pg-peercert-windows.ps1" }
 Run-Proof "fuzz-windows" { Run-Script "tools/fuzz-windows.ps1" }
 
 Run-Proof "pe-json-map-fault-90" {
@@ -211,30 +211,19 @@ Run-Proof "pe-parse-array-fault-90" {
     if ($code -ne 0) { throw "parse-array PE exit $code" }
 }
 
-Run-Proof "rebuild-proxy-windows-pe" {
-    # tools/rebuild-proxy-windows.ps1 is a checklist (exits 1 until filled).
-    # Compile the proxy guest to PE and record MZ + ws2_32 names.
-    $src = Join-Path $Root "tests/rebuild/guests/proxy-http.vire"
-    $stage = Join-Path $Data "proxy-pe"
-    New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    Copy-Item $src (Join-Path $stage "proxy-http.vire") -Force
-    Copy-Item (Join-Path $Root "src/http-client.vire") (Join-Path $stage "http-client.vire") -Force
-    $hex = Join-Path $Data "proxy-http.hex"
-    if (Test-Path $hex) { Remove-Item -Force $hex }
-    & dotnet exec $VireDll --compiler compile-native.vire data/proxy-pe/proxy-http.vire data/proxy-http.hex pe
-    if ($LASTEXITCODE -ne 0) { throw "proxy compile exit $LASTEXITCODE" }
-    Convert-HexToExe $hex (Join-Path $Data "proxy-http.exe")
-    $pe = [System.IO.File]::ReadAllBytes((Join-Path $Data "proxy-http.exe"))
-    if ($pe[0] -ne 0x4d -or $pe[1] -ne 0x5a) { throw "proxy PE missing MZ" }
-    $ascii = [Text.Encoding]::ASCII.GetString($pe)
-    if ($ascii -notmatch "ws2_32") { throw "proxy PE missing ws2_32" }
-    Log "proxy_pe_mz_ok ws2_32_ok (host-vs-PE modes still need a loopback upstream on this PC)"
-}
+Run-Proof "native-forms" { Run-Script "tools/native-forms.ps1" }
 
 Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-windows.ps1" }
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "pe-windows-gaps-check" {
+    $py = Join-Path $Root "tools/pe-windows-gaps-check.py"
+    if (-not (Test-Path $py)) { throw "missing tools/pe-windows-gaps-check.py" }
+    $r4 = (Get-Content -Raw (Join-Path $Root "src/rt-net-r4-blob.txt")).Trim()
+    if ($r4 -notmatch "41b807000000") { throw "FAIL_BEFORE packed r4 DNS CreateFileA share is not 7" }
+    if ($r4 -notmatch "5348894df8") { throw "FAIL_BEFORE packed r4 dns_hostok missing push rbx" }
+}
 Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
 Run-Proof "post-block-auth-windows" { Run-Script "tools/post-block-auth-windows.ps1" }
 Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
@@ -252,6 +241,7 @@ Run-Proof "pg-redis-tls-windows" { Run-Script "tools/pg-redis-tls-windows.ps1" }
 Run-Proof "listen-ws-windows" { Run-Script "tools/listen-ws-windows.ps1" }
 Run-Proof "ws-refuse-windows" { Run-Script "tools/ws-refuse-windows.ps1" }
 Run-Proof "proxy-reply-windows" { Run-Script "tools/proxy-reply-windows.ps1" }
+Run-Proof "listen-recv0-windows" { Run-Script "tools/listen-recv0-windows.ps1" }
 
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"
@@ -281,6 +271,26 @@ while ($i -lt $ExitCodes.Count) {
     Log ("exit " + $ExitCodes[$i])
     $i = $i + 1
 }
+$Md = Join-Path $Data "couchstation-windows-all-results.md"
+$mdLines = New-Object System.Collections.Generic.List[string]
+$mdLines.Add("# CouchStation Windows all results")
+$mdLines.Add("")
+$mdLines.Add("head_sha $Head")
+$mdLines.Add("stamp $Stamp")
+$mdLines.Add("fail $fail")
+$mdLines.Add("")
+$mdLines.Add("| proof | result |")
+$mdLines.Add("|---|---|")
+$i = 0
+while ($i -lt $Results.Count) {
+    $mdLines.Add("| " + $Results[$i] + " | " + $ExitCodes[$i] + " |")
+    $i = $i + 1
+}
+$mdLines.Add("")
+$mdLines.Add("Full log: data/couchstation-windows-all.log")
+Set-Content -LiteralPath $Md -Value ($mdLines -join "`n")
+Log "results_markdown $Md"
 if ($fail -ne 0) { exit 1 }
 Write-Host "couchstation-windows-all ok. PE proof lives only on this Windows PC."
+Write-Host "results $Md"
 exit 0

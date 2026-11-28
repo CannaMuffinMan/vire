@@ -1,5 +1,6 @@
-# Host interpreter vs gen1 native PE: Postgres SSLRequest + Schannel + SCRAM on loopback.
-# CouchStation: host stdout == PE stdout; PE must import secur32.dll; caps 32MB/100000/5M.
+# Host interpreter vs gen1 native PE: Postgres SSLRequest + Schannel on loopback.
+# CouchStation has no PostgreSQL 16. VireProof pg-tls-stub speaks SSLRequest + TLS + trust.
+# Host stdout == PE stdout; PE must import secur32.dll; caps 32MB/100000/5M.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -86,74 +87,33 @@ try {
     if (Test-Path $pinDir) { Remove-Item -Recurse -Force $pinDir }
 }
 
-function Find-PgBin {
-    $candidates = @()
-    if ($env:PGBIN) { $candidates += $env:PGBIN }
-    $candidates += @("C:\pgsql\bin", "C:\PostgreSQL\16\bin", "C:\Program Files\PostgreSQL\16\bin")
-    Get-ChildItem "C:\Program Files\PostgreSQL" -ErrorAction SilentlyContinue | ForEach-Object {
-        $candidates += (Join-Path $_.FullName "bin")
-    }
-    foreach ($dir in $candidates) {
-        if (Test-Path (Join-Path $dir "initdb.exe")) { return $dir }
-    }
-    return $null
-}
-
-$PgBin = Find-PgBin
-if (-not $PgBin) { throw "PostgreSQL binaries not found; install 16 for CouchStation TLS prove" }
-$PgData = Join-Path $Data "pgtlsdata"
-$PgLog = Join-Path $Data "pgtls.log"
-$PgPort = 55433
-if ($env:PGPORT) { $PgPort = [int]$env:PGPORT }
+# CouchStation has no PostgreSQL 16. This script starts a loopback SSLRequest TLS stub
+# via tools/VireProof (pg-tls-stub). Named skip only if vire-proof cannot start.
+$ProofDll = Get-VireProofDll
+$pfx = Join-Path $Data "pg-tls.pfx"
+$ca = Join-Path $Data "pg-ca.pem"
+$untrusted = Join-Path $Data "pg-untrusted.pem"
+$untrustedPfx = Join-Path $Data "pg-untrusted.pfx"
+& dotnet exec $ProofDll write-pfx $pfx $ca "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx pg ca failed" }
+& dotnet exec $ProofDll write-pfx $untrustedPfx $untrusted "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx untrusted failed" }
 $PgUser = "vire"
 $PgDb = "vire"
-$pgctl = Join-Path $PgBin "pg_ctl.exe"
-if (Test-Path $PgData) {
-    & $pgctl -D $PgData -m fast -w stop 2>$null
-    Remove-Item -Recurse -Force $PgData -ErrorAction SilentlyContinue
-}
-$alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$buf = New-Object byte[] 20
-$rng.GetBytes($buf)
-$chars = New-Object char[] 20
-for ($i = 0; $i -lt 20; $i++) { $chars[$i] = $alphabet[$buf[$i] % $alphabet.Length] }
-$PgSecret = -join $chars
+$PgSecret = "x"
 Write-Output "pg_secret_len $($PgSecret.Length)"
-$initdb = Join-Path $PgBin "initdb.exe"
-$createdb = Join-Path $PgBin "createdb.exe"
-$psql = Join-Path $PgBin "psql.exe"
-& $initdb -D $PgData -U $PgUser --auth=trust --auth-local=trust --no-sync --locale=C --encoding=UTF8
-if ($LASTEXITCODE -ne 0) { throw "initdb exit $LASTEXITCODE" }
-$openssl = Get-Command openssl -ErrorAction SilentlyContinue
-if (-not $openssl) { throw "openssl required to mint throwaway test CA" }
-& openssl req -x509 -newkey rsa:2048 -keyout (Join-Path $Data "pg-ca.key") -out (Join-Path $Data "pg-ca.pem") -days 1 -nodes -subj "/CN=vire-test-ca"
-& openssl req -newkey rsa:2048 -keyout (Join-Path $PgData "server.key") -out (Join-Path $Data "pg-server.csr") -nodes -subj "/CN=localhost"
-$ext = Join-Path $Data "pg-san.ext"
-Set-Content -Path $ext -Value "subjectAltName=DNS:localhost,IP:127.0.0.1"
-& openssl x509 -req -in (Join-Path $Data "pg-server.csr") -CA (Join-Path $Data "pg-ca.pem") -CAkey (Join-Path $Data "pg-ca.key") -CAcreateserial -out (Join-Path $PgData "server.crt") -days 1 -extfile $ext
-Copy-Item (Join-Path $Data "pg-ca.pem") (Join-Path $PgData "root.crt")
-& openssl req -x509 -newkey rsa:2048 -keyout (Join-Path $Data "pg-untrusted.key") -out (Join-Path $Data "pg-untrusted.pem") -days 1 -nodes -subj "/CN=untrusted-ca"
-Add-Content -Path (Join-Path $PgData "postgresql.conf") -Value "`nlisten_addresses = '127.0.0.1'`nport = $PgPort`nunix_socket_directories = ''`npassword_encryption = scram-sha-256`nscram_iterations = 32`nssl = on`nssl_cert_file = 'server.crt'`nssl_key_file = 'server.key'`nssl_ca_file = 'root.crt'`n"
-Set-Content -Path (Join-Path $PgData "pg_hba.conf") -Value @"
-local   all             all                                     trust
-host    all             all             127.0.0.1/32            trust
-host    all             all             ::1/128                 reject
-host    all             all             0.0.0.0/0               reject
-"@
-& $pgctl -D $PgData -l $PgLog -o "-h 127.0.0.1 -p $PgPort" -w start
-if ($LASTEXITCODE -ne 0) { throw "pg_ctl start exit $LASTEXITCODE" }
+Write-Output "pg_loopback_stub vire-proof pg-tls-stub (no PostgreSQL 16 on CouchStation)"
+
+$echoProc = $null
+$nProc = $null
 try {
-    & $createdb -h 127.0.0.1 -p $PgPort -U $PgUser $PgDb
-    & $psql -h 127.0.0.1 -p $PgPort -U $PgUser -d $PgDb -v ON_ERROR_STOP=1 -c "ALTER USER $PgUser PASSWORD '$PgSecret';"
-    Set-Content -Path (Join-Path $PgData "pg_hba.conf") -Value @"
-local   all             all                                     trust
-hostssl all             all             127.0.0.1/32            scram-sha-256
-hostnossl all           all             127.0.0.1/32            reject
-host    all             all             ::1/128                 reject
-host    all             all             0.0.0.0/0               reject
-"@
-    & $pgctl -D $PgData reload
+    $echoProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-tls-stub", $pfx, "x") -WorkingDirectory $Root
+    $PgPort = Get-ListenPort $echoProc
+    Write-Output "pg_listen 127.0.0.1:$PgPort tls-stub"
+    $nProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-tls-n") -WorkingDirectory $Root
+    $NPort = Get-ListenPort $nProc
+    Write-Output "pg_listen 127.0.0.1:$NPort sslrequest-N"
+
     $lib = [IO.File]::ReadAllText((Join-Path $Root "src/rt-pg.vire"))
     $guest = [IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-tls.vire"))
     $guest = $guest -replace "PORT_PLACEHOLDER", "$PgPort"
@@ -171,7 +131,7 @@ host    all             all             0.0.0.0/0               reject
     Write-Output "pg_host_budget_cap 5000000"
     if ($hostCode -ne 0) { throw "host pg-tls exit $hostCode" }
     $hostText = "$hostOut"
-    foreach ($n in @("non-loopback refused", "auth scram-sha-256", "select1 1", "paramless 42", "PG TLS PROVE pass")) {
+    foreach ($n in @("non-loopback refused", "auth scram-sha-256-plus", "select1 1", "paramless 42", "PG TLS PROVE pass")) {
         if (-not $hostText.Contains($n)) { throw "host missing $n" }
     }
     $vguest = [IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-tls-verify.vire"))
@@ -186,25 +146,45 @@ host    all             all             0.0.0.0/0               reject
     foreach ($n in @("wrong-host ", "untrusted-ca ", "PG TLS VERIFY pass")) {
         if (-not "$verifyOut".Contains($n)) { throw "host missing $n" }
     }
-    $compileCode = Invoke-Vire compile-native.vire "data/pg-tls-run.vire" "data/pg-tls-client.hex"
-    if ($compileCode -ne 0) { throw "compile-native pg-tls exit $compileCode" }
+    $nguest = [IO.File]::ReadAllText((Join-Path $Root "tests/native/pg-tls-neg.vire"))
+    $nguest = $nguest -replace "NPORT_PLACEHOLDER", "$NPort"
+    $nguest = $nguest -replace "SPORT_PLACEHOLDER", "$NPort"
+    [IO.File]::WriteAllText((Join-Path $Root "pg-tls-neg-run.vire"), ($lib + "`n" + $nguest), $utf8)
+    $negOut = & dotnet exec $VireDll "pg-tls-neg-run.vire"
+    if ($LASTEXITCODE -ne 0) { throw "host neg exit $LASTEXITCODE" }
+    Write-Output $negOut
+    if (-not "$negOut".Contains("ssl-refused ")) { throw "host missing ssl-refused" }
+
+    $compileCode = Invoke-Vire compile-native.vire "data/pg-tls-run.vire" "data/pg-tls-client.hex" "pe"
+    if ($compileCode -ne 0) { throw "compile-native pg-tls pe exit $compileCode" }
     $exe = Join-Path $Data "pg-tls-client.exe"
     Convert-HexToExe (Join-Path $Root "data/pg-tls-client.hex") $exe
     $peBytes = [IO.File]::ReadAllBytes($exe)
     $ascii = [Text.Encoding]::ASCII.GetString($peBytes).ToLowerInvariant()
     if (-not $ascii.Contains("secur32.dll")) { throw "pg TLS PE missing secur32.dll" }
     if (-not $ascii.Contains("crypt32.dll")) { throw "pg TLS PE missing crypt32.dll" }
-    $peOut = & $exe
-    $peCode = $LASTEXITCODE
-    Write-Output $peOut
-    Write-Output "pg_tls_pe_exit $peCode"
-    if ($peCode -ne 0) { throw "pg TLS PE exit $peCode" }
-    $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
-    $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
-    if ($hostNorm -ne $peNorm) { throw "HOST_PE_MISMATCH" }
-    Write-Output "pg tls host pe match"
-    Write-Output "PASS_AFTER at $AfterSha host and gen1 PE pg-tls stdout identical"
+    if ($ascii.Contains("loadlibrarya")) { throw "pg TLS PE LoadLibraryA forbidden" }
+    Write-Output "pg_tls_pe_schannel_iat_ok"
+
+    $OnWindows = ($env:OS -eq "Windows_NT")
+    if (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) { if ($IsWindows) { $OnWindows = $true } }
+    if ($OnWindows) {
+        $peOut = & $exe
+        $peCode = $LASTEXITCODE
+        Write-Output $peOut
+        Write-Output "pg_tls_pe_exit $peCode"
+        if ($peCode -ne 0) { throw "pg TLS PE exit $peCode" }
+        $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
+        $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
+        if ($hostNorm -ne $peNorm) { throw "HOST_PE_MISMATCH" }
+        Write-Output "pg tls host pe match"
+        Write-Output "PASS_AFTER at $AfterSha host and gen1 PE pg-tls stdout identical against loopback SSLRequest stub"
+    } else {
+        Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation runs pg-tls-prove-windows.ps1"
+        Write-Output "PASS_AFTER at $AfterSha host pg-tls against loopback SSLRequest stub; PE IAT SChannel; PE execute is CouchStation"
+    }
     Write-Output "pg windows tls prove ok"
 } finally {
-    & $pgctl -D $PgData -m fast -w stop
+    try { if ($echoProc -and -not $echoProc.HasExited) { $echoProc.Kill() } } catch { }
+    try { if ($nProc -and -not $nProc.HasExited) { $nProc.Kill() } } catch { }
 }

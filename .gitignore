@@ -6,6 +6,11 @@ data/*
 !data/rebuild/**
 !data/rebuild-dist/
 !data/rebuild-dist/**
+!data/native-forms/
+!data/native-forms/**
+data/native-forms/*.elf
+data/native-forms/*.hex
+data/native-forms/*.exe
 rebuild-chain-run.vire
 site/
 err.txt
