@@ -43,6 +43,40 @@
         "registered blockchain-node disabled",
         "refusing to start jobs: skeleton only"
       ]
+    },
+    {
+      "name": "enabled_no_jobs",
+      "args": ["FCG_WORKER_ENABLED=1"],
+      "exit": 0,
+      "stderr_lines": [
+        "worker-go registered jobs disabled",
+        "registered aggregation disabled",
+        "registered security-monitoring disabled",
+        "registered fcgbds-cleanup disabled",
+        "registered bds-auto-ingest disabled",
+        "registered governance-timer disabled",
+        "registered archiver disabled",
+        "registered backups disabled",
+        "registered blockchain-node disabled",
+        "disabled"
+      ]
+    },
+    {
+      "name": "skeleton_fcgbds_cleanup",
+      "args": ["FCG_WORKER_ENABLED=1", "FCG_JOB_FCGBDS_CLEANUP=1"],
+      "exit": 0,
+      "stderr_lines": [
+        "worker-go registered jobs disabled",
+        "registered aggregation disabled",
+        "registered security-monitoring disabled",
+        "registered fcgbds-cleanup disabled",
+        "registered bds-auto-ingest disabled",
+        "registered governance-timer disabled",
+        "registered archiver disabled",
+        "registered backups disabled",
+        "registered blockchain-node disabled",
+        "refusing to start jobs: skeleton only"
+      ]
     }
   ]
 }

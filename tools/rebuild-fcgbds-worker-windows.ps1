@@ -37,6 +37,7 @@ if ($p.ExitCode -ne 0) { throw "gen1 worker compile exit $($p.ExitCode)" }
 Convert-HexToExe $whex $wexe
 
 Write-Host "PE files written. Replay tests/rebuild/contracts/fcgbds-go.json against guest-fcgbds.exe listen (loopback)."
-Write-Host "Worker: guest-worker.exe with PAYMENTS_ENABLED=1 (exit 1), no args (disabled, exit 0), FCG_WORKER_ENABLED=1 FCG_JOB_AGGREGATION=1 (skeleton refusal, exit 0)."
+Write-Host "Heartbeat POST /api/bot-defense/reviewers/heartbeat JSON body {} and empty sessionId 400; {\"sessionId\":\"abc-1\"} 200 live=1. Do not use query sessionId=."
+Write-Host "Worker: guest-worker.exe PAYMENTS_ENABLED=1 exit 1; no args disabled exit 0; FCG_WORKER_ENABLED=1 no jobs disabled exit 0; FCG_WORKER_ENABLED=1 FCG_JOB_AGGREGATION=1 and FCG_JOB_FCGBDS_CLEANUP=1 skeleton refusal exit 0."
 Write-Host "Reserved: guest-fcgbds.exe 7099 and 8778 must print refusing reserved port and exit 1."
-Write-Host "PASS_AFTER PE files written (MZ compile). Replay remaining worker cases on CouchStation."
+Write-Host "PASS_AFTER PE files written (MZ compile). Replay remaining worker cases on CouchStation. This agent did not run PE."
