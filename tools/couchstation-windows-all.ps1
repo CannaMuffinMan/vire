@@ -1,7 +1,3 @@
-# One CouchStation session: every Windows PE proof the integration PRs request.
-# Do not run on Linux. Do not touch Windows Defender. Do not reboot.
-# Unsets VIRE_BUDGET first (inherited 5000000 fails BudgetCapTests).
-# Never prints FCG_API_TOKEN. Loopback only. Caps stay 32MB / 100000 / 5M.
 $ErrorActionPreference = "Stop"
 $env:UseSharedCompilation = "false"
 $env:MSBUILDDISABLENODEREUSE = "1"
@@ -220,6 +216,13 @@ Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-wind
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "pe-windows-gaps-check" {
+    $py = Join-Path $Root "tools/pe-windows-gaps-check.py"
+    if (-not (Test-Path $py)) { throw "missing tools/pe-windows-gaps-check.py" }
+    $r4 = (Get-Content -Raw (Join-Path $Root "src/rt-net-r4-blob.txt")).Trim()
+    if ($r4 -notmatch "41b807000000") { throw "FAIL_BEFORE packed r4 DNS CreateFileA share is not 7" }
+    if ($r4 -notmatch "5348894df8") { throw "FAIL_BEFORE packed r4 dns_hostok missing push rbx" }
+}
 Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
 Run-Proof "post-block-auth-windows" { Run-Script "tools/post-block-auth-windows.ps1" }
 Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }
@@ -266,6 +269,26 @@ while ($i -lt $ExitCodes.Count) {
     Log ("exit " + $ExitCodes[$i])
     $i = $i + 1
 }
+$Md = Join-Path $Data "couchstation-windows-all-results.md"
+$mdLines = New-Object System.Collections.Generic.List[string]
+$mdLines.Add("# CouchStation Windows all results")
+$mdLines.Add("")
+$mdLines.Add("head_sha $Head")
+$mdLines.Add("stamp $Stamp")
+$mdLines.Add("fail $fail")
+$mdLines.Add("")
+$mdLines.Add("| proof | result |")
+$mdLines.Add("|---|---|")
+$i = 0
+while ($i -lt $Results.Count) {
+    $mdLines.Add("| " + $Results[$i] + " | " + $ExitCodes[$i] + " |")
+    $i = $i + 1
+}
+$mdLines.Add("")
+$mdLines.Add("Full log: data/couchstation-windows-all.log")
+Set-Content -LiteralPath $Md -Value ($mdLines -join "`n")
+Log "results_markdown $Md"
 if ($fail -ne 0) { exit 1 }
 Write-Host "couchstation-windows-all ok. PE proof lives only on this Windows PC."
+Write-Host "results $Md"
 exit 0

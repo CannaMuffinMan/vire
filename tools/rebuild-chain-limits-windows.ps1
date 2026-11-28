@@ -1,12 +1,11 @@
-# CouchStation PE proof for fcgcpa chain remainder (rotate / 507 / 503 / migrate / aliases / concurrent).
-# Linux ELF proof is tools/rebuild-chain-limits-diff.sh. This script is the PE twin.
-# Do not treat a Linux run as PE proof. Loopback 127.0.0.1 only. Caps unchanged.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
 . (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
+Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
+$env:FCG_BLOCK_TOKEN = "couchstation-block-token"
 $FailBefore = "5c3ed01abe2a12a34fca74b915d5e39a9f05fde3"
 $After = (git rev-parse HEAD).Trim()
 $Data = Join-Path $Root "data"

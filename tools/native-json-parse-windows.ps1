@@ -1,4 +1,3 @@
-# CouchStation PE: native json/parse and listen+parse. Linux ELF proof is tools/native-elf-json-parse.sh.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
@@ -8,8 +7,16 @@ $env:VIRE_HEADLESS = "1"
 $Data = Join-Path $Root "data"
 $VireDll = Join-Path $Root "bin/Release/net10.0/vire.dll"
 if (-not (Test-Path $VireDll)) { throw "missing $VireDll" }
-$gen1 = Join-Path $Data "gen1.exe"
-if (-not (Test-Path $gen1)) { throw "missing gen1.exe; run native-selfhost-handoff.ps1 first" }
+Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
+Remove-Item Env:FCG_BLOCK_TOKEN -ErrorAction SilentlyContinue
+$FailBlob = "6e969fc2e9c94f537bad69b948e56670096c2a1b"
+$curBlob = (Get-Content -Raw (Join-Path $Root "src/rt-net-json-blob.txt")).Trim()
+git cat-file -e "$FailBlob^{commit}" 2>$null
+if ($LASTEXITCODE -eq 0) {
+    $oldBlob = (git show "${FailBlob}:src/rt-net-json-blob.txt").Trim()
+    if ($curBlob -eq $oldBlob) { throw "FAIL_BEFORE json blob still $FailBlob" }
+}
+Write-Host "FAIL_BEFORE json blob moved past $FailBlob"
 
 function Convert-HexToExe([string]$HexPath, [string]$ExePath) {
     $hex = [System.IO.File]::ReadAllText($HexPath).Trim()
@@ -26,9 +33,8 @@ function Compile-Native([string]$Src, [string]$Stem) {
     $hex = Join-Path $Data "$Stem.hex"
     $exe = Join-Path $Data "$Stem.exe"
     if (Test-Path $hex) { Remove-Item -Force $hex }
-    $p = Start-Process -FilePath $gen1 -ArgumentList @("data/$Stem.vire", "data/$Stem.hex") -WorkingDirectory $Root -NoNewWindow -PassThru
-    $code = Get-ChildExitCode $p
-    if ($code -ne 0) { throw "gen1 $Stem compile exit $code" }
+    & dotnet exec $VireDll --compiler compile-native.vire "data/$Stem.vire" "data/$Stem.hex" pe
+    if ($LASTEXITCODE -ne 0) { throw "compile-native $Stem exit $LASTEXITCODE" }
     Convert-HexToExe $hex $exe
     return $exe
 }
