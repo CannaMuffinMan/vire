@@ -15,7 +15,6 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | tools/apigo-ws-windows.ps1 | PE apigo-ws | Compile apigo-ws to PE and match ELF 101/echo/fail-closed frames | high | tools-ci |
 | tools/rebuild-portal-windows.ps1 | PE portal twins | Compile rpc/dev/dashboard guests to PE and match Linux portal contracts | high | tools-ci |
 | tools/rebuild-sop-proxy-windows.ps1 | PE landing SOP | Host-vs-PE landing-sop issue/verify/header and listen contracts | high | tools-ci |
-| src/rt-net.vire | rt-net-json-blob | Regen packed JSON encode/parse so parked helper roots match GPR/rbp | high | rt-net |
 | tools/rebuild-obs-listen-windows.ps1 | PE obs/listen | Host-vs-PE GET /obs 307 and listen GET/POST /proxy 200 on loopback | medium | tools-ci |
 | tools/native-forms.ps1 | native-forms fixtures | Tracked `data/native-forms` try-miss.vire and for-list.vire | medium | tools-ci |
 | compile-native.vire | tokenize | Native lexer must accept fractional number literals | medium | rt-core |
