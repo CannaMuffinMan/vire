@@ -159,6 +159,11 @@ tls_hook_io
 rt_listen
 msg_tls_listen
 msg_tls_cert
+tls_peer_bad
+tls_peerctx
+tls_peer_free
+iat_fct
+msg_tls_peer
 tpx_w
 rt_tls_wrap
 rt_tls_connect
@@ -167,3 +172,4 @@ rt_tls_send
 rt_tls_recv
 rt_tls_close
 rt_tls_listen
+rt_tls_peer_cert

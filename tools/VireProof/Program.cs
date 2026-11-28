@@ -6,7 +6,7 @@ static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|https-health|tls10-fail|tls-echo|remainder-run|remainder-pair|dns-stub|http-upok|ws-upstream> ...");
+            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|https-health|tls10-fail|tls-echo|pg-tls-stub|remainder-run|remainder-pair|dns-stub|http-upok|ws-upstream> ...");
             return 2;
         }
         try
@@ -17,6 +17,7 @@ static class Program
             if (cmd == "https-health") { Console.Write(ProofTls.HttpsHealth(int.Parse(args[1]), args[2])); return 0; }
             if (cmd == "tls10-fail") { ProofTls.Tls10MustFail(int.Parse(args[1])); return 0; }
             if (cmd == "tls-echo") return ProofTls.TlsEcho(args[1], args.Length > 2 ? args[2] : "");
+            if (cmd == "pg-tls-stub") return ProofPg.TlsStub(args[1], args.Length > 2 ? args[2] : "", args.Length > 3 ? args[3] : "honest");
             if (cmd == "remainder-run") return ProofRemainder.Run(int.Parse(args[1]), args[2], args[3], args[4]);
             if (cmd == "remainder-pair") return ProofRemainder.Pair(int.Parse(args[1]), int.Parse(args[2]), args[3], args[4]);
             if (cmd == "dns-stub") return ProofNet.DnsStub(args[1]);

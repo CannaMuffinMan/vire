@@ -1055,6 +1055,64 @@ define emitTlsPeGuest with image, fixes, labels
   emitFail with image, fixes, "msg_tls_listen"
   pin with labels, "tls_cert_fail", image
   emitFail with image, fixes, "msg_tls_cert"
+
+  pin with labels, "rt_tls_peer_cert", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_ready"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 141, 13]
+  emitRel with image, fixes, "tls_ctxt"
+  emitList with image, [186]
+  emitU32 with image, 83
+  emitList with image, [76, 141, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  let image be emitIat with image, fixes, "iat_qca"
+  emitList with image, [133, 192, 15, 133]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 139, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [139, 80, 16, 133, 210, 15, 132]
+  emitRel with image, fixes, "tls_peer_free"
+  emitList with image, [129, 250]
+  emitU32 with image, 1000000
+  emitList with image, [15, 135]
+  emitRel with image, fixes, "tls_peer_free"
+  emitList with image, [137, 85, 232, 137, 209, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 224, 72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 139, 81, 8, 68, 139, 69, 232, 72, 141, 72, 8]
+  emitCallTo with image, fixes, "tls_copy"
+  emitList with image, [72, 139, 85, 224, 139, 69, 232, 72, 137, 2, 198, 68, 2, 8, 0]
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  let image be emitIat with image, fixes, "iat_fct"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  emitList with image, [72, 139, 85, 224]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_peer_free", image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [72, 133, 201, 116]
+  emitU8 with image, 6
+  let image be emitIat with image, fixes, "iat_fct"
+  emitList with image, [72, 199, 5]
+  emitRel with image, fixes, "tls_peerctx"
+  emitList with image, [0, 0, 0, 0]
+  pin with labels, "tls_peer_bad", image
+  emitFail with image, fixes, "msg_tls_peer"
   return image
 end
 
