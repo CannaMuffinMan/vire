@@ -1147,9 +1147,6 @@ sealed class CompiledMachine
             termOps.Clear();
             return 0;
         }
-        if (name == "serve")
-            // TODO(VIRE-FINISH-NOW): drop the serve name once guests no longer call it
-            throw new VireError("serve was removed; use listen", line, col);
         throw new VireError("compiled builtin missing: " + name, line, col);
     }
 
