@@ -102,5 +102,14 @@ public class PgTests
         Assert.DoesNotContain("Set-MpPreference", plusPs);
         string couch = File.ReadAllText(Path.Combine(root, "tools", "couchstation-windows-all.ps1"));
         Assert.Contains("pg-scram-plus-windows.ps1", couch);
+        Assert.Contains("pg-peercert-windows.ps1", couch);
+        string peerPs = File.ReadAllText(Path.Combine(root, "tools", "pg-peercert-windows.ps1"));
+        Assert.Contains("pg-tls-stub", peerPs);
+        Assert.Contains("880ec761", peerPs);
+        Assert.Contains("mitm", peerPs);
+        Assert.Contains("sha384", peerPs);
+        Assert.Contains("sha512", peerPs);
+        Assert.Contains("CryptHashCertificate", peerPs);
+        Assert.DoesNotContain("Set-MpPreference", peerPs);
     }
 }

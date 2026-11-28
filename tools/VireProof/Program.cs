@@ -13,12 +13,12 @@ static class Program
         {
             string cmd = args[0];
             if (cmd == "write-pem") { ProofTls.WritePem(args[1], args[2]); return 0; }
-            if (cmd == "write-pfx") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : "", false); return 0; }
-            if (cmd == "write-pfx-expired") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : "", true); return 0; }
+            if (cmd == "write-pfx") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : "", false, args.Length > 4 ? args[4] : "sha256"); return 0; }
+            if (cmd == "write-pfx-expired") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : "", true, args.Length > 4 ? args[4] : "sha256"); return 0; }
             if (cmd == "https-health") { Console.Write(ProofTls.HttpsHealth(int.Parse(args[1]), args[2])); return 0; }
             if (cmd == "tls10-fail") { ProofTls.Tls10MustFail(int.Parse(args[1])); return 0; }
             if (cmd == "tls-echo") return ProofTls.TlsEcho(args[1], args.Length > 2 ? args[2] : "");
-            if (cmd == "pg-tls-stub") return ProofPg.TlsStub(args[1], args.Length > 2 ? args[2] : "");
+            if (cmd == "pg-tls-stub") return ProofPg.TlsStub(args[1], args.Length > 2 ? args[2] : "", args.Length > 3 ? args[3] : "honest");
             if (cmd == "pg-tls-n") return ProofPg.PlainN();
             if (cmd == "redis-tls-stub") return ProofRedis.TlsStub(args[1], args[2], args[3], args.Length > 4 ? args[4] : "");
             if (cmd == "remainder-run") return ProofRemainder.Run(int.Parse(args[1]), args[2], args[3], args[4]);

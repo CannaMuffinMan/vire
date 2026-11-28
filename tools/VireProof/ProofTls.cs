@@ -18,9 +18,9 @@ static class ProofTls
             + "\n-----END " + type + "-----\n";
     }
 
-    static X509Certificate2 MakeCert(RSA rsa, bool expired)
+    static X509Certificate2 MakeCert(RSA rsa, HashAlgorithmName hash, bool expired)
     {
-        CertificateRequest req = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        CertificateRequest req = new CertificateRequest("CN=localhost", rsa, hash, RSASignaturePadding.Pkcs1);
         SubjectAlternativeNameBuilder san = new SubjectAlternativeNameBuilder();
         san.AddDnsName("localhost");
         san.AddIpAddress(IPAddress.Loopback);
@@ -33,7 +33,7 @@ static class ProofTls
     public static void WritePem(string certPath, string keyPath)
     {
         using (RSA rsa = RSA.Create(2048))
-        using (X509Certificate2 cert = MakeCert(rsa, false))
+        using (X509Certificate2 cert = MakeCert(rsa, HashAlgorithmName.SHA256, false))
         {
             Encoding utf8 = new UTF8Encoding(false);
             File.WriteAllText(certPath, cert.ExportCertificatePem(), utf8);
@@ -41,10 +41,17 @@ static class ProofTls
         }
     }
 
-    public static void WritePfx(string pfxPath, string cerPath, string password, bool expired)
+    static HashAlgorithmName ParseHash(string name)
+    {
+        if (name == "sha384") return HashAlgorithmName.SHA384;
+        if (name == "sha512") return HashAlgorithmName.SHA512;
+        return HashAlgorithmName.SHA256;
+    }
+
+    public static void WritePfx(string pfxPath, string cerPath, string password, bool expired, string hashName)
     {
         using (RSA rsa = RSA.Create(2048))
-        using (X509Certificate2 cert = MakeCert(rsa, expired))
+        using (X509Certificate2 cert = MakeCert(rsa, ParseHash(hashName), expired))
         {
             string pw = password ?? "";
             X509Certificate2 exportCert = cert.HasPrivateKey ? cert : cert.CopyWithPrivateKey(rsa);
