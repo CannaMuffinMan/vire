@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Widen packed listen token pads from 256 to 4096 in cl_blockgate only."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
