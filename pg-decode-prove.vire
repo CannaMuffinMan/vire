@@ -95,6 +95,11 @@ define main
   let kdf be pg_pbkdf2 with "pencil", "salt", 2, tab
   proveOk with "pbkdf2 two rounds", ((length with kdf) == 32), box
 
+  let plusOnly be pg_scram_select with 1, 0, 1, 0, ""
+  proveBad with "PLUS-only refuse", (plusOnly at "why"), "channel binding", box
+  let plainPick be pg_scram_select with 0, 1, 1, 0, ""
+  proveOk with "no TLS keeps SCRAM-SHA-256", ((plainPick at "mech") == "SCRAM-SHA-256"), box
+
   proveOk with "bool t", ((pg_cell_decode with "t", 16) == true), box
   proveOk with "int4", ((pg_cell_decode with "7", 23) == 7), box
 

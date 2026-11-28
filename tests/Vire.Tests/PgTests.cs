@@ -10,10 +10,17 @@ public class PgTests
         string lib = File.ReadAllText(Path.Combine(root, "src", "rt-pg.vire"));
         Assert.Contains("PostgreSQL frontend/backend protocol v3", lib);
         Assert.Contains("SCRAM-SHA-256", lib);
+        Assert.Contains("SCRAM-SHA-256-PLUS", lib);
+        Assert.Contains("tls-server-end-point", lib);
+        Assert.Contains("pg_open_ssl_cbind", lib);
+        Assert.Contains("pg_scram_select", lib);
+        Assert.DoesNotContain("TODO(VIRE-FINISH-NOW)", lib);
         Assert.Contains("SSLRequest", lib);
         Assert.Contains("verify-full", lib);
         Assert.Contains("pg_open_ssl", lib);
         Assert.Contains("tls_wrap", lib);
+        Assert.Contains("tls_peer_cert", lib);
+        Assert.Contains("tls_end_point", lib);
         Assert.Contains("pg_open", lib);
         Assert.Contains("pg_query", lib);
         Assert.Contains("pg_exec_param", lib);
@@ -76,5 +83,23 @@ public class PgTests
         Assert.Contains("truncated", decode);
         Assert.Contains("oversize", decode);
         Assert.Contains("nonce mismatch", decode);
+        Assert.Contains("PLUS-only refuse", decode);
+        string plusProve = File.ReadAllText(Path.Combine(root, "pg-scram-plus-prove.vire"));
+        Assert.Contains("RFC7677", plusProve);
+        Assert.Contains("p=tls-server-end-point", plusProve);
+        Assert.Contains("channel binding", plusProve);
+        Assert.Contains("tls plus no bind", plusProve);
+        Assert.Contains("empty leaf der", plusProve);
+        string plusSh = File.ReadAllText(Path.Combine(root, "tools", "pg-scram-plus-prove.sh"));
+        Assert.Contains("6693e0e5", plusSh);
+        Assert.Contains("127.0.0.1", plusSh);
+        Assert.Contains("VIRE_BUDGET", plusSh);
+        Assert.Contains("5000000", plusSh);
+        string plusPs = File.ReadAllText(Path.Combine(root, "tools", "pg-scram-plus-windows.ps1"));
+        Assert.Contains("pg-scram-plus-prove.vire", plusPs);
+        Assert.Contains("5000000", plusPs);
+        Assert.DoesNotContain("Set-MpPreference", plusPs);
+        string couch = File.ReadAllText(Path.Combine(root, "tools", "couchstation-windows-all.ps1"));
+        Assert.Contains("pg-scram-plus-windows.ps1", couch);
     }
 }
