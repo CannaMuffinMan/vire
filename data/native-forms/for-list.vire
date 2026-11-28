@@ -1,0 +1,7 @@
+define main
+  let total be 0
+  for n in [1, 2, 3]
+    let total be total + n
+  end
+  say total
+end
