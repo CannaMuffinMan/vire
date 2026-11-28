@@ -41,7 +41,6 @@ define method_not_allowed
 end
 
 define route with method, path, body, head
-  let port be number with (arg_at with 0)
   if path == "/api/health"
     if method != "GET"
       return method_not_allowed
@@ -115,7 +114,6 @@ define route with method, path, body, head
 end
 
 define main
-  let port be number with (arg_at with 0)
   let mode be arg_at with 1
   if mode == "jwt-sign"
     let sec be jwt_sec
@@ -142,6 +140,7 @@ define main
     halt with 0
   end
   if mode == "proxy-echo"
+    let port be number with (arg_at with 0)
     let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "", "prefix": ""}
     say (got at "status")
     say (got at "body")
