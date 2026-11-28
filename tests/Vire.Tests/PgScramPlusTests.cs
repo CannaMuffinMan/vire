@@ -85,6 +85,8 @@ public class PgScramPlusTests
         Assert.Contains("PLUS client-final p PASS", norm);
         Assert.Contains("PLUS server-signature PASS", norm);
         Assert.Contains("plus-only no bind REJECT", norm);
+        Assert.Contains("tls plus no bind REJECT", norm);
+        Assert.Contains("empty leaf der PASS", norm);
         Assert.Contains("PG SCRAM PLUS PROVE pass", norm);
     }
 

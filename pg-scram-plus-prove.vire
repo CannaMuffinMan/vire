@@ -32,6 +32,12 @@ define main
   let tlsNoBindPlusOnly be pg_scram_select with 1, 0, 1, 0, ""
   proveBad with "plus-only no bind", (tlsNoBindPlusOnly at "why"), "channel binding", box
 
+  let tlsBothNoBind be pg_scram_select with 1, 1, 1, 0, ""
+  proveBad with "tls plus no bind", (tlsBothNoBind at "why"), "channel binding", box
+
+  let emptyLeaf be pg_cbind_endpoint with "", tab
+  proveOk with "empty leaf der", (emptyLeaf == none), box
+
   let bothNoTls be pg_scram_select with 0, 1, 1, 0, ""
   proveOk with "plain when not tls", (((bothNoTls at "mech") == "SCRAM-SHA-256") and ((bothNoTls at "gs2") == "n,,")), box
 

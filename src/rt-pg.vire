@@ -522,13 +522,11 @@ define pg_scram_select with tls, scram, plus, haveBind, bindName
     if (tls == 1) and (haveBind == 1)
       return {"ok": true, "why": "", "mech": "SCRAM-SHA-256-PLUS", "gs2": (pg_scram_gs2 with bindName), "plus": 1}
     end
-    if scram != 1
+    if tls == 1
       return {"ok": false, "why": "channel binding", "mech": "", "gs2": "", "plus": 0}
     end
-    if tls == 1
-      if haveBind != 1
-        return {"ok": true, "why": "", "mech": "SCRAM-SHA-256", "gs2": "n,,", "plus": 0}
-      end
+    if scram != 1
+      return {"ok": false, "why": "channel binding", "mech": "", "gs2": "", "plus": 0}
     end
     return {"ok": true, "why": "", "mech": "SCRAM-SHA-256", "gs2": "n,,", "plus": 0}
   end

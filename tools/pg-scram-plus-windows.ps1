@@ -14,5 +14,7 @@ Write-Output "pg_scram_plus_windows_exit $code"
 if ($code -ne 0) { throw "host pg-scram-plus-prove exit $code" }
 if ("$hostOut" -notmatch "PG SCRAM PLUS PROVE pass") { throw "host plus prove missing pass" }
 if ("$hostOut" -notmatch "PLUS client-final p PASS") { throw "host plus prove missing client-final" }
+if ("$hostOut" -notmatch "tls plus no bind REJECT") { throw "host plus prove missing tls fail-closed" }
+if ("$hostOut" -notmatch "empty leaf der PASS") { throw "host plus prove missing empty-leaf" }
 Write-Output "Linux ELF/Unicorn is not Windows PE proof. This script is host interpreter only."
 Write-Output "pg_scram_plus_windows pass"
