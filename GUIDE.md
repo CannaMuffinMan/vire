@@ -279,7 +279,7 @@ Run `vire.exe work.vire`. Type in the box, press Save, and look at `data/note.tx
 
 ## 12. Step by step: a local site
 
-Vire writes the browser files into `site/`. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire. The old `serve` builtin is gone; calling it errors with `serve was removed; use listen`.
+Vire writes the browser files into `site/`. Browsers read HTML, CSS, and JavaScript, so those files are the output. The program that creates them is Vire. HTTP serving is `listen`. There is no `serve` builtin.
 
 `vault.vire` is the one-shot local experiment:
 

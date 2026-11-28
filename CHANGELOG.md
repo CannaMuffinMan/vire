@@ -1,5 +1,9 @@
 # Changelog
 
+## Serve builtin drop (this branch)
+
+- Host `serve` is no longer a builtin. Guests already call `listen`. A leftover `serve with …` is the same unknown-name error as any other missing definition. Caps unchanged.
+
 ## VireApk host-only close (this branch)
 
 - `VireApk.Pack` is not a guest builtin. APK packing is not a Vire product. SDK lookup honors `ANDROID_SDK_ROOT` / `ANDROID_HOME` before `D:\\Android`. NDK lookup honors `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT` before SDK/`D:\\Android`. Missing tools name those env vars. `ApkTests` / `AndroidSoTests` fail closed without tools and fail the success path with that named env instead of passing. Caps unchanged.

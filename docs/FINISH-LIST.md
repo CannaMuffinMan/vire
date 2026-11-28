@@ -11,7 +11,7 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | tests/rebuild/FCGBDS-WORKER.md | FCGBDS worker | Native POST body, reviewer TTL, bind, PE proof still open | high | tests-docs |
 | tools/tls-schannel-windows.ps1 | PE tls_listen | CouchStation 50f01259 18:11-18:42 ET: `PE tls_listen exited 1`. Packed PE SChannel tls_listen, present at pre-cleanup c813695. Harness now kills tls-echo process trees and reads child logs with FileShare.ReadWrite. | high | tools-ci |
 | tools/pg-redis-tls-windows.ps1 | PE tls_wrap ping | CouchStation 50f01259 18:11-18:42 ET: `PE tls_wrap ping missing PONG`. Packed PE tls_wrap, present at pre-cleanup c813695. Leftover `vire-proof tls-echo` held the child log; finally + FileShare.ReadWrite. | high | tools-ci |
-| Vire.cs | Builtin serve | Drop the serve name from Builtins once guests no longer call it | low | host-cs |
-| Compiled.cs | Builtin serve | Drop the serve name once guests no longer call it | low | host-cs |
 
 Closed 2026-11-28: `VireApk.Pack` stays host-only. APK from `.vire` is not a product (`docs/history.md` Do not resume). No guest builtin. Missing Android SDK/NDK is a named env failure (`ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`, `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`), not a silent pass. Residual: no signed `data/app.apk` or aarch64 `.so` on this Linux agent (SDK/NDK absent). `windows/vire.windows.csproj` globs `..\\*.cs` (PR #146), so `VireApk.cs` is in the Windows compile set.
+
+Closed 2026-11-28: host `serve` is not a builtin. Guests already call `listen`. A leftover `serve with …` is `there is no definition named serve`.

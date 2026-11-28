@@ -372,7 +372,7 @@ sealed class Machine
 
     static readonly HashSet<string> Builtins = new HashSet<string>(new string[] {
         "length", "push", "text", "number", "ask", "read", "write", "slice", "keys", "has", "kind", "join",
-        "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape", "serve",
+        "abs", "min", "max", "lower", "upper", "split", "find", "span", "drop", "sort", "escape",
         "files", "json", "parse", "now", "ticks", "fetch", "post", "open", "line", "field", "button", "value", "show", "place", "mark",
         "sheet", "ink", "stroke", "fill", "dot", "watch", "term", "screen", "marks",
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
@@ -616,7 +616,6 @@ sealed class Machine
         if (name == "ink" || name == "dot" || name == "replace") need = 3;
         if (name == "stroke" || name == "fill") need = 4;
         if (name == "mark") need = 5;
-        if (name == "serve" || name == "escape") need = 1;
         if (name == "slice") need = 3;
         if (args.Count != need) throw new VireError(name + " takes " + need + " values, got " + args.Count, line, col);
         if (name == "length")
@@ -893,9 +892,6 @@ sealed class Machine
             if (raw == null) raw = Show(args[0]);
             return raw.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
-        if (name == "serve")
-            // TODO(VIRE-FINISH-NOW): drop the serve name from Builtins once guests no longer call it
-            throw new VireError("serve was removed; use listen", line, col);
         if (name == "files")
         {
             string path = SafePath(args[0], line, col);
