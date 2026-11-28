@@ -18,20 +18,22 @@ static class ProofTls
             + "\n-----END " + type + "-----\n";
     }
 
-    static X509Certificate2 MakeCert(RSA rsa)
+    static X509Certificate2 MakeCert(RSA rsa, bool expired)
     {
         CertificateRequest req = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         SubjectAlternativeNameBuilder san = new SubjectAlternativeNameBuilder();
         san.AddDnsName("localhost");
         san.AddIpAddress(IPAddress.Loopback);
         req.CertificateExtensions.Add(san.Build());
-        return req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(7));
+        DateTimeOffset notBefore = expired ? DateTimeOffset.UtcNow.AddDays(-14) : DateTimeOffset.UtcNow.AddHours(-1);
+        DateTimeOffset notAfter = expired ? DateTimeOffset.UtcNow.AddDays(-7) : DateTimeOffset.UtcNow.AddDays(7);
+        return req.CreateSelfSigned(notBefore, notAfter);
     }
 
     public static void WritePem(string certPath, string keyPath)
     {
         using (RSA rsa = RSA.Create(2048))
-        using (X509Certificate2 cert = MakeCert(rsa))
+        using (X509Certificate2 cert = MakeCert(rsa, false))
         {
             Encoding utf8 = new UTF8Encoding(false);
             File.WriteAllText(certPath, cert.ExportCertificatePem(), utf8);
@@ -39,10 +41,10 @@ static class ProofTls
         }
     }
 
-    public static void WritePfx(string pfxPath, string cerPath, string password)
+    public static void WritePfx(string pfxPath, string cerPath, string password, bool expired)
     {
         using (RSA rsa = RSA.Create(2048))
-        using (X509Certificate2 cert = MakeCert(rsa))
+        using (X509Certificate2 cert = MakeCert(rsa, expired))
         {
             string pw = password ?? "";
             X509Certificate2 exportCert = cert.HasPrivateKey ? cert : cert.CopyWithPrivateKey(rsa);
@@ -83,6 +85,35 @@ static class ProofTls
         }
     }
 
+    public static SslServerAuthenticationOptions ServerOpts(X509Certificate2 cert)
+    {
+        SslServerAuthenticationOptions opts = new SslServerAuthenticationOptions
+        {
+            ServerCertificate = cert,
+            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+            CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+            ClientCertificateRequired = false,
+            EncryptionPolicy = EncryptionPolicy.RequireEncryption
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            try
+            {
+                opts.CipherSuitesPolicy = new CipherSuitesPolicy(new TlsCipherSuite[]
+                {
+                    TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                    TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                    TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                    TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+                    TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                    TlsCipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+                });
+            }
+            catch (PlatformNotSupportedException) { }
+        }
+        return opts;
+    }
+
     public static int TlsEcho(string pfxPath, string password)
     {
         X509Certificate2 cert = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, password);
@@ -107,7 +138,7 @@ static class ProofTls
             using (c)
             using (SslStream s = new SslStream(c.GetStream(), false))
             {
-                s.AuthenticateAsServer(cert, false, SslProtocols.Tls12 | SslProtocols.Tls13, false);
+                s.AuthenticateAsServer(ServerOpts(cert));
                 byte[] buf = new byte[256];
                 int got = s.Read(buf, 0, buf.Length);
                 if (got < 0) return;

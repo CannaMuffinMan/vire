@@ -65,7 +65,7 @@ Do not implement SQL on this branch. `#95` owns the native database client. Desi
 - Native ELF: `tools/native-elf-tls.sh` (`tls_connect` ping; `tls_listen` `/health`; negatives fail-closed).
 - Windows host: `tools/tls-server-windows.ps1` (SslStream `/health`).
 - Windows PE SChannel: `tools/tls-schannel-windows.ps1` (PENDING CouchStation).
-- Windows PE Postgres/Redis TLS: `tools/pg-redis-tls-windows.ps1` (PENDING CouchStation; loopback test servers only).
+- Windows PE Postgres/Redis TLS: `tools/pg-tls-prove-windows.ps1` and `tools/redis-tls-prove-windows.ps1` start `vire-proof pg-tls-stub` / `redis-tls-stub` on loopback (no PostgreSQL 16 or redis-server on CouchStation). Combined wrap ping: `tools/pg-redis-tls-windows.ps1`. PE execute is CouchStation-only.
 
 ## Shared files
 

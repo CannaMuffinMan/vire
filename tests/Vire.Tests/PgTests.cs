@@ -39,6 +39,7 @@ public class PgTests
         Assert.Contains("127.0.0.1", tlsPs);
         Assert.Contains("secur32.dll", tlsPs);
         Assert.Contains("cd0bd38584e4d3faad0f46b4eefe98515b2dbf26", tlsPs);
+        Assert.Contains("pg-tls-stub", tlsPs);
         Assert.DoesNotContain("Set-MpPreference", tlsPs);
         string ps = File.ReadAllText(Path.Combine(root, "tools", "pg-prove-windows.ps1"));
         Assert.Contains("VIRE_BUDGET", ps);

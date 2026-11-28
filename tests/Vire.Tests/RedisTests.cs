@@ -27,6 +27,7 @@ public class RedisTests
         Assert.Contains("5000000", tlsPs);
         Assert.Contains("127.0.0.1", tlsPs);
         Assert.Contains("f085dff6770513cfc9660f1a712967e177cf5b50", tlsPs);
+        Assert.Contains("redis-tls-stub", tlsPs);
         Assert.Contains("tls-port", tlsPs);
         Assert.DoesNotContain("Set-MpPreference", tlsPs);
         string tlsSh = File.ReadAllText(Path.Combine(root, "tools", "redis-tls-prove-linux.sh"));

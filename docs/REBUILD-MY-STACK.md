@@ -13,7 +13,7 @@ This is a method, not a claim that Forever Couch Gang (FCG) already runs on nati
 | 5 | HTTP listener | `listen` + `VireListen` | `rt_listen` blob | prior | prior |
 | 6 | JSON | `json` / `parse` | `rt_json` | prior | prior |
 | 7 | Health contract | `guest-health.vire` `GET /health` | same guest | prior | prior |
-| 8 | Redis | loopback RESP + `rediss://` | `rt-redis` + `tls_wrap` | `tools/redis-prove-windows.ps1`, `tools/pg-redis-tls-windows.ps1` | PE TLS PENDING CouchStation |
+| 8 | Redis | loopback RESP + `rediss://` | `rt-redis` + `tls_wrap` | `tools/redis-prove-windows.ps1`, `tools/redis-tls-prove-windows.ps1` (VireProof stub) | PE execute CouchStation |
 | 9 | Postgres client | trust/cleartext + `sslmode=verify-full` | `rt-pg` + `tls_wrap` | `tools/pg-prove-windows.ps1`, `tools/pg-redis-tls-windows.ps1` | PE TLS PENDING CouchStation |
 | 10 | TLS client | `SslStream` `tls_connect` / `tls_wrap` | OpenSSL 3 `libssl.so.3` | PE SChannel (`tools/tls-schannel-windows.ps1`, PENDING CouchStation) | prior (#126) |
 | 11 | **TLS server / HTTPS listener** | `tls_listen` + `SslStream` on `VireListen` | OpenSSL `TLS_server_method` + `SSL_accept` wrapping `rt_listen` | PE SChannel PFX `tls_listen`; host `tools/tls-server-windows.ps1` | prior (#126) |
