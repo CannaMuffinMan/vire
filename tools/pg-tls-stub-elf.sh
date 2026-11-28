@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Host vs Linux ELF: pg_open_ssl tls_wrap against vire-proof pg-tls-stub.
-# Optional: REDIS=1 also runs redis-tls-stub ELF (tls_connect, not wrap).
+# Host and Linux ELF vs vire-proof pg-tls-stub (tls_wrap) and redis-tls-stub (tls_connect).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
