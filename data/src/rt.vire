@@ -928,7 +928,7 @@ define emitRuntime with image, fixes, labels
   pin with labels, "rt_for_more", image
   let image be emitList with image, [73, 139, 69, 248, 73, 139, 77, 232, 72, 139, 17, 72, 57, 208, 15, 131]
   let image be emitRel with image, fixes, "for_done"
-  let image be emitList with image, [72, 193, 224, 4, 72, 141, 84, 1, 16, 76, 139, 2, 76, 139, 74, 8, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16, 73, 255, 69, 232, 184]
+  let image be emitList with image, [72, 139, 73, 16, 72, 193, 224, 4, 72, 141, 20, 1, 76, 139, 2, 76, 139, 74, 8, 77, 137, 69, 0, 77, 137, 77, 8, 73, 131, 197, 16, 73, 255, 69, 232, 184]
   let image be emitU32 with image, 1
   let image be emitList with image, [195]
   pin with labels, "for_done", image

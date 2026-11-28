@@ -1,8 +1,7 @@
 define main
-  let xs be [10, 20, 30]
-  let i be 0
-  while i < (length with xs)
-    say (xs at i)
-    let i be i + 1
+  let total be 0
+  for n in [1, 2, 3]
+    let total be total + n
   end
+  say total
 end

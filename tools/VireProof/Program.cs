@@ -6,7 +6,7 @@ static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|https-health|tls10-fail|tls-echo|remainder-run|remainder-pair|dns-stub|http-upok|ws-upstream> ...");
+            Console.Error.WriteLine("usage: vire-proof <write-pem|write-pfx|https-health|tls10-fail|tls-echo|remainder-run|remainder-pair|dns-stub|http-upok|http-echo|ws-upstream|ws-prove> ...");
             return 2;
         }
         try
@@ -21,7 +21,9 @@ static class Program
             if (cmd == "remainder-pair") return ProofRemainder.Pair(int.Parse(args[1]), int.Parse(args[2]), args[3], args[4]);
             if (cmd == "dns-stub") return ProofNet.DnsStub(args[1]);
             if (cmd == "http-upok") return ProofNet.HttpUpOk();
+            if (cmd == "http-echo") return ProofNet.HttpEcho();
             if (cmd == "ws-upstream") return ProofNet.WsUpstream();
+            if (cmd == "ws-prove") return ProofNet.WsProve(int.Parse(args[1]));
             Console.Error.WriteLine("unknown command " + cmd);
             return 2;
         }
