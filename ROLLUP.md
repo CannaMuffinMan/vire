@@ -14,17 +14,32 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #145 | `29ba1ef1` | clean |
 | #146 | `3add41ce` | clean |
 | #147 | `67603360` | conflict `docs/FINISH-LIST.md`. Kept 144-146 row deletions. Dropped tools-ci rows 147 implements. |
-| #148 | `65fc7692` | conflict `docs/FINISH-LIST.md`. Dropped `pg_auth` row. Did not restore stale 147-branch rows. |
-| #149 | `ed926c6a` (`cursor/windows-tls-0630`) | clean |
+| #148 | `65fc7692` | conflict `docs/FINISH-LIST.md`. Dropped `pg_auth` row. Did not restore stale 147-branch rows. Re-merge when `cursor/pg-scram-plus-e596` moves. |
+| #149 | `16f7f4f8` (`cursor/windows-tls-0630`) | first merge `ed926c6a`, then re-merged `16f7f4f8` (no PersistKeySet on ephemeral PFX). Clean both times. |
 | #150 | `8f460c49` (`cursor/pe-dns-json-chain-567f`) | conflict `tools/couchstation-windows-all.ps1`. Kept `native-forms`. Dropped MZ-only proxy block. Writes `data/couchstation-windows-all-results.md`. |
+| #151 | `36d2e644` (`cursor/native-405-proxy-ws-33ca`) | conflict `docs/FINISH-LIST.md` only. Packed blobs did not conflict in git. See below. |
 
-## Not merged
+## Packed rt-net / listen blobs (#150 vs #151)
 
-#143 (`51de3c2f`, POST `/block` auth) is not a git ancestor of the base. Host `BlockAuthTests.cs` matches the base file. Base `6693e0e5` already denies native `POST /block` when the write secret is missing or short. Merging #143 from `native-compiler` would delete native listen code on this branch. Policy is already contained.
+Git auto-merged `src/rt-net.vire`. No conflict markers. Byte check after the merge:
 
-## Left out on purpose
+- `src/rt-net-r4-blob.txt` matches #150 (`8f460c4`), not #151. DNS rbx/share-7 pack kept.
+- `src/rt-net-json-blob.txt` matches #144 (`4b618c2`), not the stale #151 copy.
+- `src/rt-net-blob.txt` is identical on #150 and #151.
+- `src/rt-net.vire` is #144 park comments plus #151 `land_st_405`, POST body overlay at blob+2728, and in-process WS echo overlay.
 
-Dashboard, proxy, and WS feature lanes, and later 4h lanes. Fold those in a follow-up rollup.
+Re-run on this tip:
+
+```
+python3 tools/pe-windows-gaps-check.py
+bash tools/native-405-proxy-ws-check.sh
+```
+
+## Not merged yet
+
+- #143 (`51de3c2f`) host/native POST `/block` deny-by-default is already on `6693e0e5`. Do not merge the `native-compiler` branch. It would delete native listen.
+- `cursor/vire-4h-auth-compare` is not on origin yet. Merge it when the branch exists.
+- #148 head is still `65fc7692`. Re-merge (no rebase) when `cursor/pg-scram-plus-e596` moves.
 
 ## CouchStation one-shot (Windows PC only)
 
@@ -44,9 +59,10 @@ Results: `data/couchstation-windows-all-results.md` and `data/couchstation-windo
 
 ```
 python3 tools/pe-windows-gaps-check.py
+bash tools/native-405-proxy-ws-check.sh
+bash tools/windows-tls-lane-check.sh
 bash tools/native-elf-selfhost.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
-bash tools/windows-tls-lane-check.sh
 ```
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
