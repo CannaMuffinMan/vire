@@ -53,7 +53,39 @@ define main
   let got be sha256_hex with longb
   let nfail be proveLine with "FIPS 448 guest", got, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
   let fails be fails + nfail
-  say "FIPS 1M guest skipped list cap 100000 holds at most 100000 bytes"
+  let m896 be ascii_bytes with "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+  let m896b be m896 at 1
+  let got be sha256_hex with m896b
+  let nfail be proveLine with "FIPS 896 guest", got, "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1"
+  let fails be fails + nfail
+  let host896 be hash with "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+  let nfail be proveLine with "FIPS 896 hash", got, host896
+  let fails be fails + nfail
+  let a55 be fillBytes with 55, 97
+  let a56 be fillBytes with 56, 97
+  let a63 be fillBytes with 63, 97
+  let a64 be fillBytes with 64, 97
+  let a65 be fillBytes with 65, 97
+  let t55 be ascii_text with a55
+  let t56 be ascii_text with a56
+  let t63 be ascii_text with a63
+  let t64 be ascii_text with a64
+  let t65 be ascii_text with a65
+  let nfail be proveLine with "boundary 55", (sha256_hex with a55), (hash with (t55 at 1))
+  let fails be fails + nfail
+  let nfail be proveLine with "boundary 56", (sha256_hex with a56), (hash with (t56 at 1))
+  let fails be fails + nfail
+  let nfail be proveLine with "boundary 63", (sha256_hex with a63), (hash with (t63 at 1))
+  let fails be fails + nfail
+  let nfail be proveLine with "boundary 64", (sha256_hex with a64), (hash with (t64 at 1))
+  let fails be fails + nfail
+  let nfail be proveLine with "boundary 65", (sha256_hex with a65), (hash with (t65 at 1))
+  let fails be fails + nfail
+  let a448 be fillBytes with 448, 97
+  let t448 be ascii_text with a448
+  let nfail be proveLine with "largest-fit 448 a", (sha256_hex with a448), (hash with (t448 at 1))
+  let fails be fails + nfail
+  say "FIPS 1M guest skipped: list cap 100000 cannot hold 1000000 bytes; guest pad+compress of 448 x 'a' is the largest vector this prove runs under step cap 5000000"
 
   let k1 be fillBytes with 20, 11
   let m1 be ascii_bytes with "Hi There"

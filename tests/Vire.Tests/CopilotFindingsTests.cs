@@ -142,7 +142,7 @@ public class CopilotFindingsTests
         Console.WriteLine("f8_host_pass_after list=[0, 0, 1]");
         string native = File.ReadAllText(Path.Combine(DualMode.FindRoot(), "compile-native.vire"));
         Assert.Contains("emitOp with gen, [72, 185]", native);
-        Assert.Contains("emitU64 with (gen at \"image\"), (expr at 1)", native);
+        Assert.Contains("emitU64 with (gen at \"image\"), (whole with n)", native);
         Assert.DoesNotContain("emitOp with gen, [72, 199, 193]", native);
     }
 
