@@ -12,7 +12,6 @@ static class VireApk
     const string DebugAlias = "androiddebugkey";
     const string DebugStorePass = "android";
 
-    // TODO(VIRE-FINISH-NOW): expose Pack as a guest builtin only if APK from .vire is still a product goal
     public static string Pack(string root, int line, int col)
     {
         string tools = FindBuildTools();
@@ -22,11 +21,11 @@ static class VireApk
         string javaHome = FindJavaHome();
         string java = FirstExisting(Path.Combine(javaHome, "bin", "java.exe"), Path.Combine(javaHome, "bin", "java"));
         string androidJar = FindAndroidJar();
-        if (aapt == null) throw new VireError("aapt is not installed", line, col);
-        if (zipalign == null) throw new VireError("zipalign is not installed", line, col);
-        if (!File.Exists(apksignerJar)) throw new VireError("apksigner is not installed", line, col);
-        if (androidJar == null) throw new VireError("android.jar is not installed", line, col);
-        if (java == null) throw new VireError("java is not installed", line, col);
+        if (aapt == null) throw new VireError("aapt is not installed (set ANDROID_SDK_ROOT or ANDROID_HOME)", line, col);
+        if (zipalign == null) throw new VireError("zipalign is not installed (set ANDROID_SDK_ROOT or ANDROID_HOME)", line, col);
+        if (!File.Exists(apksignerJar)) throw new VireError("apksigner is not installed (set ANDROID_SDK_ROOT or ANDROID_HOME)", line, col);
+        if (androidJar == null) throw new VireError("android.jar is not installed (set ANDROID_SDK_ROOT or ANDROID_HOME)", line, col);
+        if (java == null) throw new VireError("java is not installed (set JAVA_HOME)", line, col);
         string data = Path.Combine(root, "data");
         Directory.CreateDirectory(data);
         string output = Path.Combine(data, "app.apk");
@@ -72,7 +71,7 @@ static class VireApk
         if (File.Exists(keystore)) return;
         string javaHome = FindJavaHome();
         string keytool = FirstExisting(Path.Combine(javaHome, "bin", "keytool.exe"), Path.Combine(javaHome, "bin", "keytool"));
-        if (keytool == null) throw new VireError("keytool is not installed", line, col);
+        if (keytool == null) throw new VireError("keytool is not installed (set JAVA_HOME)", line, col);
         RunTool(keytool, new string[]
         {
             "-genkeypair",
@@ -173,18 +172,22 @@ static class VireApk
                 Array.Sort(versions);
                 if (versions.Length > 0) return versions[versions.Length - 1];
             }
+            return root;
         }
         return BuildTools;
     }
 
     static string FindAndroidJar()
     {
-        if (File.Exists(AndroidJar)) return AndroidJar;
         string sdk = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
         if (string.IsNullOrEmpty(sdk)) sdk = Environment.GetEnvironmentVariable("ANDROID_HOME");
-        if (string.IsNullOrEmpty(sdk)) return null;
-        string jar = Path.Combine(sdk, "platforms", "android-35", "android.jar");
-        return File.Exists(jar) ? jar : null;
+        if (!string.IsNullOrEmpty(sdk))
+        {
+            string jar = Path.Combine(sdk, "platforms", "android-35", "android.jar");
+            return File.Exists(jar) ? jar : null;
+        }
+        if (File.Exists(AndroidJar)) return AndroidJar;
+        return null;
     }
 
     static string FindJavaHome()
