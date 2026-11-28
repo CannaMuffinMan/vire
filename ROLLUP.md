@@ -28,6 +28,8 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #159 | `9277ce8` (`cursor/vire-4h-auth-compare-946f`) | Folded after #160. Byte-range reconcile vs packed #150/#151/#155; see below. |
 | #162 | `a657a63d` (`cursor/vire-4h-elf-cbind`) | After #159. ELF `rt_tls_peer_cert` stores `i2d_X509` length (`mov [rdx],rcx` after second i2d). MITM guest + `pg-tls-cbind-dump.sh`. Clean merge. |
 | #161 | `b449ffe7` (`cursor/vire-4h-pe-peercert`) | After #162. PE `tls_peer_cert` DER export; ELF/PE `tls_end_point` SHA-256/384/512 via OID (PE `CryptHashCertificate`). Packed SChannel blob **5161**, changed `[4481,5161)`. Kept #162 i2d length. Kept PE wrap `76,137,13` from #160. Conflicts in VireProof: PLUS/MITM stub from #161 plus expired PFX / redis / `pg-tls-n` / SELECT loop from the rollup. |
+| #163 | `d664343` (`cursor/vire-4h-listen-recv0`) | Fast-forward onto the rollup. Recv0 `je` at 0x5DE → in-blob `leave;ret` (r4 0x36DF / 3-param 0x510). r4 length **18843** (#159), not #150's 18855. `cl_blockgate` e9 already at 0xA78. |
+| #164 | `4f9a337e` (`cursor/vire-4h-selfhost-listcap`) | Normal merge after #163. Packs ELF `emitTlsGuest` into a 2403-byte blob (`src/rt-tls-elf.vire` + `tools/pack-tls-elf.py`). Listen/r4 blobs untouched. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -44,7 +46,7 @@ One implementation each. No double-include.
 Git auto-merged `src/rt-net.vire`. No conflict markers. Byte-range reconcile after folding #159 `9277ce8` (do not take #159's cleanup r4 wholesale):
 
 - **3-param `src/rt-net-blob.txt`:** take #159 (11519 bytes). Cleanup was 11420. Insertion is the body-park jmp at blob+0xAA8 (`e9` to the appended trampoline) plus 99 appended bytes. #151 overlay still jmps 0xAA8 to `pr_body_fix` / `land_st_405` / WS echo; 0xAA8 was already `e9` on #159.
-- **r4 `src/rt-net-r4-blob.txt`:** keep #150 length 18855 (DNS rbx/share-7), not #159's cleanup 18843. Apply #159's fail-closed cap only: `cmp r8,0x1000` and `jbe +6` → `jae cl_401` (`0f83…` to pin `cl_401` 0x1bb4) plus `mov r8d,0x1000` at the 256→4096 immediate sites. Prefix through blob+8159 (listen/client) matches cleanup; DNS starts at `dns_hostok` 0x1fd4.
+- **r4 `src/rt-net-r4-blob.txt`:** after #163, length **18843** (#159), not #150's 18855. See #163 12-byte DNS check below. Same-length `FILE_SHARE` `41 b8 01` → `41 b8 07` kept at 0x27AB.
 - **`src/rt-net-json-blob.txt`:** still #144, not #151.
 - **`guest-chain.vire`:** #159 4-param `route with method, path, body, head` so compile uses r4.
 
@@ -61,8 +63,8 @@ bash tools/post-block-auth-native.sh
 ## Not merged yet
 
 - #143 (`51de3c2f`) host/native POST `/block` deny-by-default is already on `6693e0e5`. Do not merge the `native-compiler` branch. It would delete native listen.
-- Lane N `cursor/vire-4h-listen-recv0` will PR into this rollup and fix native listen SIGSEGV (1-param empty recv + r4 POST `/block`). Do not patch listen blobs here.
 - #148 is `880ec761` on this tip (leaf export + RFC 5929 `tls_end_point`). Re-merge if `cursor/pg-scram-plus-e596` moves again.
+- Packed PE `dns_hostok` `push rbx` (the 12-byte #150 insert). Restoring 18855 SIGSEGVs 4-param listen (empty recv, rc -11) even with #163 recv0 and `cl_blockgate` e9 → 0xA78 or pin `rt_net_pushroute` 0x3F85. Not hidden.
 
 ## CouchStation one-shot (Windows PC only)
 
@@ -149,17 +151,61 @@ Native `tools/post-block-auth-native.sh`: ELF listens then **SIGSEGV 139** on th
 
 Packed PE blob 5161. `TlsEndPointTests` 3 passed. `PgRedisTlsStubTests` 4 passed. `tools/pg-tls-stub-elf.sh` **exit 0**: host+ELF PLUS cbind, ELF MITM reject, redis stub.
 
-`native-elf-selfhost.sh`: host compile of `compile-native.vire` **`list is too large`** at parseClimb (line 274) — #161 ELF SHA-384/512 `tls_end_point` plus this rollup’s `rt-tls.vire`/`rt-net.vire` exceeds list cap **100000**. Caps not raised. Do not skip. Lane N must not treat this as a listen-blob issue.
+`native-elf-selfhost.sh` before #164: host compile of `compile-native.vire` **`list is too large`** at parseClimb (line 274). Caps not raised.
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
-## Env-only xUnit failures (this Linux agent)
+## #163 fold — 12-byte r4 DNS check
 
-Do not skip or xfail these. They fail closed when tools are missing.
+Diff of #150-era 18855 (`4ac9dc8`) vs #163 18843 (`d664343`) after `dns_hostok` 0x1FD4: **exactly 12 inserted bytes**, all `push rbx` (`53`) or `pop rbx` (`5b`):
 
-- `DriverImageTests.LinkedDriverImageIsPe` (`the C compiler is not installed`)
-- `ToolchainTests.BuildCompilesCAndroidAndDriver` (`ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`)
-- `ApkTests.PackWritesApkWithManifest` (`ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`)
-- `AndroidSoTests.AndroidBuildEmitsElfSharedLibrary` (`ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`)
+| 18855 offset | byte | vs 18843 |
+|---|---|---|
+| 0x1FDF | `53` push rbx | 0x1FDF |
+| 0x20AD | `5B` pop rbx | 0x20AC |
+| 0x20B2 | `5B` pop rbx | 0x20B0 |
+| 0x20C0 | `53` push rbx | 0x20BD |
+| 0x21BC | `5B` pop rbx | 0x21B8 |
+| 0x23E2 | `53` push rbx | 0x23DD |
+| 0x259A | `5B` pop rbx | 0x2594 |
+| 0x259F | `5B` pop rbx | 0x2598 |
+| 0x273C | `53` push rbx | 0x2734 |
+| 0x28A6 | `5B` pop rbx | 0x289D |
+| 0x2902 | `5B` pop rbx | 0x28F8 |
+| 0x290F | `5B` pop rbx | 0x2904 |
 
-Machines with SDK/NDK and a C compiler must pass those tests. Linux ELF is not Windows PE proof. GitHub Actions billing-lock is ignored.
+Not part of those 12: same-length `FILE_SHARE` `41 B8 01` → `41 B8 07` at 18843 **0x27AB** (18855 0x27B4). Kept on this tip.
+
+Re-adding the 12 bytes (restore 18855, run `tools/patch-rt-net-listen-recv0.py`, `cl_blockgate` e9 at 0xA78, and a second try e9 → `rt_net_pushroute` 0x3F85): packed DNS gaps-check **PASS** (`r4_hostok_push_rbx True`, `r4_file_share_7 True`) but 4-param ELF **GET /api/health SIGSEGV** (`recv b''`, rc -11). Unmodified 18843 (+ share-7 only) **HTTP 200**. #163 dropped the 12 bytes so listen works. The live `push rbx` in `dns_hostok` is therefore **lost** on this tip; do not hide it.
+
+## #163 listen / 401 / POST proofs (18843 + share-7)
+
+- `NativeListenRecv0Tests` 2 passed (packed e9→0xA78; Linux GET /api/health, empty connect, split headers host==native).
+- `tools/post-block-auth-native.sh` **ok**: 401 matrix (none/short/wrong/oversize on `FCG_API_TOKEN` and `FCG_BLOCK_TOKEN`) and authorized POST `/block` **200** (`accepted:true`).
+- `tools/rebuild-unauth-sidecar-diff.sh` **ok** (FAIL_BEFORE contract mismatch; PASS_AFTER host==native including GET /api/health).
+- `tools/rebuild-fcgbds-heartbeat-diff.sh` **ok** (FAIL_BEFORE sessionId; PASS_AFTER host==native).
+
+## #164 fold proof (selfhost list cap)
+
+`tools/native-elf-selfhost.sh` **PASS_AFTER** gen1=gen2 x3 `27dad454a16dc7af47dc28ee121053f57a7e2b0aa8a17aef3141a9643da98661`.
+
+- **gen1_exe_bytes 966656**. Compiler `itemCap` 1000000. Headroom **33344** bytes (3.3%).
+- `tools/pg-tls-stub-elf.sh` **exit 0**: host+ELF PLUS (`auth scram-sha-256-plus`, `cbind tls-server-end-point`), ELF MITM `PG TLS MITM pass`, redis host+ELF pass.
+
+## Full xUnit on this tip
+
+296 executed, **0 skipped**, 290 passed, **6 failed**. Do not skip or xfail.
+
+Env-only (missing tools on this Linux agent):
+
+- `ApkTests.PackWritesApkWithManifest` — `ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`; aapt not installed
+- `DriverImageTests.LinkedDriverImageIsPe` — `the C compiler is not installed`
+- `AndroidSoTests.AndroidBuildEmitsElfSharedLibrary` — `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
+- `ToolchainTests.BuildCompilesCAndroidAndDriver` — `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
+
+Real (not missing tools) — #150 packed DNS `push rbx` dropped with #163 18843:
+
+- `WindowsPeProofTests.PackedR4DnsPreservesRbxAndFileShare` — hex missing `5348894df8` (`push rbx; mov [rbp-8],rcx`)
+- `NativeNetTests.DnsResolveGuestPeShapeParksStubAndKeepsLinuxFlagOutsideR4Blob` — `PE dns_hostok must push rbx`
+
+Machines with SDK/NDK and a C compiler must pass the four env tests. Linux ELF is not Windows PE proof. GitHub Actions billing-lock is ignored. Do not merge this rollup to `native-compiler` or `main`.
