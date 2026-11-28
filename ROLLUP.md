@@ -14,7 +14,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #145 | `29ba1ef1` | clean |
 | #146 | `3add41ce` | clean |
 | #147 | `67603360` | conflict `docs/FINISH-LIST.md`. Kept 144-146 row deletions. Dropped tools-ci rows 147 implements. |
-| #148 | `65fc7692` | conflict `docs/FINISH-LIST.md`. Dropped `pg_auth` row. Did not restore stale 147-branch rows. Re-merge when `cursor/pg-scram-plus-e596` moves. |
+| #148 | `73ad94ab` (`cursor/pg-scram-plus-e596`) | first merge `65fc7692` (FINISH-LIST: dropped `pg_auth` row, did not restore stale 147 rows). Re-merged `73ad94ab` clean: TLS SCRAM PLUS-only without bind fails closed (`plus-only no bind REJECT` / `tls plus no bind REJECT`). Peer-cert export not on origin yet; re-merge later heads. |
 | #149 | `16f7f4f8` (`cursor/windows-tls-0630`) | first merge `ed926c6a`, then re-merged `16f7f4f8` (no PersistKeySet on ephemeral PFX). Clean both times. |
 | #150 | `8f460c49` (`cursor/pe-dns-json-chain-567f`) | conflict `tools/couchstation-windows-all.ps1`. Kept `native-forms`. Dropped MZ-only proxy block. Writes `data/couchstation-windows-all-results.md`. |
 | #151 | `36d2e644` (`cursor/native-405-proxy-ws-33ca`) | conflict `docs/FINISH-LIST.md` only. Packed blobs did not conflict in git. See below. |
@@ -53,7 +53,7 @@ bash tools/native-405-proxy-ws-check.sh
 
 - #143 (`51de3c2f`) host/native POST `/block` deny-by-default is already on `6693e0e5`. Do not merge the `native-compiler` branch. It would delete native listen.
 - `cursor/vire-4h-auth-compare` is not on origin yet. Merge it when the branch exists.
-- #148 head is still `65fc7692`. Re-merge (no rebase) when `cursor/pg-scram-plus-e596` moves.
+- #148 is `73ad94ab` on this tip. Re-merge (no rebase) when `cursor/pg-scram-plus-e596` moves again (peer-cert export).
 
 ## CouchStation one-shot (Windows PC only)
 
@@ -76,9 +76,11 @@ python3 tools/pe-windows-gaps-check.py
 bash tools/native-405-proxy-ws-check.sh
 bash tools/rebuild-fcgbds-worker-diff.sh
 bash tools/rebuild-fcgbds-heartbeat-diff.sh
+bash tools/pg-scram-plus-prove.sh
 bash tools/windows-tls-lane-check.sh
 bash tools/native-elf-selfhost.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter FullyQualifiedName~ServeTests
+dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter FullyQualifiedName~NativeFormsTests
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
