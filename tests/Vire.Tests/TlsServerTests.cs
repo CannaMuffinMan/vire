@@ -74,7 +74,9 @@ public class TlsServerTests : IDisposable
         string root = DualMode.FindRoot();
         string hostTls = File.ReadAllText(Path.Combine(root, "VireTls.cs"));
         Assert.Contains("EphemeralKeySet", hostTls);
+        Assert.Contains("SslStreamCertificateContext", hostTls);
         Assert.DoesNotContain("PersistKeySet", hostTls);
+        Assert.DoesNotContain("UserKeySet", hostTls);
         string work = Path.Combine(root, "data", "tls-key-cleanup", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         string cert = Path.Combine(work, "tls-health-cert.pem");
@@ -253,7 +255,9 @@ public class TlsServerTests : IDisposable
         Assert.DoesNotContain("native tls_listen is fail-closed", tls);
         string hostTls = File.ReadAllText(Path.Combine(root, "VireTls.cs"));
         Assert.Contains("EphemeralKeySet", hostTls);
+        Assert.Contains("SslStreamCertificateContext", hostTls);
         Assert.DoesNotContain("PersistKeySet", hostTls);
+        Assert.DoesNotContain("UserKeySet", hostTls);
         Assert.DoesNotContain("LoadPkcs12(pfx, (string)null", hostTls);
         string auth = File.ReadAllText(Path.Combine(root, "tools", "post-block-auth-windows.ps1"));
         Assert.Contains("Read-SharedText", auth);

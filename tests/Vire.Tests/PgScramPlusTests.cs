@@ -426,9 +426,10 @@ public class PgScramPlusTests
         req.CertificateExtensions.Add(san.Build());
         using (X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1)))
         {
-            byte[] pfx = cert.Export(X509ContentType.Pfx);
-            return X509CertificateLoader.LoadPkcs12(pfx, (string)null,
-                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+            byte[] pfx = cert.Export(X509ContentType.Pfx, password);
+            try { return VireTls.LoadPkcs12ForListen(pfx, password); }
+            finally { CryptographicOperations.ZeroMemory(pfx); }
         }
     }
 }
