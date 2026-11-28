@@ -36,6 +36,7 @@ if ! grep -Fq 'TODO(VIRE-FINISH-NOW): guest SCRAM-SHA-256-PLUS' "$pin_src"; then
   exit 1
 fi
 echo "FAIL_BEFORE at $PIN: SCRAM-SHA-256-PLUS unsupported; client-final c=biws; SASL init never -PLUS"
+echo "FAIL_BEFORE at $PIN: TLS plus=1 scram=1 haveBind=0 would send n,, (RFC 5802 channel-binding stripping)"
 
 cleanup_pin
 trap - EXIT
@@ -66,6 +67,18 @@ if ! grep -Fq "plus-only no bind REJECT" <<<"$plus_out"; then
   echo "plus prove missing downgrade-refusal" >&2
   exit 1
 fi
-echo "PASS_AFTER at $(git rev-parse HEAD) RFC7677 c= binding and PLUS refuse"
+if ! grep -Fq "tls plus no bind REJECT" <<<"$plus_out"; then
+  echo "plus prove missing tls both-mechs fail-closed" >&2
+  exit 1
+fi
+if ! grep -Fq "empty leaf der PASS" <<<"$plus_out"; then
+  echo "plus prove missing empty-leaf fail-closed" >&2
+  exit 1
+fi
+if grep -Fq 'if haveBind != 1' "$ROOT/src/rt-pg.vire"; then
+  echo "PASS_AFTER unexpected TLS downgrade branch in pg_scram_select" >&2
+  exit 1
+fi
+echo "PASS_AFTER at $(git rev-parse HEAD) RFC7677 c= binding, PLUS refuse, tls plus no bind fail-closed"
 echo "loopback_only 127.0.0.1 (xUnit PgScramPlusTests)"
 echo "caps arena 33554432 list 100000 steps 5000000 itemCap 1e6"

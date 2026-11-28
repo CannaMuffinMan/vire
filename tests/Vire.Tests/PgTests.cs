@@ -86,6 +86,8 @@ public class PgTests
         Assert.Contains("RFC7677", plusProve);
         Assert.Contains("p=tls-server-end-point", plusProve);
         Assert.Contains("channel binding", plusProve);
+        Assert.Contains("tls plus no bind", plusProve);
+        Assert.Contains("empty leaf der", plusProve);
         string plusSh = File.ReadAllText(Path.Combine(root, "tools", "pg-scram-plus-prove.sh"));
         Assert.Contains("6693e0e5", plusSh);
         Assert.Contains("127.0.0.1", plusSh);
