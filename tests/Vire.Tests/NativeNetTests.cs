@@ -131,9 +131,13 @@ public class NativeNetTests
             Assert.Contains("102, 137, 69, 178", dns);
             Assert.Contains("137, 69, 180", dns);
             Assert.Contains("Preserve rbx: octet index is ebx", dns);
+            Assert.Contains("emitDnsProRbx", dns);
+            Assert.Contains("136, 0, 0, 0, 83", dns);
             Assert.Contains("65, 184, 7, 0, 0, 0", dns);
             Assert.True(IndexOf(pe, new byte[] { 0x41, 0xb8, 7, 0, 0, 0 }) >= 0, "PE resolve must CreateFileA with FILE_SHARE 7");
             Assert.True(IndexOf(pe, new byte[] { 0x53, 0x48, 0x89, 0x4d, 0xf8 }) >= 0, "PE dns_hostok must push rbx");
+            Assert.True(IndexOf(pe, new byte[] { 0x48, 0x81, 0xec, 0x88, 0, 0, 0, 0x53, 0x48, 0x89, 0x4d, 0xf8 }) >= 0, "PE dns rbx frame must sub rsp,0x88");
+            Assert.True(IndexOf(pe, new byte[] { 0x48, 0x81, 0xec, 0x80, 0, 0, 0, 0x53, 0x48, 0x89, 0x4d, 0xf8 }) < 0, "PE dns hostok/fmta must not keep sub rsp,0x80");
         }
         finally
         {

@@ -211,6 +211,12 @@ class Emu:
         self.wr(UC_X86_REG_RAX, 1)
 
     def api_CreateFileA(self):
+        # After CALL, Win64 RSP must be ≡ 8 (mod 16). Packed r4 dns_ns used
+        # to push rbx after sub rsp,0x80 so the call landed ≡ 0.
+        if (self.rd(UC_X86_REG_RSP) & 15) != 8:
+            self.faults.append(("win64_align", self.rd(UC_X86_REG_RSP), self.rd(UC_X86_REG_RIP)))
+            self.mu.emu_stop()
+            return
         name = self.cstr(self.rd(UC_X86_REG_RCX)).decode("latin1")
         path = os.path.normpath(os.path.join(self.cwd, name))
         try:
