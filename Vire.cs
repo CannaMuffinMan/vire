@@ -3272,17 +3272,19 @@ sealed class Program
             else
                 provided = "";
         }
-        byte[] left = new byte[256];
-        byte[] right = new byte[256];
         byte[] given = Encoding.UTF8.GetBytes(provided ?? "");
         byte[] want = Encoding.UTF8.GetBytes(expected);
-        int copyGiven = given.Length > left.Length ? left.Length : given.Length;
-        int copyWant = want.Length > right.Length ? right.Length : want.Length;
-        Buffer.BlockCopy(given, 0, left, 0, copyGiven);
-        Buffer.BlockCopy(want, 0, right, 0, copyWant);
+        int n = given.Length;
+        int m = want.Length;
+        int lim = n > m ? n : m;
         int diff = hits == 1 ? 0 : 1;
-        diff |= given.Length ^ want.Length;
-        diff |= CryptographicOperations.FixedTimeEquals(left, right) ? 0 : 1;
+        diff |= n ^ m;
+        for (int i = 0; i < lim; i++)
+        {
+            int a = i < n ? given[i] : 0;
+            int b = i < m ? want[i] : 0;
+            diff |= a ^ b;
+        }
         return diff == 0;
     }
 
