@@ -1,7 +1,3 @@
-# One CouchStation session: every Windows PE proof the integration PRs request.
-# Do not run on Linux. Do not touch Windows Defender. Do not reboot.
-# Unsets VIRE_BUDGET first (inherited 5000000 fails BudgetCapTests).
-# Never prints FCG_API_TOKEN. Loopback only. Caps stay 32MB / 100000 / 5M.
 $ErrorActionPreference = "Stop"
 $env:UseSharedCompilation = "false"
 $env:MSBUILDDISABLENODEREUSE = "1"
@@ -212,8 +208,6 @@ Run-Proof "pe-parse-array-fault-90" {
 }
 
 Run-Proof "rebuild-proxy-windows-pe" {
-    # tools/rebuild-proxy-windows.ps1 is a checklist (exits 1 until filled).
-    # Compile the proxy guest to PE and record MZ + ws2_32 names.
     $src = Join-Path $Root "tests/rebuild/guests/proxy-http.vire"
     $stage = Join-Path $Data "proxy-pe"
     New-Item -ItemType Directory -Force -Path $stage | Out-Null

@@ -1,5 +1,3 @@
-# Fail-before / pass-after: native guest DNS stub on loopback UDP.
-# CouchStation only. Caps unchanged. No external network.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root

@@ -1,6 +1,3 @@
-# CouchStation PE proof for fcgcpa chain remainder (rotate / 507 / 503 / migrate / aliases / concurrent).
-# Linux ELF proof is tools/rebuild-chain-limits-diff.sh. This script is the PE twin.
-# Do not treat a Linux run as PE proof. Loopback 127.0.0.1 only. Caps unchanged.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root

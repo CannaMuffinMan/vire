@@ -39,7 +39,6 @@ public class WindowsPeProofTests
     {
         string root = DualMode.FindRoot();
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt"));
-        // ASCII " Forbidden" in the packed sendhttp reason table.
         Assert.Contains("20466f7262696464656e", blob);
         Assert.Contains("20537769746368696e672050726f746f636f6c73", blob);
         string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));

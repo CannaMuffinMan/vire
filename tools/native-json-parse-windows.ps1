@@ -1,4 +1,3 @@
-# CouchStation PE: native json/parse and listen+parse. Linux ELF proof is tools/native-elf-json-parse.sh.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $Root
