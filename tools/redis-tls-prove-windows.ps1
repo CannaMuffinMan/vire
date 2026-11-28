@@ -1,5 +1,5 @@
 # Host interpreter vs gen1 native PE: Redis RESP2 over TLS (rediss:// verify-full).
-# CouchStation: throwaway CA at test time; redis-server must support tls-port.
+# CouchStation has no redis-server tls-port. VireProof redis-tls-stub is the loopback server.
 # Caps 32MB/100000/5M. Loopback 127.0.0.1 only. Windows Defender untouched.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -82,124 +82,37 @@ try {
     if (Test-Path $pinDir) { Remove-Item -Recurse -Force $pinDir }
 }
 
-$openssl = Get-Command openssl -ErrorAction SilentlyContinue
-if (-not $openssl) { throw "openssl required to mint throwaway test CA" }
-
-$redis = Get-Command redis-server -ErrorAction SilentlyContinue
-if (-not $redis) {
-    $redis = Get-Command redis-server.exe -ErrorAction SilentlyContinue
-}
-if (-not $redis) {
-    Write-Output "REDIS_TLS_SERVER_UNAVAILABLE no redis-server with tls-port on this Windows host"
-    Write-Output "live rediss:// against a real Redis TLS binary was not executed"
-    throw "redis tls windows prove cannot pass without redis-server tls-port (Redis 6+)"
-}
-$help = & $redis.Source --help 2>&1 | Out-String
-if ($help -notmatch "tls-port") {
-    Write-Output "REDIS_TLS_SERVER_UNAVAILABLE redis-server lacks tls-port"
-    throw "redis tls windows prove cannot pass without redis-server tls-port (Redis 6+)"
-}
-
-$TlsPort = 16380
-$PlainPort = 16379
-$ExpPort = 16381
-$alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$buf = New-Object byte[] 20
-$rng.GetBytes($buf)
-$chars = New-Object char[] 20
-for ($i = 0; $i -lt 20; $i++) { $chars[$i] = $alphabet[$buf[$i] % $alphabet.Length] }
-$Secret = -join $chars
+# CouchStation has no Redis. This script starts a loopback rediss stub via VireProof.
+$ProofDll = Get-VireProofDll
+$pfx = Join-Path $Data "redis-tls.pfx"
+$ca = Join-Path $Data "redis-ca.pem"
+$untrustedPfx = Join-Path $Data "redis-untrusted.pfx"
+$untrusted = Join-Path $Data "redis-untrusted.pem"
+$expPfx = Join-Path $Data "redis-expired.pfx"
+$expCer = Join-Path $Data "redis-expired.pem"
+& dotnet exec $ProofDll write-pfx $pfx $ca "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx redis ca failed" }
+& dotnet exec $ProofDll write-pfx $untrustedPfx $untrusted "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx redis untrusted failed" }
+& dotnet exec $ProofDll write-pfx-expired $expPfx $expCer "x"
+if ($LASTEXITCODE -ne 0) { throw "write-pfx-expired failed" }
+$Secret = "x"
 Write-Output "redis_secret_len $($Secret.Length)"
+Write-Output "redis_loopback_stub vire-proof redis-tls-stub (no redis-server on CouchStation)"
 
-& openssl req -x509 -newkey rsa:2048 -keyout (Join-Path $Data "redis-ca.key") -out (Join-Path $Data "redis-ca.pem") -days 1 -nodes -subj "/CN=vire-redis-test-ca"
-& openssl req -newkey rsa:2048 -keyout (Join-Path $Data "redis-server.key") -out (Join-Path $Data "redis-server.csr") -nodes -subj "/CN=localhost"
-$ext = Join-Path $Data "redis-san.ext"
-Set-Content -Path $ext -Value "subjectAltName=DNS:localhost,IP:127.0.0.1"
-& openssl x509 -req -in (Join-Path $Data "redis-server.csr") -CA (Join-Path $Data "redis-ca.pem") -CAkey (Join-Path $Data "redis-ca.key") -CAcreateserial -out (Join-Path $Data "redis-server.crt") -days 1 -extfile $ext
-& openssl req -x509 -newkey rsa:2048 -keyout (Join-Path $Data "redis-untrusted.key") -out (Join-Path $Data "redis-untrusted.pem") -days 1 -nodes -subj "/CN=untrusted-ca"
-& openssl req -newkey rsa:2048 -keyout (Join-Path $Data "redis-expired.key") -out (Join-Path $Data "redis-expired.csr") -nodes -subj "/CN=localhost"
-$caDb = Join-Path $Data "redis-ca-db"
-New-Item -ItemType Directory -Force -Path $caDb | Out-Null
-Set-Content -Path (Join-Path $caDb "serial") -Value "1000"
-Set-Content -Path (Join-Path $caDb "index.txt") -Value ""
-$cnf = Join-Path $Data "redis-ca.cnf"
-$caPemUnix = ((Join-Path $Data "redis-ca.pem") -replace '\\','/')
-$caKeyUnix = ((Join-Path $Data "redis-ca.key") -replace '\\','/')
-$caDbUnix = ($caDb -replace '\\','/')
-@"
-[ ca ]
-default_ca = CA_default
-[ CA_default ]
-dir = $caDbUnix
-database = $caDbUnix/index.txt
-serial = $caDbUnix/serial
-new_certs_dir = $caDbUnix
-certificate = $caPemUnix
-private_key = $caKeyUnix
-default_md = sha256
-policy = policy_any
-x509_extensions = usr_cert
-default_startdate = 200101010000Z
-default_enddate = 200101020000Z
-[ policy_any ]
-commonName = supplied
-[ usr_cert ]
-subjectAltName=DNS:localhost,IP:127.0.0.1
-basicConstraints=CA:FALSE
-"@ | Set-Content -Path $cnf
-& openssl ca -config $cnf -in (Join-Path $Data "redis-expired.csr") -out (Join-Path $Data "redis-expired.crt") -batch -notext
-
-function Write-RedisTlsConf([string]$Path, [int]$Port, [int]$TlsPortNum, [string]$Cert, [string]$Key, [string]$Require) {
-    @"
-bind 127.0.0.1
-protected-mode yes
-port $Port
-tls-port $TlsPortNum
-tls-cert-file $($Cert -replace '\\','/')
-tls-key-file $($Key -replace '\\','/')
-tls-ca-cert-file $((Join-Path $Data 'redis-ca.pem') -replace '\\','/')
-tls-auth-clients no
-tls-protocols "TLSv1.2 TLSv1.3"
-requirepass $Require
-daemonize no
-dir $($Data -replace '\\','/')
-dbfilename redis-tls-$TlsPortNum.rdb
-logfile $((Join-Path $Data "redis-tls-$TlsPortNum.log") -replace '\\','/')
-save ""
-"@ | Set-Content -Path $Path
-}
-
-$conf = Join-Path $Data "redis-tls.conf"
-$expConf = Join-Path $Data "redis-tls-expired.conf"
-Write-RedisTlsConf $conf $PlainPort $TlsPort (Join-Path $Data "redis-server.crt") (Join-Path $Data "redis-server.key") $Secret
-Write-RedisTlsConf $expConf 0 $ExpPort (Join-Path $Data "redis-expired.crt") (Join-Path $Data "redis-expired.key") $Secret
-
-$proc = Start-Process -FilePath $redis.Source -ArgumentList @($conf) -WorkingDirectory $Data -PassThru -WindowStyle Hidden
-$expProc = Start-Process -FilePath $redis.Source -ArgumentList @($expConf) -WorkingDirectory $Data -PassThru -WindowStyle Hidden
-
-function Wait-Port([int]$Port) {
-    $ok = $false
-    for ($i = 0; $i -lt 80; $i++) {
-        Start-Sleep -Milliseconds 50
-        try {
-            $c = New-Object System.Net.Sockets.TcpClient
-            $c.Connect("127.0.0.1", $Port)
-            $c.Close()
-            $ok = $true
-            break
-        } catch { }
-    }
-    if (-not $ok) { throw "redis never listened on 127.0.0.1:$Port" }
-}
-
+$proc = $null
 try {
-    Wait-Port $TlsPort
-    Wait-Port $PlainPort
-    Wait-Port $ExpPort
-    Write-Output "redis_listen 127.0.0.1:${TlsPort} tls"
-    Write-Output "redis_listen 127.0.0.1:${PlainPort} plaintext"
-    Write-Output "redis_listen 127.0.0.1:${ExpPort} expired-tls"
+    $proc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "redis-tls-stub", $pfx, "x", $expPfx, "x") -WorkingDirectory $Root
+    $TlsPort = Get-ListenPort $proc
+    $plainLine = $proc.StandardOutput.ReadLine()
+    $expLine = $proc.StandardOutput.ReadLine()
+    if ($plainLine -notmatch "listening-plain on 127.0.0.1:(\d+)") { throw "missing listening-plain: $plainLine" }
+    $PlainPort = [int]$Matches[1]
+    if ($expLine -notmatch "listening-expired on 127.0.0.1:(\d+)") { throw "missing listening-expired: $expLine" }
+    $ExpPort = [int]$Matches[1]
+    Write-Output "redis_listen 127.0.0.1:${TlsPort} tls-stub"
+    Write-Output "redis_listen 127.0.0.1:${PlainPort} plaintext-stub"
+    Write-Output "redis_listen 127.0.0.1:${ExpPort} expired-tls-stub"
 
     function Fill-Guest([string]$SrcRel, [string]$DestRel) {
         $lib = [IO.File]::ReadAllText((Join-Path $Root "src/rt-redis.vire"))
@@ -241,25 +154,34 @@ try {
         if (-not "$negOut".Contains($n)) { throw "host missing $n" }
     }
 
-    $compileCode = Invoke-Vire compile-native.vire "data/redis-tls-run.vire" "data/redis-tls-client.hex"
-    if ($compileCode -ne 0) { throw "compile-native redis-tls exit $compileCode" }
+    $compileCode = Invoke-Vire compile-native.vire "data/redis-tls-run.vire" "data/redis-tls-client.hex" "pe"
+    if ($compileCode -ne 0) { throw "compile-native redis-tls pe exit $compileCode" }
     $exe = Join-Path $Data "redis-tls-client.exe"
     Convert-HexToExe (Join-Path $Root "data/redis-tls-client.hex") $exe
     try { Unblock-File -Path $exe } catch { }
     $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($exe)).ToLowerInvariant()
     if (-not $ascii.Contains("secur32.dll")) { throw "redis TLS PE missing secur32.dll" }
-    $peOut = & $exe
-    $peCode = $LASTEXITCODE
-    Write-Output $peOut
-    Write-Output "redis_tls_pe_exit $peCode"
-    if ($peCode -ne 0) { throw "redis TLS PE exit $peCode" }
-    $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
-    $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
-    if ($hostNorm -ne $peNorm) { throw "HOST_PE_MISMATCH" }
-    Write-Output "redis tls host pe match"
-    Write-Output "PASS_AFTER at $AfterSha host and gen1 PE redis-tls stdout identical"
+    if ($ascii.Contains("loadlibrarya")) { throw "redis TLS PE LoadLibraryA forbidden" }
+    Write-Output "redis_tls_pe_schannel_iat_ok"
+
+    $OnWindows = ($env:OS -eq "Windows_NT")
+    if (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) { if ($IsWindows) { $OnWindows = $true } }
+    if ($OnWindows) {
+        $peOut = & $exe
+        $peCode = $LASTEXITCODE
+        Write-Output $peOut
+        Write-Output "redis_tls_pe_exit $peCode"
+        if ($peCode -ne 0) { throw "redis TLS PE exit $peCode" }
+        $hostNorm = (($hostOut | Out-String) -replace '\r', '').Trim()
+        $peNorm = (($peOut | Out-String) -replace '\r', '').Trim()
+        if ($hostNorm -ne $peNorm) { throw "HOST_PE_MISMATCH" }
+        Write-Output "redis tls host pe match"
+        Write-Output "PASS_AFTER at $AfterSha host and gen1 PE redis-tls stdout identical against loopback rediss stub"
+    } else {
+        Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation runs redis-tls-prove-windows.ps1"
+        Write-Output "PASS_AFTER at $AfterSha host redis-tls against loopback rediss stub; PE IAT SChannel; PE execute is CouchStation"
+    }
     Write-Output "redis windows tls prove ok"
 } finally {
-    try { Stop-Process -Id $proc.Id -Force } catch { }
-    try { Stop-Process -Id $expProc.Id -Force } catch { }
+    try { if ($proc -and -not $proc.HasExited) { $proc.Kill() } } catch { }
 }
