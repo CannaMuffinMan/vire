@@ -73,6 +73,21 @@ try {
     $code = Invoke-Vire "compile-native.vire" "data/dns-resolve.vire" "data/dns-resolve.hex"
     if ($code -ne 0) { throw "compile-native dns-resolve failed" }
     Convert-HexToExe (Join-Path $Data "dns-resolve.hex") (Join-Path $Data "dns-resolve.exe")
+    $peBytes = [IO.File]::ReadAllBytes((Join-Path $Data "dns-resolve.exe"))
+    $share7 = [byte[]](0x41, 0xb8, 7, 0, 0, 0)
+    $pushRbx = [byte[]](0x53, 0x48, 0x89, 0x4d, 0xf8)
+    function IndexOfBytes([byte[]]$hay, [byte[]]$needle) {
+        for ($i = 0; $i -le $hay.Length - $needle.Length; $i++) {
+            $ok = $true
+            for ($j = 0; $j -lt $needle.Length; $j++) {
+                if ($hay[$i + $j] -ne $needle[$j]) { $ok = $false; break }
+            }
+            if ($ok) { return $i }
+        }
+        return -1
+    }
+    if ((IndexOfBytes $peBytes $share7) -lt 0) { throw "FAIL_BEFORE PE DNS missing FILE_SHARE 7 (packed r4)" }
+    if ((IndexOfBytes $peBytes $pushRbx) -lt 0) { throw "FAIL_BEFORE PE DNS missing push rbx in dns_hostok" }
     $pe = & (Join-Path $Data "dns-resolve.exe")
     $hostOut = & dotnet exec $VireDll "data/dns-resolve.vire"
     Write-Output "host_out $hostOut"

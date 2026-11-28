@@ -235,6 +235,13 @@ Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-wind
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "pe-windows-gaps-check" {
+    $py = Join-Path $Root "tools/pe-windows-gaps-check.py"
+    if (-not (Test-Path $py)) { throw "missing tools/pe-windows-gaps-check.py" }
+    $r4 = (Get-Content -Raw (Join-Path $Root "src/rt-net-r4-blob.txt")).Trim()
+    if ($r4 -notmatch "41b807000000") { throw "FAIL_BEFORE packed r4 DNS CreateFileA share is not 7" }
+    if ($r4 -notmatch "5348894df8") { throw "FAIL_BEFORE packed r4 dns_hostok missing push rbx" }
+}
 Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
 Run-Proof "post-block-auth-windows" { Run-Script "tools/post-block-auth-windows.ps1" }
 Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }

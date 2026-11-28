@@ -7,6 +7,9 @@ Set-Location -LiteralPath $Root
 . (Join-Path $PSScriptRoot "native-host-info.ps1")
 $env:VIRE_BUDGET = "5000000"
 $env:VIRE_HEADLESS = "1"
+Remove-Item Env:FCG_API_TOKEN -ErrorAction SilentlyContinue
+# Fixture write secret so native POST /block is not 401. Not a production secret.
+$env:FCG_BLOCK_TOKEN = "couchstation-block-token"
 $FailBefore = "5c3ed01abe2a12a34fca74b915d5e39a9f05fde3"
 $After = (git rev-parse HEAD).Trim()
 $Data = Join-Path $Root "data"
