@@ -1,5 +1,9 @@
 # Changelog
 
+## Serve builtin drop (this branch)
+
+- Host `serve` is no longer a builtin. Guests already call `listen`. A leftover `serve with …` is the same unknown-name error as any other missing definition. Caps unchanged.
+
 ## Tests/docs dead-code cleanup (this branch)
 
 - Root emit/compile probe programs (`probe-*.vire`), unused `dump-net-extras.vire`, superseded `make-hello.vire`, and unreferenced `guest-empty.vire` removed. Live guests, samples, and xUnit fixtures were not deleted.

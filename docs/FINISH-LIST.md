@@ -23,6 +23,4 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | tools/tls-schannel-windows.ps1 | PE tls_listen | CouchStation 50f01259 18:11-18:42 ET: `PE tls_listen exited 1`. Packed PE SChannel tls_listen, present at pre-cleanup c813695. Harness now kills tls-echo process trees and reads child logs with FileShare.ReadWrite. | high | tools-ci |
 | tools/pg-redis-tls-windows.ps1 | PE tls_wrap ping | CouchStation 50f01259 18:11-18:42 ET: `PE tls_wrap ping missing PONG`. Packed PE tls_wrap, present at pre-cleanup c813695. Leftover `vire-proof tls-echo` held the child log; finally + FileShare.ReadWrite. | high | tools-ci |
 | src/rt-crypto.vire | sha256_bytes | Wire guest SHA-256 pad+compress+IV into this wrapper instead of digest | medium | rt-crypto |
-| Vire.cs | Builtin serve | Drop the serve name from Builtins once guests no longer call it | low | host-cs |
-| Compiled.cs | Builtin serve | Drop the serve name once guests no longer call it | low | host-cs |
 | VireApk.cs | VireApk.Pack | Expose Pack as a guest builtin only if APK from .vire is still a product goal | low | host-cs |
