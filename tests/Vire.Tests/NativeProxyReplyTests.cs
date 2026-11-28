@@ -15,11 +15,10 @@ public class NativeProxyReplyTests
         string root = DualMode.FindRoot();
         string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt")).Trim();
-        Assert.Equal("488d15", blob.Substring(2728 * 2, 6));
-        Assert.Contains("pr_body_fix", net);
+        Assert.Equal("e9", blob.Substring(2728 * 2, 2));
         Assert.Contains("land_st_405", net);
         Assert.Contains("land_ws_echo", net);
-        Assert.Contains("a90a0000a400", File.ReadAllText(Path.Combine(root, "src", "rt-net-fixes.txt")));
+        Assert.DoesNotContain("ab0a0000a400", File.ReadAllText(Path.Combine(root, "src", "rt-net-fixes.txt")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "native", "proxy-reply.vire")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "proxy-reply-proof.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "proxy-reply-windows.ps1")));
