@@ -104,7 +104,7 @@ Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 - `bash tools/windows-tls-lane-check.sh` PASS (no PersistKeySet). Linux ELF is not PE proof.
 - `bash tools/native-405-proxy-ws-check.sh` PASS (host/native 405, POST `from-listen`, apigo-ws).
 - Aggregated dashboard GET 405: `tools/rebuild-portal-diff.sh` `== dashboard (no dist) == match fcgbds-dashboard-go.json` (GET `/api/challenge-verify` and `/api/reviewers-heartbeat` HTTP 405 on host and native). #156's own base still 200; this tip includes #151 packed `"status":405` overlay.
-- `bash tools/native-elf-selfhost.sh` at `ac2c29d` (post-#148 `880ec761`, pre-#160): gen1=gen2 x3 `e93e868d0a00cf43f3f090fe5d62a955347f0f7ad9d092eb881ff8f086ba048b`.
+- `bash tools/native-elf-selfhost.sh` at `481c865` (post-#148 `880ec761` + #160): gen1=gen2 x3 `d38b4a9b38f91e8a00bd54eda5c7aebb467bfd69f5a9e31eff0cd1afe768245f`.
 
 ## ELF `tls_wrap` hostname box (#160)
 
