@@ -4,10 +4,10 @@
 ~ and SCRAM-SHA-256-PLUS (RFC 5802 gs2 / RFC 7677 / RFC 5929).
 ~ HMAC-SHA-256 via native `hash` / Latin-1 guest bytes; PBKDF2 iteration
 ~ cap 8192 so a hostile server cannot burn the 5M step budget.
-~ On TLS, PLUS uses tls-server-end-point (SHA-256 of the leaf DER). tls-unique
-~ is used only when conn.cbind_name is already set. No rt-net/rt-crypto edits;
-~ leaf PEM hashing lives here. No silent downgrade: PLUS-only without bind
-~ data, or a server-final e= channel-binding error, fails closed.
+~ On TLS, PLUS uses tls-server-end-point from the handshake leaf
+~ (tls_peer_cert) or an optional leaf PEM. Hash is RFC 5929: SHA-256
+~ unless the cert signature hash is SHA-384 or SHA-512. tls-unique is
+~ used only when conn.cbind_name is already set. No silent downgrade.
 ~ Prove scripts set scram_iterations=32; default 4096 is the same
 ~ protocol and stays under the cap if the guest xor loop is later nativized.
 ~ Caps stay 32MB / 100000 / 5M. Recv cap 1000000. Message length fail-closed.
@@ -678,7 +678,7 @@ define pg_cbind_endpoint with der, tab
   if (length with der) < 1
     return none
   end
-  return pg_sha with der
+  return tls_end_point with der
 end
 
 define pg_auth with conn, secret, user
@@ -713,9 +713,13 @@ define pg_auth with conn, secret, user
       end
       let handled be 0
       if kind == 0
-        let method be "trust"
+        if scramWant == ""
+          let method be "trust"
+        end
         if scramWant != ""
-          let method be "scram-sha-256"
+          if method == "none"
+            let method be "scram-sha-256"
+          end
         end
         let handled be 1
       end
@@ -825,21 +829,42 @@ define pg_open_ssl_cbind with host, port, user, db, secret, mode, name, ca, leaf
     end
     put 1 into conn at "tls"
     let tls be 1
+    let der be ""
     if leaf != ""
       try
         let pem be read with leaf
         let der be pg_pem_der with pem, (conn at "tab")
-        let ep be pg_cbind_endpoint with der, (conn at "tab")
-        if ep == none
-          close with h
-          return {"ok": false, "why": "channel binding"}
-        end
-        put ep into conn at "cbind"
-        put "tls-server-end-point" into conn at "cbind_name"
       miss problem
         close with h
         return {"ok": false, "why": "channel binding"}
       end
+    end
+    if der == none
+      let der be ""
+    end
+    if (length with der) < 1
+      try
+        let der be tls_peer_cert with h
+      miss problem
+        close with h
+        return {"ok": false, "why": "channel binding"}
+      end
+    end
+    try
+      let ep be pg_cbind_endpoint with der, (conn at "tab")
+      if ep == none
+        close with h
+        return {"ok": false, "why": "channel binding"}
+      end
+      if (length with ep) < 1
+        close with h
+        return {"ok": false, "why": "channel binding"}
+      end
+      put ep into conn at "cbind"
+      put "tls-server-end-point" into conn at "cbind_name"
+    miss problem
+      close with h
+      return {"ok": false, "why": "channel binding"}
     end
   end
   pg_io_send with conn, (pg_startup with user, db)

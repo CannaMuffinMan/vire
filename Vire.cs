@@ -378,7 +378,7 @@ sealed class Machine
         "replace", "begins", "ends", "exists", "folders", "erase", "copy", "append",
         "round", "pick", "clear", "hash", "digest", "hmac", "hex", "chr", "seal", "run", "sources", "args", "bytes", "listen", "halt", "foreign", "build", "idiv", "extend", "shl8",
         "connect", "send", "recv", "close", "resolve",
-        "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close",
+        "tls_connect", "tls_wrap", "tls_listen", "tls_send", "tls_recv", "tls_close", "tls_peer_cert", "tls_end_point",
         "start", "wait", "result", "linux"
     });
 
@@ -761,6 +761,8 @@ sealed class Machine
         if (name == "tls_send") return VireTls.SendAll(args[0], args[1], tcp, line, col);
         if (name == "tls_recv") return VireTls.RecvBound(args[0], args[1], tcp, line, col);
         if (name == "tls_close") return VireTls.CloseHandle(args[0], tcp, line, col);
+        if (name == "tls_peer_cert") return VireTls.PeerCert(args[0], tcp, line, col);
+        if (name == "tls_end_point") return VireTls.EndPoint(args[0], line, col);
         if (name == "kind") return KindOf(args[0]);
         if (name == "foreign") return VireForeign.CallProgram(root, args, line, col);
         if (name == "build") return VireBuild.Compile(root, args[0], args[1], line, col);
