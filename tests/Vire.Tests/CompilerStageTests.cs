@@ -19,9 +19,13 @@ public class CompilerStageTests
         AssertSame(root, Path.Combine("src", "rt-linux.vire"), Path.Combine("data", "src", "rt-linux.vire"));
         AssertSame(root, Path.Combine("src", "rt-tls.vire"), Path.Combine("data", "src", "rt-tls.vire"));
         AssertSame(root, Path.Combine("src", "rt-tls-pe.vire"), Path.Combine("data", "src", "rt-tls-pe.vire"));
+        AssertSame(root, Path.Combine("src", "rt-tls-elf.vire"), Path.Combine("data", "src", "rt-tls-elf.vire"));
         AssertSame(root, Path.Combine("src", "rt-tls-pe-blob.txt"), Path.Combine("data", "src", "rt-tls-pe-blob.txt"));
         AssertSame(root, Path.Combine("src", "rt-tls-pe-pins.txt"), Path.Combine("data", "src", "rt-tls-pe-pins.txt"));
         AssertSame(root, Path.Combine("src", "rt-tls-pe-fixes.txt"), Path.Combine("data", "src", "rt-tls-pe-fixes.txt"));
+        AssertSame(root, Path.Combine("src", "rt-tls-elf-blob.txt"), Path.Combine("data", "src", "rt-tls-elf-blob.txt"));
+        AssertSame(root, Path.Combine("src", "rt-tls-elf-pins.txt"), Path.Combine("data", "src", "rt-tls-elf-pins.txt"));
+        AssertSame(root, Path.Combine("src", "rt-tls-elf-fixes.txt"), Path.Combine("data", "src", "rt-tls-elf-fixes.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-blob.txt"), Path.Combine("data", "src", "rt-net-blob.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-pins.txt"), Path.Combine("data", "src", "rt-net-pins.txt"));
         AssertSame(root, Path.Combine("src", "rt-net-fixes.txt"), Path.Combine("data", "src", "rt-net-fixes.txt"));

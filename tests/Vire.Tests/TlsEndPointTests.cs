@@ -51,6 +51,9 @@ public class TlsEndPointTests
         Assert.DoesNotContain("pin with labels, \"rt_tls_peer_cert\", image\n  emitPro with image\n  emitFail", names.Replace("\r\n", "\n"));
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe-blob.txt"));
         Assert.Contains("rt_tls_peer_cert", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe-names.txt")));
+        Assert.Contains("rt_tls_end_point", File.ReadAllText(Path.Combine(root, "src", "rt-tls-elf-names.txt")));
+        Assert.Contains("iat_sha384", File.ReadAllText(Path.Combine(root, "src", "rt-tls-elf-names.txt")));
+        Assert.Contains("iat_sha512", File.ReadAllText(Path.Combine(root, "src", "rt-tls-elf-names.txt")));
         Assert.True(blob.Length > 8000, blob.Length.ToString());
         string work = Path.Combine(root, "data", "tls-endpoint", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
