@@ -19,6 +19,8 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #150 | `8f460c49` (`cursor/pe-dns-json-chain-567f`) | conflict `tools/couchstation-windows-all.ps1`. Kept `native-forms`. Dropped MZ-only proxy block. Writes `data/couchstation-windows-all-results.md`. |
 | #151 | `36d2e644` (`cursor/native-405-proxy-ws-33ca`) | conflict `docs/FINISH-LIST.md` only. Packed blobs did not conflict in git. See below. |
 | #152 | `d1d72b4a` (`cursor/vireapk-finish-e5fe`) | clean. Closes `VireApk.Pack` FINISH-LIST row. No guest builtin. |
+| #153 | `cf7cdd07` (`cursor/fcgbds-worker-port-efbf`) | clean. JSON heartbeat `sessionId` on 4-param route plus worker env cases. |
+| #154 | `6780fa07` (`cursor/serve-builtin-drop-54a7`) | conflict `docs/FINISH-LIST.md` and `CHANGELOG.md`. Dropped serve rows. Kept VireApk closed note. Did not restore sha256/VireApk rows from 154's stale list. |
 
 ## Packed rt-net / listen blobs (#150 vs #151)
 
@@ -61,10 +63,15 @@ Results: `data/couchstation-windows-all-results.md` and `data/couchstation-windo
 ```
 python3 tools/pe-windows-gaps-check.py
 bash tools/native-405-proxy-ws-check.sh
+bash tools/rebuild-fcgbds-worker-diff.sh
+bash tools/rebuild-fcgbds-heartbeat-diff.sh
 bash tools/windows-tls-lane-check.sh
 bash tools/native-elf-selfhost.sh
+dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter FullyQualifiedName~ServeTests
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
+
+#151 keeps POST bodies on packed 3-param listen. #153 heartbeat uses 4-param `route`. Re-run both FCGBDS scripts after both PRs are in.
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
