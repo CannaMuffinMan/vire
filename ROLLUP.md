@@ -24,6 +24,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #155 | `0fc7aeae` (`cursor/finish-list-closer-6bc4`) | `rt_for_more` list.buf + native-forms fixtures + `tools/native-forms-linux.sh`. Overlaps: see below. |
 | #156 | `8ae2e4a5` (`cursor/portal-edge-contracts-11a0`, later than `8bc84095`) | in-tree rpc-portal/edge/dev-portal/fcgbds-dashboard goldens host==native, `docs/fcg-contracts-missing.md`, unauth sidecar argv0 fix. Clean merge. |
 | #157 | `90a770fd` (`cursor/win-pe-pg-redis-tls-c046`) | VireProof `pg-tls-stub` / `redis-tls-stub` + Windows prove scripts. `src/rt-pg.vire` unchanged: kept #148 PLUS fail-closed (`pg_scram_select`). CouchStation already invoked `pg-tls-prove-windows.ps1` / `redis-tls-prove-windows.ps1`. Combined `vire-proof` usage with #155 `http-echo`/`ws-prove`. |
+| #160 | `a36edcf6` (`cursor/vire-4h-tls-segv`) | ELF `rt_tls_wrap`: hostname box at `[rbp-48]`, C string at `tls_nameptr` (was TCP handle). Clean on top of #148 `880ec761` `rt-tls` (`tls_end_point` kept). `tools/pg-tls-stub-elf.sh`. Did not fold #159. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -82,6 +83,7 @@ bash tools/rebuild-unauth-sidecar-diff.sh
 bash tools/prove-fcg-portal-contracts.sh
 bash tools/rebuild-portal-diff.sh
 bash tools/pg-scram-plus-prove.sh
+bash tools/pg-tls-stub-elf.sh
 bash tools/windows-tls-lane-check.sh
 bash tools/native-elf-selfhost.sh
 dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo --filter FullyQualifiedName~ServeTests
@@ -98,17 +100,28 @@ Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 - `python3 tools/pe-windows-gaps-check.py` PASS (r4 rbx, share-7, json map).
 - `bash tools/native-forms-linux.sh` PASS. Host==native `try-miss` and `for-list` (6).
 - ServeTests + NativeFormsTests: 5 passed, 0 skipped.
-- `bash tools/pg-scram-plus-prove.sh` PASS at `73ad94ab` fold (`plus-only no bind REJECT`, `tls plus no bind REJECT`).
+- `bash tools/pg-scram-plus-prove.sh` PASS at `880ec761` fold (`plus-only no bind REJECT` / `tls plus no bind REJECT` / handshake leaf cbind).
 - `bash tools/windows-tls-lane-check.sh` PASS (no PersistKeySet). Linux ELF is not PE proof.
 - `bash tools/native-405-proxy-ws-check.sh` PASS (host/native 405, POST `from-listen`, apigo-ws).
 - Aggregated dashboard GET 405: `tools/rebuild-portal-diff.sh` `== dashboard (no dist) == match fcgbds-dashboard-go.json` (GET `/api/challenge-verify` and `/api/reviewers-heartbeat` HTTP 405 on host and native). #156's own base still 200; this tip includes #151 packed `"status":405` overlay.
-- `bash tools/rebuild-unauth-sidecar-diff.sh` FAIL_BEFORE rpcportal ok; PASS_AFTER native rpc-portal `missing header terminator`. Same class of residual as FCGBDS worker/heartbeat native HTTP on this packed listen. Do not skip. Linux ELF is not PE proof.
+- `bash tools/native-elf-selfhost.sh` at `ac2c29d` (post-#148 `880ec761`, pre-#160): gen1=gen2 x3 `e93e868d0a00cf43f3f090fe5d62a955347f0f7ad9d092eb881ff8f086ba048b`.
 
-Still required for the proof bar: `bash tools/native-elf-selfhost.sh` gen1=gen2 x3 (hash moves with #155 `rt_for_more`) and full xUnit (0 skipped; env-only named Android/C-compiler).
+## ELF `tls_wrap` hostname box (#160)
 
-## Open: ELF `tls_wrap` vs .NET SslStream SEGV (#157)
+**SEGV fixed.** Pre-#160 ELF `rt_tls_wrap` stored the TCP handle at `[rbp-48]`; `SSL_set1_host` read handle+8 and SIGSEGV'd (exit 139) after SSLRequest. #160 stores the hostname box there (`76,137,77,208` / `lea rax,[r9+8]` into `tls_nameptr`) like PE wrap.
 
-Reproduced on tip after folding `90a770fd`. Do not skip or xfail. Host interpreter vs `vire-proof pg-tls-stub` exits 0 (`PG TLS PROVE pass`). Linux ELF of the same concatenated `rt-pg` + `tests/native/pg-tls.vire` guest exits **139** (SIGSEGV) after `non-loopback refused`, before auth. PE execute is CouchStation-only. This is ELF OpenSSL `tls_wrap` talking to .NET `SslStream`, not a Windows PE proof.
+`bash tools/pg-tls-stub-elf.sh` on this tip: **host** `PG TLS PROVE pass` (auth trust). **ELF no longer 139**; wrap handshake proceeds, then **`FAIL channel binding`** (exit 1). That is #148 fail-closed when ELF `tls_peer_cert` / `tls_end_point` does not yield a cbind vs the .NET stub. Do not skip. Not PE proof.
+
+## Native rpc-portal “missing header terminator” (Lane K)
+
+Not a small rollup merge of the wrong packed blob. `tools/rebuild-unauth-sidecar-diff.sh` `http_call` raises `missing header terminator` when `recv` has no `\r\n\r\n`.
+
+Reproduced on this tip with the sidecar compile path (`listen with 0`, `compile-native` ELF of `tests/rebuild/guests/rpc-portal-go.vire`):
+
+- Host GET `/api/health`: 159 bytes `HTTP/1.1 200 OK` … `\r\n\r\n{"ok":true}`.
+- Native ELF: **SIGSEGV (139)** on the first GET; **raw_len 0**; no header terminator because the process died, not because it sent a body-only JSON 200.
+
+Same class as FCGBDS worker/heartbeat native HTTP. Packed 1-param `listen` guest vs host `VireListen`. Do not skip. Do not treat as a 3-param POST overlay mix-up.
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
