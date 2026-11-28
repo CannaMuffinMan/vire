@@ -313,10 +313,10 @@ define openTlsPeImage
   let silt be ["ilt_ach", "ilt_fch", "ilt_isc", "ilt_asc", "ilt_dsc", "ilt_qca", "ilt_enc", "ilt_dec", "ilt_fcb"]
   let siat be ["iat_ach", "iat_fch", "iat_isc", "iat_asc", "iat_dsc", "iat_qca", "iat_enc", "iat_dec", "iat_fcb"]
   let shint be ["hint_ach", "hint_fch", "hint_isc", "hint_asc", "hint_dsc", "hint_qca", "hint_enc", "hint_dec", "hint_fcb"]
-  let cr be ["PFXImportCertStore", "CertFindCertificateInStore", "CertOpenStore", "CertAddEncodedCertificateToStore", "CertCloseStore", "CertFreeCertificateContext", "CryptStringToBinaryA", "CertCreateCertificateContext"]
-  let cilt be ["ilt_pfx", "ilt_find", "ilt_ost", "ilt_addc", "ilt_cst", "ilt_fct", "ilt_c2b", "ilt_ccc"]
-  let ciat be ["iat_pfx", "iat_find", "iat_ost", "iat_addc", "iat_cst", "iat_fct", "iat_c2b", "iat_ccc"]
-  let chint be ["hint_pfx", "hint_find", "hint_ost", "hint_addc", "hint_cst", "hint_fct", "hint_c2b", "hint_ccc"]
+  let cr be ["PFXImportCertStore", "CertFindCertificateInStore", "CertOpenStore", "CertAddEncodedCertificateToStore", "CertCloseStore", "CertFreeCertificateContext", "CryptStringToBinaryA", "CertCreateCertificateContext", "CryptHashCertificate"]
+  let cilt be ["ilt_pfx", "ilt_find", "ilt_ost", "ilt_addc", "ilt_cst", "ilt_fct", "ilt_c2b", "ilt_ccc", "ilt_chc"]
+  let ciat be ["iat_pfx", "iat_find", "iat_ost", "iat_addc", "iat_cst", "iat_fct", "iat_c2b", "iat_ccc", "iat_chc"]
+  let chint be ["hint_pfx", "hint_find", "hint_ost", "hint_addc", "hint_cst", "hint_fct", "hint_c2b", "hint_ccc", "hint_chc"]
   let i be 0
   while i < (length with k32)
     pin with labels, (kilt at i), image

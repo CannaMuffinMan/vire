@@ -725,6 +725,7 @@ define noteNeed with state, nm
     put true into state at "needTls"
   end
   if nm == "tls_end_point"
+    put true into state at "needNet"
     put true into state at "needTls"
   end
   if nm == "resolve"
