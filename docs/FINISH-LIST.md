@@ -4,7 +4,6 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 
 | file | symbol | what's missing | priority | owning area |
 |---|---|---|---|---|
-| windows/vire.windows.csproj | Compile ItemGroup | WINDOWS project compiles only `Vire.cs` and `Compiled.cs`; remaining host `.cs` files are not included | high | host-cs |
 | tests/rebuild/contracts/fcgbds-dashboard-go/BLOCKED.md | dashboard-go contracts | Remaining dashboard-go routes/headers still blocked | high | tests-docs |
 | tests/rebuild/contracts/rpc-portal-go/BLOCKED.md | rpc-portal-go contracts | Remaining outbound/auth/static routes still blocked | high | tests-docs |
 | tests/rebuild/contracts/edge-go/BLOCKED.md | edge-go contracts | Host-map/maintenance/payments behaviors still blocked | high | tests-docs |
