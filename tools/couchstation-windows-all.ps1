@@ -240,6 +240,7 @@ Run-Proof "pg-redis-tls-windows" { Run-Script "tools/pg-redis-tls-windows.ps1" }
 Run-Proof "listen-ws-windows" { Run-Script "tools/listen-ws-windows.ps1" }
 Run-Proof "ws-refuse-windows" { Run-Script "tools/ws-refuse-windows.ps1" }
 Run-Proof "proxy-reply-windows" { Run-Script "tools/proxy-reply-windows.ps1" }
+Run-Proof "listen-recv0-windows" { Run-Script "tools/listen-recv0-windows.ps1" }
 
 Run-Proof "session-prove-pe" {
     $src = Join-Path $Root "session-prove.vire"

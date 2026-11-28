@@ -459,11 +459,14 @@ def patch_one(blob_name, pins_name, fixes_name, names):
         pins.append((a.labels[n], name_id[n]))
 
     local = dict(a.labels)
+    # 0xA78 is the pushroute trampoline (e9 to rt_net_pushroute). 0xA84 is the
+    # middle of cl_nobody after the 5-byte overlays; landing there pushes rdx=0x4f
+    # as method and 4-param route binds path to that integer (SIGSEGV in ==).
     local["cl_route_push"] = 0xA78
     for at, nm in a.fixups:
         if nm == "cl_route_push":
-            rel = 0xA78 - (at + 4)
-            blob[at : at + 4] = pack_u32(rel & 0xFFFFFFFF)
+            rel = (0xA78 - (at + 4)) & 0xFFFFFFFF
+            blob[at : at + 4] = pack_u32(rel)
             continue
         if nm in local:
             rel = local[nm] - (at + 4)
