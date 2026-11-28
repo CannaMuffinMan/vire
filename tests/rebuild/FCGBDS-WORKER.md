@@ -12,13 +12,12 @@ Harness `tools/rebuild-fcgbds-worker-diff.sh` drops JSON keys `ts`, `generatedAt
 
 Go `WriteHeader(503|400)` with bodies that omit `"status"`. Vire maps status from JSON `"status":N`. Refused and 400 heartbeat bodies therefore include `"status"` so the status line matches. Field match is still `ok`/`error`.
 
-TODO(VIRE-FINISH-NOW): close remaining host/native gaps listed below (POST body, reviewer TTL, bind, PE proof) without raising caps.
+TODO(VIRE-FINISH-NOW): remaining gaps below still lack an in-tree contract or would weaken listen/sandbox. Do not stub them.
 
 ## Remaining gaps
 
-- Native compiled guests SEGV if `route` reads the POST `body` value; heartbeat uses Go's query `sessionId=` instead of JSON body. Host can read the body; this lane does not, so host vs native stay aligned.
-- Reviewer TTL is process-local in Go; this guest is per-request.
-- Go `PORT` set binds `0.0.0.0`; Vire native listen stays `127.0.0.1`.
+- Reviewer TTL is process-local in Go. This guest is per-request. There is no recorded multi-request live-count golden and no guest clock for expiry.
+- Go `PORT` set binds `0.0.0.0`. Vire native listen prints `127.0.0.1`. Host public bind is `VIRE_BIND=public` plus a 16-char token, not PORT. Do not open native 0.0.0.0.
 - Go `json.Encoder` trailing newline is stripped in the diff.
-- Worker env is argv `KEY=VALUE` (no getenv). `say` is stdout, not stderr.
-- Windows PE not proven here; see `tools/rebuild-fcgbds-worker-windows.ps1`.
+- Worker env is argv `KEY=VALUE` (no getenv). `say` is stdout, not stderr. Job bodies (aggregation work) are skeleton-only; no Go job-run goldens in this repo.
+- Windows PE not proven here; see `tools/rebuild-fcgbds-worker-windows.ps1` and `tools/rebuild-fcgbds-heartbeat-windows.ps1`.

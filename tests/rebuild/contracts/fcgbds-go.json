@@ -5,7 +5,7 @@
   "volatile_fields": ["ts", "generatedAt", "lastSeenAt", "dayKey"],
   "volatile_note": "Go uses time.Now RFC3339Nano (and dayKey YYYY-MM-DD, lastSeenAt millis UTC). Native guests have no wall clock; those fields are the placeholder now or 1970-01-01. The harness drops them before JSON equality.",
   "status_field_note": "Go refused routes and the 400 heartbeat set the HTTP status with WriteHeader and do not put status in JSON. Vire listen maps HTTP status from JSON \"status\":N (host StatusOf / native rt_net_statusof). Goldens therefore include status in those bodies so the status line is 503/400. Compare remaining fields (ok, error) to Go UnavailableBody / sessionId error.",
-  "query_nil_note": "main constructs Server{} so Query and Memory are zero. stats.Build + audit.Totals(nil) + EvidenceSection(nil) are zeros; reviewers TTL map is empty until a heartbeat in the same Go process. This guest is per-request (no shared reviewer map).",
+  "query_nil_note": "main constructs Server{} so Query and Memory are zero. stats.Build + audit.Totals(nil) + EvidenceSection(nil) are zeros; reviewers TTL map is empty until a heartbeat in the same Go process. This guest is per-request (no shared reviewer map). Heartbeat sessionId is read from the JSON POST body (leaf Content-Length), not the query string.",
   "bind_note": "Go ListenHost is 127.0.0.1 unless PORT or HOST is set. Vire native listen always prints 127.0.0.1. Refused ports 7099 and 8778: Go ListenPort error refusing reserved port; this guest says that line and halt 1 before listen.",
   "cases": [
     {
@@ -71,12 +71,19 @@
       "body_fields": { "error": "sessionId is required" }
     },
     {
+      "name": "post_heartbeat_empty_session",
+      "method": "POST",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{\"sessionId\":\"\"}",
+      "status": 400,
+      "headers": { "content-type": "application/json", "cache-control": "no-store" },
+      "body_fields": { "error": "sessionId is required" }
+    },
+    {
       "name": "post_heartbeat_ok",
       "method": "POST",
-      "path": "/api/bot-defense/reviewers/heartbeat?sessionId=abc-1",
-      "body": "",
-      "native_only": true,
-      "native_only_note": "Go accepts sessionId on the query string. Native keep the query on path; host HttpWire strips '?'. Native guests SEGV if route reads POST body, so this guest never inspects body. Host therefore cannot prove JSON-body heartbeat 200 with this binary.",
+      "path": "/api/bot-defense/reviewers/heartbeat",
+      "body": "{\"sessionId\":\"abc-1\"}",
       "status": 200,
       "headers": { "content-type": "application/json", "cache-control": "no-store" },
       "body_fields": { "ok": true, "reviewers": { "live": 1, "ttlSeconds": 90 } }
