@@ -21,6 +21,8 @@ public class RebuildFcgbdsWorkerContractTests
         Assert.Contains("refusing reserved port", guest);
         Assert.Contains("7099", guest);
         Assert.Contains("8778", guest);
+        Assert.Contains("session_id with body", guest);
+        Assert.DoesNotContain("sessionId=", guest);
         Assert.DoesNotContain("path == \"/healthz\"", failHttp);
 
         string json = File.ReadAllText(Path.Combine(root, "tests", "rebuild", "contracts", "fcgbds-go.json"));
@@ -34,7 +36,7 @@ public class RebuildFcgbdsWorkerContractTests
             if (q >= 0) path = path.Substring(0, q);
             Assert.Contains(path, guest);
         }
-        Assert.Equal(25, n);
+        Assert.Equal(26, n);
 
         Assert.Contains("PAYMENTS_ENABLED must stay false", worker);
         Assert.Contains("worker-go registered jobs disabled", worker);
@@ -42,6 +44,7 @@ public class RebuildFcgbdsWorkerContractTests
         Assert.DoesNotContain("PAYMENTS_ENABLED must stay false", failWorker);
 
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgbds-worker-diff.sh")));
+        Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgbds-heartbeat-diff.sh")));
         Assert.True(File.Exists(Path.Combine(root, "tools", "rebuild-fcgbds-worker-windows.ps1")));
         Assert.DoesNotContain("railway.internal", guest);
         Assert.DoesNotContain("railway.internal", worker);
