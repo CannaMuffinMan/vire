@@ -22,6 +22,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #153 | `cf7cdd07` (`cursor/fcgbds-worker-port-efbf`) | clean. JSON heartbeat `sessionId` on 4-param route plus worker env cases. |
 | #154 | `6780fa07` (`cursor/serve-builtin-drop-54a7`) | conflict `docs/FINISH-LIST.md` and `CHANGELOG.md`. Dropped serve rows. Kept VireApk closed note. Did not restore sha256/VireApk rows from 154's stale list. |
 | #155 | `0fc7aeae` (`cursor/finish-list-closer-6bc4`) | `rt_for_more` list.buf + native-forms fixtures + `tools/native-forms-linux.sh`. Overlaps: see below. |
+| #156 | `8ae2e4a5` (`cursor/portal-edge-contracts-11a0`, later than `8bc84095`) | in-tree rpc-portal/edge/dev-portal/fcgbds-dashboard goldens host==native, `docs/fcg-contracts-missing.md`, unauth sidecar argv0 fix. Clean merge. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -76,6 +77,9 @@ python3 tools/pe-windows-gaps-check.py
 bash tools/native-405-proxy-ws-check.sh
 bash tools/rebuild-fcgbds-worker-diff.sh
 bash tools/rebuild-fcgbds-heartbeat-diff.sh
+bash tools/rebuild-unauth-sidecar-diff.sh
+bash tools/prove-fcg-portal-contracts.sh
+bash tools/rebuild-portal-diff.sh
 bash tools/pg-scram-plus-prove.sh
 bash tools/windows-tls-lane-check.sh
 bash tools/native-elf-selfhost.sh
