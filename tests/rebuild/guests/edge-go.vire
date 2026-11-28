@@ -4,10 +4,16 @@
 use "http-client.vire"
 
 define route with method, path, body
-  let port be number with (args at 0)
-  let host be args at 1
+  let host be none
+  if (length with args) > 1
+    let host be args at 1
+  end
   if path == "/healthz"
     return "ok"
+  end
+  let port be 0
+  if (length with args) > 0
+    let port be number with (args at 0)
   end
   if host == "www"
     if path == "/echo"
@@ -23,9 +29,12 @@ define route with method, path, body
 end
 
 define main
-  let port be number with (args at 0)
-  let host be args at 1
+  let host be none
+  if (length with args) > 1
+    let host be args at 1
+  end
   if host == "proxy-echo"
+    let port be number with (args at 0)
     let got be proxy with {"method": "GET", "port": port, "path": "/up", "body": "", "head": "Host: www.fixture.test\r\n", "prefix": ""}
     say (got at "status")
     say (got at "body")

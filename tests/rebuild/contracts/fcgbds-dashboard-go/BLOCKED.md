@@ -7,7 +7,6 @@ TODO(VIRE-FINISH-NOW): prove remaining dashboard-go routes/headers listed below 
 - `X-FCGBDS-Fallback` / `X-FCGBDS-Wall` headers
 - stream `Cache-Control: public, max-age=3`
 - Go `Content-Type: application/json; charset=utf-8`
-- HTTP 405 / 502 (`StatusOf` needles are 507,503,500,431,413,411,408,404,403,401,400). `/api/events` 502 and method-not-allowed stay unproven.
-- GET/POST `/api/stream-wall/tilt` 502
-- upstream 429 on tilt
+- HTTP 405 mapping (another agent). Per-route JSON does not include GET 405 cases.
+- upstream 429 on tilt (nil-Upstream 502 is `api-stream-wall-tilt.json`)
 - WebSockets, TLS, Postgres, Redis, Railway, Stripe

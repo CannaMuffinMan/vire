@@ -42,7 +42,7 @@
       "method": "POST",
       "path": "/api/health",
       "status": 405,
-      "body": "{\"error\":\"method_not_allowed\",\"status\":405}"
+      "body": "{\"error\":\"method not allowed\",\"status\":405}"
     },
     {
       "name": "dist_missing",

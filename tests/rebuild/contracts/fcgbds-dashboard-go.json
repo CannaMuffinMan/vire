@@ -8,42 +8,42 @@
       "method": "GET",
       "path": "/api/health",
       "status": 200,
-      "body": "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}"
+      "body": "{\"ok\":true,\"service\":\"fcgbds-dashboard\"}\n"
     },
     {
       "name": "get_challenge",
       "method": "GET",
       "path": "/api/challenge",
       "status": 200,
-      "body": "{\"unavailable\":true,\"caption\":\"Visitor check is unavailable. You were not blocked.\"}"
+      "body": "{\"caption\":\"Visitor check is unavailable. You were not blocked.\",\"unavailable\":true}\n"
     },
     {
       "name": "get_stream_wall",
       "method": "GET",
       "path": "/api/stream-wall/status",
       "status": 200,
-      "body": "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}"
+      "body": "{\"unlocked\":false,\"scheduledUnlockAt\":null,\"liveNow\":false,\"live\":[]}\n"
     },
     {
       "name": "get_events_502",
       "method": "GET",
       "path": "/api/events",
       "status": 502,
-      "body": "{\"error\":\"Failed to fetch events\",\"details\":\"All upstream attempts failed\",\"status\":502}"
+      "body": "{\"details\":\"All upstream attempts failed\",\"error\":\"Failed to fetch events\",\"status\":502}\n"
     },
     {
       "name": "get_events_detailed_503",
       "method": "GET",
       "path": "/api/events-detailed",
       "status": 503,
-      "body": "{\"error\":\"Detailed events unavailable\",\"status\":503}"
+      "body": "{\"error\":\"Detailed events unavailable\",\"status\":503}\n"
     },
     {
       "name": "get_stats_gated",
       "method": "GET",
       "path": "/api/stats",
       "status": 200,
-      "body": "{\"gated\":true,\"streamUnlocked\":false,\"publicWallEnabled\":false,\"statsAvailable\":false}"
+      "body": "{\"gated\":true,\"publicWallEnabled\":false,\"statsAvailable\":false,\"streamUnlocked\":false}\n"
     },
     {
       "name": "challenge_verify_405",
@@ -71,14 +71,14 @@
       "method": "GET",
       "path": "/",
       "status": 503,
-      "body": "{\"reason\":\"dist_missing\",\"status\":503}"
+      "body": "{\"reason\":\"dist_missing\",\"status\":503}\n"
     },
     {
       "name": "unknown_api_404",
       "method": "GET",
       "path": "/api/nope",
       "status": 404,
-      "body": "{\"error\":\"not_found\",\"status\":404}"
+      "body": "{\"error\":\"not_found\",\"status\":404}\n"
     }
   ]
 }
