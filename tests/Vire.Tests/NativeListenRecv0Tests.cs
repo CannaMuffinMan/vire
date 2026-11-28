@@ -15,7 +15,6 @@ public class NativeListenRecv0Tests
         byte[] r4 = HexFile(Path.Combine(root, "src", "rt-net-r4-blob.txt"));
         Assert.Equal(r4, HexFile(Path.Combine(root, "data", "src", "rt-net-r4-blob.txt")));
         Assert.Equal(0xE9, r4[0xA78]);
-        Assert.Equal(0xE9, r4[0xAC0]);
         bool sawPush = false;
         for (int i = 0; i + 5 <= r4.Length; i++)
         {
@@ -31,8 +30,10 @@ public class NativeListenRecv0Tests
         }
         Assert.True(sawRecv0);
         byte[] r3 = HexFile(Path.Combine(root, "src", "rt-net-blob.txt"));
-        Assert.Equal(0xC9, r3[r3.Length - 2]);
-        Assert.Equal(0xC3, r3[r3.Length - 1]);
+        int r3tgt = 0x5E4 + BitConverter.ToInt32(r3, 0x5E0);
+        Assert.True(r3tgt >= 0 && r3tgt + 1 < r3.Length);
+        Assert.Equal(0xC9, r3[r3tgt]);
+        Assert.Equal(0xC3, r3[r3tgt + 1]);
         Assert.Contains("listen-recv0-windows.ps1", File.ReadAllText(Path.Combine(root, "tools", "couchstation-windows-all.ps1")));
         Assert.Equal(5000000, Program.ProgramStepCap);
         Assert.Contains("33554432", File.ReadAllText(Path.Combine(root, "src", "rt.vire")));

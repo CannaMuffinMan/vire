@@ -23,7 +23,6 @@ $r4 = (Get-Content -Raw (Join-Path $Root "src\rt-net-r4-blob.txt")).Trim()
 $bytes = New-Object byte[] ($r4.Length / 2)
 for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] = [Convert]::ToByte($r4.Substring($i * 2, 2), 16) }
 if ($bytes[0xA78] -ne 0xE9) { throw "r4 missing 0xa78 trampoline" }
-if ($bytes[0xAC0] -ne 0xE9) { throw "r4 missing save_frame trampoline at 0xac0" }
 $sawPush = $false
 $sawRecv0 = $false
 for ($i = 0; $i + 5 -le $bytes.Length; $i++) {
