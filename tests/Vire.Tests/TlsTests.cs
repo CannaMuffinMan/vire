@@ -66,9 +66,10 @@ public class TlsTests
         Assert.Contains("rt_tls_connect", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("rt_tls_listen", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
-        string elfTls = File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire"));
+        string elfTls = File.ReadAllText(Path.Combine(root, "src", "rt-tls-elf.vire"));
         Assert.Contains("76, 137, 77, 208", elfTls);
         Assert.DoesNotContain("emitList with image, [72, 137, 85, 208]\n  emitList with image, [72, 137, 85, 224]", elfTls);
+        Assert.Contains("4c894dd0", File.ReadAllText(Path.Combine(root, "src", "rt-tls-elf-blob.txt")));
         Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire")));
         Assert.Contains("openPeTlsImage", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
         Assert.Contains("openTlsPeImage", File.ReadAllText(Path.Combine(root, "src", "pe.vire")));
