@@ -77,6 +77,104 @@ public class PgRedisTlsStubTests
     }
 
     [Fact]
+    public void LinuxElfPgTlsWrapAndRedisTlsConnectAgainstStubs()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+        string root = DualMode.FindRoot();
+        string proof = BuildProof(root);
+        string work = Path.Combine(root, "data", "elf-tls-stub", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        Directory.CreateDirectory(Path.Combine(work, "data"));
+        Process pgStub = null;
+        Process redisStub = null;
+        try
+        {
+            string pfx = Path.Combine(work, "data", "pg-tls.pfx");
+            string ca = Path.Combine(work, "data", "pg-ca.pem");
+            string unPfx = Path.Combine(work, "data", "pg-untrusted.pfx");
+            string unCer = Path.Combine(work, "data", "pg-untrusted.pem");
+            RunProof(proof, root, "write-pfx", pfx, ca, "x");
+            RunProof(proof, root, "write-pfx-expired", unPfx, unCer, "x");
+            File.Copy(ca, Path.Combine(root, "data", "pg-ca.pem"), true);
+            File.Copy(unCer, Path.Combine(root, "data", "pg-untrusted.pem"), true);
+            pgStub = StartProof(proof, root, "pg-tls-stub", pfx, "x");
+            int pgPort = ReadPort(pgStub);
+            string lib = File.ReadAllText(Path.Combine(root, "src", "rt-pg.vire"));
+            string guest = File.ReadAllText(Path.Combine(root, "tests", "native", "pg-tls.vire"));
+            guest = guest.Replace("PORT_PLACEHOLDER", pgPort.ToString())
+                .Replace("PGUSER_PLACEHOLDER", "vire")
+                .Replace("PGDB_PLACEHOLDER", "vire")
+                .Replace("PGSECRET_PLACEHOLDER", "x");
+            string src = Path.Combine(work, "pg-run.vire");
+            File.WriteAllText(src, lib + "\n" + guest);
+            string rel = Rel(root, src);
+            File.Copy(src, Path.Combine(root, "pg-tls-run.vire"), true);
+            DualMode.Proc host = DualMode.RunVire(root, new string[] { "pg-tls-run.vire" }, root);
+            Assert.True(host.Code == 0, DualMode.Norm(host.Out + " " + host.Err));
+            Assert.Contains("PG TLS PROVE pass", DualMode.Norm(host.Out));
+            string hexRel = Rel(root, Path.Combine(work, "pg-run.hex"));
+            DualMode.Proc compiled = DualMode.RunVire(
+                root,
+                new string[] { "compile-native.vire", rel, hexRel, "elf" },
+                root);
+            Assert.True(compiled.Code == 0, DualMode.Norm(compiled.Out + " " + compiled.Err));
+            DualMode.Proc elf = RunElf(root, HexPath(root, hexRel));
+            Assert.True(elf.Code == 0, DualMode.Norm(elf.Out + " " + elf.Err) + " code=" + elf.Code);
+            Assert.Contains("non-loopback refused", DualMode.Norm(elf.Out));
+            Assert.Contains("PG TLS PROVE pass", DualMode.Norm(elf.Out));
+
+            string vguest = File.ReadAllText(Path.Combine(root, "tests", "native", "pg-tls-verify.vire"));
+            vguest = vguest.Replace("PORT_PLACEHOLDER", pgPort.ToString())
+                .Replace("PGUSER_PLACEHOLDER", "vire")
+                .Replace("PGDB_PLACEHOLDER", "vire")
+                .Replace("PGSECRET_PLACEHOLDER", "x");
+            File.WriteAllText(Path.Combine(root, "pg-tls-verify-run.vire"), lib + "\n" + vguest);
+            DualMode.Proc verify = DualMode.RunVire(root, new string[] { "pg-tls-verify-run.vire" }, root);
+            Assert.True(verify.Code == 0, DualMode.Norm(verify.Out + " " + verify.Err));
+            Assert.Contains("wrong-host ", DualMode.Norm(verify.Out));
+            Assert.Contains("untrusted-ca ", DualMode.Norm(verify.Out));
+
+            string rpfx = Path.Combine(work, "data", "redis-tls.pfx");
+            string rca = Path.Combine(work, "data", "redis-ca.pem");
+            string expPfx = Path.Combine(work, "data", "redis-expired.pfx");
+            string expCer = Path.Combine(work, "data", "redis-expired.pem");
+            RunProof(proof, root, "write-pfx", rpfx, rca, "x");
+            RunProof(proof, root, "write-pfx-expired", expPfx, expCer, "x");
+            File.Copy(rca, Path.Combine(root, "data", "redis-ca.pem"), true);
+            File.WriteAllText(Path.Combine(root, "data", "redis-untrusted.pem"), File.ReadAllText(expCer));
+            redisStub = StartProof(proof, root, "redis-tls-stub", rpfx, "x", expPfx, "x");
+            int tlsPort = ReadPort(redisStub);
+            string rlib = File.ReadAllText(Path.Combine(root, "src", "rt-redis.vire"));
+            string rguest = File.ReadAllText(Path.Combine(root, "tests", "native", "redis-tls.vire"));
+            rguest = rguest.Replace("TLS_PORT_PLACEHOLDER", tlsPort.ToString())
+                .Replace("SECRET_PLACEHOLDER", "x");
+            string rsrc = Path.Combine(work, "redis-run.vire");
+            File.WriteAllText(rsrc, rlib + "\n" + rguest);
+            string rrel = Rel(root, rsrc);
+            File.Copy(rsrc, Path.Combine(root, "redis-tls-run.vire"), true);
+            DualMode.Proc rhost = DualMode.RunVire(root, new string[] { "redis-tls-run.vire" }, root);
+            Assert.True(rhost.Code == 0, DualMode.Norm(rhost.Out + " " + rhost.Err));
+            Assert.Contains("REDIS TLS PROVE pass", DualMode.Norm(rhost.Out));
+            string rhex = Rel(root, Path.Combine(work, "redis-run.hex"));
+            DualMode.Proc rcompiled = DualMode.RunVire(
+                root,
+                new string[] { "compile-native.vire", rrel, rhex, "elf" },
+                root);
+            Assert.True(rcompiled.Code == 0, DualMode.Norm(rcompiled.Out + " " + rcompiled.Err));
+            DualMode.Proc relf = RunElf(root, HexPath(root, rhex));
+            Assert.True(relf.Code == 0, DualMode.Norm(relf.Out + " " + relf.Err) + " code=" + relf.Code);
+            Assert.Contains("REDIS TLS PROVE pass", DualMode.Norm(relf.Out));
+        }
+        finally
+        {
+            try { if (pgStub != null && !pgStub.HasExited) pgStub.Kill(); } catch (Exception) { }
+            try { if (redisStub != null && !redisStub.HasExited) redisStub.Kill(); } catch (Exception) { }
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void HostMatchesRedisTlsStubFailClosedAndPeImportsSchannel()
     {
         string root = DualMode.FindRoot();
@@ -227,5 +325,29 @@ public class PgRedisTlsStubTests
         for (int i = 0; i < raw.Length; i++)
             raw[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
         return raw;
+    }
+
+    static DualMode.Proc RunElf(string root, string hexPath)
+    {
+        string hex = File.ReadAllText(hexPath).Trim();
+        byte[] raw = new byte[hex.Length / 2];
+        for (int i = 0; i < raw.Length; i++)
+            raw[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        string elfPath = hexPath + ".elf";
+        File.WriteAllBytes(elfPath, raw);
+        Process chmod = Process.Start(new ProcessStartInfo("chmod", "+x \"" + elfPath + "\"") { UseShellExecute = false });
+        chmod.WaitForExit();
+        ProcessStartInfo ninfo = new ProcessStartInfo(elfPath)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = root
+        };
+        Process nat = Process.Start(ninfo);
+        string nout = nat.StandardOutput.ReadToEnd();
+        string nerr = nat.StandardError.ReadToEnd();
+        Assert.True(nat.WaitForExit(60000), "elf timed out");
+        return new DualMode.Proc(nat.ExitCode, nout, nerr);
     }
 }
