@@ -234,9 +234,29 @@ def main():
         n = rewrite_crossing(blob, relocs, todo)
         print("rewrote", n, "crossing relocs")
 
-    hostok = bytes.fromhex("554889e54881ec800000005348894df8")
+    # push rbx after sub rsp,0x80 leaves RSP ≡ 8 (mod 16) at Win64 calls.
+    # CreateFileA then runs misaligned; CouchStation AV addr=ffffffffffffffff
+    # is the INVALID_HANDLE_VALUE follow-on. ELF skips iat_cf (linux_flag).
+    # Same-length 0x80→0x88: entry≡8, push rbp≡0, sub 0x88≡8, push rbx≡0.
+    rbx_pro = bytes.fromhex("554889e54881ec8000000053")
+    rbx_pro88 = bytes.fromhex("554889e54881ec8800000053")
+    n88 = 0
+    for nm in ("dns_hostok", "dns_fmta", "dns_parse", "dns_ns"):
+        o = pin_off(pins, names, nm)
+        if blob[o : o + 12] == rbx_pro88:
+            n88 += 1
+            continue
+        if blob[o : o + 12] != rbx_pro:
+            raise SystemExit("%s prologue is %s" % (nm, bytes(blob[o : o + 12]).hex()))
+        blob[o + 7] = 0x88
+        n88 += 1
+        print("align", nm, "sub rsp,0x88 at", hex(o))
+    if n88 != 4:
+        raise SystemExit("expected 4 rbx frames, got %d" % n88)
+
+    hostok = bytes.fromhex("554889e54881ec880000005348894df8")
     if blob.find(hostok) < 0:
-        raise SystemExit("dns_hostok missing push rbx")
+        raise SystemExit("dns_hostok missing aligned push rbx")
     if blob.find(want) < 0:
         raise SystemExit("FILE_SHARE 7 missing")
     assert_listen(blob)
