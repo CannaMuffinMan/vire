@@ -23,6 +23,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #154 | `6780fa07` (`cursor/serve-builtin-drop-54a7`) | conflict `docs/FINISH-LIST.md` and `CHANGELOG.md`. Dropped serve rows. Kept VireApk closed note. Did not restore sha256/VireApk rows from 154's stale list. |
 | #155 | `0fc7aeae` (`cursor/finish-list-closer-6bc4`) | `rt_for_more` list.buf + native-forms fixtures + `tools/native-forms-linux.sh`. Overlaps: see below. |
 | #156 | `8ae2e4a5` (`cursor/portal-edge-contracts-11a0`, later than `8bc84095`) | in-tree rpc-portal/edge/dev-portal/fcgbds-dashboard goldens host==native, `docs/fcg-contracts-missing.md`, unauth sidecar argv0 fix. Clean merge. |
+| #157 | `90a770fd` (`cursor/win-pe-pg-redis-tls-c046`) | VireProof `pg-tls-stub` / `redis-tls-stub` + Windows prove scripts. `src/rt-pg.vire` unchanged: kept #148 PLUS fail-closed (`pg_scram_select`). CouchStation already invoked `pg-tls-prove-windows.ps1` / `redis-tls-prove-windows.ps1`. Combined `vire-proof` usage with #155 `http-echo`/`ws-prove`. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -104,6 +105,10 @@ Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 - `bash tools/rebuild-unauth-sidecar-diff.sh` FAIL_BEFORE rpcportal ok; PASS_AFTER native rpc-portal `missing header terminator`. Same class of residual as FCGBDS worker/heartbeat native HTTP on this packed listen. Do not skip. Linux ELF is not PE proof.
 
 Still required for the proof bar: `bash tools/native-elf-selfhost.sh` gen1=gen2 x3 (hash moves with #155 `rt_for_more`) and full xUnit (0 skipped; env-only named Android/C-compiler).
+
+## Open: ELF `tls_wrap` vs .NET SslStream SEGV (#157)
+
+Reproduced on tip after folding `90a770fd`. Do not skip or xfail. Host interpreter vs `vire-proof pg-tls-stub` exits 0 (`PG TLS PROVE pass`). Linux ELF of the same concatenated `rt-pg` + `tests/native/pg-tls.vire` guest exits **139** (SIGSEGV) after `non-loopback refused`, before auth. PE execute is CouchStation-only. This is ELF OpenSSL `tls_wrap` talking to .NET `SslStream`, not a Windows PE proof.
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
