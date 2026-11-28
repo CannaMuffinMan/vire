@@ -872,13 +872,15 @@ define emitTlsPeGuest with image, fixes, labels
   emitList with image, [72, 137, 21]
   emitRel with image, fixes, "tls_captr"
   emitPop2 with image
-  ~ rax/rdx = handle, r8/r9 = name
+  ~ rax/rdx = handle, r8/r9 = name box. Store the box at [rbp-48] and the
+  ~ C string at tls_nameptr (pszTargetName). Do not treat [r9] as length
+  ~ before the box is saved: a zero first qword is wrap_bad on interned
+  ~ text that is not empty, which is the PE analog of ELF #160.
   emitList with image, [72, 131, 248, 1, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
   emitList with image, [73, 131, 248, 2, 15, 133]
   emitRel with image, fixes, "tls_wrap_bad"
-  emitList with image, [73, 139, 1, 73, 133, 192, 15, 132]
-  emitRel with image, fixes, "tls_wrap_bad"
+  emitList with image, [76, 137, 77, 208]
   emitList with image, [73, 141, 65, 8, 72, 137, 5]
   emitRel with image, fixes, "tls_nameptr"
   emitList with image, [72, 137, 85, 224, 72, 137, 21]

@@ -94,6 +94,37 @@ public class TlsSchannelTests
             Assert.Contains("rt_tls_wrap", peSrc);
             Assert.Contains("76, 137, 77, 216, 76, 137, 13", peSrc);
             Assert.DoesNotContain("76, 137, 77, 216, 72, 137, 13", peSrc);
+            Assert.Contains("76, 137, 77, 208", peSrc);
+            Assert.Contains("4c894dd0", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe-blob.txt")));
+            Assert.DoesNotContain("73, 139, 1, 73, 133, 192, 15, 132", peSrc);
+        }
+        finally
+        {
+            try { Directory.Delete(work, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void NativePeTlsListenGuestCompilesWithWsCli()
+    {
+        string root = DualMode.FindRoot();
+        Assert.Contains("needWs", File.ReadAllText(Path.Combine(root, "compile-native.vire")));
+        string work = Path.Combine(root, "data", "tls-schannel", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            File.WriteAllText(Path.Combine(work, "guest.vire"),
+                "define route with method, path, body\n  return \"{\\\"ok\\\":true}\"\nend\n" +
+                "define main\n  tls_listen with 0, \"data/tls-health.pfx\", \"x\"\nend\n");
+            string srcRel = Rel(work, "guest.vire");
+            string hexRel = Rel(work, "guest.hex");
+            DualMode.Proc compiled = DualMode.RunVire(
+                root,
+                new string[] { "compile-native.vire", srcRel, hexRel, "pe" },
+                root);
+            Assert.True(compiled.Code == 0, DualMode.Norm(compiled.Out + " " + compiled.Err));
+            Assert.DoesNotContain("ws_cli", DualMode.Norm(compiled.Err));
+            Assert.Contains("compiled", DualMode.Norm(compiled.Out));
         }
         finally
         {

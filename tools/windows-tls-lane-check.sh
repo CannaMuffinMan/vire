@@ -17,6 +17,18 @@ else
   echo "FAIL pe_tls_listen_password_r9 (want mov [tls_keyptr], r9 after emitPop2)"
   fail=1
 fi
+if grep -F -q "76, 137, 77, 208" "$pe" && grep -F -q "4c894dd0" "$ROOT/src/rt-tls-pe-blob.txt"; then
+  echo "PASS pe_tls_wrap_hostname_box"
+else
+  echo "FAIL pe_tls_wrap_hostname_box (want mov [rbp-48], r9 like ELF #160)"
+  fail=1
+fi
+if grep -q 'put true into state at "needWs"' "$ROOT/compile-native.vire"; then
+  echo "PASS tls_listen_needWs"
+else
+  echo "FAIL tls_listen_needWs (PE tls_listen relocates ws_cli)"
+  fail=1
+fi
 if grep -F -q "76, 137, 77, 216, 72, 137, 13" "$pe"; then
   echo "FAIL pe_tls_listen_password_rcx (mov [tls_keyptr], rcx drops the PFX password)"
   fail=1
@@ -34,6 +46,12 @@ if grep -q "EphemeralKeySet" "$tls"; then
   echo "PASS host_pem_ephemeralkeyset"
 else
   echo "FAIL host_pem_ephemeralkeyset"
+  fail=1
+fi
+if grep -q "SslStreamCertificateContext" "$tls" && ! grep -q "UserKeySet" "$tls"; then
+  echo "PASS host_schannel_context_no_userkeyset"
+else
+  echo "FAIL host_schannel_context_no_userkeyset"
   fail=1
 fi
 

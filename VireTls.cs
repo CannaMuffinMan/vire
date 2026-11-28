@@ -34,31 +34,37 @@ static class VireTls
         }
     }
 
-    static X509Certificate2 LoadPkcs12ForListen(byte[] pfx, string password)
+    internal static X509Certificate2 LoadPkcs12ForListen(byte[] pfx, string password)
     {
-        X509Certificate2 ephemeral = X509CertificateLoader.LoadPkcs12(pfx, password, X509KeyStorageFlags.EphemeralKeySet);
-        if (!OperatingSystem.IsWindows()) return ephemeral;
-        if (PrivateKeyUsable(ephemeral)) return ephemeral;
-        ephemeral.Dispose();
-        return X509CertificateLoader.LoadPkcs12(pfx, password, X509KeyStorageFlags.UserKeySet);
+        X509Certificate2 loaded = X509CertificateLoader.LoadPkcs12(
+            pfx, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+        if (!OperatingSystem.IsWindows()) return loaded;
+        X509Certificate2 bound = BindWindowsSchannelKey(loaded);
+        if (!object.ReferenceEquals(bound, loaded)) loaded.Dispose();
+        return bound;
     }
 
-    static bool PrivateKeyUsable(X509Certificate2 cert)
+    static X509Certificate2 BindWindowsSchannelKey(X509Certificate2 loaded)
     {
-        try
+        using (RSA rsa = loaded.GetRSAPrivateKey())
         {
-            using (RSA rsa = cert.GetRSAPrivateKey())
+            if (rsa != null)
             {
-                if (rsa == null) return false;
-                byte[] data = new byte[] { 1, 2, 3, 4 };
-                byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-                return rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                RSA eph = RSA.Create();
+                eph.ImportParameters(rsa.ExportParameters(true));
+                return loaded.CopyWithPrivateKey(eph);
             }
         }
-        catch (CryptographicException)
+        using (ECDsa ecdsa = loaded.GetECDsaPrivateKey())
         {
-            return false;
+            if (ecdsa != null)
+            {
+                ECDsa eph = ECDsa.Create();
+                eph.ImportParameters(ecdsa.ExportParameters(true));
+                return loaded.CopyWithPrivateKey(eph);
+            }
         }
+        return loaded;
     }
 
     internal static SslStream WrapServer(Stream inner, X509Certificate2 cert, int line)
@@ -73,7 +79,7 @@ static class VireTls
         {
             SslServerAuthenticationOptions opts = new SslServerAuthenticationOptions
             {
-                ServerCertificate = cert,
+                ServerCertificateContext = SslStreamCertificateContext.Create(cert, additionalCertificates: null, offline: true),
                 EnabledSslProtocols = Tls12Plus,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
                 ClientCertificateRequired = false,
