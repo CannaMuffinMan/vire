@@ -63,7 +63,7 @@ if [[ "$host_code" != "0" ]]; then
   echo "host pg-tls stub exit $host_code" >&2
   exit 1
 fi
-for n in "non-loopback refused" "auth trust" "select1 1" "paramless 42" "PG TLS PROVE pass"; do
+for n in "non-loopback refused" "auth trust" "cbind tls-server-end-point" "select1 1" "paramless 42" "PG TLS PROVE pass"; do
   if ! grep -Fq "$n" <<<"$host_out"; then
     echo "host missing $n" >&2
     exit 1
@@ -99,7 +99,7 @@ if [[ "$elf_code" != "0" ]]; then
   echo "pg tls ELF vs stub exit $elf_code" >&2
   exit 1
 fi
-for n in "non-loopback refused" "auth trust" "PG TLS PROVE pass"; do
+for n in "non-loopback refused" "auth trust" "cbind tls-server-end-point" "PG TLS PROVE pass"; do
   if ! grep -Fq "$n" <<<"$elf_out"; then
     echo "elf missing $n" >&2
     exit 1
@@ -137,6 +137,57 @@ for n in "wrong-host " "untrusted-ca " "PG TLS VERIFY pass"; do
   fi
 done
 echo "pg tls stub fail-closed hostname/ca ok"
+
+python3 - <<PY
+from pathlib import Path
+root = Path("$ROOT")
+lib = (root / "src/rt-pg.vire").read_text()
+guest = (root / "tests/native/pg-tls-mitm.vire").read_text()
+guest = guest.replace("PORT_PLACEHOLDER", "$port")
+guest = guest.replace("PGUSER_PLACEHOLDER", "vire")
+guest = guest.replace("PGDB_PLACEHOLDER", "vire")
+guest = guest.replace("PGSECRET_PLACEHOLDER", "x")
+(root / "pg-tls-mitm-run.vire").write_text(lib + "\n" + guest)
+(root / "data/pg-tls-mitm-run.vire").write_text(lib + "\n" + guest)
+PY
+saved_budget="${VIRE_BUDGET:-}"
+unset VIRE_BUDGET || true
+set +e
+mitm_compile="$(dotnet exec "$VIRE_DLL" --compiler compile-native.vire data/pg-tls-mitm-run.vire data/pg-tls-mitm.hex elf)"
+mitm_compile_code=$?
+if [[ -n "$saved_budget" ]]; then export VIRE_BUDGET="$saved_budget"; fi
+set -e
+echo "pg_tls_elf_mitm_compile_exit $mitm_compile_code"
+if [[ "$mitm_compile_code" != "0" ]]; then
+  printf '%s\n' "$mitm_compile"
+  echo "compile-native elf pg-tls-mitm exit $mitm_compile_code" >&2
+  exit 1
+fi
+python3 - <<PY
+from pathlib import Path
+hx = Path("$ROOT/data/pg-tls-mitm.hex").read_text().strip()
+Path("$ROOT/data/pg-tls-mitm.elf").write_bytes(bytes.fromhex(hx))
+PY
+chmod +x "$ROOT/data/pg-tls-mitm.elf"
+set +e
+mitm_out="$("$ROOT/data/pg-tls-mitm.elf")"
+mitm_code=$?
+set -e
+printf '%s\n' "$mitm_out"
+echo "pg_tls_elf_mitm_exit $mitm_code"
+if [[ "$mitm_code" != "0" ]]; then
+  echo "elf MITM cert exit $mitm_code" >&2
+  exit 1
+fi
+if ! grep -Fq "PG TLS MITM pass" <<<"$mitm_out"; then
+  echo "elf missing PG TLS MITM pass" >&2
+  exit 1
+fi
+if ! grep -Fq "mitm-cert " <<<"$mitm_out"; then
+  echo "elf missing mitm-cert reject" >&2
+  exit 1
+fi
+echo "pg tls stub elf MITM cert reject ok"
 
 dotnet exec "$PROOF" write-pfx "$ROOT/data/redis-tls.pfx" "$ROOT/data/redis-ca.pem" x
 dotnet exec "$PROOF" write-pfx-expired "$ROOT/data/redis-expired.pfx" "$ROOT/data/redis-expired.pem" x

@@ -702,10 +702,7 @@ end
 define ct_eq with left, right
   let n be length with left
   let m be length with right
-  let d be 0
-  if n != m
-    let d be 1
-  end
+  let d be (n - m) * (n - m)
   let lim be n
   if m > lim
     let lim be m
@@ -720,9 +717,7 @@ define ct_eq with left, right
     if i < m
       let b be right at i
     end
-    if a != b
-      let d be 1
-    end
+    let d be d + (xor8_bit with a, b)
     let i be i + 1
   end
   if d == 0

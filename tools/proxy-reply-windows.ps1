@@ -19,7 +19,7 @@ $cs = Get-Content -Raw (Join-Path $Root "Vire.cs")
 if ($cs -notmatch "100000") { throw "list cap missing" }
 if ($cs -notmatch "5000000") { throw "step cap missing" }
 $blob = (Get-Content -Raw (Join-Path $Root "src\rt-net-blob.txt")).Trim()
-if ($blob.Substring(2728 * 2, 6) -ne "488d15") { throw "packed GET body park missing lea txt_empty" }
+if ($blob.Substring(2728 * 2, 2) -ne "e9") { throw "packed GET body park missing jmp to ctx+0x40 stub" }
 $fixes = Get-Content -Raw (Join-Path $Root "src\rt-net-fixes.txt")
 if ($fixes -notmatch "ab0a0000a400") { throw "txt_empty reloc at blob+2731 missing" }
 Write-Host "caps_src_ok arena=33554432 list=100000 steps=5000000"
