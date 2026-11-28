@@ -31,6 +31,9 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #163 | `d664343` (`cursor/vire-4h-listen-recv0`) | Fast-forward onto the rollup. Recv0 `je` at 0x5DE → in-blob `leave;ret` (r4 0x36DF / 3-param 0x510). r4 length **18843** (#159), not #150's 18855. `cl_blockgate` e9 already at 0xA78. |
 | #164 | `4f9a337e` (`cursor/vire-4h-selfhost-listcap`) | Normal merge after #163. Packs ELF `emitTlsGuest` into a 2403-byte blob (`src/rt-tls-elf.vire` + `tools/pack-tls-elf.py`). Listen/r4 blobs untouched. |
 | #165 | `49061b7` (`cursor/vire-4h-r4-dns-rbx-1673`) | Normal merge after #164. Re-inserts the 12 #150 `push`/`pop rbx` bytes into #163's 18843 r4 and rewrites crossing baked rel32s (`tools/patch-rt-net-r4-dns.py`). Length **18855**. Recv0 `leave;ret` and `e9`→0xA78 asserted. `FILE_SHARE` 7 kept. |
+| #166 | `bf54c31` (lane R PE DNS) | Normal merge after #165. Same-length `sub rsp,0x80`→`0x88` in the four packed DNS frames after `push rbx`. Blob stays **18855**. `r4_hostok_win64_align` True. |
+| #167 | `1b067c4` (`cursor/vire-4h-win-harness-6dee`) | Normal merge after #166. `vire.csproj` `DefaultItemExcludes` `windows/** **/obj/** **/bin/**`; Compile-VireNative path-only; post-block log lock; fcgcpa unauth 401 + fixture bearer `test-block-token1`; pg-prove uses `vire-proof` stub; proxy-reply reloc blob+11444. |
+| #168 | `e571cb6` (`cursor/vire-4h-win-tls-005b`) | Normal merge last. PE `tls_wrap` hostname box (`76,137,77,208` / `4c894dd0`); `tls_listen` `needWs` in `compile-native.vire`; host cert loader Exportable+Ephemeral, in-memory rebind, `SslStreamCertificateContext` offline. SChannel blob **5153** via `pack-tls-pe.py` (no hand-merge). |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -230,9 +233,34 @@ Independent re-proof on merge tip:
 
 No real product failures on this Linux agent.
 
-## Ready for Windows PE
+## Ready for Windows PE (round 2)
 
-Linux ELF is not PE execute. CouchStation is the PE proof:
+e31b1a5 CouchStation was 23 PASS / 20 FAIL (PE DNS AV, Windows TLS, harness). Lanes R/Q/S folded as #166/#167/#168.
+
+### #166 Win64 RSP (lane R)
+
+Four DNS frames `55 4889e5 4881ec88000000 53` at 0x1FD4, 0x20B5, 0x23D7, 0x2731. objdump: every `leave` in those frames is preceded by `pop %rbx`. PE IAT `ff15` CreateFile/ReadFile at 0x27D6 and 0x2805 have RSP ≡ 0 (mod 16). The following `push %rax; ff15; pop %rax` at 0x2810 is 8-mod because of the extra push (saves RAX across GetFileSize/CloseHandle); not a 0x80 leftover. `pe-windows-gaps-check.py`: `r4_hostok_push_rbx True`, `r4_file_share_7 True`, `r4_hostok_win64_align True`.
+
+### #167 harness (lane Q)
+
+`dotnet msbuild -getItem:Compile` before vs after `DefaultItemExcludes`: **16 files both, dropped 0, added 0**. All 16 root `*.cs` still compile. `windows/` has no `.cs`. fcgcpa token is the fixture string `test-block-token1` (`$BlockTok`); unauth POST `/block` still expects **401** `unauthorized`; the bearer is only for the 400 not-json path. `src/rt-pg.vire` `pg_scram_select` still returns `channel binding` when PLUS has no bind. Auth not weakened.
+
+### #168 Windows TLS (lane S)
+
+`VireTls.cs`: `Exportable | EphemeralKeySet` only. **No** `PersistKeySet`, `UserKeySet`, or `MachineKeySet` in product code (asserted only as `DoesNotContain` in tests). PFX bytes `ZeroMemory`'d after load. Windows path copies the key into an in-memory `RSA`/`ECDsa` then `CopyWithPrivateKey`. `SslStreamCertificateContext.Create(..., offline: true)`. `TlsListenDisposeLeavesNoPersistedPrivateKey` **passed**. `windows-tls-lane-check.sh` **PASS_AFTER**. PLUS fail-closed: `LoopbackPlusOnlyWithoutBindFailsClosed` passed; ELF MITM `mitm-cert tls handshake failed`. Regenerated SChannel blob with `python3 tools/pack-tls-pe.py` after the merge: **5153** bytes, tree unchanged (no hand-merge).
+
+### Linux proof on final tip
+
+- `pe-windows-gaps-check.py` PASS (rbx, share 7, win64 align)
+- `windows-tls-lane-check.sh` PASS
+- `pg-tls-stub-elf.sh` exit 0 including MITM
+- `NativeListenRecv0Tests` + DNS tests + `post-block-auth-native.sh` + sidecar + heartbeat + `native-elf-dns.sh` ok
+- `native-elf-selfhost.sh` gen1=gen2 x3 `437d771624bf826454675ac6138c5ea78734c0bf1d8567aa37197a2451ef78fb` (changed with `compile-native.vire` `needWs`). gen1 **966656**, itemCap 1000000, headroom **33344**
+- Full xUnit: **297 executed, 0 skipped, 293 passed, 4 failed** (env-only): `ApkTests.PackWritesApkWithManifest`, `DriverImageTests.LinkedDriverImageIsPe`, `AndroidSoTests.AndroidBuildEmitsElfSharedLibrary`, `ToolchainTests.BuildCompilesCAndroidAndDriver`
+
+Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
+
+CouchStation (unset `VIRE_BUDGET` and `FCG_API_TOKEN` first):
 
 ```
 git fetch origin cursor/vire-4h-rollup
@@ -243,6 +271,4 @@ $env:VIRE_HEADLESS = "1"
 powershell -NoProfile -File tools/couchstation-windows-all.ps1
 ```
 
-The script also unsets `VIRE_BUDGET` and `FCG_API_TOKEN`. Do not touch Defender. Do not reboot. Results: `data/couchstation-windows-all-results.md` and `data/couchstation-windows-all.log`.
-
-Do not merge this rollup (#158) to `native-compiler` or `main`. GitHub Actions billing-lock is ignored.
+Do not merge this rollup (#158) to `native-compiler` or `main`. GitHub Actions billing-lock is ignored. Linux ELF is not Windows PE proof.
