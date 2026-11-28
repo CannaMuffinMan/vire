@@ -22,8 +22,6 @@ for d in dirs:
     for p in sorted(d.glob("*.json")):
         name = str(p).replace("\\", "/")
         ok = name in sidecar or p.name in sidecar
-        if p.name in ("healthz.json", "not-found.json", "maintenance.json", "dist-missing.json"):
-            ok = True
         if not ok:
             unwired.append(name)
         else:
