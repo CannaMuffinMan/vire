@@ -3,16 +3,115 @@ using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 
 static class ProofPg
 {
-    const int SslRequestCode = 80877103;
-
-    public static int TlsStub(string pfxPath, string password)
+    static byte[] Be32(int n)
     {
+        return new byte[] { (byte)(n >> 24), (byte)(n >> 16), (byte)(n >> 8), (byte)n };
+    }
+
+    static byte[] AuthSasl()
+    {
+        byte[] plus = Encoding.ASCII.GetBytes("SCRAM-SHA-256-PLUS");
+        byte[] plain = Encoding.ASCII.GetBytes("SCRAM-SHA-256");
+        using (MemoryStream body = new MemoryStream())
+        {
+            body.Write(Be32(10), 0, 4);
+            body.Write(plus, 0, plus.Length);
+            body.WriteByte(0);
+            body.Write(plain, 0, plain.Length);
+            body.WriteByte(0);
+            body.WriteByte(0);
+            byte[] payload = body.ToArray();
+            using (MemoryStream msg = new MemoryStream())
+            {
+                msg.WriteByte((byte)'R');
+                msg.Write(Be32(payload.Length + 4), 0, 4);
+                msg.Write(payload, 0, payload.Length);
+                return msg.ToArray();
+            }
+        }
+    }
+
+    static byte[] AuthContinue(string payload)
+    {
+        byte[] raw = Encoding.ASCII.GetBytes(payload);
+        using (MemoryStream msg = new MemoryStream())
+        {
+            msg.WriteByte((byte)'R');
+            msg.Write(Be32(4 + 4 + raw.Length), 0, 4);
+            msg.Write(Be32(11), 0, 4);
+            msg.Write(raw, 0, raw.Length);
+            return msg.ToArray();
+        }
+    }
+
+    static byte[] AuthFinalError(string e)
+    {
+        byte[] payload = Encoding.ASCII.GetBytes("e=" + e);
+        using (MemoryStream msg = new MemoryStream())
+        {
+            msg.WriteByte((byte)'R');
+            msg.Write(Be32(4 + 4 + payload.Length), 0, 4);
+            msg.Write(Be32(12), 0, 4);
+            msg.Write(payload, 0, payload.Length);
+            return msg.ToArray();
+        }
+    }
+
+    static byte[] AuthFinalOk(string v)
+    {
+        byte[] payload = Encoding.ASCII.GetBytes("v=" + v);
+        using (MemoryStream msg = new MemoryStream())
+        {
+            msg.WriteByte((byte)'R');
+            msg.Write(Be32(4 + 4 + payload.Length), 0, 4);
+            msg.Write(Be32(12), 0, 4);
+            msg.Write(payload, 0, payload.Length);
+            return msg.ToArray();
+        }
+    }
+
+    static byte[] AuthOk()
+    {
+        using (MemoryStream msg = new MemoryStream())
+        {
+            msg.WriteByte((byte)'R');
+            msg.Write(Be32(8), 0, 4);
+            msg.Write(Be32(0), 0, 4);
+            return msg.ToArray();
+        }
+    }
+
+    static byte[] Ready()
+    {
+        using (MemoryStream msg = new MemoryStream())
+        {
+            msg.WriteByte((byte)'Z');
+            msg.Write(Be32(5), 0, 4);
+            msg.WriteByte((byte)'I');
+            return msg.ToArray();
+        }
+    }
+
+    static string ServerSig(string secret, string saltB64, int rounds, string bare, string serverFirst, string without)
+    {
+        byte[] salt = Convert.FromBase64String(saltB64);
+        byte[] salted = Rfc2898DeriveBytes.Pbkdf2(secret, salt, rounds, HashAlgorithmName.SHA256, 32);
+        byte[] serverKey = HMACSHA256.HashData(salted, Encoding.ASCII.GetBytes("Server Key"));
+        byte[] auth = Encoding.ASCII.GetBytes(bare + "," + serverFirst + "," + without);
+        return Convert.ToBase64String(HMACSHA256.HashData(serverKey, auth));
+    }
+
+    public static int TlsStub(string pfxPath, string password, string mode)
+    {
+        bool mitm = mode == "mitm";
         X509Certificate2 cert = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, password);
         TcpListener l = new TcpListener(IPAddress.Loopback, 0);
         l.Start();
@@ -22,10 +121,96 @@ static class ProofPg
         while (true)
         {
             TcpClient c = l.AcceptTcpClient();
-            Thread inner = new Thread(() => ServeTls(c, cert));
+            Thread inner = new Thread(() => Serve(c, cert, mitm, password));
             inner.IsBackground = true;
             inner.Start();
         }
+    }
+
+    static void Serve(TcpClient c, X509Certificate2 cert, bool mitm, string secret)
+    {
+        try
+        {
+            using (c)
+            using (NetworkStream raw = c.GetStream())
+            {
+                raw.ReadTimeout = 8000;
+                raw.WriteTimeout = 8000;
+                byte[] buf = new byte[16384];
+                int n = raw.Read(buf, 0, 8);
+                if (n < 8) return;
+                raw.WriteByte((byte)'S');
+                using (SslStream ssl = new SslStream(raw, false))
+                {
+                    ssl.AuthenticateAsServer(new SslServerAuthenticationOptions
+                    {
+                        ServerCertificate = cert,
+                        EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                    });
+                    ssl.Read(buf, 0, buf.Length);
+                    byte[] sasl = AuthSasl();
+                    ssl.Write(sasl, 0, sasl.Length);
+                    n = ssl.Read(buf, 0, buf.Length);
+                    if (n < 1) return;
+                    string captured = Encoding.Latin1.GetString(buf, 0, n);
+                    int rAt = captured.IndexOf(",r=", StringComparison.Ordinal);
+                    if (rAt < 0) return;
+                    string cn = captured.Substring(rAt + 3).TrimEnd('\0');
+                    int z = cn.IndexOf('\0');
+                    if (z >= 0) cn = cn.Substring(0, z);
+                    string sn = cn + "s";
+                    string sf = "r=" + sn + ",s=W22ZaJ0SNY7soEsUEjb6gQ==,i=2";
+                    byte[] cont = AuthContinue(sf);
+                    ssl.Write(cont, 0, cont.Length);
+                    n = ssl.Read(buf, 0, buf.Length);
+                    if (n < 1) return;
+                    string clientFinal = Encoding.Latin1.GetString(buf, 0, n);
+                    if (mitm)
+                    {
+                        byte[] err = AuthFinalError("channel binding");
+                        ssl.Write(err, 0, err.Length);
+                        try { ssl.Read(buf, 0, buf.Length); } catch (IOException) { }
+                        return;
+                    }
+                    int pAt = captured.IndexOf("n=", StringComparison.Ordinal);
+                    string bare = "";
+                    if (pAt >= 0)
+                    {
+                        bare = captured.Substring(pAt).TrimEnd('\0');
+                        int z2 = bare.IndexOf('\0');
+                        if (z2 >= 0) bare = bare.Substring(0, z2);
+                    }
+                    int comma = clientFinal.LastIndexOf(",p=", StringComparison.Ordinal);
+                    string without = "";
+                    if (comma > 0)
+                    {
+                        int cAt = clientFinal.IndexOf("c=", StringComparison.Ordinal);
+                        if (cAt >= 0) without = clientFinal.Substring(cAt, comma - cAt);
+                    }
+                    string v = ServerSig(secret, "W22ZaJ0SNY7soEsUEjb6gQ==", 2, bare, sf, without);
+                    byte[] fin = AuthFinalOk(v);
+                    ssl.Write(fin, 0, fin.Length);
+                    byte[] ok = AuthOk();
+                    ssl.Write(ok, 0, ok.Length);
+                    byte[] ready = Ready();
+                    ssl.Write(ready, 0, ready.Length);
+                    while (true)
+                    {
+                        int kind = ssl.ReadByte();
+                        if (kind < 0) return;
+                        byte[] hdr = new byte[4];
+                        if (!ReadExact(ssl, hdr, 4)) return;
+                        int mlen = ReadBe32(hdr, 0);
+                        if (mlen < 4 || mlen > 1000000) return;
+                        byte[] body = new byte[mlen - 4];
+                        if (body.Length > 0 && !ReadExact(ssl, body, body.Length)) return;
+                        if (kind == (int)'Q') WriteQuery(ssl, CString(body));
+                    }
+                }
+            }
+        }
+        catch (Exception) { }
     }
 
     public static int PlainN()
@@ -58,58 +243,6 @@ static class ProofPg
         }
     }
 
-    static void ServeTls(TcpClient c, X509Certificate2 cert)
-    {
-        try
-        {
-            using (c)
-            {
-                NetworkStream raw = c.GetStream();
-                byte[] req = new byte[8];
-                if (!ReadExact(raw, req, 8)) return;
-                int len = ReadBe32(req, 0);
-                int code = ReadBe32(req, 4);
-                if (len != 8 || code != SslRequestCode) return;
-                raw.WriteByte((byte)'S');
-                raw.Flush();
-                using (SslStream s = new SslStream(raw, false))
-                {
-                    s.AuthenticateAsServer(ProofTls.ServerOpts(cert));
-                    if (!ReadStartup(s)) return;
-                    WriteAll(s, AuthOk());
-                    WriteAll(s, ReadyIdle());
-                    while (true)
-                    {
-                        int kind = s.ReadByte();
-                        if (kind < 0) return;
-                        byte[] hdr = new byte[4];
-                        if (!ReadExact(s, hdr, 4)) return;
-                        int mlen = ReadBe32(hdr, 0);
-                        if (mlen < 4 || mlen > 1000000) return;
-                        byte[] body = new byte[mlen - 4];
-                        if (body.Length > 0 && !ReadExact(s, body, body.Length)) return;
-                        if (kind == (int)'Q')
-                        {
-                            string sql = CString(body);
-                            WriteQuery(s, sql);
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception) { }
-    }
-
-    static bool ReadStartup(Stream s)
-    {
-        byte[] hdr = new byte[4];
-        if (!ReadExact(s, hdr, 4)) return false;
-        int len = ReadBe32(hdr, 0);
-        if (len < 8 || len > 10000) return false;
-        byte[] rest = new byte[len - 4];
-        return ReadExact(s, rest, rest.Length);
-    }
-
     static void WriteQuery(Stream s, string sql)
     {
         string text = "1";
@@ -134,17 +267,10 @@ static class ProofPg
         WriteMsg(s, (byte)'D', dr.ToArray());
         byte[] cc = Encoding.ASCII.GetBytes("SELECT 1\0");
         WriteMsg(s, (byte)'C', cc);
-        WriteAll(s, ReadyIdle());
+        WriteAll(s, ReadyMsg());
     }
 
-    static byte[] AuthOk()
-    {
-        MemoryStream ms = new MemoryStream();
-        WriteBe32(ms, 0);
-        return Msg((byte)'R', ms.ToArray());
-    }
-
-    static byte[] ReadyIdle()
+    static byte[] ReadyMsg()
     {
         return Msg((byte)'Z', new byte[] { (byte)'I' });
     }
@@ -188,22 +314,22 @@ static class ProofPg
         return (b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3];
     }
 
-    static bool ReadExact(Stream s, byte[] buf, int n)
-    {
-        int o = 0;
-        while (o < n)
-        {
-            int g = s.Read(buf, o, n - o);
-            if (g <= 0) return false;
-            o += g;
-        }
-        return true;
-    }
-
     static string CString(byte[] body)
     {
         int n = body.Length;
         if (n > 0 && body[n - 1] == 0) n--;
         return Encoding.ASCII.GetString(body, 0, n);
+    }
+
+    static bool ReadExact(Stream s, byte[] buf, int n)
+    {
+        int off = 0;
+        while (off < n)
+        {
+            int got = s.Read(buf, off, n - off);
+            if (got <= 0) return false;
+            off += got;
+        }
+        return true;
     }
 }

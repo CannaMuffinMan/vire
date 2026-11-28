@@ -27,6 +27,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #160 | `a36edcf6` (`cursor/vire-4h-tls-segv`) | ELF `rt_tls_wrap`: hostname box at `[rbp-48]`, C string at `tls_nameptr` (was TCP handle). Clean on top of #148 `880ec761` `rt-tls` (`tls_end_point` kept). `tools/pg-tls-stub-elf.sh`. |
 | #159 | `9277ce8` (`cursor/vire-4h-auth-compare-946f`) | Folded after #160. Byte-range reconcile vs packed #150/#151/#155; see below. |
 | #162 | `a657a63d` (`cursor/vire-4h-elf-cbind`) | After #159. ELF `rt_tls_peer_cert` stores `i2d_X509` length (`mov [rdx],rcx` after second i2d). MITM guest + `pg-tls-cbind-dump.sh`. Clean merge. |
+| #161 | `b449ffe7` (`cursor/vire-4h-pe-peercert`) | After #162. PE `tls_peer_cert` DER export; ELF/PE `tls_end_point` SHA-256/384/512 via OID (PE `CryptHashCertificate`). Packed SChannel blob **5161**, changed `[4481,5161)`. Kept #162 i2d length. Kept PE wrap `76,137,13` from #160. Conflicts in VireProof: PLUS/MITM stub from #161 plus expired PFX / redis / `pg-tls-n` / SELECT loop from the rollup. |
 
 ## Overlaps (#155 vs #146 / #147)
 
@@ -60,8 +61,7 @@ bash tools/post-block-auth-native.sh
 ## Not merged yet
 
 - #143 (`51de3c2f`) host/native POST `/block` deny-by-default is already on `6693e0e5`. Do not merge the `native-compiler` branch. It would delete native listen.
-- Lane N `cursor/vire-4h-listen-recv0` (from `e4f2b1a`) will PR into this rollup. It patches packed listen; rebase onto the #159 r4/3-param reconcile.
-- #161 `cursor/vire-4h-pe-peercert` (into #148). Waiting for the follow-up head. With #162+#161 together, `tools/pg-tls-stub-elf.sh` and `PgRedisTlsStubTests` should pass real PLUS cbind and the ELF MITM guest should fail closed. Do not fold the current `2d4b85e8` until that head is named.
+- Lane N `cursor/vire-4h-listen-recv0` will PR into this rollup and fix native listen SIGSEGV (1-param empty recv + r4 POST `/block`). Do not patch listen blobs here.
 - #148 is `880ec761` on this tip (leaf export + RFC 5929 `tls_end_point`). Re-merge if `cursor/pg-scram-plus-e596` moves again.
 
 ## CouchStation one-shot (Windows PC only)
@@ -118,7 +118,7 @@ Caps unchanged: arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 
 **SEGV fixed.** Pre-#160 ELF `rt_tls_wrap` stored the TCP handle at `[rbp-48]`; `SSL_set1_host` read handle+8 and SIGSEGV'd (exit 139) after SSLRequest. #160 stores the hostname box there (`76,137,77,208` / `lea rax,[r9+8]` into `tls_nameptr`) like PE wrap.
 
-`bash tools/pg-tls-stub-elf.sh` after #162 (`3c00595`): **host** `PG TLS PROVE pass` including `cbind tls-server-end-point`. **ELF** still **`FAIL channel binding`** (exit 1). #162 stored i2d length; RFC 5929 SHA-384/512 `tls_end_point` is #161. MITM ELF did not run because the script exits on PLUS fail. Do not skip. Not PE proof.
+`bash tools/pg-tls-stub-elf.sh` after #161+#162: **host and ELF** `PG TLS PROVE pass` with `auth scram-sha-256-plus` and `cbind tls-server-end-point`. ELF MITM guest **`PG TLS MITM pass`** (`mitm-cert tls handshake failed`). Hostname/CA verify fail-closed. Redis TLS host+ELF pass. Do not skip. Not PE proof.
 
 ## Native rpc-portal “missing header terminator” (Lane K)
 
@@ -143,7 +143,13 @@ Native `tools/post-block-auth-native.sh`: ELF listens then **SIGSEGV 139** on th
 
 ## #162 fold proof (`3c00595`)
 
-`rt_tls_peer_cert` second `i2d_X509` now writes DER length into the box (`72,139,85,232,72,137,10`). Host PLUS vs stub prints `cbind tls-server-end-point`. ELF PLUS still `FAIL channel binding` until #161. `PgRedisTlsStubTests.LinuxElfPgTlsWrapAndRedisTlsConnectAgainstStubs` same ELF fail (3 other cases passed). Waiting on named #161 head.
+`rt_tls_peer_cert` second `i2d_X509` writes DER length into the box (`72,139,85,232,72,137,10`). Kept through the #161 merge.
+
+## #161 fold proof (`83354e3` + VireProof reconcile)
+
+Packed PE blob 5161. `TlsEndPointTests` 3 passed. `PgRedisTlsStubTests` 4 passed. `tools/pg-tls-stub-elf.sh` **exit 0**: host+ELF PLUS cbind, ELF MITM reject, redis stub.
+
+`native-elf-selfhost.sh`: host compile of `compile-native.vire` **`list is too large`** at parseClimb (line 274) — #161 ELF SHA-384/512 `tls_end_point` plus this rollup’s `rt-tls.vire`/`rt-net.vire` exceeds list cap **100000**. Caps not raised. Do not skip. Lane N must not treat this as a listen-blob issue.
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
 

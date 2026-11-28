@@ -63,7 +63,7 @@ if [[ "$host_code" != "0" ]]; then
   echo "host pg-tls stub exit $host_code" >&2
   exit 1
 fi
-for n in "non-loopback refused" "auth trust" "cbind tls-server-end-point" "select1 1" "paramless 42" "PG TLS PROVE pass"; do
+for n in "non-loopback refused" "auth scram-sha-256-plus" "cbind tls-server-end-point" "select1 1" "paramless 42" "PG TLS PROVE pass"; do
   if ! grep -Fq "$n" <<<"$host_out"; then
     echo "host missing $n" >&2
     exit 1
@@ -99,7 +99,7 @@ if [[ "$elf_code" != "0" ]]; then
   echo "pg tls ELF vs stub exit $elf_code" >&2
   exit 1
 fi
-for n in "non-loopback refused" "auth trust" "cbind tls-server-end-point" "PG TLS PROVE pass"; do
+for n in "non-loopback refused" "auth scram-sha-256-plus" "cbind tls-server-end-point" "PG TLS PROVE pass"; do
   if ! grep -Fq "$n" <<<"$elf_out"; then
     echo "elf missing $n" >&2
     exit 1
