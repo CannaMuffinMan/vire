@@ -164,6 +164,20 @@ tls_peerctx
 tls_peer_free
 iat_fct
 msg_tls_peer
+tls_rl_fail
+tls_rl_done
+tls_rl_long
+tls_ep_def
+tls_read_len
+tls_ep_try8
+tls_ep_nist
+tls_ep_384
+tls_ep_512
+tls_ep_kind
+tls_ep_alg384
+tls_ep_alg512
+tls_ep_hash
+iat_chc
 tpx_w
 rt_tls_wrap
 rt_tls_connect
@@ -173,3 +187,4 @@ rt_tls_recv
 rt_tls_close
 rt_tls_listen
 rt_tls_peer_cert
+rt_tls_end_point

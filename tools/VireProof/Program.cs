@@ -13,7 +13,7 @@ static class Program
         {
             string cmd = args[0];
             if (cmd == "write-pem") { ProofTls.WritePem(args[1], args[2]); return 0; }
-            if (cmd == "write-pfx") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : ""); return 0; }
+            if (cmd == "write-pfx") { ProofTls.WritePfx(args[1], args[2], args.Length > 3 ? args[3] : "", args.Length > 4 ? args[4] : "sha256"); return 0; }
             if (cmd == "https-health") { Console.Write(ProofTls.HttpsHealth(int.Parse(args[1]), args[2])); return 0; }
             if (cmd == "tls10-fail") { ProofTls.Tls10MustFail(int.Parse(args[1])); return 0; }
             if (cmd == "tls-echo") return ProofTls.TlsEcho(args[1], args.Length > 2 ? args[2] : "");

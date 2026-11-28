@@ -37,12 +37,6 @@ $OnWindows = ($env:OS -eq "Windows_NT")
 if (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) {
     if ($IsWindows) { $OnWindows = $true }
 }
-if (-not $OnWindows) {
-    Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation must run this script"
-    Write-Output "PASS_AFTER compile-only: packed blob pins rt_tls_peer_cert + iat_fct"
-    Write-Output "pg_peercert_windows compile_ok"
-    exit 0
-}
 
 $ProofDll = Get-VireProofDll
 $pfx = Join-Path $Data "pg-peercert.pfx"
@@ -56,6 +50,61 @@ if ($LASTEXITCODE -ne 0) { throw "write-pfx mitm failed" }
 
 $lib = [IO.File]::ReadAllText((Join-Path $Root "src/rt-pg.vire"))
 $utf8 = New-Object System.Text.UTF8Encoding $false
+
+function Get-CerBytes([string]$CerPath) {
+    $pem = [IO.File]::ReadAllText($CerPath)
+    $b64 = (($pem -replace "-----BEGIN CERTIFICATE-----", "") -replace "-----END CERTIFICATE-----", "") -replace "\s", ""
+    return [Convert]::FromBase64String($b64)
+}
+
+function Invoke-PeEndPoint([string]$Hash, [int]$Want) {
+    $epPfx = Join-Path $Data ("pg-peercert-" + $Hash + ".pfx")
+    $epCer = Join-Path $Data ("pg-peercert-" + $Hash + ".pem")
+    & dotnet exec $ProofDll write-pfx $epPfx $epCer "x" $Hash
+    if ($LASTEXITCODE -ne 0) { throw "write-pfx $Hash failed" }
+    $der = Get-CerBytes $epCer
+    $nums = ($der | ForEach-Object { $_.ToString() }) -join ", "
+    $epGuest = @"
+define main
+  let xs be [$nums]
+  let der be ""
+  let i be 0
+  while i < (length with xs)
+    let der be der + (chr with (xs at i))
+    let i be i + 1
+  end
+  let ep be tls_end_point with der
+  say (length with ep)
+end
+"@
+    $src = Join-Path $Data ("pg-peercert-ep-" + $Hash + ".vire")
+    [IO.File]::WriteAllText($src, $epGuest, $utf8)
+    Remove-Item Env:VIRE_BUDGET -ErrorAction SilentlyContinue
+    & dotnet exec $VireDll --compiler compile-native.vire ("data/pg-peercert-ep-" + $Hash + ".vire") ("data/pg-peercert-ep-" + $Hash + ".hex") pe
+    if ($LASTEXITCODE -ne 0) { throw "PE compile ep-$Hash exit $LASTEXITCODE" }
+    $env:VIRE_BUDGET = "5000000"
+    Convert-HexToExe (Join-Path $Data ("pg-peercert-ep-" + $Hash + ".hex")) (Join-Path $Data ("pg-peercert-ep-" + $Hash + ".exe"))
+    $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $Data ("pg-peercert-ep-" + $Hash + ".exe"))))
+    if ($ascii -notmatch "CryptHashCertificate") { throw "PE ep-$Hash missing CryptHashCertificate" }
+    Write-Output ("pe_endpoint_" + $Hash + "_compiled " + $Want)
+    if (-not $OnWindows) { return }
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { $out = & (Join-Path $Data ("pg-peercert-ep-" + $Hash + ".exe")) 2>&1 | Out-String } finally { $ErrorActionPreference = $savedEap }
+    if ($LASTEXITCODE -ne 0) { throw "PE ep-$Hash exit $LASTEXITCODE out $out" }
+    if ($out -notmatch [regex]::Escape("$Want")) { throw "PE ep-$Hash want $Want got $out" }
+    Write-Output ("pe_endpoint_" + $Hash + "_ok " + $Want)
+}
+
+Invoke-PeEndPoint "sha384" 48
+Invoke-PeEndPoint "sha512" 64
+
+if (-not $OnWindows) {
+    Write-Output "pe_execute_skipped linux agent cannot run PE; CouchStation must run this script"
+    Write-Output "PASS_AFTER compile-only: packed blob pins rt_tls_end_point + iat_chc; PE SHA-384/512 guests compiled"
+    Write-Output "pg_peercert_windows compile_ok"
+    exit 0
+}
 
 function Invoke-PePg([int]$Port, [string]$CaRel, [string]$Tag) {
     $guest = @"
@@ -97,6 +146,34 @@ try {
     try { if ($honestProc -and -not $honestProc.HasExited) { Stop-Process -Id $honestProc.Id -Force } } catch { }
 }
 
+$sha384Proc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-tls-stub", (Join-Path $Data "pg-peercert-sha384.pfx"), "x", "honest") -WorkingDirectory $Root
+try {
+    $port = Get-ListenPort $sha384Proc
+    Write-Output "pg_tls_stub_sha384 127.0.0.1:$port"
+    $r = Invoke-PePg $port "data/pg-peercert-sha384.pem" "honest384"
+    Write-Output $r.Out
+    if ($r.Code -ne 0) { throw "sha384 PE exit $($r.Code)" }
+    if ($r.Out -notmatch "ok") { throw "sha384 PE missing ok" }
+    if ($r.Out -notmatch "scram-sha-256-plus") { throw "sha384 PE missing PLUS" }
+    Write-Output "pe_plus_sha384_ok"
+} finally {
+    try { if ($sha384Proc -and -not $sha384Proc.HasExited) { Stop-Process -Id $sha384Proc.Id -Force } } catch { }
+}
+
+$sha512Proc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-tls-stub", (Join-Path $Data "pg-peercert-sha512.pfx"), "x", "honest") -WorkingDirectory $Root
+try {
+    $port = Get-ListenPort $sha512Proc
+    Write-Output "pg_tls_stub_sha512 127.0.0.1:$port"
+    $r = Invoke-PePg $port "data/pg-peercert-sha512.pem" "honest512"
+    Write-Output $r.Out
+    if ($r.Code -ne 0) { throw "sha512 PE exit $($r.Code)" }
+    if ($r.Out -notmatch "ok") { throw "sha512 PE missing ok" }
+    if ($r.Out -notmatch "scram-sha-256-plus") { throw "sha512 PE missing PLUS" }
+    Write-Output "pe_plus_sha512_ok"
+} finally {
+    try { if ($sha512Proc -and -not $sha512Proc.HasExited) { Stop-Process -Id $sha512Proc.Id -Force } } catch { }
+}
+
 $mitmProc = Start-VireProcess -FilePath "dotnet" -ArgumentList @("exec", $ProofDll, "pg-tls-stub", $mitmPfx, "x", "mitm") -WorkingDirectory $Root
 try {
     $port = Get-ListenPort $mitmProc
@@ -109,5 +186,5 @@ try {
     try { if ($mitmProc -and -not $mitmProc.HasExited) { Stop-Process -Id $mitmProc.Id -Force } } catch { }
 }
 
-Write-Output "PASS_AFTER at $AfterSha PE tls_peer_cert PLUS vs pg-tls-stub; MITM cert fail-closed"
+Write-Output "PASS_AFTER at $AfterSha PE tls_peer_cert PLUS vs pg-tls-stub; MITM cert fail-closed; PE tls_end_point SHA-384/512"
 Write-Output "pg_peercert_windows pass"

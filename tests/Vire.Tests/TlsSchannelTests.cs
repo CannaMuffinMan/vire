@@ -41,6 +41,7 @@ public class TlsSchannelTests
             Assert.Contains("DecryptMessage", names);
             Assert.Contains("QueryContextAttributesA", names);
             Assert.Contains("CertFreeCertificateContext", names);
+            Assert.Contains("CryptHashCertificate", names);
             Assert.Contains("PFXImportCertStore", names);
             Assert.DoesNotContain("LoadLibraryA", names);
             Assert.DoesNotContain("GetProcAddress", names);

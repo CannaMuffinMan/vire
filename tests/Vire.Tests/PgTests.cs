@@ -106,6 +106,9 @@ public class PgTests
         Assert.Contains("pg-tls-stub", peerPs);
         Assert.Contains("880ec761", peerPs);
         Assert.Contains("mitm", peerPs);
+        Assert.Contains("sha384", peerPs);
+        Assert.Contains("sha512", peerPs);
+        Assert.Contains("CryptHashCertificate", peerPs);
         Assert.DoesNotContain("Set-MpPreference", peerPs);
     }
 }

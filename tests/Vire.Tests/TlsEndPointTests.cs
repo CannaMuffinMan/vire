@@ -36,9 +36,14 @@ public class TlsEndPointTests
         string root = DualMode.FindRoot();
         string pe = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire"));
         Assert.Contains("rt_tls_peer_cert", pe);
+        Assert.Contains("rt_tls_end_point", pe);
         Assert.Contains("iat_fct", pe);
+        Assert.Contains("iat_chc", pe);
+        Assert.Contains("tls_ep_kind", pe);
         Assert.Contains("tls_peerctx", pe);
         Assert.Contains("emitU32 with image, 83", pe);
+        Assert.Contains("32781", pe);
+        Assert.Contains("32782", pe);
         string names = File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire"));
         Assert.Contains("rt_tls_peer_cert", names);
         Assert.Contains("SHA384", names);
@@ -47,6 +52,19 @@ public class TlsEndPointTests
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe-blob.txt"));
         Assert.Contains("rt_tls_peer_cert", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe-names.txt")));
         Assert.True(blob.Length > 8000, blob.Length.ToString());
+        string work = Path.Combine(root, "data", "tls-endpoint", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        File.WriteAllText(Path.Combine(work, "ep.vire"),
+            "define main\n  say (length with (tls_end_point with \"abc\"))\nend\n");
+        DualMode.Proc compiled = DualMode.RunVire(
+            root,
+            new string[] { "compile-native.vire", Rel(root, work, "ep.vire"), Rel(root, work, "ep.hex"), "pe" },
+            root);
+        Assert.True(compiled.Code == 0, compiled.Err + compiled.Out);
+        byte[] peBin = HexToBytes(root, Rel(root, work, "ep.hex"));
+        string ascii = Encoding.ASCII.GetString(peBin);
+        Assert.Contains("CryptHashCertificate", ascii);
+        Assert.DoesNotContain("bcrypt.dll", ascii.ToLowerInvariant());
     }
 
     static void RunLeaf(string root, HashAlgorithmName hash, int want)
