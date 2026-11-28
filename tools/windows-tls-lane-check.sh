@@ -1,7 +1,7 @@
 #!/bin/sh
 # Pass/fail check for the Windows TLS lane. Linux ELF is not PE proof.
-# FAIL_BEFORE: rcx stored as PFX password, host EphemeralKeySet-only, exclusive log read.
-# PASS_AFTER: r9 password, Windows UserKeySet, Read-SharedText on block-auth-pe.log.
+# FAIL_BEFORE: rcx password, PersistKeySet unpassworded PKCS#12, exclusive log read.
+# PASS_AFTER: r9 password, EphemeralKeySet (no PersistKeySet), Read-SharedText.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
@@ -24,10 +24,16 @@ else
   echo "PASS pe_tls_listen_password_not_rcx"
 fi
 
-if grep -q "UserKeySet" "$tls" && grep -q "IsWindows" "$tls"; then
-  echo "PASS host_pem_windows_userkeyset"
+if grep -q "PersistKeySet" "$tls"; then
+  echo "FAIL host_pem_no_persistkeyset (unpassworded PKCS#12 must not persist in the user store)"
+  fail=1
 else
-  echo "FAIL host_pem_windows_userkeyset (Schannel cannot use EphemeralKeySet for tls_listen)"
+  echo "PASS host_pem_no_persistkeyset"
+fi
+if grep -q "EphemeralKeySet" "$tls"; then
+  echo "PASS host_pem_ephemeralkeyset"
+else
+  echo "FAIL host_pem_ephemeralkeyset"
   fail=1
 fi
 

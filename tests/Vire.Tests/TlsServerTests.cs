@@ -69,6 +69,86 @@ public class TlsServerTests : IDisposable
     }
 
     [Fact]
+    public void TlsListenDisposeLeavesNoPersistedPrivateKey()
+    {
+        string root = DualMode.FindRoot();
+        string hostTls = File.ReadAllText(Path.Combine(root, "VireTls.cs"));
+        Assert.Contains("EphemeralKeySet", hostTls);
+        Assert.DoesNotContain("PersistKeySet", hostTls);
+        string work = Path.Combine(root, "data", "tls-key-cleanup", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        string cert = Path.Combine(work, "tls-health-cert.pem");
+        string key = Path.Combine(work, "tls-health-key.pem");
+        MakeSelfSigned(cert, key);
+        string thumb = X509CertificateLoader.LoadCertificateFromFile(cert).Thumbprint;
+        HashSet<string> before = UserPrivateKeyFiles();
+        int storeBefore = PrivateKeysInMyStore(thumb);
+        using (TlsListenHost extra = TlsListenHost.Start(HealthSource(), cert, key))
+        {
+            using (HttpClient client = HttpsClient(cert))
+            {
+                HttpResponseMessage res = client.GetAsync("https://127.0.0.1:" + extra.Port + "/health").Result;
+                Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            }
+        }
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        HashSet<string> after = UserPrivateKeyFiles();
+        after.ExceptWith(before);
+        Assert.Empty(after);
+        Assert.Equal(storeBefore, PrivateKeysInMyStore(thumb));
+    }
+
+    static HttpClient HttpsClient(string pemPath)
+    {
+        X509Certificate2 expected = X509CertificateLoader.LoadCertificateFromFile(pemPath);
+        string want = expected.GetCertHashString();
+        HttpClientHandler handler = new HttpClientHandler();
+        handler.ServerCertificateCustomValidationCallback = delegate (HttpRequestMessage req, X509Certificate2 got, X509Chain chain, SslPolicyErrors errors)
+        {
+            return got != null && got.GetCertHashString() == want;
+        };
+        HttpClient client = new HttpClient(handler);
+        client.Timeout = TimeSpan.FromSeconds(15);
+        return client;
+    }
+
+    static HashSet<string> UserPrivateKeyFiles()
+    {
+        HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!OperatingSystem.IsWindows()) return names;
+        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        AddKeyFiles(names, Path.Combine(roaming, "Microsoft", "Crypto", "RSA"));
+        AddKeyFiles(names, Path.Combine(roaming, "Microsoft", "Crypto", "Keys"));
+        AddKeyFiles(names, Path.Combine(local, "Microsoft", "Crypto", "Keys"));
+        return names;
+    }
+
+    static void AddKeyFiles(HashSet<string> names, string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (string path in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+            names.Add(path);
+    }
+
+    static int PrivateKeysInMyStore(string thumb)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrEmpty(thumb)) return 0;
+        using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+        {
+            store.Open(OpenFlags.ReadOnly);
+            int n = 0;
+            foreach (X509Certificate2 c in store.Certificates)
+            {
+                if (c.HasPrivateKey && string.Equals(c.Thumbprint, thumb, StringComparison.OrdinalIgnoreCase))
+                    n++;
+            }
+            return n;
+        }
+    }
+
+    [Fact]
     public void DualModeTlsListenRefusesPathTraversal()
     {
         DualMode.DualRun run = DualMode.RunSource(
@@ -172,9 +252,9 @@ public class TlsServerTests : IDisposable
         Assert.Contains("rt_listen", tls);
         Assert.DoesNotContain("native tls_listen is fail-closed", tls);
         string hostTls = File.ReadAllText(Path.Combine(root, "VireTls.cs"));
-        Assert.Contains("UserKeySet", hostTls);
-        Assert.Contains("IsWindows", hostTls);
-        Assert.Contains("PersistKeySet", hostTls);
+        Assert.Contains("EphemeralKeySet", hostTls);
+        Assert.DoesNotContain("PersistKeySet", hostTls);
+        Assert.DoesNotContain("LoadPkcs12(pfx, (string)null", hostTls);
         string auth = File.ReadAllText(Path.Combine(root, "tools", "post-block-auth-windows.ps1"));
         Assert.Contains("Read-SharedText", auth);
         Assert.DoesNotContain("ReadAllText($outLog)", auth);

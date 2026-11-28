@@ -21,19 +21,43 @@ static class VireTls
             string keyPem = File.ReadAllText(keyPath);
             using (X509Certificate2 loaded = X509Certificate2.CreateFromPem(certPem, keyPem))
             {
-                byte[] pfx = loaded.Export(X509ContentType.Pfx);
-                X509KeyStorageFlags flags = X509KeyStorageFlags.Exportable;
-                if (OperatingSystem.IsWindows())
-                    flags |= X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.PersistKeySet;
-                else
-                    flags |= X509KeyStorageFlags.EphemeralKeySet;
-                return X509CertificateLoader.LoadPkcs12(pfx, (string)null, flags);
+                string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+                byte[] pfx = loaded.Export(X509ContentType.Pfx, password);
+                try { return LoadPkcs12ForListen(pfx, password); }
+                finally { CryptographicOperations.ZeroMemory(pfx); }
             }
         }
         catch (VireError) { throw; }
         catch (Exception)
         {
             throw new VireError("could not load that tls certificate", line, column);
+        }
+    }
+
+    static X509Certificate2 LoadPkcs12ForListen(byte[] pfx, string password)
+    {
+        X509Certificate2 ephemeral = X509CertificateLoader.LoadPkcs12(pfx, password, X509KeyStorageFlags.EphemeralKeySet);
+        if (!OperatingSystem.IsWindows()) return ephemeral;
+        if (PrivateKeyUsable(ephemeral)) return ephemeral;
+        ephemeral.Dispose();
+        return X509CertificateLoader.LoadPkcs12(pfx, password, X509KeyStorageFlags.UserKeySet);
+    }
+
+    static bool PrivateKeyUsable(X509Certificate2 cert)
+    {
+        try
+        {
+            using (RSA rsa = cert.GetRSAPrivateKey())
+            {
+                if (rsa == null) return false;
+                byte[] data = new byte[] { 1, 2, 3, 4 };
+                byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                return rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
+        }
+        catch (CryptographicException)
+        {
+            return false;
         }
     }
 
