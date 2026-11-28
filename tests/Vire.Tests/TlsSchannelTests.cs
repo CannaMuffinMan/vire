@@ -87,10 +87,10 @@ public class TlsSchannelTests
             Assert.Contains("EncryptMessage", names);
             Assert.DoesNotContain("LoadLibraryA", names);
             Assert.DoesNotContain("GetProcAddress", names);
-            Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire")));
-            string pe = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire"));
-            Assert.Contains("76, 137, 77, 216, 76, 137, 13", pe);
-            Assert.DoesNotContain("76, 137, 77, 216, 72, 137, 13", pe);
+            string peSrc = File.ReadAllText(Path.Combine(root, "src", "rt-tls-pe.vire"));
+            Assert.Contains("rt_tls_wrap", peSrc);
+            Assert.Contains("76, 137, 77, 216, 76, 137, 13", peSrc);
+            Assert.DoesNotContain("76, 137, 77, 216, 72, 137, 13", peSrc);
         }
         finally
         {
