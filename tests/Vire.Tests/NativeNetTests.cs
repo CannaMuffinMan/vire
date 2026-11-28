@@ -103,6 +103,7 @@ public class NativeNetTests
         string rtNet = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
         Assert.Contains("if nm != \"linux_flag\"", rtNet);
         Assert.Contains("route_nparams == 0", rtNet);
+        Assert.Contains("(route_nparams == 4) or (route_nparams == 0)", rtNet);
         string work = Path.Combine(root, "data", "native-dns-pe", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
@@ -131,6 +132,8 @@ public class NativeNetTests
             Assert.Contains("137, 69, 180", dns);
             Assert.Contains("Preserve rbx: octet index is ebx", dns);
             Assert.Contains("65, 184, 7, 0, 0, 0", dns);
+            Assert.True(IndexOf(pe, new byte[] { 0x41, 0xb8, 7, 0, 0, 0 }) >= 0, "PE resolve must CreateFileA with FILE_SHARE 7");
+            Assert.True(IndexOf(pe, new byte[] { 0x53, 0x48, 0x89, 0x4d, 0xf8 }) >= 0, "PE dns_hostok must push rbx");
         }
         finally
         {

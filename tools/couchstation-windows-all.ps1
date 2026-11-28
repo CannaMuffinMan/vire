@@ -1,7 +1,3 @@
-# One CouchStation session: every Windows PE proof the integration PRs request.
-# Do not run on Linux. Do not touch Windows Defender. Do not reboot.
-# Unsets VIRE_BUDGET first (inherited 5000000 fails BudgetCapTests).
-# Never prints FCG_API_TOKEN. Loopback only. Caps stay 32MB / 100000 / 5M.
 $ErrorActionPreference = "Stop"
 $env:UseSharedCompilation = "false"
 $env:MSBUILDDISABLENODEREUSE = "1"
@@ -212,8 +208,6 @@ Run-Proof "pe-parse-array-fault-90" {
 }
 
 Run-Proof "rebuild-proxy-windows-pe" {
-    # tools/rebuild-proxy-windows.ps1 is a checklist (exits 1 until filled).
-    # Compile the proxy guest to PE and record MZ + ws2_32 names.
     $src = Join-Path $Root "tests/rebuild/guests/proxy-http.vire"
     $stage = Join-Path $Data "proxy-pe"
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -235,6 +229,13 @@ Run-Proof "native-json-parse-windows" { Run-Script "tools/native-json-parse-wind
 Run-Proof "rebuild-sop-proxy-windows" { Run-Script "tools/rebuild-sop-proxy-windows.ps1" }
 Run-Proof "rebuild-portal-windows" { Run-Script "tools/rebuild-portal-windows.ps1" }
 Run-Proof "native-dns-windows" { Run-Script "tools/native-dns-windows.ps1" }
+Run-Proof "pe-windows-gaps-check" {
+    $py = Join-Path $Root "tools/pe-windows-gaps-check.py"
+    if (-not (Test-Path $py)) { throw "missing tools/pe-windows-gaps-check.py" }
+    $r4 = (Get-Content -Raw (Join-Path $Root "src/rt-net-r4-blob.txt")).Trim()
+    if ($r4 -notmatch "41b807000000") { throw "FAIL_BEFORE packed r4 DNS CreateFileA share is not 7" }
+    if ($r4 -notmatch "5348894df8") { throw "FAIL_BEFORE packed r4 dns_hostok missing push rbx" }
+}
 Run-Proof "rebuild-chain-limits-windows" { Run-Script "tools/rebuild-chain-limits-windows.ps1" }
 Run-Proof "post-block-auth-windows" { Run-Script "tools/post-block-auth-windows.ps1" }
 Run-Proof "rebuild-fcgbds-heartbeat-windows" { Run-Script "tools/rebuild-fcgbds-heartbeat-windows.ps1" }

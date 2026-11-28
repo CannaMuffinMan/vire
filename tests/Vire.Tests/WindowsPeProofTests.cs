@@ -39,7 +39,6 @@ public class WindowsPeProofTests
     {
         string root = DualMode.FindRoot();
         string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-blob.txt"));
-        // ASCII " Forbidden" in the packed sendhttp reason table.
         Assert.Contains("20466f7262696464656e", blob);
         Assert.Contains("20537769746368696e672050726f746f636f6c73", blob);
         string net = File.ReadAllText(Path.Combine(root, "src", "rt-net.vire"));
@@ -65,6 +64,21 @@ public class WindowsPeProofTests
         Assert.Contains(" Forbidden", ascii);
         Assert.Contains(" Switching Protocols", ascii);
         Assert.Contains(" Bad Request", ascii);
+    }
+
+    [Fact]
+    public void PackedR4DnsPreservesRbxAndFileShare()
+    {
+        string root = DualMode.FindRoot();
+        Assert.True(File.Exists(Path.Combine(root, "tools", "pe-windows-gaps-check.py")));
+        string r4 = File.ReadAllText(Path.Combine(root, "src", "rt-net-r4-blob.txt")).Trim();
+        Assert.Contains("41b807000000", r4);
+        Assert.Contains("5348894df8", r4);
+        Assert.Contains("b87f000001ba350000005bc9c3", r4);
+        string blob = File.ReadAllText(Path.Combine(root, "src", "rt-net-json-blob.txt")).Trim();
+        Assert.StartsWith("488b4df8", blob);
+        Assert.DoesNotContain("4801c848894108", blob);
+        Assert.Contains("4c8b024c01c148894808", blob);
     }
 
     [Fact]
