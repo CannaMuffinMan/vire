@@ -86,7 +86,8 @@ end
 ~ a stale pointer. Native FCG_API_TOKEN uses iat_ev (GetEnvironmentVariableA
 ~ / ELF envp scan) and constant-time header compare before fn_route.
 ~ POST /block is deny-by-default Bearer (FCG_BLOCK_TOKEN else FCG_API_TOKEN,
-~ length at least 16). GET/HEAD /health /info /chain stay open.
+~ length at least 16). Write-secret compare walks the full token (pads 4096).
+~ GET/HEAD /health /info /chain stay open.
 
 define emitNetRuntime with image, fixes, labels, has_route, need_net, route_nparams
   let base be length with image
@@ -235,19 +236,19 @@ define parkNet with image, labels
   let image be emitU64 with image, 0
   pin with labels, "token_env", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end
   pin with labels, "token_left", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end
   pin with labels, "token_right", image
   let z be 0
-  while z < 256
+  while z < 4096
     let image be emitU8 with image, 0
     let z be z + 1
   end

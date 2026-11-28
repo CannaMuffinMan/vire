@@ -107,6 +107,28 @@ public class BlockAuthTests
     }
 
     [Fact]
+    public void ShortConfiguredApiTokenStillDeniesWrites()
+    {
+        ListenHooks.Reset();
+        ListenHooks.OverrideEnv = true;
+        ListenHooks.Token = "short-token";
+        try
+        {
+            using (ListenHost host = ListenHost.Start(ChainSource()))
+            {
+                string before = GetChain(host.Port);
+                string res = ReadAll(host.Port, PostBlock("{\"text\":\"x\"}", "Bearer short-token"));
+                Assert.StartsWith("HTTP/1.1 401 ", res);
+                Assert.Equal(before, GetChain(host.Port));
+            }
+        }
+        finally
+        {
+            ListenHooks.Reset();
+        }
+    }
+
+    [Fact]
     public void ApiTokenIsWriteSecretWhenBlockTokenUnset()
     {
         ListenHooks.Reset();

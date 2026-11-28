@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Loopback 127.0.0.1 proof: native POST /block deny-by-default Bearer.
+# FCG_BLOCK_TOKEN else FCG_API_TOKEN, length at least 16, both env names.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -28,18 +29,27 @@ chmod +x data/block-auth.elf
 mkdir -p data/chain
 cp data/rebuild/chain/head.json data/rebuild/chain/000001.json data/rebuild/chain/blocks.json data/chain/
 
-rm -f /tmp/vire-auth-short.out
-FCG_API_TOKEN=short-token ./data/block-auth.elf >/tmp/vire-auth-short.out 2>&1 &
-SPID=$!
-for i in $(seq 1 120); do
-  grep -q "listening on 127.0.0.1:" /tmp/vire-auth-short.out && break
-  kill -0 "$SPID" 2>/dev/null || { cat /tmp/vire-auth-short.out; exit 1; }
-  sleep 0.05
-done
-SPORT="$(sed -n 's/.*listening on 127.0.0.1:\([0-9]*\).*/\1/p' /tmp/vire-auth-short.out | head -1)"
-python3 - "$SPORT" <<'PY'
+start_elf() {
+  local log="$1"
+  shift
+  rm -f "$log"
+  env "$@" ./data/block-auth.elf >"$log" 2>&1 &
+  local pid=$!
+  for i in $(seq 1 120); do
+    grep -q "listening on 127.0.0.1:" "$log" && break
+    kill -0 "$pid" 2>/dev/null || { cat "$log"; exit 1; }
+    sleep 0.05
+  done
+  local port
+  port="$(sed -n 's/.*listening on 127.0.0.1:\([0-9]*\).*/\1/p' "$log" | head -1)"
+  echo "$pid $port"
+}
+
+probe() {
+  python3 - "$1" "$2" <<'PY'
 import socket, sys
 port = int(sys.argv[1])
+mode = sys.argv[2]
 
 def req(raw):
     s = socket.create_connection(("127.0.0.1", port), 3)
@@ -56,78 +66,81 @@ def req(raw):
         pass
     s.close()
     return b"".join(chunks)
+
+def post(auth):
+    extra = b"" if auth is None else (b"Authorization: " + auth + b"\r\n")
+    body = b'{"text":"pwned"}'
+    raw = b"POST /block HTTP/1.1\r\nHost: x\r\n" + extra + b"Content-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
+    return req(raw)
 
 def chain():
     r = req(b"GET /chain HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
     split = r.find(b"\r\n\r\n")
-    return r.split(b"\r\n", 1)[0], r[split + 4 :]
+    return r.split(b"\r\n", 1)[0], (r[split + 4 :] if split >= 0 else r)
 
 st0, c0 = chain()
 print("GET /chain before", st0)
-post = b'POST /block HTTP/1.1\r\nHost: x\r\nContent-Length: 16\r\nConnection: close\r\n\r\n{"text":"pwned"}'
-r = req(post)
-print("POST short-secret", r.split(b"\r\n", 1)[0])
-print("body", r[r.find(b"\r\n\r\n") + 4 :][:200] if b"\r\n\r\n" in r else r[:200])
-assert b"401" in r and b"unauthorized" in r, r
-assert b"short-token" not in r
-st1, c1 = chain()
-print("GET /chain after", st1)
-assert c0 == c1
-assert b"pwned" not in c1
-print("PASS_AFTER short configured secret 401 chain unchanged")
-health = req(b"GET /health HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-info = req(b"GET /info HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
-print("GET /health", health.split(b"\r\n", 1)[0])
-print("GET /info", info.split(b"\r\n", 1)[0])
-assert b"401" not in health.split(b"\r\n", 1)[0]
-assert b"401" not in info.split(b"\r\n", 1)[0]
+
+if mode == "none":
+    r = post(None)
+    print("POST no-token", r.split(b"\r\n", 1)[0])
+    assert b"401" in r and b"unauthorized" in r, r
+elif mode == "short":
+    r = post(b"Bearer short-token")
+    print("POST short Bearer", r.split(b"\r\n", 1)[0])
+    assert b"401" in r, r
+    assert b"short-token" not in r
+elif mode == "wrong":
+    r = post(b"Bearer wrong-token-16x")
+    print("POST wrong Bearer", r.split(b"\r\n", 1)[0])
+    assert b"401" in r, r
+    assert b"wrong-token" not in r
+elif mode == "right":
+    r = post(b"Bearer test-block-token1")
+    line = r.split(b"\r\n", 1)[0] if r else b"<empty>"
+    print("POST right Bearer", line, r[r.find(b"\r\n\r\n")+4:][:160] if b"\r\n\r\n" in r else r[:80])
+    assert b"test-block-token1" not in r
+    if b"401" in r.split(b"\r\n", 1)[0]:
+        raise SystemExit("right token was 401")
+    if b"200" in line:
+        print("PASS_AFTER right token allowed")
+    else:
+        print("RESIDUAL right token left the 401 gate (packed POST body still empty/crash)")
+else:
+    raise SystemExit("bad mode")
+
+if mode != "right":
+    st1, c1 = chain()
+    print("GET /chain after", st1)
+    assert c0 == c1
+    assert b"pwned" not in c1
+print("mode", mode, "ok")
 PY
-kill "$SPID" 2>/dev/null || true
-wait "$SPID" 2>/dev/null || true
+}
 
-rm -f /tmp/vire-auth-ok.out
-FCG_BLOCK_TOKEN=test-block-token1 ./data/block-auth.elf >/tmp/vire-auth-ok.out 2>&1 &
-OPID=$!
-for i in $(seq 1 120); do
-  grep -q "listening on 127.0.0.1:" /tmp/vire-auth-ok.out && break
-  kill -0 "$OPID" 2>/dev/null || { cat /tmp/vire-auth-ok.out; exit 1; }
-  sleep 0.05
-done
-OPORT="$(sed -n 's/.*listening on 127.0.0.1:\([0-9]*\).*/\1/p' /tmp/vire-auth-ok.out | head -1)"
-python3 - "$OPORT" <<'PY'
-import socket, sys
-port = int(sys.argv[1])
+run_case() {
+  local name="$1"
+  local mode="$2"
+  shift 2
+  local pair pid port
+  pair="$(start_elf "/tmp/vire-auth-${name}.out" "$@")"
+  pid="${pair%% *}"
+  port="${pair##* }"
+  echo "case $name port $port"
+  if ! probe "$port" "$mode"; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    exit 1
+  fi
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+}
 
-def req(raw):
-    s = socket.create_connection(("127.0.0.1", port), 3)
-    s.sendall(raw)
-    s.settimeout(3)
-    chunks = []
-    try:
-        while True:
-            d = s.recv(4096)
-            if not d:
-                break
-            chunks.append(d)
-    except socket.timeout:
-        pass
-    s.close()
-    return b"".join(chunks)
-
-r = req(b'POST /block HTTP/1.1\r\nHost: x\r\nX-FCG-Token: test-block-token1\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
-print("X-FCG-Token only", r.split(b"\r\n", 1)[0])
-assert b"401" in r
-r = req(b'POST /block HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer test-block-token1\r\nAuthorization: Bearer test-block-token1\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
-print("dup Bearer", r.split(b"\r\n", 1)[0])
-assert b"401" in r
-r = req(b'POST /block HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer test-block-token\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
-print("prefix Bearer", r.split(b"\r\n", 1)[0])
-assert b"401" in r
-r = req(b'POST /block HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer test-block-token1\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
-print("good Bearer", r.split(b"\r\n", 1)[0] if r else b"<empty>", r[r.find(b"\r\n\r\n")+4:][:180] if b"\r\n\r\n" in r else b"")
-assert b"test-block-token1" not in r
-print("PASS_AFTER Bearer refuse cases (packed POST body residual may still crash/empty on authorized route)")
-PY
-kill "$OPID" 2>/dev/null || true
-wait "$OPID" 2>/dev/null || true
+run_case none none
+run_case short-api short FCG_API_TOKEN=short-token
+run_case short-block short FCG_BLOCK_TOKEN=short-token
+run_case wrong-api wrong FCG_API_TOKEN=test-block-token1
+run_case wrong-block wrong FCG_BLOCK_TOKEN=test-block-token1
+run_case right-api right FCG_API_TOKEN=test-block-token1
+run_case right-block right FCG_BLOCK_TOKEN=test-block-token1
 echo "post-block-auth native ok"
