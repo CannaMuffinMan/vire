@@ -25,4 +25,5 @@ Every row has a `TODO(VIRE-FINISH-NOW):` marker in the named file. Every such ma
 | src/rt-crypto.vire | sha256_bytes | Wire guest SHA-256 pad+compress+IV into this wrapper instead of digest | medium | rt-crypto |
 | Vire.cs | Builtin serve | Drop the serve name from Builtins once guests no longer call it | low | host-cs |
 | Compiled.cs | Builtin serve | Drop the serve name once guests no longer call it | low | host-cs |
-| VireApk.cs | VireApk.Pack | Expose Pack as a guest builtin only if APK from .vire is still a product goal | low | host-cs |
+
+Closed 2026-11-28: `VireApk.Pack` stays host-only. APK from `.vire` is not a product (`docs/history.md` Do not resume). No guest builtin. Missing Android SDK/NDK is a named env failure (`ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`, `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`), not a silent pass. Residual: no signed `data/app.apk` or aarch64 `.so` on this Linux agent (SDK/NDK absent). `windows/vire.windows.csproj` still omits `VireApk.cs` (separate row).

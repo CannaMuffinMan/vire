@@ -1,5 +1,9 @@
 # Changelog
 
+## VireApk host-only close (this branch)
+
+- `VireApk.Pack` is not a guest builtin. APK packing is not a Vire product. SDK lookup honors `ANDROID_SDK_ROOT` / `ANDROID_HOME` before `D:\\Android`. NDK lookup honors `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT` before SDK/`D:\\Android`. Missing tools name those env vars. `ApkTests` / `AndroidSoTests` fail closed without tools and fail the success path with that named env instead of passing. Caps unchanged.
+
 ## Tests/docs dead-code cleanup (this branch)
 
 - Root emit/compile probe programs (`probe-*.vire`), unused `dump-net-extras.vire`, superseded `make-hello.vire`, and unreferenced `guest-empty.vire` removed. Live guests, samples, and xUnit fixtures were not deleted.
