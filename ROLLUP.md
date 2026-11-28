@@ -18,6 +18,7 @@ This branch is not a merge unit. Land the source PRs, then this rollup only as a
 | #149 | `16f7f4f8` (`cursor/windows-tls-0630`) | first merge `ed926c6a`, then re-merged `16f7f4f8` (no PersistKeySet on ephemeral PFX). Clean both times. |
 | #150 | `8f460c49` (`cursor/pe-dns-json-chain-567f`) | conflict `tools/couchstation-windows-all.ps1`. Kept `native-forms`. Dropped MZ-only proxy block. Writes `data/couchstation-windows-all-results.md`. |
 | #151 | `36d2e644` (`cursor/native-405-proxy-ws-33ca`) | conflict `docs/FINISH-LIST.md` only. Packed blobs did not conflict in git. See below. |
+| #152 | `d1d72b4a` (`cursor/vireapk-finish-e5fe`) | clean. Closes `VireApk.Pack` FINISH-LIST row. No guest builtin. |
 
 ## Packed rt-net / listen blobs (#150 vs #151)
 
@@ -66,3 +67,14 @@ dotnet test tests/Vire.Tests/Vire.Tests.csproj -c Release --nologo
 ```
 
 Caps stay arena 33554432, list 100000, steps 5000000, itemCap 1e6.
+
+## Env-only xUnit failures (this Linux agent)
+
+Do not skip or xfail these. They fail closed when tools are missing.
+
+- `DriverImageTests.LinkedDriverImageIsPe` (`the C compiler is not installed`)
+- `ToolchainTests.BuildCompilesCAndroidAndDriver` (`ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`)
+- `ApkTests.PackWritesApkWithManifest` (`ANDROID_SDK_ROOT` / `ANDROID_HOME` / `JAVA_HOME`)
+- `AndroidSoTests.AndroidBuildEmitsElfSharedLibrary` (`ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`)
+
+Machines with SDK/NDK and a C compiler must pass those tests. Linux ELF is not Windows PE proof. GitHub Actions billing-lock is ignored.
