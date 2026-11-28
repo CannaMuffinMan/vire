@@ -1065,6 +1065,16 @@ sealed class CompiledMachine
             if (args.Count != 1) throw new VireError("tls_close takes 1 values, got " + args.Count, line, col);
             return VireTls.CloseHandle(args[0], tcp, line, col);
         }
+        if (name == "tls_peer_cert")
+        {
+            if (args.Count != 1) throw new VireError("tls_peer_cert takes 1 values, got " + args.Count, line, col);
+            return VireTls.PeerCert(args[0], tcp, line, col);
+        }
+        if (name == "tls_end_point")
+        {
+            if (args.Count != 1) throw new VireError("tls_end_point takes 1 values, got " + args.Count, line, col);
+            return VireTls.EndPoint(args[0], line, col);
+        }
         if (name == "line")
         {
             string text = args[0] as string;

@@ -1,41 +1,42 @@
 ~ Native TLS: Linux OpenSSL 3 via PT_INTERP/libssl.so.3. Windows PE SChannel
 ~ (secur32/crypt32 IAT). Guest APIs:
 ~ tls_connect host port name ca; tls_wrap handle name ca checkHost;
-~ tls_listen port cert key; tls_send/recv/close.
+~ tls_listen port cert key; tls_send/recv/close; tls_peer_cert handle;
+~ tls_end_point der (RFC 5929 tls-server-end-point).
 ~ Cert validation on. TLS 1.2 minimum, TLS 1.3 max. No insecure flags.
 ~ ELF tls_listen: PEM cert/key under data/ or site/, then rt_listen + SSL_accept.
 ~ PE tls_listen: sandboxed PFX + SChannel AcceptSecurityContext.
 
 define tlsSymNames
-  return ["TLS_client_method", "TLS_server_method", "SSL_CTX_new", "SSL_CTX_free", "SSL_CTX_set_verify", "SSL_CTX_ctrl", "SSL_CTX_load_verify_locations", "SSL_CTX_set_default_verify_paths", "SSL_CTX_use_certificate_file", "SSL_CTX_use_PrivateKey_file", "SSL_CTX_check_private_key", "SSL_new", "SSL_free", "SSL_set_fd", "SSL_connect", "SSL_accept", "SSL_read", "SSL_write", "SSL_shutdown", "SSL_get_verify_result", "SSL_set1_host", "SSL_CTX_set_options", "OpenSSL_version_num"]
+  return ["TLS_client_method", "TLS_server_method", "SSL_CTX_new", "SSL_CTX_free", "SSL_CTX_set_verify", "SSL_CTX_ctrl", "SSL_CTX_load_verify_locations", "SSL_CTX_set_default_verify_paths", "SSL_CTX_use_certificate_file", "SSL_CTX_use_PrivateKey_file", "SSL_CTX_check_private_key", "SSL_new", "SSL_free", "SSL_set_fd", "SSL_connect", "SSL_accept", "SSL_read", "SSL_write", "SSL_shutdown", "SSL_get_verify_result", "SSL_set1_host", "SSL_CTX_set_options", "OpenSSL_version_num", "SSL_get1_peer_certificate", "i2d_X509", "X509_free"]
 end
 
 define tlsIatNames
-  return ["iat_tcm", "iat_tsm", "iat_ctxnew", "iat_ctxfree", "iat_setver", "iat_ctrl", "iat_loadca", "iat_defca", "iat_usecert", "iat_usekey", "iat_chkkey", "iat_sslnew", "iat_sslfree", "iat_setfd", "iat_sslcon", "iat_sslacc", "iat_sslrd", "iat_sslwr", "iat_sslshut", "iat_vfyres", "iat_sethost", "iat_setopt", "iat_vernum"]
+  return ["iat_tcm", "iat_tsm", "iat_ctxnew", "iat_ctxfree", "iat_setver", "iat_ctrl", "iat_loadca", "iat_defca", "iat_usecert", "iat_usekey", "iat_chkkey", "iat_sslnew", "iat_sslfree", "iat_setfd", "iat_sslcon", "iat_sslacc", "iat_sslrd", "iat_sslwr", "iat_sslshut", "iat_vfyres", "iat_sethost", "iat_setopt", "iat_vernum", "iat_peer", "iat_i2d", "iat_xfree"]
 end
 
 define tlsStubNames
-  return ["stub_tcm", "stub_tsm", "stub_ctxnew", "stub_ctxfree", "stub_setver", "stub_ctrl", "stub_loadca", "stub_defca", "stub_usecert", "stub_usekey", "stub_chkkey", "stub_sslnew", "stub_sslfree", "stub_setfd", "stub_sslcon", "stub_sslacc", "stub_sslrd", "stub_sslwr", "stub_sslshut", "stub_vfyres", "stub_sethost", "stub_setopt", "stub_vernum"]
+  return ["stub_tcm", "stub_tsm", "stub_ctxnew", "stub_ctxfree", "stub_setver", "stub_ctrl", "stub_loadca", "stub_defca", "stub_usecert", "stub_usekey", "stub_chkkey", "stub_sslnew", "stub_sslfree", "stub_setfd", "stub_sslcon", "stub_sslacc", "stub_sslrd", "stub_sslwr", "stub_sslshut", "stub_vfyres", "stub_sethost", "stub_setopt", "stub_vernum", "stub_peer", "stub_i2d", "stub_xfree"]
 end
 
 define tlsThunkNames
-  return ["thunk_tcm", "thunk_tsm", "thunk_ctxnew", "thunk_ctxfree", "thunk_setver", "thunk_ctrl", "thunk_loadca", "thunk_defca", "thunk_usecert", "thunk_usekey", "thunk_chkkey", "thunk_sslnew", "thunk_sslfree", "thunk_setfd", "thunk_sslcon", "thunk_sslacc", "thunk_sslrd", "thunk_sslwr", "thunk_sslshut", "thunk_vfyres", "thunk_sethost", "thunk_setopt", "thunk_vernum"]
+  return ["thunk_tcm", "thunk_tsm", "thunk_ctxnew", "thunk_ctxfree", "thunk_setver", "thunk_ctrl", "thunk_loadca", "thunk_defca", "thunk_usecert", "thunk_usekey", "thunk_chkkey", "thunk_sslnew", "thunk_sslfree", "thunk_setfd", "thunk_sslcon", "thunk_sslacc", "thunk_sslrd", "thunk_sslwr", "thunk_sslshut", "thunk_vfyres", "thunk_sethost", "thunk_setopt", "thunk_vernum", "thunk_peer", "thunk_i2d", "thunk_xfree"]
 end
 
 define tlsPltNames
-  return ["plt_tcm", "plt_tsm", "plt_ctxnew", "plt_ctxfree", "plt_setver", "plt_ctrl", "plt_loadca", "plt_defca", "plt_usecert", "plt_usekey", "plt_chkkey", "plt_sslnew", "plt_sslfree", "plt_setfd", "plt_sslcon", "plt_sslacc", "plt_sslrd", "plt_sslwr", "plt_sslshut", "plt_vfyres", "plt_sethost", "plt_setopt", "plt_vernum"]
+  return ["plt_tcm", "plt_tsm", "plt_ctxnew", "plt_ctxfree", "plt_setver", "plt_ctrl", "plt_loadca", "plt_defca", "plt_usecert", "plt_usekey", "plt_chkkey", "plt_sslnew", "plt_sslfree", "plt_setfd", "plt_sslcon", "plt_sslacc", "plt_sslrd", "plt_sslwr", "plt_sslshut", "plt_vfyres", "plt_sethost", "plt_setopt", "plt_vernum", "plt_peer", "plt_i2d", "plt_xfree"]
 end
 
 define tlsGotNames
-  return ["got_tcm", "got_tsm", "got_ctxnew", "got_ctxfree", "got_setver", "got_ctrl", "got_loadca", "got_defca", "got_usecert", "got_usekey", "got_chkkey", "got_sslnew", "got_sslfree", "got_setfd", "got_sslcon", "got_sslacc", "got_sslrd", "got_sslwr", "got_sslshut", "got_vfyres", "got_sethost", "got_setopt", "got_vernum"]
+  return ["got_tcm", "got_tsm", "got_ctxnew", "got_ctxfree", "got_setver", "got_ctrl", "got_loadca", "got_defca", "got_usecert", "got_usekey", "got_chkkey", "got_sslnew", "got_sslfree", "got_setfd", "got_sslcon", "got_sslacc", "got_sslrd", "got_sslwr", "got_sslshut", "got_vfyres", "got_sethost", "got_setopt", "got_vernum", "got_peer", "got_i2d", "got_xfree"]
 end
 
 define tlsHashBuckets
-  return [0, 0, 0, 8, 20, 18, 0, 0, 0, 11, 0, 0, 6, 0, 19, 0, 0, 0, 0, 22, 21, 13, 0, 12, 0, 5, 0, 0, 0, 23, 0, 0]
+  return [0, 0, 0, 8, 20, 18, 0, 0, 0, 11, 0, 0, 6, 0, 19, 0, 0, 0, 0, 22, 21, 26, 0, 12, 0, 25, 0, 0, 0, 23, 0, 0]
 end
 
 define tlsHashChains
-  return [0, 0, 1, 0, 0, 0, 0, 0, 7, 4, 0, 0, 3, 9, 0, 2, 15, 16, 10, 0, 14, 17, 0, 0]
+  return [0, 0, 1, 0, 0, 0, 0, 0, 7, 4, 0, 0, 3, 9, 0, 2, 15, 16, 10, 0, 14, 17, 0, 0, 13, 5, 24]
 end
 
 define emitTlsPltAndMeta with image, fixes, labels
@@ -72,7 +73,7 @@ define emitTlsPltAndMeta with image, fixes, labels
   let image be alignTo with image, 8
   pin with labels, "tls_hash", image
   let image be emitU32 with image, 32
-  let image be emitU32 with image, 24
+  let image be emitU32 with image, 27
   let b be tlsHashBuckets
   let i be 0
   while i < 32
@@ -81,7 +82,7 @@ define emitTlsPltAndMeta with image, fixes, labels
   end
   let c be tlsHashChains
   let i be 0
-  while i < 24
+  while i < 27
     let image be emitU32 with image, (c at i)
     let i be i + 1
   end
@@ -572,6 +573,52 @@ define emitTlsGuest with image, fixes, labels
   emitFail with image, fixes, "msg_tls_listen"
   pin with labels, "tls_cert_fail", image
   emitFail with image, fixes, "msg_tls_cert"
+
+  pin with labels, "rt_tls_peer_cert", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 139, 13]
+  emitRel with image, fixes, "tls_ssl"
+  emitList with image, [72, 133, 201, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  let image be emitIat with image, fixes, "iat_peer"
+  emitList with image, [72, 133, 192, 15, 132]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 137, 69, 240, 72, 137, 193, 49, 210]
+  let image be emitIat with image, fixes, "iat_i2d"
+  emitList with image, [133, 192, 15, 142]
+  emitRel with image, fixes, "tls_peer_free"
+  emitList with image, [72, 99, 200, 72, 131, 193, 16]
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232, 72, 141, 80, 8, 72, 137, 85, 224, 72, 139, 77, 240, 72, 141, 85, 224]
+  let image be emitIat with image, fixes, "iat_i2d"
+  emitList with image, [72, 139, 77, 240]
+  let image be emitIat with image, fixes, "iat_xfree"
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_peer_free", image
+  emitList with image, [72, 139, 77, 240]
+  let image be emitIat with image, fixes, "iat_xfree"
+  pin with labels, "tls_peer_bad", image
+  emitFail with image, fixes, "msg_tls_peer"
+
+  pin with labels, "rt_tls_end_point", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_peer_bad"
+  emitList with image, [72, 137, 85, 248, 72, 139, 10, 72, 137, 77, 240]
+  emitList with image, [185]
+  emitU32 with image, 48
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 131, 193, 8, 72, 139, 85, 240, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 2
+  emitEpi with image
   return image
 end
 
@@ -595,7 +642,28 @@ define emitTlsRuntime with image, fixes, labels, elf
     let image be emitTlsGuest with image, fixes, labels
     return image
   end
-  return (emitTlsPeGuest with image, fixes, labels)
+  let image be emitTlsPeGuest with image, fixes, labels
+  pin with labels, "rt_tls_peer_cert", image
+  emitPro with image
+  emitFail with image, fixes, "msg_tls_peer"
+  pin with labels, "rt_tls_end_point", image
+  emitPro with image
+  emitPop1 with image
+  emitList with image, [72, 131, 248, 2, 15, 133]
+  emitRel with image, fixes, "tls_pe_end_bad"
+  emitList with image, [72, 137, 85, 248, 72, 139, 10, 72, 137, 77, 240]
+  emitList with image, [185]
+  emitU32 with image, 48
+  emitCallTo with image, fixes, "rt_alloc"
+  emitLeaf with image
+  emitList with image, [72, 137, 69, 232, 72, 139, 77, 248, 72, 131, 193, 8, 72, 139, 85, 240, 76, 141, 64, 8]
+  emitCallTo with image, fixes, "rt_sha256"
+  emitList with image, [72, 139, 85, 232]
+  emitPushTag with image, 2
+  emitEpi with image
+  pin with labels, "tls_pe_end_bad", image
+  emitFail with image, fixes, "msg_tls_peer"
+  return image
 end
 
 define parkTls with image, labels
@@ -607,6 +675,7 @@ define parkTls with image, labels
   parkMsg with image, labels, "msg_tls_listen", "tls_listen needs a certificate file and a key file"
   parkMsg with image, labels, "msg_tls_cert", "could not load that tls certificate"
   parkMsg with image, labels, "msg_tls_ver", "openssl must be 3.0 or newer"
+  parkMsg with image, labels, "msg_tls_peer", "tls_peer_cert needs a tls connection"
   pin with labels, "txt_unisp", image
   let image be emitStr with image, "Microsoft Unified Security Protocol Provider"
   let image be alignTo with image, 8

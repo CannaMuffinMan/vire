@@ -19,6 +19,8 @@ public class PgTests
         Assert.Contains("verify-full", lib);
         Assert.Contains("pg_open_ssl", lib);
         Assert.Contains("tls_wrap", lib);
+        Assert.Contains("tls_peer_cert", lib);
+        Assert.Contains("tls_end_point", lib);
         Assert.Contains("pg_open", lib);
         Assert.Contains("pg_query", lib);
         Assert.Contains("pg_exec_param", lib);

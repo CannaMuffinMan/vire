@@ -57,6 +57,9 @@ public class TlsTests
         string native = File.ReadAllText(Path.Combine(root, "compile-native.vire"));
         Assert.Contains("tls_connect", native);
         Assert.Contains("tls_wrap", native);
+        Assert.Contains("tls_peer_cert", native);
+        Assert.Contains("tls_end_point", native);
+        Assert.Contains("rt_tls_peer_cert", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("rt_tls_connect", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("rt_tls_wrap", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));
         Assert.Contains("rt_tls_listen", File.ReadAllText(Path.Combine(root, "src", "rt-tls.vire")));

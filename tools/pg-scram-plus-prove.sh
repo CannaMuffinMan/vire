@@ -37,6 +37,11 @@ if ! grep -Fq 'TODO(VIRE-FINISH-NOW): guest SCRAM-SHA-256-PLUS' "$pin_src"; then
 fi
 echo "FAIL_BEFORE at $PIN: SCRAM-SHA-256-PLUS unsupported; client-final c=biws; SASL init never -PLUS"
 echo "FAIL_BEFORE at $PIN: TLS plus=1 scram=1 haveBind=0 would send n,, (RFC 5802 channel-binding stripping)"
+if grep -Fq 'tls_peer_cert' "$pin_src"; then
+  echo "FAIL_BEFORE unexpected tls_peer_cert at $PIN" >&2
+  exit 1
+fi
+echo "FAIL_BEFORE at $PIN: no handshake leaf export; PLUS needed a user-supplied PEM"
 
 cleanup_pin
 trap - EXIT
@@ -79,6 +84,10 @@ if grep -Fq 'if haveBind != 1' "$ROOT/src/rt-pg.vire"; then
   echo "PASS_AFTER unexpected TLS downgrade branch in pg_scram_select" >&2
   exit 1
 fi
-echo "PASS_AFTER at $(git rev-parse HEAD) RFC7677 c= binding, PLUS refuse, tls plus no bind fail-closed"
+if ! grep -Fq 'tls_peer_cert' "$ROOT/src/rt-pg.vire"; then
+  echo "PASS_AFTER missing tls_peer_cert in pg_open_ssl" >&2
+  exit 1
+fi
+echo "PASS_AFTER at $(git rev-parse HEAD) RFC7677 c= binding, PLUS refuse, tls plus no bind fail-closed, handshake leaf cbind"
 echo "loopback_only 127.0.0.1 (xUnit PgScramPlusTests)"
 echo "caps arena 33554432 list 100000 steps 5000000 itemCap 1e6"
